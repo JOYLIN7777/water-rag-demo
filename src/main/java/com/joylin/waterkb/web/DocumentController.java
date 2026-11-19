@@ -1,8 +1,10 @@
 package com.joylin.waterkb.web;
 
 import com.joylin.waterkb.rag.DocumentIngestService;
+import com.joylin.waterkb.rag.VectorStoreAdminRepository;
 import com.joylin.waterkb.web.dto.UploadResult;
 import org.springframework.http.MediaType;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -24,9 +26,11 @@ import java.util.Set;
 public class DocumentController {
 
     private final DocumentIngestService ingestService;
+    private final VectorStoreAdminRepository adminRepository;
 
-    public DocumentController(DocumentIngestService ingestService) {
+    public DocumentController(DocumentIngestService ingestService, VectorStoreAdminRepository adminRepository) {
         this.ingestService = ingestService;
+        this.adminRepository = adminRepository;
     }
 
     /**
@@ -50,6 +54,26 @@ public class DocumentController {
     public Map<String, Object> formats() {
         List<String> list = DocumentIngestService.getSupportedExtensions().stream().sorted().toList();
         return Map.of("extensions", list, "count", list.size());
+    }
+
+    /**
+     * 知识库文档清单（按文件名聚合：切片数、最近上传时间）。
+     */
+    @GetMapping(value = "/list", produces = MediaType.APPLICATION_JSON_VALUE)
+    public List<Map<String, Object>> list() {
+        return adminRepository.listDocuments();
+    }
+
+    /**
+     * 删除单个知识文档（按文件名删除其全部切片）。
+     */
+    @DeleteMapping
+    public Map<String, Object> delete(@RequestParam String fileName) {
+        int deleted = adminRepository.deleteByFileName(fileName);
+        if (deleted == 0) {
+            throw new IllegalArgumentException("知识库中不存在文档：" + fileName);
+        }
+        return Map.of("fileName", fileName, "deletedChunks", deleted);
     }
 
     private String extension(String name) {

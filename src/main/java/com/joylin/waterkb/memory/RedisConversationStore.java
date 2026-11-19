@@ -59,7 +59,10 @@ public class RedisConversationStore {
             redis.opsForList().rightPush(key, objectMapper.writeValueAsString(msg));
             // 只保留最近 N 条，防止长会话无限制增长
             redis.opsForList().trim(key, -props.getHistoryMaxEntries(), -1);
-            redis.expire(key, Duration.ofHours(props.getHistoryTtlHours()));
+            // ttlHours <= 0 表示永久保存（不设置过期）；> 0 则每次对话刷新过期时间
+            if (props.getHistoryTtlHours() > 0) {
+                redis.expire(key, Duration.ofHours(props.getHistoryTtlHours()));
+            }
         } catch (Exception e) {
             // 历史写入失败不影响主问答流程，降级为"无上下文继续"
             log.warn("对话历史写入 Redis 失败（不影响本次回答）", e);

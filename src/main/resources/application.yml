@@ -67,9 +67,9 @@ rag:
   chunk-overlap: 100
   # 拼入 Prompt 的历史对话轮数
   history-max-turns: 6
-  # Redis 历史最多保留条数与过期时间
+  # Redis 历史最多保留条数与过期时间（hours 为 0 表示永久保存，不设置过期）
   history-max-entries: 40
-  history-ttl-hours: 24
+  history-ttl-hours: 0
   # 流式回答整体超时（秒）
   stream-timeout-seconds: 60
   # 熔断：连续失败 N 次后打开熔断，M 秒内直接降级不再请求大模型

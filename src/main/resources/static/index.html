@@ -35,7 +35,18 @@
   .drop-icon{font-size:22px;color:#60a5fa;line-height:1}
   .drop-text{font-size:12.5px;color:#4b5563;margin-top:7px}
   .drop-formats{font-size:10px;color:#9ca3af;margin-top:5px;line-height:1.5;word-break:break-all}
-  .upload-msg{font-size:11.5px;color:#059669;margin-top:8px;padding:0 4px}
+  .upload-msg{font-size:11.5px;margin-top:8px;padding:6px 8px;border-radius:6px;line-height:1.5;word-break:break-all}
+  .upload-msg.ok{background:#ecfdf5;color:#047857;border:1px solid #a7f3d0}
+  .upload-msg.err{background:#fef2f2;color:#b91c1c;border:1px solid #fecaca}
+  .doc-list{margin-top:10px;max-height:150px;overflow-y:auto}
+  .doc-item{display:flex;align-items:center;gap:6px;padding:6px 8px;border-radius:6px;font-size:12px;color:#374151}
+  .doc-item:hover{background:#f3f4f6}
+  .doc-name{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .doc-meta{font-size:10px;color:#9ca3af;flex:0 0 auto}
+  .doc-delete{border:0;background:transparent;color:#9ca3af;font-size:14px;opacity:0;padding:0 2px;line-height:1}
+  .doc-item:hover .doc-delete{opacity:1}
+  .doc-delete:hover{color:#dc2626}
+  .doc-empty{font-size:11px;color:#cbd5e1;text-align:center;padding:8px 0}
   .sidebar-footer{font-size:10px;color:#cbd5e1;text-align:center;margin-top:14px}
   .main{flex:1;display:flex;flex-direction:column;min-width:0}
   .topbar{height:58px;flex:0 0 58px;background:#fff;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;padding:0 24px}
@@ -85,6 +96,10 @@
   .md-body p{margin:0 0 10px}.md-body p:last-child{margin-bottom:0}
   .md-body ul,.md-body ol{margin:6px 0 10px;padding-left:22px}
   .md-body code{background:#f1f5f9;padding:1px 5px;border-radius:4px;font-size:.9em}
+  .md-body table{border-collapse:collapse;margin:10px 0;font-size:.92em;max-width:100%}
+  .md-body th,.md-body td{border:1px solid #d1d5db;padding:5px 10px;text-align:left}
+  .md-body th{background:#f3f4f6;font-weight:600}
+  .md-body hr{border:0;border-top:1px solid #e5e7eb;margin:12px 0}
   .md-body pre{background:#0f172a;color:#e2e8f0;padding:12px 14px;border-radius:8px;overflow-x:auto}
   .md-body pre code{background:transparent;padding:0;color:inherit}
   ::-webkit-scrollbar{width:8px;height:8px}
@@ -109,7 +124,8 @@
         <div class="drop-text" id="dropText">点击或拖拽上传文档</div>
         <div class="drop-formats" id="dropFormats">txt / md / pdf / doc / docx / xls / xlsx / csv...</div>
       </div>
-      <div class="upload-msg" id="uploadMsg"></div>
+      <div class="upload-msg" id="uploadMsg" style="display:none"></div>
+      <div class="doc-list" id="docList"></div>
       <input type="file" id="fileInput" hidden>
     </div>
     <div class="sidebar-footer">Spring Boot 3.4 · Spring AI · pgvector</div>
@@ -189,12 +205,38 @@ function renderSessions(){
 function escapeHtml(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 function renderMarkdown(text){
   let h=escapeHtml(text);
-  h=h.replace(/```([\s\S]*?)```/g,(m,code)=>'<pre><code>'+code.replace(/^\n/,'')+'</code></pre>');
+  // 代码块先抽出占位，避免内部符号被后续规则误伤
+  const codeBlocks=[];
+  h=h.replace(/```([\s\S]*?)```/g,(m,code)=>{
+    codeBlocks.push('<pre><code>'+code.replace(/^\n/,'')+'</code></pre>');
+    return '\u0000CB'+(codeBlocks.length-1)+'\u0000';
+  });
   h=h.replace(/`([^`\n]+)`/g,'<code>$1</code>');
-  h=h.replace(/^### (.+)$/gm,'<h3>$1</h3>').replace(/^## (.+)$/gm,'<h2>$1</h2>').replace(/^# (.+)$/gm,'<h1>$1</h1>');
+  // GFM 表格：连续以 | 开头的行块，第二行必须是 |---|---| 分隔行
+  h=h.replace(/(?:^\|.*\r?\n)+/gm,block=>{
+    const rows=block.trim().split(/\r?\n/).map(r=>r.trim());
+    if(rows.length<2||!/^\|[\s:|-]+\|?$/.test(rows[1]))return block;
+    const cells=r=>r.replace(/^\|/,'').replace(/\|$/,'').split('|').map(c=>c.trim());
+    let out='<table>';
+    rows.forEach((r,i)=>{
+      if(i===1)return; // 跳过分隔行
+      const tag=i===0?'th':'td';
+      out+='<tr>'+cells(r).map(c=>'<'+tag+'>'+c+'</'+tag+'>').join('')+'</tr>';
+    });
+    return out+'</table>';
+  });
+  // 标题：允许 ### 后无空格（大模型常输出"###一、"）
+  h=h.replace(/^####\s*(.+)$/gm,'<h4>$1</h4>')
+     .replace(/^###\s*(.+)$/gm,'<h3>$1</h3>')
+     .replace(/^##\s*(.+)$/gm,'<h2>$1</h2>')
+     .replace(/^#\s*(.+)$/gm,'<h1>$1</h1>');
+  // 分隔线
+  h=h.replace(/^---+\s*$/gm,'<hr>');
   h=h.replace(/\*\*([^*]+)\*\*/g,'<strong>$1</strong>');
   h=h.replace(/^[-*] (.+)$/gm,'<li>$1</li>');
   h=h.replace(/(<li>.*<\/li>\n?)+/g,m=>'<ul>'+m+'</ul>');
+  // 代码块占位还原要在 <br> 替换之前，避免 pre 内换行被改成 <br>
+  h=h.replace(/\u0000CB(\d+)\u0000/g,(m,i)=>codeBlocks[i]);
   h=h.replace(/\n/g,'<br>');
   return '<div class="md-body">'+h+'</div>';
 }
@@ -301,20 +343,61 @@ document.getElementById('fileInput').onchange=e=>{uploadFile(e.target.files[0]);
 async function uploadFile(file){
   if(!file)return;
   const msg=document.getElementById('uploadMsg');
+  msg.className='upload-msg';msg.style.display='block';
   msg.textContent='正在解析 '+file.name+' ...';
   const fd=new FormData();fd.append('file',file);
+  const started=Date.now();
   try{
     const r=await fetch('/api/docs/upload',{method:'POST',body:fd});
     const j=await r.json();
     if(!r.ok)throw new Error(j.message||'上传失败');
-    msg.textContent='✓ '+file.name+' 已入库（'+j.chunks+' 个切片，'+j.chars+' 字）';
-  }catch(e){msg.textContent='✗ '+e.message}
-  setTimeout(()=>{msg.textContent=''},6000);
+    const secs=((Date.now()-started)/1000).toFixed(1);
+    // 完成提示持久显示（不自动消失），上传下一个文件时才被替换
+    msg.className='upload-msg ok';
+    msg.textContent='✓ 解析完成：'+file.name+' 共 '+j.chunks+' 个切片（'+j.chars+' 字），耗时 '+secs+' 秒，已可提问';
+    loadDocs();
+  }catch(e){
+    msg.className='upload-msg err';
+    msg.textContent='✗ '+file.name+' 入库失败：'+e.message;
+  }
+}
+// ===== 知识库文档清单（列表 + 删除）=====
+async function loadDocs(){
+  const el=document.getElementById('docList');
+  try{
+    const list=await (await fetch('/api/docs/list')).json();
+    el.innerHTML='';
+    if(!list.length){el.innerHTML='<div class="doc-empty">知识库暂无文档，先上传一份吧</div>';return}
+    list.forEach(d=>{
+      const item=document.createElement('div');
+      item.className='doc-item';
+      item.innerHTML='<span class="doc-name" title="'+escapeHtml(d.fileName)+'">'+escapeHtml(d.fileName)+'</span>'+
+        '<span class="doc-meta">'+d.chunks+'片</span>'+
+        '<button class="doc-delete" title="从知识库删除该文档">×</button>';
+      item.querySelector('.doc-delete').onclick=()=>{
+        if(!confirm('确定从知识库删除「'+d.fileName+'」（'+d.chunks+' 个切片）吗？'))return;
+        fetch('/api/docs?fileName='+encodeURIComponent(d.fileName),{method:'DELETE'})
+          .then(r=>r.json()).then(j=>{
+            if(!j.deletedChunks&&j.deletedChunks!==0)throw new Error(j.message||'删除失败');
+            loadDocs();
+            const msg=document.getElementById('uploadMsg');
+            msg.className='upload-msg ok';msg.style.display='block';
+            msg.textContent='✓ 已删除「'+d.fileName+'」（'+j.deletedChunks+' 个切片）';
+          }).catch(e=>{
+            const msg=document.getElementById('uploadMsg');
+            msg.className='upload-msg err';msg.style.display='block';
+            msg.textContent='✗ 删除失败：'+e.message;
+          });
+      };
+      el.appendChild(item);
+    });
+  }catch(e){el.innerHTML='<div class="doc-empty">文档列表加载失败</div>'}
 }
 fetch('/api/docs/formats').then(r=>r.json()).then(d=>{
   document.getElementById('dropFormats').textContent=d.extensions.join(' / ');
 }).catch(()=>{});
 loadSessions();
+loadDocs();
 </script>
 </body>
 </html>
