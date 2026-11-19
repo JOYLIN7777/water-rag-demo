@@ -1,0 +1,21 @@
+{
+  "name": "water-kb-rag-frontend",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "水利知识库智能问答系统前端 - Vue 3 + Vite",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "vue": "^3.5.13",
+    "marked": "^15.0.6",
+    "dompurify": "^3.2.4"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^5.2.1",
+    "vite": "^6.0.11"
+  }
+}

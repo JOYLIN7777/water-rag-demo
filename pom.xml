@@ -20,6 +20,8 @@
     <properties>
         <java.version>17</java.version>
         <spring-ai.version>1.0.1</spring-ai.version>
+        <tika.version>3.2.3</tika.version>
+        <poi.version>5.4.1</poi.version>
     </properties>
 
     <dependencyManagement>
@@ -74,11 +76,29 @@
             <scope>runtime</scope>
         </dependency>
 
-        <!-- PDF 解析（PDFBox 3.x：org.apache.pdfbox.Loader 入口） -->
+        <!-- Apache Tika：统一文档解析器，一个依赖覆盖 pdf/doc/docx/xls/xlsx/ppt/pptx/rtf/html/epub 等几十种格式 -->
         <dependency>
-            <groupId>org.apache.pdfbox</groupId>
-            <artifactId>pdfbox</artifactId>
-            <version>3.0.3</version>
+            <groupId>org.apache.tika</groupId>
+            <artifactId>tika-core</artifactId>
+            <version>${tika.version}</version>
+        </dependency>
+        <!-- 解析器实现包（tika-core 只含 API，不含具体解析器；显式声明避免传递依赖缺失） -->
+        <dependency>
+            <groupId>org.apache.tika</groupId>
+            <artifactId>tika-parsers-standard-package</artifactId>
+            <version>${tika.version}</version>
+        </dependency>
+
+        <!-- POI：Excel 专用解析（保留"表头当字段名"语义，Tika 的默认表格文本会丢失列头对应关系） -->
+        <dependency>
+            <groupId>org.apache.poi</groupId>
+            <artifactId>poi-ooxml</artifactId>
+            <version>${poi.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.poi</groupId>
+            <artifactId>poi</artifactId>
+            <version>${poi.version}</version>
         </dependency>
 
         <dependency>

@@ -1,0 +1,57 @@
+:root {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  color: #1f2937;
+  background: #f5f7fa;
+  font-synthesis: none;
+  --primary: #2563eb;
+  --primary-dark: #1d4ed8;
+  --primary-light: #eff6ff;
+  --border: #e5e7eb;
+  --muted: #6b7280;
+  --shadow: 0 1px 3px rgba(0, 0, 0, .08), 0 1px 2px rgba(0, 0, 0, .04);
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+}
+
+#app { height: 100vh; }
+
+button { font-family: inherit; cursor: pointer; }
+button:disabled { cursor: not-allowed; opacity: .55; }
+
+input, textarea { font-family: inherit; }
+
+/* Markdown 回答排版 */
+.md-body { line-height: 1.75; word-wrap: break-word; }
+.md-body p { margin: 0 0 10px; }
+.md-body p:last-child { margin-bottom: 0; }
+.md-body h1, .md-body h2, .md-body h3 { margin: 14px 0 8px; font-size: 1.05em; color: #111827; }
+.md-body ul, .md-body ol { margin: 6px 0 10px; padding-left: 22px; }
+.md-body li { margin: 3px 0; }
+.md-body code {
+  background: #f1f5f9; padding: 1px 5px; border-radius: 4px;
+  font-family: 'Cascadia Code', Consolas, monospace; font-size: .9em; color: #0f172a;
+}
+.md-body pre {
+  background: #0f172a; color: #e2e8f0; padding: 12px 14px; border-radius: 8px;
+  overflow-x: auto; margin: 10px 0;
+}
+.md-body pre code { background: transparent; padding: 0; color: inherit; }
+.md-body table { border-collapse: collapse; margin: 10px 0; font-size: .92em; }
+.md-body th, .md-body td { border: 1px solid #d1d5db; padding: 5px 10px; text-align: left; }
+.md-body th { background: #f3f4f6; }
+.md-body blockquote {
+  margin: 8px 0; padding: 6px 12px; border-left: 3px solid #93c5fd;
+  background: #f8fafc; color: #4b5563;
+}
+
+/* 滚动条 */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: #9ca3af; }
+::-webkit-scrollbar-track { background: transparent; }
