@@ -77,6 +77,8 @@ rag:
   breaker-open-seconds: 30
   # RAG 系统提示词模板位置（外置配置，改提示词不用重新编译）
   rag-system-prompt: classpath:prompts/rag-system.st
+  # 向量化入库单批条数上限（DashScope text-embedding-v3 限制单次 ≤10 条）
+  embedding-batch-size: 10
 
 logging:
   level:

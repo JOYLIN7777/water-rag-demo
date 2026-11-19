@@ -44,6 +44,14 @@ public class RagProperties {
     /** RAG 系统提示词模板位置（classpath 资源） */
     private String ragSystemPrompt = "classpath:prompts/rag-system.st";
 
+    /**
+     * 向量化入库单批最大条数。
+     * DashScope text-embedding-v3 接口限制单次请求不超过 10 条文本，
+     * 超过会报 "batch size is invalid, it should not be larger than 10"，
+     * 所以入库时按此值分批调用。
+     */
+    private int embeddingBatchSize = 10;
+
     public int getTopK() { return topK; }
     public void setTopK(int topK) { this.topK = topK; }
 
@@ -76,4 +84,7 @@ public class RagProperties {
 
     public String getRagSystemPrompt() { return ragSystemPrompt; }
     public void setRagSystemPrompt(String ragSystemPrompt) { this.ragSystemPrompt = ragSystemPrompt; }
+
+    public int getEmbeddingBatchSize() { return embeddingBatchSize; }
+    public void setEmbeddingBatchSize(int embeddingBatchSize) { this.embeddingBatchSize = embeddingBatchSize; }
 }

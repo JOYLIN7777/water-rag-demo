@@ -1,5 +1,6 @@
 package com.joylin.waterkb.common;
 
+import org.springframework.ai.retry.NonTransientAiException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
@@ -22,6 +23,17 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(MaxUploadSizeExceededException.class)
     public Map<String, Object> handleMaxUpload(MaxUploadSizeExceededException e) {
         return Map.of("code", 400, "message", "文件超过大小限制（20MB）");
+    }
+
+    /**
+     * 大模型 API 调用失败：502。
+     * 不吞错误详情——之前这里被兜底成"服务内部异常"，上传失败的真实原因
+     * （如 DashScope 的 batch size 限制）在页面上完全看不到，排查成本高。
+     * 现在把 API 返回的原始 message 透出，前端上传区可直接看到失败原因。
+     */
+    @ExceptionHandler(NonTransientAiException.class)
+    public Map<String, Object> handleAiError(NonTransientAiException e) {
+        return Map.of("code", 502, "message", "大模型接口调用失败：" + e.getMessage());
     }
 
     /** 兜底：500 */

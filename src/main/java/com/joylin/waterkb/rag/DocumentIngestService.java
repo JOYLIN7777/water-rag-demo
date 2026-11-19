@@ -1,5 +1,6 @@
 package com.joylin.waterkb.rag;
 
+import com.joylin.waterkb.config.RagProperties;
 import com.joylin.waterkb.web.dto.UploadResult;
 import org.apache.poi.hssf.usermodel.HSSFWorkbook;
 import org.apache.poi.ss.usermodel.Cell;
@@ -81,10 +82,12 @@ public class DocumentIngestService {
 
     private final VectorStore vectorStore;
     private final ParagraphSplitter splitter;
+    private final RagProperties props;
 
-    public DocumentIngestService(VectorStore vectorStore, ParagraphSplitter splitter) {
+    public DocumentIngestService(VectorStore vectorStore, ParagraphSplitter splitter, RagProperties props) {
         this.vectorStore = vectorStore;
         this.splitter = splitter;
+        this.props = props;
     }
 
     /** 对外暴露支持的格式集合（供接口层校验与前端展示，避免两处硬编码不一致） */
@@ -120,8 +123,15 @@ public class DocumentIngestService {
             docs.add(new Document(chunks.get(i), meta));
         }
 
-        vectorStore.add(docs);
-        log.info("文档入库完成：{}，共 {} 个切片，{} 字符", fileName, chunks.size(), text.length());
+        // 分批向量化入库：DashScope embedding 接口限制单次请求最多 10 条文本，
+        // 一次性全量提交会报 400（batch size is invalid），必须按批切分
+        int batchSize = Math.max(1, props.getEmbeddingBatchSize());
+        for (int start = 0; start < docs.size(); start += batchSize) {
+            int end = Math.min(start + batchSize, docs.size());
+            vectorStore.add(docs.subList(start, end));
+        }
+        log.info("文档入库完成：{}，共 {} 个切片（{} 批），{} 字符",
+                fileName, chunks.size(), (chunks.size() + batchSize - 1) / batchSize, text.length());
         return new UploadResult(fileName, chunks.size(), text.length());
     }
 

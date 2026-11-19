@@ -40,7 +40,8 @@ class DocumentIngestServiceTest {
         docsCaptor = ArgumentCaptor.forClass(List.class);
         PROPS.setChunkMaxChars(600);
         PROPS.setChunkOverlap(100);
-        service = new DocumentIngestService(vectorStore, new ParagraphSplitter(PROPS));
+        PROPS.setEmbeddingBatchSize(10);
+        service = new DocumentIngestService(vectorStore, new ParagraphSplitter(PROPS), PROPS);
     }
 
     /** 构造一个两行两列的 xlsx：表头 站点/水位，数据行 云溪水库/45.1 */
@@ -122,6 +123,33 @@ class DocumentIngestServiceTest {
         assertTrue(allText.contains("汛限水位45.50米"), "Tika 应正确抽取 docx 段落文本：" + allText);
         assertTrue(allText.contains("橙色预警"), allText);
         assertTrue(result.chars() > 20);
+    }
+
+    @Test
+    void 切片数超过批次上限时分批入库() throws Exception {
+        // 用极小切片参数构造 >10 个切片，模拟用户上传大文档触发 DashScope batch 限制的场景
+        RagProperties small = new RagProperties();
+        small.setChunkMaxChars(20);
+        small.setChunkOverlap(0);
+        small.setEmbeddingBatchSize(5);
+        DocumentIngestService batchService = new DocumentIngestService(vectorStore, new ParagraphSplitter(small), small);
+
+        // 20 个短句、空行分隔 → 20 个自然段 → 20 个切片 > 单批 5 条
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < 20; i++) {
+            sb.append("第").append(i).append("段规程内容。\n\n");
+        }
+        UploadResult result = batchService.ingest("大文档.md", sb.toString().getBytes(StandardCharsets.UTF_8));
+
+        // 贪心聚合后的切片数可能小于自然段数，批次数按 ceil(切片数/批大小) 精确验证
+        int expectedBatches = (result.chunks() + small.getEmbeddingBatchSize() - 1) / small.getEmbeddingBatchSize();
+        verify(vectorStore, times(expectedBatches)).add(docsCaptor.capture());
+        List<List<Document>> batches = docsCaptor.getAllValues();
+        // 每批不超过 batch size（5），且总量守恒
+        batches.forEach(b -> assertTrue(b.size() <= 5, "单批不得超过 batch size，实际：" + b.size()));
+        int total = batches.stream().mapToInt(List::size).sum();
+        assertEquals(result.chunks(), total, "分批后的切片总数应与入库结果一致");
+        assertTrue(result.chunks() > 5, "应产生多于一个批次的切片数，实际：" + result.chunks());
     }
 
     @Test
