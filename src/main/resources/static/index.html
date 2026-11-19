@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>水利知识库 RAG 问答 - 本地验证页</title>
+<style>
+  body { font-family: "Microsoft YaHei", sans-serif; max-width: 860px; margin: 24px auto; padding: 0 16px; color: #222; }
+  h2 { border-bottom: 2px solid #2b6cb0; padding-bottom: 6px; }
+  .box { border: 1px solid #ccc; border-radius: 8px; padding: 14px; margin-bottom: 18px; }
+  input[type=text] { width: 70%; padding: 8px; }
+  button { padding: 8px 18px; margin-left: 8px; cursor: pointer; }
+  #answer { white-space: pre-wrap; line-height: 1.7; min-height: 60px; }
+  .sources { color: #666; font-size: 13px; margin-top: 8px; border-top: 1px dashed #ddd; padding-top: 6px; }
+  .meta { color: #888; font-size: 12px; }
+</style>
+</head>
+<body>
+<h2>水利知识库 RAG 问答（本地验证页）</h2>
+
+<div class="box">
+  <b>1. 上传文档入库</b><br><br>
+  <input type="file" id="fileInput">
+  <button onclick="uploadDoc()">上传并切片入库</button>
+  <div id="uploadResult" class="meta"></div>
+</div>
+
+<div class="box">
+  <b>2. RAG 流式问答</b>（SSE：sources → message → done）<br><br>
+  <input type="text" id="question" placeholder="例如：云溪水库的汛限水位是多少？" value="云溪水库的汛限水位是多少？">
+  <button onclick="ask()">提问</button>
+  <button onclick="clearHistory()">清空会话</button>
+  <div id="answer"></div>
+  <div id="sources" class="sources"></div>
+</div>
+
+<div class="box">
+  <b>3. 实时水情工具直调</b>（不经过大模型）<br><br>
+  <input type="text" id="station" placeholder="站点名，如：云溪水库" value="云溪水库">
+  <button onclick="queryWater()">查询</button>
+  <div id="waterResult" class="meta"></div>
+</div>
+
+<script>
+const sessionId = 'web-' + Date.now();
+
+async function uploadDoc() {
+  const f = document.getElementById('fileInput').files[0];
+  if (!f) { alert('先选一个文件'); return; }
+  const fd = new FormData(); fd.append('file', f);
+  const r = await fetch('/api/docs/upload', { method: 'POST', body: fd });
+  const j = await r.json();
+  document.getElementById('uploadResult').textContent =
+    `已入库：${j.fileName}，切了 ${j.chunks} 片，共 ${j.chars} 字`;
+}
+
+async function ask() {
+  const q = document.getElementById('question').value.trim();
+  if (!q) return;
+  const ansEl = document.getElementById('answer');
+  const srcEl = document.getElementById('sources');
+  ansEl.textContent = ''; srcEl.textContent = '检索中…';
+  const r = await fetch('/api/chat/stream', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ sessionId: sessionId, question: q })
+  });
+  const reader = r.body.getReader();
+  const dec = new TextDecoder();
+  let buf = '';
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buf += dec.decode(value, { stream: true });
+    const parts = buf.split('\n\n');
+    buf = parts.pop();
+    for (const part of parts) {
+      const ev = (part.match(/event:(.+)/) || [])[1]?.trim();
+      const data = (part.match(/data:([\s\S]*)/) || [])[1] || '';
+      if (ev === 'sources') {
+        const arr = JSON.parse(data);
+        srcEl.textContent = '引用片段：' + arr.map(s => `${s.fileName}#chunk${s.chunkIndex}`).join('、');
+      } else if (ev === 'message') {
+        ansEl.textContent += data;
+      } else if (ev === 'done') {
+        srcEl.textContent += '（已完成）';
+      }
+    }
+  }
+}
+
+async function clearHistory() {
+  await fetch('/api/chat/history?sessionId=' + sessionId, { method: 'DELETE' });
+  document.getElementById('answer').textContent = '';
+  document.getElementById('sources').textContent = '（会话已清空）';
+}
+
+async function queryWater() {
+  const st = document.getElementById('station').value.trim();
+  const r = await fetch('/api/chat/tool/water?station=' + encodeURIComponent(st), { method: 'POST' });
+  document.getElementById('waterResult').textContent = JSON.stringify(await r.json(), null, 2);
+}
+</script>
+</body>
+</html>
