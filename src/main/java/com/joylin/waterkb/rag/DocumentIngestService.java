@@ -58,9 +58,9 @@ public class DocumentIngestService {
 
     private static final Logger log = LoggerFactory.getLogger(DocumentIngestService.class);
 
-    /** 纯文本类：直接按 UTF-8 读，无需解析器 */
+    /** 纯文本类：直接按 UTF-8 读，无需解析器（geojson/topojson 本质是 JSON 文本） */
     private static final Set<String> PLAIN_TEXT_EXTENSIONS = Set.of(
-            "txt", "md", "markdown", "json", "xml", "yaml", "yml",
+            "txt", "md", "markdown", "json", "geojson", "topojson", "xml", "yaml", "yml",
             "sql", "log", "ini", "properties", "java", "py", "js", "ts", "css");
 
     /** 表格类：走表头语义解析（csv/tsv 手写，xls/xlsx 走 POI） */

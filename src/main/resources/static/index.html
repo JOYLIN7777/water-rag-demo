@@ -53,6 +53,7 @@
   .topbar-title{font-size:15px;font-weight:600;color:#111827}
   .text-btn{border:1px solid var(--border);background:#fff;color:#4b5563;padding:6px 12px;border-radius:7px;font-size:12px}
   .text-btn:hover:not(:disabled){border-color:#93c5fd;color:var(--primary);background:#f8fbff}
+  .nav-link{text-decoration:none;display:inline-block;line-height:1.4}
   .scroll-area{flex:1;overflow-y:auto;padding:28px 6%}
   .welcome{max-width:720px;margin:12vh auto 0;text-align:center}
   .welcome-mark{width:56px;height:56px;border-radius:14px;background:var(--primary);color:#fff;font-size:24px;font-weight:600;display:flex;align-items:center;justify-content:center;margin:0 auto 18px}
@@ -137,6 +138,7 @@
       <div>
         <button class="text-btn" onclick="testTool()">工具演示</button>
         <button class="text-btn" onclick="clearHistory()">清空历史</button>
+        <a class="text-btn nav-link" href="manage.html">文档管理</a>
       </div>
     </header>
     <div class="scroll-area" id="scrollArea">
@@ -350,7 +352,8 @@ async function uploadFile(file){
   try{
     const r=await fetch('/api/docs/upload',{method:'POST',body:fd});
     const j=await r.json();
-    if(!r.ok)throw new Error(j.message||'上传失败');
+    // 双保险：错误响应缺 chunks 字段时按失败处理（后端已修复状态码，这里兜旧版本）
+    if(!r.ok||j.chunks===undefined)throw new Error(j.message||('上传失败（HTTP '+r.status+'）'));
     const secs=((Date.now()-started)/1000).toFixed(1);
     // 完成提示持久显示（不自动消失），上传下一个文件时才被替换
     msg.className='upload-msg ok';

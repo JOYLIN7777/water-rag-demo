@@ -63,8 +63,17 @@ class DocumentIngestServiceTest {
     void 支持格式列表包含常见办公格式() {
         List<String> formats = DocumentIngestService.getSupportedExtensions().stream().toList();
         assertTrue(formats.containsAll(List.of(
-                "txt", "md", "pdf", "doc", "docx", "xls", "xlsx", "csv", "tsv", "pptx")));
+                "txt", "md", "pdf", "doc", "docx", "xls", "xlsx", "csv", "tsv", "pptx", "geojson")));
         assertTrue(formats.size() >= 30, "应覆盖尽可能多的格式，实际：" + formats.size());
+    }
+
+    @Test
+    void geojson按纯文本解析入库() throws Exception {
+        String geo = "{\"type\":\"FeatureCollection\",\"features\":[{\"properties\":{\"name\":\"大王滩水库管理范围线\"}}]}";
+        UploadResult result = service.ingest("管理范围线.geojson", geo.getBytes(StandardCharsets.UTF_8));
+        assertEquals(1, result.chunks());
+        verify(vectorStore).add(docsCaptor.capture());
+        assertTrue(docsCaptor.getValue().get(0).getText().contains("大王滩水库"));
     }
 
     @Test
