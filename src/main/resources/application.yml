@@ -1,0 +1,82 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: water-kb-rag
+
+  servlet:
+    multipart:
+      max-file-size: 20MB
+      max-request-size: 20MB
+
+  # ============ PostgreSQL（含 pgvector 扩展） ============
+  datasource:
+    url: jdbc:postgresql://localhost:5432/waterkb
+    username: postgres
+    password: rag123
+
+  # ============ Redis（对话历史存储） ============
+  data:
+    redis:
+      host: localhost
+      port: 6379
+
+  # ============ Spring AI ============
+  ai:
+    openai:
+      # 大模型 API Key：通过环境变量注入，不要提交到 Git
+      # 默认走通义千问 DashScope 兼容模式（chat + embedding 一个 Key 搞定，有免费额度）
+      # 到 https://bailian.console.aliyun.com 开通后创建 API-KEY
+      api-key: ${AI_API_KEY:}
+      # 兼容 OpenAI 协议的 base-url（Spring AI 会自动拼接 /v1/chat/completions、/v1/embeddings）
+      base-url: ${AI_BASE_URL:https://dashscope.aliyuncs.com/compatible-mode}
+      chat:
+        options:
+          # 对话模型；换 DeepSeek 时改 base-url=https://api.deepseek.com、model=deepseek-chat
+          # 注意：DeepSeek 不提供 embedding 接口，换 DeepSeek 时 embedding 需另配服务
+          model: ${AI_CHAT_MODEL:qwen-plus}
+          temperature: 0.3
+      embedding:
+        options:
+          # 通义向量模型，输出维度 1024（与下方 pgvector dimensions 保持一致）
+          model: ${AI_EMBEDDING_MODEL:text-embedding-v3}
+    retry:
+      # API 瞬时失败自动重试
+      max-attempts: 3
+    vectorstore:
+      pgvector:
+        # 首次启动自动建表（vector_store 表 + HNSW 向量索引）
+        initialize-schema: true
+        # 必须与 embedding 模型输出维度一致：text-embedding-v3 = 1024
+        dimensions: 1024
+        # 余弦距离：文本语义检索的通用选择，对向量模长不敏感
+        distance-type: COSINE_DISTANCE
+        index-type: HNSW
+
+# ============ RAG 自定义参数（RagProperties 绑定） ============
+rag:
+  # 检索返回 Top-K 片段数
+  top-k: 5
+  # 相似度阈值：低于此值的片段直接丢弃（防低相关片段诱导幻觉）
+  similarity-threshold: 0.4
+  # 切片参数：单切片最大字符数 / 相邻切片重叠字符数
+  chunk-max-chars: 600
+  chunk-overlap: 100
+  # 拼入 Prompt 的历史对话轮数
+  history-max-turns: 6
+  # Redis 历史最多保留条数与过期时间
+  history-max-entries: 40
+  history-ttl-hours: 24
+  # 流式回答整体超时（秒）
+  stream-timeout-seconds: 60
+  # 熔断：连续失败 N 次后打开熔断，M 秒内直接降级不再请求大模型
+  breaker-failure-threshold: 3
+  breaker-open-seconds: 30
+  # RAG 系统提示词模板位置（外置配置，改提示词不用重新编译）
+  rag-system-prompt: classpath:prompts/rag-system.st
+
+logging:
+  level:
+    com.joylin.waterkb: DEBUG
+    org.springframework.ai: INFO

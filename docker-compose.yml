@@ -1,0 +1,27 @@
+# 一键拉起 pgvector 数据库和 Redis（本机需先安装 Docker Desktop）
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: waterkb-pg
+    environment:
+      POSTGRES_DB: waterkb
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: rag123
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      # 容器首次初始化时自动启用 vector 扩展
+      - ./init/init.sql:/docker-entrypoint-initdb.d/init.sql
+
+  redis:
+    image: redis:7-alpine
+    container_name: waterkb-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redisdata:/data
+
+volumes:
+  pgdata:
+  redisdata:
