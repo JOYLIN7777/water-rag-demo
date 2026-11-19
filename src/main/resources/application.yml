@@ -11,16 +11,18 @@ spring:
       max-request-size: 20MB
 
   # ============ PostgreSQL（含 pgvector 扩展） ============
+  # 本地启动：localhost；Docker 容器内：由 compose 传 DB_HOST=postgres（服务名）
   datasource:
-    url: jdbc:postgresql://localhost:5432/waterkb
-    username: postgres
-    password: rag123
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:waterkb}
+    username: ${DB_USER:postgres}
+    password: ${DB_PASSWORD:rag123}
 
   # ============ Redis（对话历史存储） ============
+  # 本地启动：localhost；Docker 容器内：REDIS_HOST=host.docker.internal（连宿主机 Redis）
   data:
     redis:
-      host: localhost
-      port: 6379
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
 
   # ============ Spring AI ============
   ai:

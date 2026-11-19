@@ -1,4 +1,13 @@
-# 一键拉起 pgvector 数据库和 Redis（本机需先安装 Docker Desktop）
+# 完整环境编排：pgvector 数据库 + 应用；Redis 默认用宿主机已启动的实例
+#
+# 启动步骤：
+#   1. 确认本机 Redis 在 6379 运行（当前环境就是）
+#   2. 设置 API Key：CMD: set AI_API_KEY=sk-xxx / PowerShell: $env:AI_API_KEY="sk-xxx"
+#   3. mvn -DskipTests package  （构建 jar）
+#   4. docker compose up -d --build app
+#
+# 若想把 Redis 也放进 Docker：docker compose --profile docker-redis up -d --build app
+# 并把应用环境变量 REDIS_HOST 改为 redis（见下方 app.environment 注释）
 services:
   postgres:
     image: pgvector/pgvector:pg16
@@ -13,14 +22,50 @@ services:
       - pgdata:/var/lib/postgresql/data
       # 容器首次初始化时自动启用 vector 扩展
       - ./init/init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d waterkb"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
 
+  # 可选 Redis（默认不启动，用宿主机的）；需要时加 --profile docker-redis
   redis:
     image: redis:7-alpine
     container_name: waterkb-redis
+    profiles: ["docker-redis"]
     ports:
       - "6379:6379"
     volumes:
       - redisdata:/data
+
+  app:
+    build: .
+    container_name: waterkb-app
+    # 等数据库健康后再启动，避免首次启动建表时连不上库
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      # 宿主机 8080 → 容器 8080；本地浏览器访问 localhost:8080 即容器内的应用
+      - "8080:8080"
+    environment:
+      # 容器内用服务名 postgres 访问数据库（Docker DNS 解析）
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: waterkb
+      DB_USER: postgres
+      DB_PASSWORD: rag123
+      # host.docker.internal = 宿主机；若启用 docker-redis profile 则改成 redis
+      REDIS_HOST: ${REDIS_HOST:-host.docker.internal}
+      REDIS_PORT: 6379
+      # Key 从启动 compose 的 shell 环境变量读取，不写进文件、不进 Git
+      AI_API_KEY: ${AI_API_KEY}
+      AI_BASE_URL: ${AI_BASE_URL:-https://dashscope.aliyuncs.com/compatible-mode}
+      AI_CHAT_MODEL: ${AI_CHAT_MODEL:-qwen-plus}
+      AI_EMBEDDING_MODEL: ${AI_EMBEDDING_MODEL:-text-embedding-v3}
+    extra_hosts:
+      # Linux 需要显式映射；Docker Desktop for Windows/Mac 已内置该主机名
+      - "host.docker.internal:host-gateway"
 
 volumes:
   pgdata:

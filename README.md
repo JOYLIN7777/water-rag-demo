@@ -53,21 +53,55 @@ flowchart LR
 
 前置：JDK 17、Maven 3.8+、Docker Desktop；Web 页面另需 Node.js 18+（可选，不影响后端接口）。
 
+### 方式 A：全部容器化部署（推荐演示）
+
 ```bash
-# 1. 启动 pgvector 数据库 + Redis
-docker compose up -d
+# 1. 打包应用（本机 Maven 已缓存依赖）
+mvn -DskipTests package
 
-# 2. 配置大模型 API Key（阿里云百炼 https://bailian.console.aliyun.com 创建）
+# 2. 设置 API Key（从启动 compose 的 shell 环境变量读取，不落文件、不进 Git）
 #    Windows CMD: set AI_API_KEY=sk-xxxx     PowerShell: $env:AI_API_KEY="sk-xxxx"
-export AI_API_KEY=sk-xxxx
+#    Git Bash:    export AI_API_KEY=sk-xxxx
 
-# 3. 启动应用（首次启动自动建 vector_store 表）
+# 3. 构建镜像并启动（pgvector + app 两个容器；Redis 默认用宿主机已启动的实例）
+docker compose up -d --build app
+
+# 4. 浏览器访问 http://localhost:8080（容器 8080 已映射到宿主机）
+```
+
+容器网络说明：容器内通过服务名 `postgres` 访问数据库（compose 内置 DNS），通过
+`host.docker.internal` 访问宿主机的 Redis；两处地址由 `application.yml` 的环境变量
+占位符（`DB_HOST` / `REDIS_HOST`）注入，本地 `mvn spring-boot:run` 启动时不设这些
+变量即回落到 `localhost`，同一份配置兼容两种部署方式。
+
+基础镜像说明：Dockerfile 基于 `pgvector/pgvector:pg16` + apt 安装 openjdk-17（未用
+eclipse-temurin 官方镜像），原因是 Docker Hub 在受限网络下拉取超时，而 Debian 官方
+apt 源可直连。网络通畅时可把 `FROM` 换回 `eclipse-temurin:17-jre`。
+
+### 方式 B：本地启动应用 + 容器跑数据库（开发模式）
+
+```bash
+# 只起数据库容器（应用在本机跑，Redis 用本机实例）
+docker compose up -d postgres
+
+# 启动应用（不设 DB_HOST/REDIS_HOST 时自动用 localhost）
 mvn spring-boot:run
 
-# 4.（可选）启动 Web 问答页面：浏览器打开 http://localhost:5173
+#（可选）启动 Vue 前端：浏览器打开 http://localhost:5173
 cd frontend
 npm install
 npm run dev
+```
+
+若想把 Redis 也放进 Docker：`docker compose --profile docker-redis up -d --build app`，
+并把应用环境变量 `REDIS_HOST` 设为 `redis`。
+
+### 停止与清理
+
+```bash
+docker compose down               # 停止并移除容器（pgdata 卷保留，数据不丢）
+docker compose down -v            # 连数据卷一起清（需重新入库所有文档）
+docker compose up -d --build app  # 代码改动后：重新 package + 重建镜像启动
 ```
 
 > `npm install` 若报 `EPERM`（全局 npm 缓存目录无写权限，常见于公司机器），改用工作区缓存：
@@ -131,7 +165,9 @@ curl -X POST "http://localhost:8080/api/chat/tool/water?station=云溪水库"
 
 ```
 water-rag-demo
-├── docker-compose.yml                  # pgvector + Redis 一键启动
+├── Dockerfile                          # 应用镜像（pg 基础镜像 + apt JRE，见"快速启动"说明）
+├── .dockerignore                       # 构建上下文裁剪
+├── docker-compose.yml                  # pgvector + app 编排（Redis 为可选 profile）
 ├── init/init.sql                       # 启用 vector 扩展
 ├── frontend/                           # Vue 3 + Vite 问答页面
 │   ├── vite.config.js                  # 开发代理 /api → localhost:8080

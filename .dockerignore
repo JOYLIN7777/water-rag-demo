@@ -1,0 +1,12 @@
+target/
+!target/water-rag-demo-1.0.0.jar
+.git/
+.gitignore
+frontend/node_modules/
+frontend/dist/
+frontend/.npm-cache/
+docs/
+*.md
+!README.md
+*.log
+.DS_Store
