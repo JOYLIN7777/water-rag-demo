@@ -10,3 +10,7 @@ frontend/node_modules/
 frontend/dist/
 frontend/.npm-cache/
 docs/
+
+# 本地环境变量（含 API Key，严禁提交）
+.env
+.workbuddy/

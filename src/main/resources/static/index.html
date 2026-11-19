@@ -281,7 +281,7 @@ function hideError(){document.getElementById('errorBar').style.display='none'}
 async function send(text){
   const q=(text||document.getElementById('question').value).trim();
   if(!q||sending)return;
-  document.getElementById('question').value='';
+  clearDraft();
   sending=true;document.getElementById('sendBtn').disabled=true;hideError();
   const session=sessions.find(s=>s.id===currentId);
   if(session&&!session.title){session.title=q.length>18?q.slice(0,18)+'…':q;saveSessions();renderSessions()}
@@ -321,9 +321,19 @@ async function send(text){
   }
 }
 function quickAsk(q){document.getElementById('question').value=q;send()}
-document.getElementById('question').addEventListener('keydown',e=>{
+const draftBox=document.getElementById('question');
+// 输入草稿跨页面保留：跳转到管理页/刷新后自动恢复（sessionStorage，关标签页才清）
+draftBox.value=sessionStorage.getItem('water-rag-draft')||'';
+draftBox.addEventListener('input',()=>{
+  sessionStorage.setItem('water-rag-draft',draftBox.value);
+});
+draftBox.addEventListener('keydown',e=>{
   if(e.key==='Enter'&&!e.shiftKey&&!e.isComposing){e.preventDefault();send()}
 });
+function clearDraft(){
+  sessionStorage.removeItem('water-rag-draft');
+  draftBox.value='';
+}
 async function clearHistory(){
   try{
     await fetch('/api/chat/history?sessionId='+encodeURIComponent(currentId),{method:'DELETE'});
