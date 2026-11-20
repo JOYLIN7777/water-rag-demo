@@ -3,6 +3,7 @@ package com.joylin.waterkb.rag;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.joylin.waterkb.config.RagProperties;
 import com.joylin.waterkb.memory.RedisConversationStore;
+import com.joylin.waterkb.model.ModelRegistry;
 import com.joylin.waterkb.resilience.LlmCircuitBreaker;
 import com.joylin.waterkb.tool.WaterInfoTool;
 import org.slf4j.Logger;
@@ -36,15 +37,17 @@ public class RagChatService {
     private static final Logger log = LoggerFactory.getLogger(RagChatService.class);
 
     private final VectorStore vectorStore;
-    private final ChatClient chatClient;
+    private final ModelRegistry modelRegistry;
     private final RedisConversationStore historyStore;
     private final PromptTemplateLoader promptLoader;
     private final LlmCircuitBreaker breaker;
     private final RagProperties props;
     private final ObjectMapper objectMapper;
 
+    private final WaterInfoTool waterInfoTool;
+
     public RagChatService(VectorStore vectorStore,
-                          ChatClient.Builder chatClientBuilder,
+                          ModelRegistry modelRegistry,
                           WaterInfoTool waterInfoTool,
                           RedisConversationStore historyStore,
                           PromptTemplateLoader promptLoader,
@@ -52,13 +55,15 @@ public class RagChatService {
                           RagProperties props,
                           ObjectMapper objectMapper) {
         this.vectorStore = vectorStore;
+        this.modelRegistry = modelRegistry;
+        this.waterInfoTool = waterInfoTool;
         this.historyStore = historyStore;
         this.promptLoader = promptLoader;
         this.breaker = breaker;
         this.props = props;
         this.objectMapper = objectMapper;
-        // 注册 Tool Calling 工具：模型根据 @Tool 注解的描述自主决定何时调用
-        this.chatClient = chatClientBuilder.defaultTools(waterInfoTool).build();
+        // 不在构造时固定 ChatClient：每次问答从 ModelRegistry 取当前激活模型，
+        // 这样管理页切换模型后无需重启容器即可生效。
     }
 
     /**
@@ -100,6 +105,22 @@ public class RagChatService {
             answerBuf.append(fallback);
             tokens = Flux.just(fallback);
         } else {
+            // 每次调用动态取当前激活的 Chat 模型（含 Tool Calling 工具注册）
+            ChatClient chatClient;
+            try {
+                chatClient = modelRegistry.currentChatClient(waterInfoTool);
+            } catch (Exception ex) {
+                // 配置缺失/构建失败也走同一条降级路径，不让整个问答接口 500
+                breaker.recordFailure();
+                degraded[0] = true;
+                log.error("Chat 模型构建失败，触发降级：{}", ex.getMessage());
+                String fallback = degradeText("模型配置异常，已自动降级", hits);
+                answerBuf.append(fallback);
+                tokens = Flux.just(fallback);
+                return Flux.just(sse("sources", sourcesJson))
+                        .concatWith(tokens.map(t -> sse("message", t)))
+                        .concatWith(Mono.just(sse("done", "[DONE]")));
+            }
             tokens = chatClient.prompt()
                     .system(systemPrompt)
                     .user(question)
