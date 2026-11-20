@@ -1,11 +1,12 @@
 package com.joylin.waterkb.web;
 
-import com.joylin.waterkb.memory.RedisConversationStore;
+import com.joylin.waterkb.memory.ConversationTreeStore;
 import com.joylin.waterkb.rag.RagChatService;
 import com.joylin.waterkb.tool.WaterInfoTool;
 import com.joylin.waterkb.web.dto.ChatRequest;
 import jakarta.validation.Valid;
 import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.http.codec.ServerSentEvent;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -31,40 +32,81 @@ import java.util.Map;
 public class ChatController {
 
     private final RagChatService ragChatService;
-    private final RedisConversationStore historyStore;
+    private final ConversationTreeStore treeStore;
     private final WaterInfoTool waterInfoTool;
 
     public ChatController(RagChatService ragChatService,
-                          RedisConversationStore historyStore,
+                          ConversationTreeStore treeStore,
                           WaterInfoTool waterInfoTool) {
         this.ragChatService = ragChatService;
-        this.historyStore = historyStore;
+        this.treeStore = treeStore;
         this.waterInfoTool = waterInfoTool;
     }
 
     /**
      * RAG 问答（SSE 流式）。
+     * parentId 为空则顺着当前 head 继续；传历史节点 ID 则从该点分叉。
      * 事件流：sources（引用片段）→ message（增量文本）→ done（结束）。
      */
     @PostMapping(value = "/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public Flux<ServerSentEvent<String>> chat(@RequestBody @Valid ChatRequest req) {
-        return ragChatService.chatStream(req.sessionId(), req.question());
+        return ragChatService.chatStream(req.sessionId(), req.question(), req.parentId());
     }
 
     /**
-     * 查看某会话的历史记录（Redis）。
+     * 查看当前分支的历史记录（线性链，兼容原有问答页）。
      */
     @GetMapping("/history")
     public List<Map<String, String>> history(@RequestParam String sessionId) {
-        return historyStore.getHistory(sessionId);
+        return treeStore.historyList(sessionId);
     }
 
     /**
-     * 清空某会话的历史记录。
+     * 查看完整消息树：所有节点 + 当前 head + 命名分支。
+     * 前端据此画分支图，节点父子关系由 parentId 表达。
+     */
+    @GetMapping("/tree")
+    public Map<String, Object> tree(@RequestParam String sessionId) {
+        return Map.of(
+                "sessionId", sessionId,
+                "head", treeStore.head(sessionId) == null ? "" : treeStore.head(sessionId),
+                "nodes", treeStore.allNodes(sessionId),
+                "branches", treeStore.branches(sessionId));
+    }
+
+    /**
+     * rewind：把当前 head 移到历史节点。不删除任何节点，旧分支随时可切回。
+     */
+    @PostMapping("/rewind")
+    public ResponseEntity<Map<String, Object>> rewind(@RequestParam String sessionId,
+                                                      @RequestParam String nodeId) {
+        if (!treeStore.rewind(sessionId, nodeId)) {
+            return ResponseEntity.badRequest().body(Map.of("error", "节点不存在：" + nodeId));
+        }
+        return ResponseEntity.ok(Map.of("ok", true, "head", nodeId));
+    }
+
+    /**
+     * fork：给某个历史节点起分支名（标记分叉起点）。
+     * 真正的分叉发生在下一次带 parentId 的问答——新消息挂在该节点下，
+     * 原分支不受影响。
+     */
+    @PostMapping("/fork")
+    public ResponseEntity<Map<String, Object>> fork(@RequestParam String sessionId,
+                                                    @RequestParam String nodeId,
+                                                    @RequestParam String name) {
+        if (!treeStore.fork(sessionId, nodeId, name)) {
+            return ResponseEntity.badRequest().body(Map.of("error", "节点不存在或分支名为空"));
+        }
+        return ResponseEntity.ok(Map.of("ok", true, "nodeId", nodeId, "name", name));
+    }
+
+    /**
+     * 清空某会话的整棵树（所有分支一起删）。
      */
     @DeleteMapping("/history")
     public Map<String, Object> clear(@RequestParam String sessionId) {
-        historyStore.clear(sessionId);
+        treeStore.clear(sessionId);
         return Map.of("cleared", true, "sessionId", sessionId);
     }
 

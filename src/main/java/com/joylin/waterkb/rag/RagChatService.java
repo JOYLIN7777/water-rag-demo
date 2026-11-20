@@ -2,7 +2,8 @@ package com.joylin.waterkb.rag;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.joylin.waterkb.config.RagProperties;
-import com.joylin.waterkb.memory.RedisConversationStore;
+import com.joylin.waterkb.memory.ConversationTreeStore;
+import com.joylin.waterkb.memory.TreeNode;
 import com.joylin.waterkb.model.ModelRegistry;
 import com.joylin.waterkb.resilience.LlmCircuitBreaker;
 import com.joylin.waterkb.tool.WaterInfoTool;
@@ -38,7 +39,7 @@ public class RagChatService {
 
     private final VectorStore vectorStore;
     private final ModelRegistry modelRegistry;
-    private final RedisConversationStore historyStore;
+    private final ConversationTreeStore historyStore;
     private final PromptTemplateLoader promptLoader;
     private final LlmCircuitBreaker breaker;
     private final RagProperties props;
@@ -49,7 +50,7 @@ public class RagChatService {
     public RagChatService(VectorStore vectorStore,
                           ModelRegistry modelRegistry,
                           WaterInfoTool waterInfoTool,
-                          RedisConversationStore historyStore,
+                          ConversationTreeStore historyStore,
                           PromptTemplateLoader promptLoader,
                           LlmCircuitBreaker breaker,
                           RagProperties props,
@@ -74,17 +75,19 @@ public class RagChatService {
      * message —— 回答文本增量（逐 token 推送）；
      * done —— 结束标记。</p>
      */
-    public Flux<ServerSentEvent<String>> chatStream(String sessionId, String question) {
+    public Flux<ServerSentEvent<String>> chatStream(String sessionId, String question, String parentId) {
         // ===== 阶段 1：相似度检索 =====
-        // pgvector 内部会先把问题交给 EmbeddingModel 向量化，再用 HNSW 索引做余弦相似度检索
+        // ES 混合检索内部会先把问题交给 EmbeddingModel 向量化，再跑 BM25+kNN+RRF
         // 检索失败不阻塞问答：降级为无上下文模式（模型只靠自身知识 + 工具）
         final List<Document> hits = retrieve(question);
 
         // ===== 阶段 2：拼装知识库上下文 =====
         String context = hits.isEmpty() ? "（知识库中未检索到相关内容）" : formatContext(hits);
 
-        // ===== 阶段 3：取带会话 ID 的历史对话（Redis） =====
-        String history = historyStore.recentAsText(sessionId, props.getHistoryMaxTurns());
+        // ===== 阶段 3：取指定分支的祖先链作为上下文 =====
+        // parentId=null 走当前 head；传历史节点则从该点分叉，只带它的祖先链，
+        // 兄弟分支的消息不会串进 Prompt——这是 fork 的语义基础。
+        String history = historyChainText(sessionId, parentId);
 
         // ===== 阶段 4：渲染外置 Prompt 模板 =====
         String systemPrompt = promptLoader.render(props.getRagSystemPrompt(),
@@ -116,9 +119,10 @@ public class RagChatService {
                 log.error("Chat 模型构建失败，触发降级：{}", ex.getMessage());
                 String fallback = degradeText("模型配置异常，已自动降级", hits);
                 answerBuf.append(fallback);
-                tokens = Flux.just(fallback);
+                // 降级路径同样落树，且必须挂到同一父节点，不打断分支
+                appendExchange(sessionId, parentId, question, fallback, hits);
                 return Flux.just(sse("sources", sourcesJson))
-                        .concatWith(tokens.map(t -> sse("message", t)))
+                        .concatWith(Flux.just(fallback).map(t -> sse("message", t)))
                         .concatWith(Mono.just(sse("done", "[DONE]")));
             }
             tokens = chatClient.prompt()
@@ -139,12 +143,11 @@ public class RagChatService {
                         return Flux.just(fallback);
                     })
                     .doFinally(sig -> {
-                        // 正常完成 → 熔断计数清零；两条路径都落对话历史
+                        // 正常完成 → 熔断计数清零；两条路径都落消息树
                         if (sig == SignalType.ON_COMPLETE && !degraded[0]) {
                             breaker.recordSuccess();
                         }
-                        historyStore.append(sessionId, "user", question);
-                        historyStore.append(sessionId, "assistant", answerBuf.toString());
+                        appendExchange(sessionId, parentId, question, answerBuf.toString(), hits);
                     });
         }
 
@@ -152,6 +155,53 @@ public class RagChatService {
         return Flux.just(sse("sources", sourcesJson))
                 .concatWith(tokens.map(t -> sse("message", t)))
                 .concatWith(Mono.just(sse("done", "[DONE]")));
+    }
+
+    /**
+     * 取祖先链文本：parentId 为空走当前 head，否则从指定节点回溯到根。
+     * 只保留最近 maxTurns 轮，防止长会话撑爆 token 预算。
+     */
+    private String historyChainText(String sessionId, String parentId) {
+        try {
+            List<TreeNode> nodes = parentId == null || parentId.isBlank()
+                    ? historyStore.path(sessionId)
+                    : historyStore.pathTo(sessionId, parentId);
+            int from = Math.max(0, nodes.size() - props.getHistoryMaxTurns() * 2);
+            StringBuilder sb = new StringBuilder();
+            for (TreeNode n : nodes.subList(from, nodes.size())) {
+                sb.append("user".equals(n.role()) ? "用户" : "助手").append("：")
+                        .append(n.content()).append('\n');
+            }
+            return sb.length() > 0 ? sb.toString() : "（无）";
+        } catch (Exception e) {
+            log.warn("读取对话树上下文失败，按无历史处理", e);
+            return "（无）";
+        }
+    }
+
+    /**
+     * 落树：user 挂到 parentId（或当前 head），assistant 再挂到 user 下。
+     * 同一次问答的两条消息用父子关系绑定，rewind 到 user 即丢弃这次回答，
+     * rewind 到 assistant 则完整保留——可精确控制回滚粒度。
+     */
+    private void appendExchange(String sessionId, String parentId, String question,
+                                String answer, List<Document> hits) {
+        String parent = parentId == null || parentId.isBlank()
+                ? historyStore.head(sessionId) : parentId;
+        String userNode = historyStore.append(sessionId, parent, "user", question, null, null);
+        historyStore.append(sessionId, userNode, "assistant", answer, toSourceMaps(hits), null);
+    }
+
+    /** 把检索命中转成可存入节点 JSON 的来源片段（回显引用卡片用） */
+    private List<Map<String, Object>> toSourceMaps(List<Document> hits) {
+        List<Map<String, Object>> out = new ArrayList<>();
+        for (Document d : hits) {
+            out.add(Map.of(
+                    "fileName", String.valueOf(d.getMetadata().getOrDefault("fileName", "")),
+                    "chunkIndex", String.valueOf(d.getMetadata().getOrDefault("chunkIndex", "")),
+                    "preview", preview(d.getText(), 80)));
+        }
+        return out;
     }
 
     /**

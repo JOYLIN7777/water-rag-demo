@@ -144,6 +144,7 @@
       <div>
         <button class="text-btn" onclick="testTool()">工具演示</button>
         <button class="text-btn" onclick="clearHistory()">清空历史</button>
+        <a class="text-btn nav-link" id="treeLink" href="tree.html">会话树</a>
         <a class="text-btn nav-link" href="search.html">检索实验</a>
         <a class="text-btn nav-link" href="models.html">模型配置</a>
         <a class="text-btn nav-link" href="manage.html">文档管理</a>
@@ -187,6 +188,7 @@ function newSession(){
 }
 function switchSession(id){
   currentId=id;messages=[];renderMessages();hideError();
+  document.getElementById('treeLink').href='tree.html?sid='+encodeURIComponent(id);
   fetch('/api/chat/history?sessionId='+encodeURIComponent(id)).then(r=>r.json()).then(list=>{
     if(currentId!==id)return;
     messages=list.map(m=>({role:m.role,content:m.content,sources:[],streaming:false}));
