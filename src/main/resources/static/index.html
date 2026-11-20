@@ -102,38 +102,40 @@
   .quick-item:hover{border-color:#b9cbff;background:var(--primary-soft);color:var(--primary);transform:translateY(-2px);box-shadow:0 6px 18px rgba(59,110,245,.12)}
   .quick-item::before{content:'✦';color:var(--primary);margin-right:8px;font-size:11px}
 
-  .messages{max-width:900px;margin:0 auto}
-  .message-row{display:flex;gap:14px;margin-bottom:26px;align-items:flex-start;animation:fadeUp .25s ease}
-  .message-row.is-user{flex-direction:row-reverse}
-  .avatar{width:36px;height:36px;border-radius:10px;flex:0 0 36px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;box-shadow:var(--shadow-sm)}
-  .avatar-user{background:linear-gradient(135deg,#d8e4ff,#c3d6ff);color:#1e4bb8}
-  .avatar-ai{background:linear-gradient(135deg,var(--primary-hi),var(--primary));color:#fff}
-  .message-body{max-width:min(840px,84%);min-width:0}
-  .message-sender{font-size:11.5px;color:var(--muted);margin:0 0 7px 3px;font-weight:600;letter-spacing:.3px}
-  .is-user .message-sender{text-align:right;margin-right:3px}
-  .message-bubble{padding:13px 17px;border-radius:13px;font-size:14px;box-shadow:var(--shadow-sm);white-space:pre-wrap;line-height:1.7}
-  .bubble-user{background:linear-gradient(135deg,var(--primary),#2f61e8);color:#fff;border-bottom-right-radius:4px;box-shadow:0 3px 12px rgba(59,110,245,.22)}
-  .bubble-ai{background:#fff;color:var(--ink);border:1px solid var(--line);border-bottom-left-radius:4px}
-  .source-card{border:1px solid #dbe6ff;background:linear-gradient(180deg,#f7faff,#fbfcff);border-radius:10px;margin-bottom:9px;overflow:hidden}
-  .source-head{display:flex;align-items:center;gap:8px;width:100%;border:0;background:transparent;padding:10px 13px;color:#25469b;font-size:12.5px;text-align:left;font-weight:500}
-  .source-head:hover{background:#eff5ff}
-  .source-title{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .source-list{border-top:1px solid #dbe6ff;padding:4px 13px 11px}
-  .source-item{padding:8px 0;border-bottom:1px dashed #dde7fb}
-  .source-item:last-child{border-bottom:0}
-  .source-file{font-size:12px;font-weight:650;color:#1e3a8a}
-  .source-index{font-size:10.5px;color:#3568d4;background:#e3ecff;padding:2px 7px;border-radius:10px;margin-left:8px}
-  .source-preview{font-size:12px;color:var(--ink-2);line-height:1.65;margin-top:4px}
+  /* ============ 消息区（参考 FastGPT：文档卡片式 AI 回答 + 内嵌引用角标） ============ */
+  .messages{max-width:860px;margin:0 auto}
+  .msg-group{margin-bottom:30px;animation:fadeUp .25s ease}
+  .msg-group.user{display:flex;justify-content:flex-end}
+  .user-bubble{max-width:78%;background:var(--primary-soft);color:#1e3a8a;border:1px solid #d6e4ff;border-radius:14px 14px 4px 14px;padding:12px 17px;font-size:14px;line-height:1.7;white-space:pre-wrap;box-shadow:var(--shadow-sm)}
+  .ai-card{background:#fff;border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow-sm);overflow:hidden}
+  .ai-card-head{display:flex;align-items:center;gap:8px;padding:10px 16px;background:#fafbfd;border-bottom:1px solid var(--line);font-size:11.5px;color:var(--muted)}
+  .ai-badge{width:22px;height:22px;border-radius:6px;background:linear-gradient(135deg,var(--primary-hi),var(--primary));color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700}
+  .ai-card-name{font-weight:600;color:var(--ink-2)}
+  .ai-card-actions{margin-left:auto;display:flex;gap:4px}
+  .icon-btn{border:0;background:transparent;color:var(--muted);width:26px;height:26px;border-radius:6px;font-size:12.5px;line-height:1;transition:all .15s}
+  .icon-btn:hover{background:var(--primary-soft);color:var(--primary)}
+  .ai-card-body{padding:15px 18px;font-size:14px;line-height:1.75;color:var(--ink)}
+  /* 引用角标行：参考 FastGPT 的 #1 检索 0.8534 */
+  .cite-row{display:flex;flex-wrap:wrap;gap:6px;padding:0 18px 13px}
+  .cite-chip{display:inline-flex;align-items:center;gap:5px;border:1px solid #dbe6ff;background:#f7faff;color:#25469b;border-radius:7px;padding:4px 9px;font-size:11.5px;cursor:pointer;transition:all .15s;max-width:260px}
+  .cite-chip:hover{background:var(--primary-soft);border-color:#b9cbff}
+  .cite-num{background:var(--primary);color:#fff;border-radius:5px;padding:0 5px;font-size:10px;font-weight:700;flex:0 0 auto}
+  .cite-file{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .cite-preview{border-top:1px dashed #dbe6ff;margin:0 18px 13px;padding:10px 12px;background:#fbfcff;border-radius:7px;font-size:12px;color:var(--ink-2);line-height:1.7;display:none;white-space:pre-wrap}
+  .cite-preview.open{display:block}
   .cursor{display:inline-block;width:7px;height:15px;background:var(--primary);vertical-align:text-bottom;margin-left:2px;animation:blink 1s steps(2) infinite}
   @keyframes blink{50%{opacity:0}}
 
-  /* ============ 输入区 ============ */
-  .composer-wrap{flex:0 0 auto;padding:12px 6% 18px;background:linear-gradient(transparent,var(--bg) 20%)}
-  .error-bar{max-width:900px;margin:0 auto 9px;padding:9px 13px;border-radius:8px;background:#fdeef3;color:#b91c4a;font-size:12.5px;border:1px solid #f8cfdc;box-shadow:var(--shadow-sm)}
-  .composer{max-width:900px;margin:0 auto;display:flex;gap:11px;align-items:flex-end;background:#fff;border:1px solid #d9e0ec;border-radius:14px;padding:11px 11px 11px 16px;box-shadow:var(--shadow-md);transition:all .18s}
+  /* ============ 输入区（参考 FastGPT：居中受限宽度 + 底部工具栏） ============ */
+  .composer-wrap{flex:0 0 auto;padding:14px 6% 16px;background:linear-gradient(transparent,var(--bg) 18%)}
+  .error-bar{max-width:860px;margin:0 auto 9px;padding:9px 13px;border-radius:8px;background:#fdeef3;color:#b91c4a;font-size:12.5px;border:1px solid #f8cfdc;box-shadow:var(--shadow-sm)}
+  .composer{max-width:860px;margin:0 auto;background:#fff;border:1px solid #d9e0ec;border-radius:14px;box-shadow:var(--shadow-md);transition:all .18s;padding:12px 14px 10px}
   .composer:focus-within{border-color:var(--primary);box-shadow:0 0 0 4px rgba(59,110,245,.1),var(--shadow-md)}
-  .composer textarea{flex:1;resize:none;border:0;outline:0;font-size:14px;line-height:1.6;max-height:160px;min-height:24px;padding:6px 0;color:var(--ink);background:transparent}
-  .send-btn{border:0;background:linear-gradient(135deg,var(--primary-hi),var(--primary));color:#fff;padding:10px 20px;border-radius:9px;font-size:13px;font-weight:600;transition:all .18s;box-shadow:0 3px 10px rgba(59,110,245,.28);display:flex;align-items:center;gap:6px}
+  .composer textarea{width:100%;resize:none;border:0;outline:0;font-size:14px;line-height:1.6;max-height:160px;min-height:26px;color:var(--ink);background:transparent;display:block}
+  .composer-bar{display:flex;align-items:center;gap:8px;margin-top:8px}
+  .composer-tool{border:0;background:transparent;color:var(--muted);font-size:11.5px;padding:5px 8px;border-radius:6px;display:inline-flex;align-items:center;gap:5px}
+  .composer-tool:hover{background:var(--primary-soft);color:var(--primary)}
+  .send-btn{border:0;background:linear-gradient(135deg,var(--primary-hi),var(--primary));color:#fff;padding:8px 16px;border-radius:8px;font-size:12.5px;font-weight:600;transition:all .18s;box-shadow:0 3px 10px rgba(59,110,245,.28);display:flex;align-items:center;gap:6px;margin-left:auto}
   .send-btn:hover:not(:disabled){transform:translateY(-1px);box-shadow:0 5px 16px rgba(59,110,245,.36)}
   .composer-tip{text-align:center;font-size:10.5px;color:var(--muted);margin-top:9px;letter-spacing:.2px}
 
@@ -234,7 +236,11 @@
       <div class="error-bar" id="errorBar" style="display:none"></div>
       <div class="composer">
         <textarea id="question" rows="1" placeholder="输入你的问题，Enter 发送，Shift+Enter 换行"></textarea>
-        <button class="send-btn" id="sendBtn" onclick="send()">发送 <span style="opacity:.7">↵</span></button>
+        <div class="composer-bar">
+          <span class="composer-tool" title="基于知识库检索作答"><span style="color:var(--primary)">◈</span> 知识库问答</span>
+          <button class="composer-tool" onclick="document.getElementById('fileInput').click()" title="上传文档到知识库">⇪ 上传文档</button>
+          <button class="send-btn" id="sendBtn" onclick="send()">发送 <span style="opacity:.75">↵</span></button>
+        </div>
       </div>
       <div class="composer-tip">回答基于知识库生成，关键数据请以正式规程为准</div>
     </div>
@@ -254,35 +260,51 @@ function loadSessions(){
   renderSessions();
 }
 function saveSessions(){localStorage.setItem('water-rag-sessions',JSON.stringify(sessions))}
-// 本地消息缓存：后端是权威源，缓存只用于切换会话时【立即】显示，避免闪烁/空白。
-// 后端返回后用真实历史覆盖，两者不一致时以后端为准。
+// ============ 按会话隔离的状态（核心：所有会话状态互不干扰）============
+// msgStore[sid] = 该会话的消息数组；草稿也按 sid 存，切换会话绝不串台。
+let msgStore=Object.create(null);
+let historySeq=0; // 会话切换请求序号，忽略过期响应，避免闪屏
 function cacheKey(id){return 'water-rag-msgs:'+id}
-function cacheMessages(id){
-  try{localStorage.setItem(cacheKey(id),JSON.stringify(messages.filter(m=>!m.streaming).map(m=>
-    ({role:m.role,content:m.content,sources:m.sources||[]}))))}catch(e){}
+function draftKey(id){return 'water-rag-draft:'+id}
+function cacheMessages(id,list){
+  try{const arr=list||msgStore[id]||[];
+    localStorage.setItem(cacheKey(id),JSON.stringify(arr.filter(m=>!m.streaming).map(m=>
+      ({role:m.role,content:m.content,sources:m.sources||[]}))))}catch(e){}
 }
 function loadCached(id){
-  try{return JSON.parse(localStorage.getItem(cacheKey(id))||'[]')}catch(e){return []}
+  try{const a=JSON.parse(localStorage.getItem(cacheKey(id))||'[]');return Array.isArray(a)?a:[]}catch(e){return []}
+}
+function storeOf(id){
+  if(!msgStore[id])msgStore[id]=loadCached(id).map(m=>({...m,streaming:false}));
+  return msgStore[id];
 }
 function newSession(){
   const id='session-'+Date.now();sessions.unshift({id,title:'',updatedAt:Date.now()});saveSessions();switchSession(id);renderSessions();
 }
 function switchSession(id){
-  if(currentId&&currentId!==id)cacheMessages(currentId); // 切走前先存当前会话
+  if(currentId&&currentId!==id){
+    cacheMessages(currentId);                              // 存旧会话消息
+    try{sessionStorage.setItem(draftKey(currentId),draftBox.value)}catch(e){} // 存旧会话草稿
+  }
   currentId=id;
-  messages=loadCached(id).map(m=>({...m,streaming:false})); // 立即显示缓存，无空白等待
+  messages=storeOf(id);                                   // 切到目标会话自己的数组
   renderMessages();hideError();
+  syncDraft();                                            // 恢复目标会话草稿
   document.getElementById('treeLink').href='tree.html?sid='+encodeURIComponent(id);
+  const seq=++historySeq;
   fetch('/api/chat/history?sessionId='+encodeURIComponent(id)).then(r=>r.json()).then(list=>{
-    if(currentId!==id)return;
-    // 后端有记录就以它为准；只有后端空且本地有内容时才保留缓存（应对写入时序）
-    if(Array.isArray(list)&&list.length){
-      messages=list.map(m=>({role:m.role,content:m.content,sources:m.sources||[],streaming:false}));
-    }else if(!messages.length){
-      messages=[];
+    if(currentId!==id||seq!==historySeq)return;            // 已切走或有过期的旧请求，忽略
+    if(!Array.isArray(list))return;
+    // 若该会话正在流式输出，后端此刻的历史还不完整，等回答结束再以落库为准，避免打断/闪屏
+    if(list.length){
+      const streaming=messages.some(m=>m.streaming);
+      if(!streaming){
+        messages=list.map(m=>({role:m.role,content:m.content,sources:m.sources||[],streaming:false}));
+        msgStore[id]=messages;
+        cacheMessages(id);renderMessages();scrollBottom();
+      }
     }
-    cacheMessages(id);renderMessages();scrollBottom();
-  }).catch(()=>{/* 网络失败时保留本地缓存，不清空 */});
+  }).catch(()=>{});
   renderSessions();
 }
 function removeSession(id,ev){
@@ -385,32 +407,38 @@ function renderMessages(){
   box.style.display=messages.length?'block':'none';box.innerHTML='';
   messages.forEach((m,i)=>{
     const row=document.createElement('div');
-    row.className='message-row'+(m.role==='user'?' is-user':'');
-    let inner='<div class="avatar '+(m.role==='user'?'avatar-user':'avatar-ai')+'">'+(m.role==='user'?'我':'AI')+'</div><div class="message-body">';
-    inner+='<div class="message-sender">'+(m.role==='user'?'你':'水利知识库助手')+'</div>';
-    if(m.role==='assistant'&&m.sources&&m.sources.length){
-      const names=[...new Set(m.sources.map(s=>s.fileName))];
-      const sum=names.length===1?names[0]:(names[0]+' 等 '+names.length+' 个文档');
-      inner+='<div class="source-card"><button class="source-head" onclick="toggleSources('+i+')">'+
-        '<span>▤</span><span class="source-title">参考了 '+m.sources.length+' 个知识片段 · '+escapeHtml(sum)+'</span>'+
-        '<span id="arrow'+i+'">▾</span></button><div id="src'+i+'" class="source-list" style="display:none">';
-      m.sources.forEach(s=>{
-        inner+='<div class="source-item"><span class="source-file">'+escapeHtml(s.fileName)+'</span>'+
-          '<span class="source-index">第 '+(Number(s.chunkIndex)+1)+' 段</span>'+
-          '<div class="source-preview">'+escapeHtml(s.preview||'')+'</div></div>';
-      });
-      inner+='</div></div>';
+    if(m.role==='user'){
+      row.className='msg-group user';
+      row.innerHTML='<div class="user-bubble">'+escapeHtml(m.content)+'</div>';
+    }else{
+      row.className='msg-group ai';
+      const cites=(m.sources||[]).map((s,k)=>
+        '<span class="cite-chip" onclick="toggleCite('+i+','+k+')" title="查看引用原文">'+
+          '<span class="cite-num">'+(k+1)+'</span><span class="cite-file">'+escapeHtml(s.fileName)+' · 第'+(Number(s.chunkIndex)+1)+'段</span></span>').join('');
+      const previews=(m.sources||[]).map((s,k)=>
+        '<div class="cite-preview" id="cite-p-'+i+'-'+k+'">'+escapeHtml(s.preview||'')+'</div>').join('');
+      row.innerHTML='<div class="ai-card">'+
+        '<div class="ai-card-head"><span class="ai-badge">水</span><span class="ai-card-name">水利知识库助手</span>'+
+          (m.streaming?'<span style="color:var(--primary)">生成中…</span>':'')+
+          '<span class="ai-card-actions">'+
+            (cites?'<button class="icon-btn" title="'+m.sources.length+' 条引用">▤ '+m.sources.length+'</button>':'')+
+            '<button class="icon-btn" title="复制回答" onclick="copyMsg('+i+')">⧉</button>'+
+          '</span></div>'+
+        '<div class="ai-card-body">'+renderMarkdown(m.content)+(m.streaming?'<span class="cursor"></span>':'')+'</div>'+
+        (cites?'<div class="cite-row">'+cites+'</div>'+previews:'')+
+      '</div>';
     }
-    const content=m.role==='user'?escapeHtml(m.content):renderMarkdown(m.content);
-    inner+='<div class="message-bubble '+(m.role==='user'?'bubble-user':'bubble-ai')+'">'+content+
-      (m.streaming?'<span class="cursor"></span>':'')+'</div></div>';
-    row.innerHTML=inner;box.appendChild(row);
+    box.appendChild(row);
   });
 }
-function toggleSources(i){
-  const el=document.getElementById('src'+i),open=el.style.display!=='none';
-  el.style.display=open?'none':'block';
-  document.getElementById('arrow'+i).textContent=open?'▾':'▴';
+function toggleCite(i,k){
+  const el=document.getElementById('cite-p-'+i+'-'+k);
+  if(el)el.classList.toggle('open');
+}
+async function copyMsg(i){
+  const m=messages[i];if(!m)return;
+  try{await navigator.clipboard.writeText(m.content);toast('回答已复制','ok')}
+  catch(e){toast('复制失败','err')}
 }
 function scrollBottom(){const el=document.getElementById('scrollArea');el.scrollTop=el.scrollHeight}
 function showError(msg){const el=document.getElementById('errorBar');el.textContent=msg;el.style.display='block'}
@@ -418,18 +446,21 @@ function hideError(){document.getElementById('errorBar').style.display='none'}
 async function send(text){
   const q=(text||document.getElementById('question').value).trim();
   if(!q||sending)return;
-  clearDraft();
+  const ownerId=currentId;              // 本次回答归属的会话，全程锁定，切换会话不影响它
+  clearDraft(ownerId);
   sending=true;document.getElementById('sendBtn').disabled=true;hideError();
-  const session=sessions.find(s=>s.id===currentId);
+  const session=sessions.find(s=>s.id===ownerId);
   if(session&&!session.title){session.title=q.length>18?q.slice(0,18)+'…':q}
-  touchSession(currentId);renderSessions(); // 更新会话时间并置顶
-  messages.push({role:'user',content:q,sources:[],streaming:false});
+  touchSession(ownerId);renderSessions();
+  const store=storeOf(ownerId);         // 写入归属会话自己的数组，不是全局变量
+  store.push({role:'user',content:q,sources:[],streaming:false});
   const ai={role:'assistant',content:'',sources:[],streaming:true};
-  messages.push(ai);renderMessages();scrollBottom();
+  store.push(ai);
+  if(currentId===ownerId){renderMessages();scrollBottom()}
   try{
     const r=await fetch('/api/chat/stream',{
       method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({sessionId:currentId,question:q})
+      body:JSON.stringify({sessionId:ownerId,question:q})
     });
     if(!r.ok)throw new Error('请求失败（HTTP '+r.status+'）');
     const reader=r.body.getReader(),dec=new TextDecoder();let buf='';
@@ -446,8 +477,10 @@ async function send(text){
         });
         const data=dataLines.join('\n');
         if(ev==='sources'){try{ai.sources=JSON.parse(data)}catch(e){}}
-        else if(ev==='message'){ai.content+=data;renderMessages();scrollBottom()}
+        else if(ev==='message')ai.content+=data;
       }
+      // 只在用户仍停留在本会话时才重绘，避免切走后仍在后台刷 DOM 造成闪屏/串台
+      if(currentId===ownerId){renderMessages();scrollBottom()}
     }
   }catch(e){
     showError(e.message);
@@ -455,29 +488,33 @@ async function send(text){
   }finally{
     ai.streaming=false;sending=false;
     document.getElementById('sendBtn').disabled=false;
-    cacheMessages(currentId); // 回答一结束就落本地缓存，切换会话立即能看到
-    renderMessages();scrollBottom();
+    cacheMessages(ownerId,store);       // 落到归属会话的缓存
+    if(currentId===ownerId){renderMessages();scrollBottom()}
+    else toast('后台回答已完成','ok');   // 切走了给个轻提示，不打断当前视图
   }
 }
 function quickAsk(q){document.getElementById('question').value=q;send()}
 const draftBox=document.getElementById('question');
-// 输入草稿跨页面保留：跳转到管理页/刷新后自动恢复（sessionStorage，关标签页才清）
-draftBox.value=sessionStorage.getItem('water-rag-draft')||'';
+// 草稿按会话隔离：切到哪个会话就显示哪个会话的草稿，绝不串台。
+function syncDraft(){
+  try{draftBox.value=sessionStorage.getItem(draftKey(currentId))||''}catch(e){draftBox.value=''}
+}
+function clearDraft(id){
+  try{sessionStorage.removeItem(draftKey(id||currentId))}catch(e){}
+  if((id||currentId)===currentId)draftBox.value='';
+}
 draftBox.addEventListener('input',()=>{
-  sessionStorage.setItem('water-rag-draft',draftBox.value);
+  try{sessionStorage.setItem(draftKey(currentId),draftBox.value)}catch(e){}
 });
 draftBox.addEventListener('keydown',e=>{
   if(e.key==='Enter'&&!e.shiftKey&&!e.isComposing){e.preventDefault();send()}
 });
-function clearDraft(){
-  sessionStorage.removeItem('water-rag-draft');
-  draftBox.value='';
-}
 async function clearHistory(){
   try{
     await fetch('/api/chat/history?sessionId='+encodeURIComponent(currentId),{method:'DELETE'});
-    try{localStorage.removeItem(cacheKey(currentId))}catch(e){}
-    messages=[];renderMessages();hideError();toast('当前会话历史已清空','ok');
+    const id=currentId;
+    try{localStorage.removeItem(cacheKey(id))}catch(e){}
+    msgStore[id]=[];messages=[];renderMessages();hideError();toast('当前会话历史已清空','ok');
   }catch(e){showError(e.message)}
 }
 async function testTool(){
