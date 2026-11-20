@@ -62,6 +62,19 @@ class EsHybridSearchServiceTest {
     }
 
     @Test
+    void 权限过滤强制包含租户隔离() {
+        UserContext.CURRENT_TEST(new UserContext.CurrentUser("u", List.of("g1"), "dept-b", "jwt"));
+        String filter = service.buildPermissionFilter();
+        assertTrue(filter.contains("tenantId"));
+        assertTrue(filter.contains("dept-b"));
+        assertFalse(filter.contains("\"tenantId\":\"default\""), "非默认租户不能放宽到 default");
+
+        UserContext.CURRENT_TEST(new UserContext.CurrentUser("u", List.of(), "default", "header"));
+        String def = service.buildPermissionFilter();
+        assertTrue(def.contains("must_not"), "默认租户需兼容历史无tenantId数据");
+    }
+
+    @Test
     void 匿名用户只匹配公开() {
         String filter = service.buildPermissionFilter();
         assertTrue(filter.contains("anonymous"));

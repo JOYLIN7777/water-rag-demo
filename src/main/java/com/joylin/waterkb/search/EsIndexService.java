@@ -53,19 +53,43 @@ public class EsIndexService {
                 .build();
     }
 
-    /** 启动时确保索引存在（幂等） */
+    /** 启动时确保索引存在且含 tenantId 字段（幂等，兼容老索引平滑升级） */
     @PostConstruct
     public void init() {
         try {
             if (!exists(props.getIndex())) {
                 createIndex(props.getIndex());
-                log.info("ES 索引 {} 已创建（{} 维向量 + HNSW）", props.getIndex(), props.getDimensions());
+                log.info("ES 索引 {} 已创建（{} 维向量 + HNSW + tenantId）", props.getIndex(), props.getDimensions());
             } else {
                 log.info("ES 索引 {} 已存在，复用", props.getIndex());
+                ensureTenantField();
             }
         } catch (Exception e) {
             // ES 未启动时不要让整个应用起不来——问答仍可用（检索降级为空）
             log.error("ES 索引初始化失败，检索将降级为空：{}", e.getMessage());
+        }
+    }
+
+    /**
+     * 老索引平滑升级：补 tenantId mapping（ES 允许给已有索引加新字段，无需 reindex）。
+     * 历史数据没有该字段时按 default 租户处理，由查询侧 terms 兼容逻辑覆盖。
+     */
+    private void ensureTenantField() {
+        try {
+            JsonNode mapping = parse(client.get().uri("/" + props.getIndex() + "/_mapping")
+                    .retrieve().body(byte[].class));
+            boolean has = !mapping.path(props.getIndex()).path("mappings").path("properties")
+                    .path("tenantId").isMissingNode();
+            if (!has) {
+                String patch = "{\"properties\":{\"tenantId\":{\"type\":\"keyword\"}}}";
+                client.put().uri("/" + props.getIndex() + "/_mapping")
+                        .contentType(JSON_UTF8)
+                        .body(patch.getBytes(StandardCharsets.UTF_8))
+                        .retrieve().toBodilessEntity();
+                log.info("ES 索引 {} 已补 tenantId 字段", props.getIndex());
+            }
+        } catch (Exception e) {
+            log.warn("补 tenantId mapping 失败：{}", e.getMessage());
         }
     }
 
@@ -108,7 +132,8 @@ public class EsIndexService {
                   "chunkIndex": {"type": "integer"},
                   "uploadedAt": {"type": "date"},
                   "ownerUser": {"type": "keyword"},
-                  "allowedGroups": {"type": "keyword"}
+                  "allowedGroups": {"type": "keyword"},
+                  "tenantId": {"type": "keyword"}
                 }
               }
             }
@@ -171,10 +196,12 @@ public class EsIndexService {
         }
     }
 
-    /** 按文件名删除（先 _delete_by_query，再 refresh） */
+    /** 按文件名删除（先 _delete_by_query，再 refresh）——强制带当前租户 */
     public int deleteByFileName(String fileName) {
+        String tenant = com.joylin.waterkb.security.UserContext.get().tenantId();
         // fileName 本身就是 keyword 类型，没有 .keyword 子字段
-        String dsl = "{\"query\":{\"term\":{\"fileName\":" + quote(fileName) + "}}}";
+        String dsl = "{\"query\":{\"bool\":{\"must\":["
+                + "{\"term\":{\"fileName\":" + quote(fileName) + "}}," + tenantClause(tenant) + "]}}}";
         try {
             return postJson("/" + props.getIndex() + "/_delete_by_query?refresh=true", dsl).path("deleted").asInt();
         } catch (Exception e) {
@@ -182,15 +209,32 @@ public class EsIndexService {
         }
     }
 
-    /** 文档清单：按 fileName 聚合切片数与权限字段 */
+    /** 文档清单：按 fileName 聚合切片数与权限字段，只看当前租户 */
     public JsonNode listDocuments() {
+        String tenant = com.joylin.waterkb.security.UserContext.get().tenantId();
         String dsl = """
-            {"size":0,"aggs":{"files":{"terms":{"field":"fileName","size":1000},
+            {"size":0,"query":%s,"aggs":{"files":{"terms":{"field":"fileName","size":1000},
               "aggs":{"latest":{"max":{"field":"uploadedAt"}},
                       "owner":{"terms":{"field":"ownerUser","size":1}},
                       "groups":{"terms":{"field":"allowedGroups","size":10}}}}}}
-            """;
+            """.formatted(tenantQuery(tenant));
         return search(props.getIndex(), dsl).path("aggregations").path("files").path("buckets");
+    }
+
+    /** 租户过滤子句：tenantId=当前租户；历史无该字段的数据仅在 default 租户下可见 */
+    private String tenantClause(String tenant) {
+        if ("default".equals(tenant)) {
+            return "{\"bool\":{\"should\":["
+                    + "{\"term\":{\"tenantId\":\"default\"}},"
+                    + "{\"bool\":{\"must_not\":{\"exists\":{\"field\":\"tenantId\"}}}}"
+                    + "],\"minimum_should_match\":1}}";
+        }
+        return "{\"term\":{\"tenantId\":" + quote(tenant) + "}}";
+    }
+
+    /** 供查询 DSL 的顶层 query 使用（返回完整 query 对象） */
+    private String tenantQuery(String tenant) {
+        return "{\"bool\":{\"filter\":[" + tenantClause(tenant) + "]}}";
     }
 
     private JsonNode parse(byte[] raw) {

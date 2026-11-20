@@ -6,6 +6,7 @@ import com.joylin.waterkb.memory.ConversationTreeStore;
 import com.joylin.waterkb.memory.TreeNode;
 import com.joylin.waterkb.model.ModelRegistry;
 import com.joylin.waterkb.resilience.LlmCircuitBreaker;
+import com.joylin.waterkb.security.UserContext;
 import com.joylin.waterkb.tool.WaterInfoTool;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -76,6 +77,11 @@ public class RagChatService {
      * done —— 结束标记。</p>
      */
     public Flux<ServerSentEvent<String>> chatStream(String sessionId, String question, String parentId) {
+        // 同步捕获身份快照：SSE 的 doFinally 在 Reactor 异步线程执行，
+        // 那时 Filter 已 clear ThreadLocal，直接读会拿到 anonymous/default（多租户串台）。
+        final String tenantAtStart = UserContext.get().tenantId();
+        final String userAtStart = UserContext.get().userId();
+
         // ===== 阶段 1：相似度检索 =====
         // ES 混合检索内部会先把问题交给 EmbeddingModel 向量化，再跑 BM25+kNN+RRF
         // 检索失败不阻塞问答：降级为无上下文模式（模型只靠自身知识 + 工具）
@@ -120,7 +126,7 @@ public class RagChatService {
                 String fallback = degradeText("模型配置异常，已自动降级", hits);
                 answerBuf.append(fallback);
                 // 降级路径同样落树，且必须挂到同一父节点，不打断分支
-                appendExchange(sessionId, parentId, question, fallback, hits);
+                appendExchange(sessionId, tenantAtStart, parentId, question, fallback, hits);
                 return Flux.just(sse("sources", sourcesJson))
                         .concatWith(Flux.just(fallback).map(t -> sse("message", t)))
                         .concatWith(Mono.just(sse("done", "[DONE]")));
@@ -147,7 +153,7 @@ public class RagChatService {
                         if (sig == SignalType.ON_COMPLETE && !degraded[0]) {
                             breaker.recordSuccess();
                         }
-                        appendExchange(sessionId, parentId, question, answerBuf.toString(), hits);
+                        appendExchange(sessionId, tenantAtStart, parentId, question, answerBuf.toString(), hits);
                     });
         }
 
@@ -184,12 +190,13 @@ public class RagChatService {
      * 同一次问答的两条消息用父子关系绑定，rewind 到 user 即丢弃这次回答，
      * rewind 到 assistant 则完整保留——可精确控制回滚粒度。
      */
-    private void appendExchange(String sessionId, String parentId, String question,
+    private void appendExchange(String sessionId, String tenant, String parentId, String question,
                                 String answer, List<Document> hits) {
+        // 全程用显式 tenant：异步回调线程没有 ThreadLocal 身份，不能读 UserContext
         String parent = parentId == null || parentId.isBlank()
-                ? historyStore.head(sessionId) : parentId;
-        String userNode = historyStore.append(sessionId, parent, "user", question, null, null);
-        historyStore.append(sessionId, userNode, "assistant", answer, toSourceMaps(hits), null);
+                ? historyStore.head(sessionId, tenant) : parentId;
+        String userNode = historyStore.append(sessionId, tenant, parent, "user", question, null, null);
+        historyStore.append(sessionId, tenant, userNode, "assistant", answer, toSourceMaps(hits), null);
     }
 
     /** 把检索命中转成可存入节点 JSON 的来源片段（回显引用卡片用） */

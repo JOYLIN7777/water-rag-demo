@@ -61,6 +61,7 @@ public class EsVectorStoreAdapter implements VectorStore {
             src.put("embedding", toList(vec));
             Map<String, Object> meta = d.getMetadata();
             copyIfPresent(src, meta, "fileName");
+            copyIfPresent(src, meta, "tenantId");
             if (meta.get("chunkIndex") != null) src.put("chunkIndex", meta.get("chunkIndex"));
             if (meta.get("uploadedAt") != null) src.put("uploadedAt", meta.get("uploadedAt"));
             // 权限字段：上传时由 DocumentIngestService 注入，缺省按公开+调用者

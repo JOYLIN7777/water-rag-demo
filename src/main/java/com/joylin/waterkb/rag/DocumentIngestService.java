@@ -131,6 +131,8 @@ public class DocumentIngestService {
             // 由 UserContext 从 Filter 注入，检索层用同一份规则强制过滤
             com.joylin.waterkb.security.UserContext.CurrentUser user = com.joylin.waterkb.security.UserContext.get();
             meta.put("ownerUser", user.userId());
+            // 多租户隔离：文档归属当前租户，检索/列表/删除都按此字段强制过滤
+            meta.put("tenantId", user.tenantId());
             java.util.List<String> groups = new java.util.ArrayList<>(user.groups());
             if (groups.isEmpty()) groups.add("public");
             meta.put("allowedGroups", groups);

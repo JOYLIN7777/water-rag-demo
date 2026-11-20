@@ -142,19 +142,26 @@ public class EsHybridSearchService {
     }
 
     /**
-     * 行级权限过滤条件：owner=自己 OR 用户组命中 allowedGroups OR 公开。
-     * 这是整个权限模型的唯一入口，任何检索都必须经过这里。
+     * 行级权限过滤条件：租户匹配 AND (owner=自己 OR 组命中 OR 公开)。
+     * 这是整个权限模型的唯一入口，任何检索都必须经过这里——调用方无法关闭租户过滤。
      */
     String buildPermissionFilter() {
         UserContext.CurrentUser user = UserContext.get();
         StringBuilder sb = new StringBuilder();
-        sb.append("{\"bool\":{\"should\":[")
+        // 租户条件：非 default 租户严格匹配；default 兼容历史无 tenantId 的老数据
+        String tenant = user.tenantId();
+        String tenantClause = "default".equals(tenant)
+                ? "{\"bool\":{\"should\":[{\"term\":{\"tenantId\":\"default\"}},"
+                        + "{\"bool\":{\"must_not\":{\"exists\":{\"field\":\"tenantId\"}}}}],"
+                        + "\"minimum_should_match\":1}}"
+                : "{\"term\":{\"tenantId\":" + jsonString(tenant) + "}}";
+        sb.append("{\"bool\":{\"filter\":[").append(tenantClause).append(",{\"bool\":{\"should\":[")
                 .append("{\"term\":{\"ownerUser\":").append(jsonString(user.userId())).append("}}")
                 .append(",{\"term\":{\"allowedGroups\":\"public\"}}");
         for (String group : user.groups()) {
             sb.append(",{\"term\":{\"allowedGroups\":").append(jsonString(group)).append("}}");
         }
-        sb.append("],\"minimum_should_match\":1}}");
+        sb.append("],\"minimum_should_match\":1}}]}}");
         return sb.toString();
     }
 
