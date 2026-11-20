@@ -184,17 +184,35 @@ function loadSessions(){
   renderSessions();
 }
 function saveSessions(){localStorage.setItem('water-rag-sessions',JSON.stringify(sessions))}
+// 本地消息缓存：后端是权威源，缓存只用于切换会话时【立即】显示，避免闪烁/空白。
+// 后端返回后用真实历史覆盖，两者不一致时以后端为准。
+function cacheKey(id){return 'water-rag-msgs:'+id}
+function cacheMessages(id){
+  try{localStorage.setItem(cacheKey(id),JSON.stringify(messages.filter(m=>!m.streaming).map(m=>
+    ({role:m.role,content:m.content,sources:m.sources||[]}))))}catch(e){}
+}
+function loadCached(id){
+  try{return JSON.parse(localStorage.getItem(cacheKey(id))||'[]')}catch(e){return []}
+}
 function newSession(){
   const id='session-'+Date.now();sessions.unshift({id,title:''});saveSessions();switchSession(id);renderSessions();
 }
 function switchSession(id){
-  currentId=id;messages=[];renderMessages();hideError();
+  if(currentId&&currentId!==id)cacheMessages(currentId); // 切走前先存当前会话
+  currentId=id;
+  messages=loadCached(id).map(m=>({...m,streaming:false})); // 立即显示缓存，无空白等待
+  renderMessages();hideError();
   document.getElementById('treeLink').href='tree.html?sid='+encodeURIComponent(id);
   fetch('/api/chat/history?sessionId='+encodeURIComponent(id)).then(r=>r.json()).then(list=>{
     if(currentId!==id)return;
-    messages=list.map(m=>({role:m.role,content:m.content,sources:[],streaming:false}));
-    renderMessages();scrollBottom();
-  }).catch(()=>{});
+    // 后端有记录就以它为准；只有后端空且本地有内容时才保留缓存（应对写入时序）
+    if(Array.isArray(list)&&list.length){
+      messages=list.map(m=>({role:m.role,content:m.content,sources:m.sources||[],streaming:false}));
+    }else if(!messages.length){
+      messages=[];
+    }
+    cacheMessages(id);renderMessages();scrollBottom();
+  }).catch(()=>{/* 网络失败时保留本地缓存，不清空 */});
   renderSessions();
 }
 function removeSession(id,ev){
@@ -331,6 +349,7 @@ async function send(text){
   }finally{
     ai.streaming=false;sending=false;
     document.getElementById('sendBtn').disabled=false;
+    cacheMessages(currentId); // 回答一结束就落本地缓存，切换会话立即能看到
     renderMessages();scrollBottom();
   }
 }
@@ -351,6 +370,7 @@ function clearDraft(){
 async function clearHistory(){
   try{
     await fetch('/api/chat/history?sessionId='+encodeURIComponent(currentId),{method:'DELETE'});
+    try{localStorage.removeItem(cacheKey(currentId))}catch(e){}
     messages=[];renderMessages();hideError();
   }catch(e){showError(e.message)}
 }

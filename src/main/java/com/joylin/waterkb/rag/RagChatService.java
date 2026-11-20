@@ -18,7 +18,6 @@ import org.springframework.http.codec.ServerSentEvent;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
-import reactor.core.publisher.SignalType;
 
 import java.time.Duration;
 import java.util.ArrayList;
@@ -103,6 +102,10 @@ public class RagChatService {
         String sourcesJson = toSourcesJson(hits);
 
         // ===== 阶段 5：流式生成（超时 / 异常 → 熔断计数 + 降级） =====
+        // 关键时序：历史落库必须在 done 事件【之前】完成。
+        // 之前放在 doFinally 里，而 Reactor 的 concatWith 会先订阅并发出 done，
+        // 再回调 doFinally——前端收到 done 立刻切会话时历史还没写，回来就空了。
+        // 现在所有分支统一走下面的 persist Mono，done 在其后发出。
         StringBuilder answerBuf = new StringBuilder();
         boolean[] degraded = {false};
         Flux<String> tokens;
@@ -115,52 +118,55 @@ public class RagChatService {
             tokens = Flux.just(fallback);
         } else {
             // 每次调用动态取当前激活的 Chat 模型（含 Tool Calling 工具注册）
-            ChatClient chatClient;
-            try {
-                chatClient = modelRegistry.currentChatClient(waterInfoTool);
-            } catch (Exception ex) {
-                // 配置缺失/构建失败也走同一条降级路径，不让整个问答接口 500
-                breaker.recordFailure();
-                degraded[0] = true;
-                log.error("Chat 模型构建失败，触发降级：{}", ex.getMessage());
-                String fallback = degradeText("模型配置异常，已自动降级", hits);
-                answerBuf.append(fallback);
-                // 降级路径同样落树，且必须挂到同一父节点，不打断分支
-                appendExchange(sessionId, tenantAtStart, parentId, question, fallback, hits);
-                return Flux.just(sse("sources", sourcesJson))
-                        .concatWith(Flux.just(fallback).map(t -> sse("message", t)))
-                        .concatWith(Mono.just(sse("done", "[DONE]")));
-            }
-            tokens = chatClient.prompt()
-                    .system(systemPrompt)
-                    .user(question)
-                    .stream()
-                    .content()   // 只要回答文本的 Flux（工具调用过程由框架内部消化）
-                    .timeout(Duration.ofSeconds(props.getStreamTimeoutSeconds()))
-                    .doOnNext(answerBuf::append)
-                    .onErrorResume(ex -> {
-                        // 超时 / API 异常：熔断计数 +1，并降级输出检索原文
-                        breaker.recordFailure();
-                        degraded[0] = true;
-                        log.error("模型调用失败，触发降级：{}", ex.getMessage());
-                        String fallback = degradeText("AI 服务出现异常，已自动降级", hits);
-                        answerBuf.setLength(0);
-                        answerBuf.append(fallback);
-                        return Flux.just(fallback);
-                    })
-                    .doFinally(sig -> {
-                        // 正常完成 → 熔断计数清零；两条路径都落消息树
-                        if (sig == SignalType.ON_COMPLETE && !degraded[0]) {
-                            breaker.recordSuccess();
-                        }
-                        appendExchange(sessionId, tenantAtStart, parentId, question, answerBuf.toString(), hits);
-                    });
+            tokens = buildTokens(question, systemPrompt, answerBuf, degraded, hits);
         }
 
+        // 统一收尾：先落库（同步、可观测），再发 done。所有分支（正常/熔断/降级）都经过这里。
+        Mono<Void> persist = Mono.fromRunnable(() -> {
+            if (!degraded[0]) breaker.recordSuccess();
+            appendExchange(sessionId, tenantAtStart, parentId, question, answerBuf.toString(), hits);
+        });
+
         // ===== 阶段 6：包装成 SSE 事件流 =====
+        // concatWith 是串行订阅：sources → 所有 message → persist 完成 → done
         return Flux.just(sse("sources", sourcesJson))
                 .concatWith(tokens.map(t -> sse("message", t)))
-                .concatWith(Mono.just(sse("done", "[DONE]")));
+                .concatWith(persist.thenMany(Mono.just(sse("done", "[DONE]"))));
+    }
+
+    /**
+     * 构建模型输出的 token 流。模型构建失败也降级为检索原文，不让问答接口 500。
+     * 独立成方法避免 try/catch 里 chatClient 的编译期确定赋值歧义。
+     */
+    private Flux<String> buildTokens(String question, String systemPrompt, StringBuilder answerBuf,
+                                     boolean[] degraded, List<Document> hits) {
+        ChatClient chatClient;
+        try {
+            chatClient = modelRegistry.currentChatClient(waterInfoTool);
+        } catch (Exception ex) {
+            breaker.recordFailure();
+            degraded[0] = true;
+            log.error("Chat 模型构建失败，触发降级：{}", ex.getMessage());
+            String fallback = degradeText("模型配置异常，已自动降级", hits);
+            answerBuf.append(fallback);
+            return Flux.just(fallback);
+        }
+        return chatClient.prompt()
+                .system(systemPrompt)
+                .user(question)
+                .stream()
+                .content()
+                .timeout(Duration.ofSeconds(props.getStreamTimeoutSeconds()))
+                .doOnNext(answerBuf::append)
+                .onErrorResume(ex -> {
+                    breaker.recordFailure();
+                    degraded[0] = true;
+                    log.error("模型调用失败，触发降级：{}", ex.getMessage());
+                    String fallback = degradeText("AI 服务出现异常，已自动降级", hits);
+                    answerBuf.setLength(0);
+                    answerBuf.append(fallback);
+                    return Flux.just(fallback);
+                });
     }
 
     /**
