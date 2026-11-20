@@ -1,6 +1,7 @@
 package com.joylin.waterkb.security;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.joylin.waterkb.audit.AuditService;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -32,10 +33,12 @@ public class JwtAuthFilter extends OncePerRequestFilter {
 
     private final JwtService jwt;
     private final ObjectMapper mapper;
+    private final AuditService audit;
 
-    public JwtAuthFilter(JwtService jwt, ObjectMapper mapper) {
+    public JwtAuthFilter(JwtService jwt, ObjectMapper mapper, AuditService audit) {
         this.jwt = jwt;
         this.mapper = mapper;
+        this.audit = audit;
     }
 
     @Override
@@ -51,6 +54,12 @@ public class JwtAuthFilter extends OncePerRequestFilter {
             String token = auth.substring(7).trim();
             UserContext.CurrentUser principal = jwt.verify(token);
             if (principal == null) {
+                // 本 Filter 直接短路，AuditFilter(Order=3) 不会执行——必须在这里手工记审计，
+                // 否则所有认证失败都逃逸出审计视野（合规大忌）。
+                audit.record(AuditService.of("default", "anonymous", "",
+                        "GET " + request.getRequestURI(), request.getRequestURI(),
+                        "Invalid bearer token", request.getRemoteAddr(),
+                        HttpServletResponse.SC_UNAUTHORIZED, 0, "DENIED"));
                 response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
                 response.setContentType(MediaType.APPLICATION_JSON_VALUE);
                 response.setCharacterEncoding("UTF-8");

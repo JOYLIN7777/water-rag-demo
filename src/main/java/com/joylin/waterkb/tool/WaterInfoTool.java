@@ -1,5 +1,7 @@
 package com.joylin.waterkb.tool;
 
+import com.joylin.waterkb.audit.AuditService;
+import com.joylin.waterkb.security.UserContext;
 import org.springframework.ai.tool.annotation.Tool;
 import org.springframework.ai.tool.annotation.ToolParam;
 import org.springframework.stereotype.Component;
@@ -29,9 +31,11 @@ public class WaterInfoTool {
     private static final DateTimeFormatter TS_FMT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
     private final ToolPermissionRegistry permissions;
+    private final AuditService audit;
 
-    public WaterInfoTool(ToolPermissionRegistry permissions) {
+    public WaterInfoTool(ToolPermissionRegistry permissions, AuditService audit) {
         this.permissions = permissions;
+        this.audit = audit;
     }
 
     /** 各站点水位/流量的基准值（模拟实时报值 = 基准值 + 随机抖动） */
@@ -56,10 +60,21 @@ public class WaterInfoTool {
         // 返回结构化拒绝结果给模型，模型会据此告诉用户"无权限"，而不是静默失败。
         String denied = permissions.denyReason(ToolPermissionRegistry.TOOL_WATER_QUERY);
         if (denied != null) {
+            // HTTP 层面工具调用仍返回 200（结构化错误给模型），AuditFilter 判不出拒绝，
+            // 必须在这里显式记审计，否则越权调用在审计里显示为"成功"。
+            UserContext.CurrentUser u = UserContext.get();
+            audit.record(AuditService.of(u.tenantId(), u.userId(), String.join(",", u.groups()),
+                    "TOOL_DENIED " + ToolPermissionRegistry.TOOL_WATER_QUERY,
+                    station, denied, "", 403, 0, "DENIED"));
             return "{\"error\":\"PERMISSION_DENIED\",\"message\":\"" + denied + "\"}";
         }
 
         // 未收录站点给一组中性默认值，避免模型拿到 null 后胡编
+        UserContext.CurrentUser u = UserContext.get();
+        audit.record(AuditService.of(u.tenantId(), u.userId(), String.join(",", u.groups()),
+                "TOOL_CALL " + ToolPermissionRegistry.TOOL_WATER_QUERY,
+                station, "查询 " + station + " 实时水情", "", 200, 0, "SUCCESS"));
+
         double[] base = BASE.getOrDefault(station, new double[]{20.00, 150.0});
         double level = round1(base[0] + ThreadLocalRandom.current().nextDouble(-0.3, 0.3));
         double flow = round1(base[1] * (1 + ThreadLocalRandom.current().nextDouble(-0.10, 0.10)));
