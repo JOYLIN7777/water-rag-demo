@@ -361,7 +361,7 @@ async function uploadFile(file){
   if(!file)return;
   const msg=document.getElementById('uploadMsg');
   msg.className='upload-msg';msg.style.display='block';
-  msg.textContent='正在解析 '+file.name+' ...';
+  msg.textContent='正在解析 '+file.name+'（'+(file.size/1048576).toFixed(1)+'MB）...';
   const fd=new FormData();fd.append('file',file);
   const started=Date.now();
   try{

@@ -11,9 +11,9 @@ spring:
 
   servlet:
     multipart:
-      # 数字孪生项目 PPT/报告常含大量截图，上限放宽到 100MB
-      max-file-size: 100MB
-      max-request-size: 100MB
+      # 数字孪生项目 PPT/报告常含大量截图甚至视频，实测有超 100MB 的 pptx，放宽到 500MB
+      max-file-size: 500MB
+      max-request-size: 500MB
 
   # ============ PostgreSQL（含 pgvector 扩展） ============
   # 本地启动：localhost；Docker 容器内：由 compose 传 DB_HOST=postgres（服务名）

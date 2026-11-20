@@ -1,6 +1,7 @@
 package com.joylin.waterkb.common;
 
 import org.springframework.ai.retry.NonTransientAiException;
+import org.springframework.boot.autoconfigure.web.servlet.MultipartProperties;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -19,16 +20,24 @@ import java.util.Map;
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
+    /** multipart 配置（用于超限提示动态显示真实上限，避免提示文案与配置脱节） */
+    private final MultipartProperties multipartProperties;
+
+    public GlobalExceptionHandler(MultipartProperties multipartProperties) {
+        this.multipartProperties = multipartProperties;
+    }
+
     /** 业务校验类错误：400 */
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<Map<String, Object>> handleBadRequest(IllegalArgumentException e) {
         return ResponseEntity.badRequest().body(Map.of("code", 400, "message", e.getMessage()));
     }
 
-    /** 上传文件超限：400 */
+    /** 上传文件超限：400（上限文案从 multipart 配置动态读取） */
     @ExceptionHandler(MaxUploadSizeExceededException.class)
     public ResponseEntity<Map<String, Object>> handleMaxUpload(MaxUploadSizeExceededException e) {
-        return ResponseEntity.badRequest().body(Map.of("code", 400, "message", "文件超过大小限制（20MB）"));
+        return ResponseEntity.badRequest().body(Map.of("code", 400,
+                "message", "文件超过大小限制（" + multipartProperties.getMaxFileSize() + "）"));
     }
 
     /**
