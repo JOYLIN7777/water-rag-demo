@@ -1,38 +1,45 @@
 # 水利知识库智能问答系统（RAG）
 
-基于 **Spring Boot 3.4 + Spring AI + pgvector** 的检索增强生成（RAG）问答系统，面向水利规程、调度文档等专业知识库场景。支持文档上传解析、中文段落重叠切片、向量相似度检索、SSE 流式回答、Tool Calling、Redis 会话历史与熔断降级。
+基于 **Spring Boot 3.4 + Spring AI + Elasticsearch** 的检索增强生成（RAG）问答系统，面向水利规程、调度文档等专业知识库场景。已从 Demo 演进到"企业上线级"能力：ES 混合检索（BM25 + kNN + RRF）、行级权限与多租户隔离、模型可插拔、pi-mono 风格会话树（fork/rewind）、OIDC/JWT 认证、工具权限治理、全量审计日志。
 
 ## 功能清单
 
 | 模块 | 说明 |
 |---|---|
-| 文档上传与解析 | **30+ 种格式**：txt/md/json/xml/yaml/sql/log 等纯文本直读；xls/xlsx/csv/tsv 保留"表头当字段名"语义；pdf/doc/docx/ppt/pptx/rtf/odt/html/epub 等由 Apache Tika 统一解析。空行切段 + 句子兜底，600 字切片 / 100 字重叠窗口 |
-| RAG 问答链路 | 提问 → 向量化 → pgvector Top-5 相似检索 → 外置 Prompt 模板拼装上下文 → 大模型流式生成（SSE） |
-| Tool Calling | 注册"查询实时水情"mock 工具，模型自主决定何时调用（问实时水位时触发） |
-| 工程化 | Redis 会话历史（会话 ID 隔离、TTL、窗口裁剪）、超时 + API 异常的熔断降级（降级返回检索原文）、Prompt 模板外置配置 |
-| Web 前端 | Vue 3 + Vite 专业知识库问答页：会话管理、拖拽上传、SSE 打字机式流式回答、引用片段卡片、Markdown 渲染 |
+| 文档上传与解析 | **36 种格式**：txt/md/json/xml/yaml/sql/log 等纯文本直读；xls/xlsx/csv/tsv 保留"表头当字段名"语义；pdf/doc/docx/ppt/pptx/rtf/odt/html/epub 等由 Apache Tika 统一解析。空行切段 + 句子兜底，600 字切片 / 100 字重叠窗口；支持整文件夹递归上传 |
+| ES 混合检索 | **BM25 全文 + kNN 向量 + RRF 融合**（应用层融合，兼容 ES 8.13），1024 维 dense_vector + HNSW；检索实验页可并排对比三种模式 |
+| 权限与多租户 | 行级权限（owner / 用户组 / public）+ **租户隔离**：ES 文档、检索、增删改、Redis 会话树全部按当前租户强制过滤，调用方无法绕过 |
+| RAG 问答链路 | 提问 → 向量化 → ES 混合检索 → 外置 Prompt 模板拼装上下文 → 大模型流式生成（SSE）；含来源溯源与超时/API 异常熔断降级（返回检索原文） |
+| 模型可插拔 | 数据库配置 CHAT/EMBEDDING 模型，API Key 脱敏、连通性测试、切换即时生效；兼容公有云 API 与内网私有化模型（OpenAI 兼容协议） |
+| 会话树 | pi-mono 风格消息树：**fork**（从任意历史节点开新支）/ **rewind**（只移动当前位置不删节点）；上下文只取祖先链，兄弟分支不串 |
+| 认证与治理 | 零依赖 JWT（HS256）Bearer 认证，sub/groups/tenant claims；**工具权限白名单**（默认拒绝）；**审计日志**落 PostgreSQL，覆盖所有 API + 401 + 工具越权 |
+| Web 前端 | 零依赖静态页（手写渲染，无需 npm）：问答页、文档管理、检索实验、模型配置、会话树、企业治理中心 |
 
 ## 架构图
 
 ```mermaid
 flowchart LR
     subgraph offline [离线索引链路]
-        A[30+ 格式文档上传] --> B[Tika / POI / UTF-8 分路抽取]
+        A[36 种格式文档上传] --> B[Tika / POI / UTF-8 分路抽取]
         B --> C[段落重叠切片 600 字 / 100 字重叠]
         C --> D[Embedding text-embedding-v3]
-        D --> E[(pgvector 向量库)]
+        D --> E[(ES 索引: 文本 + 1024维向量 + 权限字段)]
     end
 
     subgraph online [在线问答链路]
+        AUTH[JWT / X-User 身份] --> G[权限 + 租户强制过滤]
         Q[用户提问 SSE] --> V[问题向量化]
-        V --> S[Top-5 余弦相似检索 阈值过滤]
-        S --> P[Prompt 拼装 外置模板 + 上下文 + 历史]
-        H[(Redis 会话历史)] --> P
+        V --> S[ES: BM25 + kNN + RRF 融合]
+        G --> S
+        S --> P[Prompt 拼装 外置模板 + 上下文 + 分支历史]
+        H[(Redis 会话树 fork/rewind)] --> P
         P --> LLM[大模型 qwen-plus 流式生成]
-        LLM -->|问实时水情时| T[工具: 查询实时水情 mock]
+        LLM -->|问实时水情时| T[工具: 权限校验后调实时水情]
         LLM --> O[SSE 流式输出 sources / message / done]
     end
 
+    S -. 全量请求 .-> AUDIT[(PostgreSQL audit_log 审计)]
+    T -. 越权拒绝 .-> AUDIT
     LLM -. 超时 / 异常 .-> F[熔断计数 + 降级: 返回检索原文]
     E --> S
 ```
@@ -40,18 +47,19 @@ flowchart LR
 ## 技术栈
 
 - Spring Boot 3.4.5 / Java 17
-- Spring AI 1.0.x（OpenAI 兼容协议接入）
+- Spring AI 1.0.x（OpenAI 兼容协议接入，ChatClient / VectorStore / @Tool）
 - 通义千问 DashScope 兼容模式：`qwen-plus`（对话）+ `text-embedding-v3`（1024 维向量）
-- PostgreSQL + pgvector（HNSW 索引、余弦距离）
-- Redis 7（对话历史）
+- Elasticsearch 8.13（BM25 + dense_vector HNSW + 应用层 RRF 融合，完全替代 pgvector）
+- PostgreSQL（审计日志 audit_log + 模型配置 model_config，JdbcTemplate 自动建表）
+- Redis 7（会话消息树：节点 Hash + head 指针 + 命名分支）
 - Apache Tika 3.2（pdf/doc/docx/ppt/pptx/rtf/html/epub 等统一解析）+ POI 5.4（Excel 表头语义）
-- Vue 3 + Vite 6 + marked/DOMPurify（Web 问答页面）
+- 手写 JWT HS256 验签（零新增依赖）+ 零依赖静态前端页（无 npm 构建步骤）
 
 > 为什么不用 DeepSeek 做默认：DeepSeek API **不提供 embedding 接口**，RAG 必须有向量模型。DashScope 一个 Key 同时提供 chat + embedding 且有免费额度。要换 DeepSeek 做对话模型，改 `AI_BASE_URL=https://api.deepseek.com`、`AI_CHAT_MODEL=deepseek-chat`，embedding 保留 DashScope 或另配（见 application.yml 注释）。
 
 ## 快速启动
 
-前置：JDK 17、Maven 3.8+、Docker Desktop；Web 页面另需 Node.js 18+（可选，不影响后端接口）。
+前置：JDK 17、Maven 3.8+、Docker Desktop、本机 Redis（6379）。前端为零依赖静态页，无需 Node.js/npm。
 
 ### 方式 A：全部容器化部署（推荐演示）
 
@@ -63,7 +71,8 @@ mvn -DskipTests package
 #    Windows CMD: set AI_API_KEY=sk-xxxx     PowerShell: $env:AI_API_KEY="sk-xxxx"
 #    Git Bash:    export AI_API_KEY=sk-xxxx
 
-# 3. 构建镜像并启动（pgvector + app 两个容器；Redis 默认用宿主机已启动的实例）
+# 3. 构建镜像并启动（ES + PostgreSQL + app；Redis 默认用宿主机已启动的实例）
+#    JWT 密钥可用环境变量 JWT_SECRET 覆盖（不设则用内置 Demo 密钥）
 docker compose up -d --build app
 
 # 4. 浏览器访问 http://localhost:8080（容器 8080 已映射到宿主机）
@@ -87,10 +96,8 @@ docker compose up -d postgres
 # 启动应用（不设 DB_HOST/REDIS_HOST 时自动用 localhost）
 mvn spring-boot:run
 
-#（可选）启动 Vue 前端：浏览器打开 http://localhost:5173
-cd frontend
-npm install
-npm run dev
+# 浏览器直接访问 http://localhost:8080（零依赖静态页，应用自身托管）
+# 页面入口：问答 / 会话树 / 检索实验 / 模型配置 / 文档管理 / 企业治理
 ```
 
 若想把 Redis 也放进 Docker：`docker compose --profile docker-redis up -d --build app`，
@@ -194,19 +201,37 @@ water-rag-demo
 ## 测试
 
 ```bash
-mvn test   # 18 例：切片器 5 + 熔断器 6 + 多格式解析入库 7（xlsx/csv/md/docx经Tika/拒绝非法格式等）
-cd frontend && npm run build   # 前端生产构建（输出 dist/）
+mvn test   # 38 例：切片5 + 熔断6 + 多格式7 + RRF/DSL/权限5 + JWT4 + 工具权限5 + 脱敏3 + 其他
+mvn package -DskipTests   # 打包后 docker compose up -d --build app
 ```
 
 测试覆盖说明：
-- `DocumentIngestServiceTest`：用 Mockito 捕获 `vectorStore.add()` 参数，验证 xlsx 表头字段语义、csv 引号转义、md 入库、**docx 经 Tika 真实解析**、非法/空文件拒绝，**无需真实数据库和 API Key**；
-- `ParagraphSplitterTest`：切片边界、重叠窗口、句子回退；
-- `LlmCircuitBreakerTest`：CLOSED → OPEN → 半开 → 再熔断的完整状态机。
+- `DocumentIngestServiceTest`：Mockito 捕获 `vectorStore.add()` 参数，验证 xlsx 表头语义、csv 引号转义、docx 经 Tika 真实解析、非法/空文件拒绝，**无需真实数据库和 API Key**；
+- `EsHybridSearchServiceTest`：RRF 跨路去重/Top-K 截断、BM25 与 kNN DSL 结构、权限 filter 强制注入租户与用户组；
+- `JwtServiceTest`：合法 token、篡改签名、过期、格式错误四类路径；
+- `ToolPermissionRegistryTest`：默认拒绝、组命中放行、管理员放行、未注册工具拒绝；
+- `ParagraphSplitterTest` / `LlmCircuitBreakerTest` / `ModelConfigTest`：切片边界、熔断状态机、API Key 脱敏。
+
+## 企业能力演示
+
+浏览器打开 `http://localhost:8080/governance.html`（企业治理中心），可现场演示：
+
+| 演示项 | 操作 | 预期效果 |
+|---|---|---|
+| 认证 | 治理页签发演示 Token，用 `Authorization: Bearer xxx` 调 `/api/auth/me` | 返回 JWT 里的用户/组/租户；伪造或过期 Token 返回 401 |
+| 多租户 | 分别以 `X-Tenant: dept-a` / `dept-b` 上传同名文件 | 两租户检索/列表互不可见；跨租户删除返回"不存在" |
+| 行级权限 | 匿名 / water-dept 组用户查同一问题 | 匿名只见 public 文档，组内用户可见内部文档 |
+| 工具权限 | 匿名 / outsider / water-dept 调 `/api/chat/tool/water` | 前两者返回 PERMISSION_DENIED，后者返回水情数据 |
+| 会话树 | 问答页顶栏进「会话树」，从历史节点 fork 或 rewind | 新分支保留旧分支；切回旧分支上下文不串 |
+| 审计 | 治理页查看审计日志 | 每次 API 调用、401、工具越权均有记录，按租户隔离 |
 
 ## 已知边界与可扩展方向
 
 - 扫描版 PDF / 图片型文档（png/jpg）不支持，需先接 OCR 才有文本可切；
 - 表格单 sheet 最多读 5000 行、100 列（防内存溢出，可在 `DocumentIngestService` 常量调整）；
-- 纯向量检索，可升级为 BM25 + 向量混合检索 + rerank 提升召回质量；
+- ES 中文用 standard analyzer 按字符切分，BM25 召回宽、精度低，靠向量检索弥补；生产可换 IK 分词插件；
+- RRF 在应用层实现（两次 ES 往返），兼容 ES 8.13；ES 8.15+ 可换原生 retriever 减一次往返；
+- JWT 用 HS256 共享密钥 + 演示签发端点；生产应对接真实 IdP 的 JWKS 验签并关闭签发端点；
+- 会话树节点目前不裁剪（永久保留），大体量场景需加节点上限与冷归档；
 - 多轮追问可加 query 改写（把"那它的校核水位呢"改写成独立问题再检索）；
-- 未做用户鉴权，接入生产前需补登录与限流。
+- 工具权限目前是内存规则表，生产应落到数据库并支持运行时配置。
