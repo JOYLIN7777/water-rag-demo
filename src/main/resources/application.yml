@@ -1,5 +1,9 @@
 server:
   port: 8080
+  tomcat:
+    # 不限制超限请求的回吞量：文件超上限时能返回正常 JSON 报错，
+    # 否则 Tomcat 默认只回吞 2MB 就掐断连接，浏览器只会看到 Failed to fetch
+    max-swallow-size: -1
 
 spring:
   application:
@@ -7,8 +11,9 @@ spring:
 
   servlet:
     multipart:
-      max-file-size: 20MB
-      max-request-size: 20MB
+      # 数字孪生项目 PPT/报告常含大量截图，上限放宽到 100MB
+      max-file-size: 100MB
+      max-request-size: 100MB
 
   # ============ PostgreSQL（含 pgvector 扩展） ============
   # 本地启动：localhost；Docker 容器内：由 compose 传 DB_HOST=postgres（服务名）
