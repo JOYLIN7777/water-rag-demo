@@ -3,76 +3,67 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>企业治理中心 · 认证 / 租户 / 工具权限 / 审计</title>
+<title>企业治理中心 · 水利知识库</title>
+<link rel="stylesheet" href="assets/app.css">
 <style>
-:root{--primary:#2563eb;--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb;--red:#dc2626;--green:#059669}
-*{box-sizing:border-box}
-body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;color:#1f2937;background:var(--bg);font-size:14px}
-.topbar{height:58px;background:#fff;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;padding:0 24px;position:sticky;top:0;z-index:5}
-.top-left{display:flex;align-items:center;gap:12px}
-.brand-mark{width:32px;height:32px;border-radius:9px;background:var(--primary);color:#fff;display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:600}
-.topbar-title{font-size:15px;font-weight:600;color:#111827}
-.nav a{color:#4b5563;text-decoration:none;font-size:12px;margin-left:14px}
-.nav a:hover{color:var(--primary)}
-.page{max-width:1100px;margin:0 auto;padding:22px 24px 60px}
-.card{background:#fff;border:1px solid var(--border);border-radius:11px;padding:18px 20px;margin-bottom:16px}
-.card h3{margin:0 0 4px;font-size:15px;color:#111827}
-.card .sub{font-size:12px;color:var(--muted);margin-bottom:14px;line-height:1.6}
-.kv{display:flex;flex-wrap:wrap;gap:10px 28px;font-size:13px;line-height:2}
-.kv b{color:#111827;font-weight:600}
-.tag{display:inline-block;border-radius:10px;padding:2px 9px;font-size:11px;margin-right:5px}
-.tag.ok{background:#d1fae5;color:var(--green)}
-.tag.no{background:#fee2e2;color:var(--red)}
-.tag.info{background:#dbeafe;color:#1e40af}
-.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:10px}
-input,button{font-family:inherit;font-size:12.5px;border-radius:7px;padding:8px 11px}
-input{border:1px solid var(--border)}
-.btn{border:1px solid var(--border);background:#fff;color:#374151;cursor:pointer}
-.btn:hover{border-color:#93c5fd;color:var(--primary)}
-.btn-primary{background:var(--primary);border-color:var(--primary);color:#fff}
-table{width:100%;border-collapse:collapse;font-size:12.5px}
-th,td{text-align:left;padding:8px 10px;border-bottom:1px solid #f3f4f6;white-space:nowrap}
-th{color:var(--muted);font-weight:500;background:#fafafa}
-td.detail{max-width:340px;white-space:normal;word-break:break-all;color:#6b7280}
-.res-SUCCESS{color:var(--green)}.res-DENIED,.res-ERROR{color:var(--red)}
-.scroll{overflow-x:auto;max-height:420px;overflow-y:auto}
-#tokenBox{font-family:monospace;font-size:11px;word-break:break-all;background:#f8fafc;border:1px solid var(--border);border-radius:7px;padding:9px;margin-top:8px;display:none;color:#1e3a8a}
+  .row input[type=text]{width:auto;flex:1;min-width:120px}
+  #tokenBox{font-family:ui-monospace,Consolas,monospace;font-size:11px;word-break:break-all;background:#f7f9fc;border:1px solid var(--line);border-radius:8px;padding:10px;margin-top:10px;display:none;color:#25469b}
+  #tools .tool-row{padding:9px 0;border-bottom:1px solid #f1f4f9;font-size:13px}
+  #tools .tool-row:last-child{border-bottom:0}
+  #tools .tool-desc{font-size:11.5px;color:var(--muted);margin-top:4px}
+  td.detail{max-width:340px;white-space:normal;word-break:break-all;color:var(--muted)}
+  .res-SUCCESS{color:var(--ok);font-weight:600}
+  .res-DENIED,.res-ERROR{color:var(--danger);font-weight:600}
 </style>
 </head>
 <body>
-<header class="topbar">
-  <div class="top-left"><div class="brand-mark">治</div><div class="topbar-title">企业治理中心</div></div>
-  <nav class="nav"><a href="index.html">问答</a><a href="tree.html">会话树</a><a href="search.html">检索</a><a href="models.html">模型</a><a href="manage.html">文档</a></nav>
-</header>
+<div class="layout" id="sidebarHost">
+<main class="main">
+  <header class="topbar">
+    <div class="topbar-left"><div class="topbar-title">企业治理中心</div><span class="topbar-sub">认证 / 租户 / 权限 / 审计</span></div>
+    <span class="status-pill" data-status-pill><span class="status-dot"></span>检测中…</span>
+  </header>
 
-<div class="page">
-  <div class="card">
-    <h3>① 认证身份（OIDC / JWT）</h3>
-    <div class="sub">无 Authorization 头时降级为 X-User/X-Groups/X-Tenant 演示头；带 Bearer Token 时以 JWT claims 为准。伪造/过期 token 直接 401。</div>
-    <div class="kv" id="identity">加载中…</div>
-    <div class="row">
-      <input id="juser" value="zhangsan" placeholder="用户"><input id="jgroups" value="water-dept" placeholder="组（逗号分隔）"><input id="jtenant" value="dept-a" placeholder="租户">
-      <button class="btn btn-primary" onclick="issueToken()">签发演示Token</button>
-      <button class="btn" onclick="loadAll()">刷新身份</button>
+  <div class="page">
+    <div class="page-head">
+      <h1 class="page-title">企业治理中心</h1>
+      <p class="page-desc">集中查看认证身份、工具权限与审计日志，验证系统的租户隔离与权限控制能力。</p>
     </div>
-    <div id="tokenBox"></div>
-  </div>
 
-  <div class="card">
-    <h3>② 工具权限治理</h3>
-    <div class="sub">Tool Calling 触发真实方法前强制校验白名单（用户/组/租户），默认拒绝；admin 组对已注册工具全局放行。</div>
-    <div id="tools">加载中…</div>
-  </div>
+    <div class="card">
+      <div class="card-head"><h3>① 认证身份（OIDC / JWT）</h3></div>
+      <div class="sub">无 Authorization 头时降级为 X-User/X-Groups/X-Tenant 演示头；带 Bearer Token 时以 JWT claims 为准。伪造/过期 token 直接 401。</div>
+      <div class="kv" id="identity">加载中…</div>
+      <div class="row">
+        <input id="juser" type="text" value="zhangsan" placeholder="用户">
+        <input id="jgroups" type="text" value="water-dept" placeholder="组（逗号分隔）">
+        <input id="jtenant" type="text" value="dept-a" placeholder="租户">
+        <button class="btn btn-primary" onclick="issueToken()">签发演示Token</button>
+        <button class="btn" onclick="loadAll()">刷新身份</button>
+      </div>
+      <div id="tokenBox"></div>
+    </div>
 
-  <div class="card">
-    <h3>③ 审计日志</h3>
-    <div class="sub">所有 /api/** 请求自动落库（含身份、租户、动作、状态、耗时、IP）；认证失败与工具越权额外显式埋点。查询按当前租户强制过滤。</div>
-    <div class="kv" id="auditStats"></div>
-    <div class="row"><button class="btn" onclick="loadAudit()">刷新审计</button></div>
-    <div class="scroll" style="margin-top:12px"><table><thead><tr><th>时间</th><th>租户</th><th>用户</th><th>动作</th><th>状态</th><th>耗时</th><th>结果</th><th>细节</th></tr></thead><tbody id="auditBody"></tbody></table></div>
+    <div class="card">
+      <div class="card-head"><h3>② 工具权限治理</h3></div>
+      <div class="sub">Tool Calling 触发真实方法前强制校验白名单（用户/组/租户），默认拒绝；admin 组对已注册工具全局放行。</div>
+      <div id="tools">加载中…</div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h3>③ 审计日志</h3></div>
+      <div class="sub">所有 /api/** 请求自动落库（含身份、租户、动作、状态、耗时、IP）；认证失败与工具越权额外显式埋点。查询按当前租户强制过滤。</div>
+      <div class="kv" id="auditStats"></div>
+      <div class="row"><button class="btn" onclick="loadAudit()">刷新审计</button></div>
+      <div class="scroll" style="margin-top:14px;max-height:440px">
+        <table><thead><tr><th>时间</th><th>租户</th><th>用户</th><th>动作</th><th>状态</th><th>耗时</th><th>结果</th><th>细节</th></tr></thead><tbody id="auditBody"></tbody></table>
+      </div>
+    </div>
   </div>
+</main>
 </div>
 
+<script src="assets/app.js"></script>
 <script>
 function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 function demoHeaders(){return {'X-User':'zhangsan','X-Groups':'water-dept','X-Tenant':'dept-a'}}
@@ -86,16 +77,15 @@ async function loadIdentity(){
 async function loadTools(){
   const r=await fetch('/api/chat/tools',{headers:demoHeaders()});const list=await r.json();
   document.getElementById('tools').innerHTML=list.map(t=>
-    '<div style="padding:7px 0;border-bottom:1px solid #f3f4f6">'+
-    '<b>'+esc(t.tool)+'</b> '+(t.allowed?'<span class="tag ok">有权</span>':'<span class="tag no">无权</span>')+
-    '<div style="font-size:11.5px;color:#6b7280;margin-top:3px">'+esc(t.description)+
+    '<div class="tool-row"><b>'+esc(t.tool)+'</b> '+(t.allowed?'<span class="tag ok">有权</span>':'<span class="tag no">无权</span>')+
+    '<div class="tool-desc">'+esc(t.description)+
     ' · 允许用户 '+esc((t.allowUsers||[]).join(','))+' / 允许组 '+esc((t.allowGroups||[]).join(','))+'</div></div>').join('');
 }
 async function loadAudit(){
   const r=await fetch('/api/audit/stats',{headers:demoHeaders()});const s=await r.json();
   document.getElementById('auditStats').innerHTML=
-    '<span>总记录 <b>'+s.total+'</b></span><span>拒绝 <b style="color:var(--red)">'+s.denied+'</b></span>'+
-    '<span>错误 <b style="color:var(--red)">'+s.errors+'</b></span><span>租户 <b>'+esc(s.tenant)+'</b></span>';
+    '<span>总记录 <b>'+s.total+'</b></span><span>拒绝 <b style="color:var(--danger)">'+s.denied+'</b></span>'+
+    '<span>错误 <b style="color:var(--danger)">'+s.errors+'</b></span><span>租户 <b>'+esc(s.tenant)+'</b></span>';
   const r2=await fetch('/api/audit/logs?limit=100',{headers:demoHeaders()});const j2=await r2.json();
   document.getElementById('auditBody').innerHTML=(j2.logs||[]).map(l=>
     '<tr><td>'+esc(String(l.ts).slice(11,19))+'</td><td>'+esc(l.tenant_id)+'</td><td>'+esc(l.user_id)+'</td>'+
@@ -109,8 +99,10 @@ async function issueToken(){
   const r=await fetch('/api/auth/token'+q,{method:'POST'});const j=await r.json();
   const box=document.getElementById('tokenBox');box.style.display='block';
   box.textContent=j.token;
+  appToast('演示 Token 已签发','ok');
 }
 async function loadAll(){await loadIdentity();await loadTools();await loadAudit()}
+initShell('governance');
 loadAll();
 </script>
 </body>

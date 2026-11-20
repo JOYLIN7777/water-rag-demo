@@ -3,81 +3,56 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>知识库文档管理</title>
+<title>知识库文档管理 · 水利知识库</title>
+<link rel="stylesheet" href="assets/app.css">
 <style>
-  :root{--primary:#2563eb;--primary-dark:#1d4ed8;--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb}
-  *{box-sizing:border-box}
-  body{margin:0;min-height:100vh;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;color:#1f2937;background:var(--bg)}
-  button{font-family:inherit;cursor:pointer}
-  .topbar{height:58px;background:#fff;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;padding:0 24px}
-  .topbar .left{display:flex;align-items:center;gap:12px}
-  .brand-mark{width:34px;height:34px;border-radius:9px;background:var(--primary);color:#fff;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:600}
-  .topbar-title{font-size:15px;font-weight:600;color:#111827}
-  .text-btn{border:1px solid var(--border);background:#fff;color:#4b5563;padding:6px 12px;border-radius:7px;font-size:12px;text-decoration:none;display:inline-block}
-  .text-btn:hover{border-color:#93c5fd;color:var(--primary);background:#f8fbff}
-  .page{max-width:980px;margin:24px auto;padding:0 20px}
-  .stats{display:flex;gap:14px;margin-bottom:18px}
-  .stat-card{flex:1;background:#fff;border:1px solid var(--border);border-radius:12px;padding:16px 18px;box-shadow:0 1px 2px rgba(0,0,0,.04)}
-  .stat-num{font-size:24px;font-weight:600;color:var(--primary)}
-  .stat-label{font-size:12px;color:var(--muted);margin-top:4px}
-  .toolbar{display:flex;gap:10px;margin-bottom:14px;align-items:center}
-  .search{flex:1;max-width:340px;padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-size:13px;outline:0;font-family:inherit}
-  .search:focus{border-color:#93c5fd;box-shadow:0 0 0 3px #dbeafe}
-  .dropzone{border:1.5px dashed #cbd5e1;border-radius:10px;padding:14px 10px;text-align:center;cursor:pointer;transition:all .2s;background:#fff}
-  .dropzone:hover,.dropzone.dragging{border-color:var(--primary);background:#eff6ff}
-  .dropzone .t{font-size:12.5px;color:#4b5563}
-  .upload-msg{margin:10px 0;padding:8px 12px;border-radius:7px;font-size:12.5px;line-height:1.5;word-break:break-all;display:none}
-  .upload-msg.ok{background:#ecfdf5;color:#047857;border:1px solid #a7f3d0}
-  .upload-msg.err{background:#fef2f2;color:#b91c1c;border:1px solid #fecaca}
-  .table-card{background:#fff;border:1px solid var(--border);border-radius:12px;overflow:hidden;box-shadow:0 1px 2px rgba(0,0,0,.04)}
-  table{width:100%;border-collapse:collapse;font-size:13.5px}
-  th{background:#f8fafc;color:#6b7280;font-weight:500;text-align:left;padding:11px 16px;border-bottom:1px solid var(--border);font-size:12px}
-  td{padding:12px 16px;border-bottom:1px solid #f3f4f6}
-  tr:last-child td{border-bottom:0}
-  tr:hover td{background:#f8fafc}
-  .doc-name{max-width:420px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .del-btn{border:1px solid #fecaca;background:#fff;color:#dc2626;padding:5px 12px;border-radius:6px;font-size:12px}
-  .del-btn:hover{background:#fef2f2}
-  .empty{padding:40px;text-align:center;color:#9ca3af;font-size:13px}
-  .foot-tip{font-size:11px;color:#9ca3af;text-align:center;margin:18px 0}
-  ::-webkit-scrollbar{width:8px}::-webkit-scrollbar-thumb{background:#d1d5db;border-radius:4px}
+  .toolbar{display:flex;gap:12px;margin-bottom:16px;align-items:center;flex-wrap:wrap}
+  .search{flex:1;max-width:320px}
+  .dropzone{border:1.5px dashed #b9cbff;border-radius:10px;padding:11px 16px;text-align:center;cursor:pointer;transition:all .2s;background:#fff;font-size:12.5px;color:var(--ink-2)}
+  .dropzone:hover,.dropzone.dragging{border-color:var(--primary);background:var(--primary-soft);color:var(--primary)}
+  .upload-msg{margin:0 0 16px;display:block;background:#f7f9fc;border:1px solid var(--line);color:var(--ink-2)}
+  .doc-name{max-width:420px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600;color:var(--ink)}
 </style>
 </head>
 <body>
-<header class="topbar">
-  <div class="left">
-    <div class="brand-mark">水</div>
-    <div class="topbar-title">知识库文档管理</div>
-  </div>
-  <a class="text-btn" href="index.html">← 返回问答</a>
-</header>
+<div class="layout" id="sidebarHost">
+<main class="main">
+  <header class="topbar">
+    <div class="topbar-left"><div class="topbar-title">知识库文档管理</div><span class="topbar-sub">/ 文档</span></div>
+    <span class="status-pill" data-status-pill><span class="status-dot"></span>检测中…</span>
+  </header>
 
-<div class="page">
-  <div class="stats">
-    <div class="stat-card"><div class="stat-num" id="statDocs">-</div><div class="stat-label">已入库文档数</div></div>
-    <div class="stat-card"><div class="stat-num" id="statChunks">-</div><div class="stat-label">切片总数（向量条数）</div></div>
-    <div class="stat-card"><div class="stat-num" id="statLatest">-</div><div class="stat-label">最近更新时间</div></div>
-  </div>
-
-  <div class="toolbar">
-    <input class="search" id="search" placeholder="按文件名过滤…">
-    <div class="dropzone" id="dropzone" style="flex:1">
-      <span class="t">⇪ 点击或拖拽上传文档入库</span>
+  <div class="page">
+    <div class="page-head">
+      <h1 class="page-title">知识库文档管理</h1>
+      <p class="page-desc">上传、查看与删除知识库文档。文档解析后会切分成片段写入检索库，删除时其全部切片一并移除。</p>
     </div>
-    <input type="file" id="fileInput" hidden>
-  </div>
 
-  <div class="upload-msg" id="uploadMsg"></div>
+    <div class="stats">
+      <div class="stat-card"><div class="stat-num" id="statDocs">-</div><div class="stat-label">已入库文档数</div></div>
+      <div class="stat-card"><div class="stat-num" id="statChunks">-</div><div class="stat-label">切片总数</div></div>
+      <div class="stat-card"><div class="stat-num" id="statLatest" style="font-size:15px;line-height:1.9">-</div><div class="stat-label">最近更新时间</div></div>
+    </div>
 
-  <div class="table-card">
-    <table>
-      <thead><tr><th style="width:55%">文件名</th><th>切片数</th><th>最近上传时间</th><th style="width:110px">操作</th></tr></thead>
-      <tbody id="docTbody"><tr><td colspan="4" class="empty">加载中…</td></tr></tbody>
-    </table>
+    <div class="toolbar">
+      <input class="search" id="search" type="text" placeholder="按文件名过滤…">
+      <div class="dropzone" id="dropzone" style="flex:1">⇪ 点击或拖拽上传文档入库</div>
+      <input type="file" id="fileInput" hidden>
+    </div>
+
+    <div class="upload-msg" id="uploadMsg"></div>
+
+    <div class="table-card">
+      <div class="scroll"><table>
+        <thead><tr><th style="width:52%">文件名</th><th>切片数</th><th>最近上传时间</th><th style="width:100px">操作</th></tr></thead>
+        <tbody id="docTbody"><tr><td colspan="4" class="empty">加载中…</td></tr></tbody>
+      </table></div>
+    </div>
   </div>
-  <div class="foot-tip">删除文档会同时移除其全部向量切片，删除前请确认不再需要问答引用该文档。</div>
+</main>
 </div>
 
+<script src="assets/app.js"></script>
 <script>
 let docs=[];
 function escapeHtml(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
@@ -109,9 +84,9 @@ function render(){
   list.forEach(d=>{
     const tr=document.createElement('tr');
     tr.innerHTML='<td class="doc-name" title="'+escapeHtml(d.fileName)+'">'+escapeHtml(d.fileName)+'</td>'+
-      '<td>'+d.chunks+'</td><td>'+fmtTime(d.uploadedAt)+'</td>'+
-      '<td><button class="del-btn">删除</button></td>';
-    tr.querySelector('.del-btn').onclick=()=>delDoc(d);
+      '<td><span class="tag">'+d.chunks+' 片</span></td><td>'+fmtTime(d.uploadedAt)+'</td>'+
+      '<td><button class="btn btn-sm btn-danger">删除</button></td>';
+    tr.querySelector('.btn-danger').onclick=()=>delDoc(d);
     tbody.appendChild(tr);
   });
 }
@@ -125,6 +100,7 @@ async function delDoc(d){
     const j=await r.json();
     if(!r.ok||j.deletedChunks===undefined)throw new Error(j.message||('删除失败（HTTP '+r.status+'）'));
     showMsg('ok','✓ 已删除「'+d.fileName+'」（'+j.deletedChunks+' 个切片）');
+    appToast('文档已删除','ok');
     loadDocs();
   }catch(e){showMsg('err','✗ 删除失败：'+e.message)}
 }
@@ -139,7 +115,8 @@ async function uploadFile(file){
     const j=await r.json();
     if(!r.ok||j.chunks===undefined)throw new Error(j.message||('上传失败（HTTP '+r.status+'）'));
     const secs=((Date.now()-started)/1000).toFixed(1);
-    showMsg('ok','✓ 解析完成：'+file.name+' 共 '+j.chunks+' 个切片（'+j.chars+' 字），耗时 '+secs+' 秒');
+    showMsg('ok','✓ 解析完成：'+file.name+' 共 '+j.chunks+' 个切片（'+j.chars+' 字），耗时 '+secs+' 秒，已可提问');
+    appToast('文档已入库','ok');
     loadDocs();
   }catch(e){showMsg('err','✗ '+file.name+' 入库失败：'+e.message)}
 }
@@ -155,6 +132,7 @@ dz.ondragleave=e=>{e.preventDefault();dz.classList.remove('dragging')};
 dz.ondrop=e=>{e.preventDefault();dz.classList.remove('dragging');uploadFile(e.dataTransfer.files[0])};
 document.getElementById('fileInput').onchange=e=>{uploadFile(e.target.files[0]);e.target.value=''};
 
+initShell('manage');
 loadDocs();
 </script>
 </body>

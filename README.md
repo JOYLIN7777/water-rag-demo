@@ -1,6 +1,6 @@
 # 水利知识库智能问答系统（RAG）
 
-基于 **Spring Boot 3.4 + Spring AI + Elasticsearch** 的检索增强生成（RAG）问答系统，面向水利规程、调度文档等专业知识库场景。已从 Demo 演进到"企业上线级"能力：ES 混合检索（BM25 + kNN + RRF）、行级权限与多租户隔离、模型可插拔、pi-mono 风格会话树（fork/rewind）、OIDC/JWT 认证、工具权限治理、全量审计日志。
+基于 **Spring Boot 3.4 + Spring AI + Elasticsearch** 的检索增强生成（RAG）问答系统，面向水利规程、调度文档等专业知识库场景。包含 ES 混合检索（BM25 + kNN + RRF）、行级权限与多租户隔离、模型可插拔、pi-mono 风格会话树（fork/rewind）、OIDC/JWT 认证、工具权限治理、全量审计日志等能力。
 
 ## 功能清单
 
