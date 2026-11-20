@@ -2,6 +2,7 @@ package com.joylin.waterkb.web;
 
 import com.joylin.waterkb.memory.ConversationTreeStore;
 import com.joylin.waterkb.rag.RagChatService;
+import com.joylin.waterkb.tool.ToolPermissionRegistry;
 import com.joylin.waterkb.tool.WaterInfoTool;
 import com.joylin.waterkb.web.dto.ChatRequest;
 import jakarta.validation.Valid;
@@ -34,13 +35,16 @@ public class ChatController {
     private final RagChatService ragChatService;
     private final ConversationTreeStore treeStore;
     private final WaterInfoTool waterInfoTool;
+    private final ToolPermissionRegistry toolPermissions;
 
     public ChatController(RagChatService ragChatService,
                           ConversationTreeStore treeStore,
-                          WaterInfoTool waterInfoTool) {
+                          WaterInfoTool waterInfoTool,
+                          ToolPermissionRegistry toolPermissions) {
         this.ragChatService = ragChatService;
         this.treeStore = treeStore;
         this.waterInfoTool = waterInfoTool;
+        this.toolPermissions = toolPermissions;
     }
 
     /**
@@ -111,10 +115,17 @@ public class ChatController {
     }
 
     /**
-     * 实时水情工具直调（不经过大模型，用于单独验证工具逻辑）。
+     * 实时水情工具直调（不经过大模型，用于单独验证工具权限与逻辑）。
+     * 越权时返回 JSON 错误而非水情数据。
      */
     @PostMapping("/tool/water")
     public String queryWater(@RequestParam String station) {
         return waterInfoTool.queryRealtimeWater(station);
+    }
+
+    /** 当前身份可见的工具清单及是否有权调用（作品集演示工具权限治理） */
+    @GetMapping("/tools")
+    public List<Map<String, Object>> tools() {
+        return toolPermissions.listForCurrentUser();
     }
 }

@@ -28,6 +28,12 @@ public class WaterInfoTool {
 
     private static final DateTimeFormatter TS_FMT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
+    private final ToolPermissionRegistry permissions;
+
+    public WaterInfoTool(ToolPermissionRegistry permissions) {
+        this.permissions = permissions;
+    }
+
     /** 各站点水位/流量的基准值（模拟实时报值 = 基准值 + 随机抖动） */
     private static final Map<String, double[]> BASE = Map.of(
             "云溪水库", new double[]{45.10, 1200.0},
@@ -45,6 +51,13 @@ public class WaterInfoTool {
             "当用户询问实时水位、实时流量、当前水情、汛情动态等知识库无法提供的动态信息时调用本工具")
     public String queryRealtimeWater(
             @ToolParam(description = "站点名称，例如：云溪水库") String station) {
+
+        // 权限守卫：Tool Calling 触发的是真实方法，必须在执行前强制校验。
+        // 返回结构化拒绝结果给模型，模型会据此告诉用户"无权限"，而不是静默失败。
+        String denied = permissions.denyReason(ToolPermissionRegistry.TOOL_WATER_QUERY);
+        if (denied != null) {
+            return "{\"error\":\"PERMISSION_DENIED\",\"message\":\"" + denied + "\"}";
+        }
 
         // 未收录站点给一组中性默认值，避免模型拿到 null 后胡编
         double[] base = BASE.getOrDefault(station, new double[]{20.00, 150.0});
