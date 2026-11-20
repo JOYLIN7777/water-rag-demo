@@ -1,5 +1,7 @@
 package com.joylin.waterkb.common;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.ai.retry.NonTransientAiException;
 import org.springframework.boot.autoconfigure.web.servlet.MultipartProperties;
 import org.springframework.http.HttpStatus;
@@ -19,6 +21,8 @@ import java.util.Map;
  */
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
+    private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
     /** multipart 配置（用于超限提示动态显示真实上限，避免提示文案与配置脱节） */
     private final MultipartProperties multipartProperties;
@@ -51,9 +55,10 @@ public class GlobalExceptionHandler {
                 .body(Map.of("code", 502, "message", "大模型接口调用失败：" + e.getMessage()));
     }
 
-    /** 兜底：500 */
+    /** 兜底：500（必须把异常打进日志，否则排查时无迹可循） */
     @ExceptionHandler(Exception.class)
     public ResponseEntity<Map<String, Object>> handleOther(Exception e) {
+        log.error("未处理异常：{}", e.getMessage(), e);
         return ResponseEntity.internalServerError().body(Map.of("code", 500, "message", "服务内部异常，请稍后重试"));
     }
 }

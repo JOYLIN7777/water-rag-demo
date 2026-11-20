@@ -58,6 +58,13 @@ public class DocumentIngestService {
 
     private static final Logger log = LoggerFactory.getLogger(DocumentIngestService.class);
 
+    static {
+        // POI 默认拒绝分配单条超过 100MB 的记录（RecordFormatException），
+        // 数字孪生项目 pptx 实测存在 105MB 的单条记录（大图/嵌入对象），放宽到 1.5GB。
+        // 代价是解析超大文件时可能临时占用大块堆内存，容器堆默认 25% 物理内存，可承受。
+        org.apache.poi.util.IOUtils.setByteArrayMaxOverride(1_500_000_000);
+    }
+
     /** 纯文本类：直接按 UTF-8 读，无需解析器（geojson/topojson 本质是 JSON 文本） */
     private static final Set<String> PLAIN_TEXT_EXTENSIONS = Set.of(
             "txt", "md", "markdown", "json", "geojson", "topojson", "xml", "yaml", "yml",
