@@ -88,6 +88,8 @@ services:
       AI_EMBEDDING_MODEL: ${AI_EMBEDDING_MODEL:-text-embedding-v3}
       # 容器内用服务名 elasticsearch 访问 ES
       ES_URL: ${ES_URL:-http://elasticsearch:9200}
+      # JWT 签名密钥从环境变量传入，绝不写入文件/镜像；未设置时应用用内置 Demo 密钥
+      JWT_SECRET: ${JWT_SECRET:-water-rag-demo-dev-secret-change-in-prod}
     extra_hosts:
       # Linux 需要显式映射；Docker Desktop for Windows/Mac 已内置该主机名
       - "host.docker.internal:host-gateway"

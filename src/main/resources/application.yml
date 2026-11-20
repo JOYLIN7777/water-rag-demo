@@ -58,6 +58,13 @@ spring:
         initialize-schema: false
         dimensions: 1024
 
+# ============ 认证：JWT / OIDC 骨架 ============
+security:
+  jwt:
+    # 密钥必须由环境变量注入；默认值仅用于本地 Demo，生产务必覆盖
+    secret: ${JWT_SECRET:water-rag-demo-dev-secret-change-in-prod}
+    enabled: ${JWT_ENABLED:true}
+
 # ============ Elasticsearch：混合检索底座 ============
 # 容器内用服务名 elasticsearch；本地直连用 localhost
 es:
