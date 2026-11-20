@@ -37,11 +37,13 @@ public class GlobalExceptionHandler {
         return ResponseEntity.badRequest().body(Map.of("code", 400, "message", e.getMessage()));
     }
 
-    /** 上传文件超限：400（上限文案从 multipart 配置动态读取） */
+    /** 上传文件超限：400（上限文案动态读取并格式化为可读单位，避免出现 524288000B 这种原始字节数） */
     @ExceptionHandler(MaxUploadSizeExceededException.class)
     public ResponseEntity<Map<String, Object>> handleMaxUpload(MaxUploadSizeExceededException e) {
+        var max = multipartProperties.getMaxFileSize();
+        String readable = max.toGigabytes() >= 1 ? max.toGigabytes() + "GB" : max.toMegabytes() + "MB";
         return ResponseEntity.badRequest().body(Map.of("code", 400,
-                "message", "文件超过大小限制（" + multipartProperties.getMaxFileSize() + "）"));
+                "message", "文件超过大小限制（上限 " + readable + "）"));
     }
 
     /**

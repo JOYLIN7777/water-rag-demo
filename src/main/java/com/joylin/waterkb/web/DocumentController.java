@@ -3,6 +3,7 @@ package com.joylin.waterkb.web;
 import com.joylin.waterkb.rag.DocumentIngestService;
 import com.joylin.waterkb.rag.VectorStoreAdminRepository;
 import com.joylin.waterkb.web.dto.UploadResult;
+import org.springframework.boot.autoconfigure.web.servlet.MultipartProperties;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -27,10 +28,14 @@ public class DocumentController {
 
     private final DocumentIngestService ingestService;
     private final VectorStoreAdminRepository adminRepository;
+    private final MultipartProperties multipartProperties;
 
-    public DocumentController(DocumentIngestService ingestService, VectorStoreAdminRepository adminRepository) {
+    public DocumentController(DocumentIngestService ingestService,
+                              VectorStoreAdminRepository adminRepository,
+                              MultipartProperties multipartProperties) {
         this.ingestService = ingestService;
         this.adminRepository = adminRepository;
+        this.multipartProperties = multipartProperties;
     }
 
     /**
@@ -48,12 +53,13 @@ public class DocumentController {
     }
 
     /**
-     * 查询支持的格式列表（前端上传区动态展示）。
+     * 查询支持的格式列表（前端上传区动态展示 + 文件大小前端预检）。
      */
     @GetMapping(value = "/formats", produces = MediaType.APPLICATION_JSON_VALUE)
     public Map<String, Object> formats() {
         List<String> list = DocumentIngestService.getSupportedExtensions().stream().sorted().toList();
-        return Map.of("extensions", list, "count", list.size());
+        return Map.of("extensions", list, "count", list.size(),
+                "maxFileSizeBytes", multipartProperties.getMaxFileSize().toBytes());
     }
 
     /**
