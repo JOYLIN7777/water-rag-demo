@@ -66,6 +66,10 @@ services:
     extra_hosts:
       # Linux 需要显式映射；Docker Desktop for Windows/Mac 已内置该主机名
       - "host.docker.internal:host-gateway"
+    dns:
+      # 固定公共 DNS，绕开宿主机间歇性 DNS 故障（2026-11-20 实测默认 DNS 时好时坏）
+      - 114.114.114.114
+      - 223.5.5.5
 
 volumes:
   pgdata:
