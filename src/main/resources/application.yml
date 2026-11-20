@@ -53,13 +53,21 @@ spring:
       max-attempts: 3
     vectorstore:
       pgvector:
-        # 首次启动自动建表（vector_store 表 + HNSW 向量索引）
-        initialize-schema: true
-        # 必须与 embedding 模型输出维度一致：text-embedding-v3 = 1024
+        # 已完全切换到 ES（见 WaterKbApplication 的 exclude），此段仅保留给
+        # ModelConfigRepository 读取默认维度种子（dimensions），不再创建向量表
+        initialize-schema: false
         dimensions: 1024
-        # 余弦距离：文本语义检索的通用选择，对向量模长不敏感
-        distance-type: COSINE_DISTANCE
-        index-type: HNSW
+
+# ============ Elasticsearch：混合检索底座 ============
+# 容器内用服务名 elasticsearch；本地直连用 localhost
+es:
+  url: ${ES_URL:http://localhost:9200}
+  index: ${ES_INDEX:water_knowledge}
+  dimensions: 1024
+  knn-candidates: 100
+  top-k: 5
+  rrf-rank-constant: 60
+  min-score: 0
 
 # ============ RAG 自定义参数（RagProperties 绑定） ============
 rag:

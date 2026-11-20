@@ -1,49 +1,56 @@
 package com.joylin.waterkb.rag;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.jdbc.core.JdbcTemplate;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.joylin.waterkb.search.EsIndexService;
 import org.springframework.stereotype.Repository;
 
+import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
 /**
- * 向量库管理操作（文档清单 / 按文件名删除切片）。
+ * 向量库管理操作（文档清单 / 按文件名删除）——底层已从 pgvector 切到 ES。
  *
- * <p>设计决策：直接用 JdbcTemplate 操作 Spring AI 的 vector_store 表，而不是绕
- * VectorStore 接口——后者只支持按 id 删除，而我们的删除维度是"文件名"（存在
- * metadata JSON 里），SQL 一条搞定且语义清晰。表名固定为 pgvector 默认的
- * vector_store（与 application.yml 的 initialize-schema 建表一致）。</p>
+ * <p>保留原类名是为了让 Controller 与前端零改动，内部全部委托 EsIndexService。
+ * 这是"完全替换存储底座但上层 contracts 不变"的落地样例。</p>
  */
 @Repository
 public class VectorStoreAdminRepository {
 
-    private static final Logger log = LoggerFactory.getLogger(VectorStoreAdminRepository.class);
+    private final EsIndexService es;
 
-    private final JdbcTemplate jdbc;
-
-    public VectorStoreAdminRepository(JdbcTemplate jdbc) {
-        this.jdbc = jdbc;
+    public VectorStoreAdminRepository(EsIndexService es) {
+        this.es = es;
     }
 
-    /**
-     * 知识库文档清单：按文件名聚合切片数与最近上传时间。
-     * 注意 PG 列别名必须加双引号，否则会折叠成小写导致前端取不到 key。
-     */
+    /** 文档清单：从 ES 聚合按文件名分组，返回与旧版一致的结构 */
     public List<Map<String, Object>> listDocuments() {
-        String sql = "SELECT metadata->>'fileName' AS \"fileName\", COUNT(*) AS \"chunks\", " +
-                "MAX(metadata->>'uploadedAt') AS \"uploadedAt\" " +
-                "FROM vector_store GROUP BY metadata->>'fileName' ORDER BY \"fileName\"";
-        return jdbc.queryForList(sql);
+        List<Map<String, Object>> out = new ArrayList<>();
+        try {
+            JsonNode buckets = es.listDocuments();
+            Iterator<JsonNode> it = buckets.elements();
+            while (it.hasNext()) {
+                JsonNode b = it.next();
+                JsonNode owner = b.path("owner").path("buckets");
+                JsonNode groups = b.path("groups").path("buckets");
+                List<String> groupNames = new ArrayList<>();
+                Iterator<JsonNode> git = groups.elements();
+                while (git.hasNext()) groupNames.add(git.next().path("key").asText());
+                out.add(Map.of(
+                        "fileName", b.path("key").asText(),
+                        "chunks", b.path("doc_count").asInt(),
+                        "uploadedAt", b.path("latest").path("value_as_string").asText(""),
+                        "ownerUser", owner.isEmpty() ? "" : owner.get(0).path("key").asText(),
+                        "allowedGroups", groupNames));
+            }
+        } catch (Exception e) {
+            return List.of(); // ES 未就绪时返回空清单，不让接口 500
+        }
+        return out;
     }
 
-    /**
-     * 删除指定文档的所有切片，返回删除条数（0 表示文档不存在）。
-     */
     public int deleteByFileName(String fileName) {
-        int deleted = jdbc.update("DELETE FROM vector_store WHERE metadata->>'fileName' = ?", fileName);
-        log.info("删除文档 {} 的 {} 个切片", fileName, deleted);
-        return deleted;
+        return es.deleteByFileName(fileName);
     }
 }

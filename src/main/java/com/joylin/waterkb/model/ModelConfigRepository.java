@@ -135,14 +135,8 @@ public class ModelConfigRepository {
         return jdbc.update("DELETE FROM model_config WHERE id=?", id);
     }
 
-    /** 统计切片表向量维度，用于校验 embedding 切换的兼容性（只读查询） */
+    /** ES 索引维度（来自 es.dimensions 配置），用于校验 embedding 切换兼容性 */
     public Integer vectorDimension() {
-        try {
-            List<Map<String, Object>> rows = jdbc.queryForList(
-                    "SELECT vector_dims(embedding) AS dim FROM vector_store LIMIT 1");
-            return rows.isEmpty() ? null : ((Number) rows.get(0).get("dim")).intValue();
-        } catch (Exception e) {
-            return null; // 表不存在或空表：放行，由配置维度为准
-        }
+        return seedDimensions; // ES mapping 固定该维度，切不同维度模型必须拒绝
     }
 }

@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>混合检索实验 · 水利知识库</title>
+<style>
+  :root{--primary:#2563eb;--border:#e5e7eb;--muted:#6b7280;--bg:#f9fafb}
+  *{box-sizing:border-box}
+  body{margin:0;min-height:100vh;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;color:#1f2937;background:var(--bg)}
+  button{font-family:inherit;cursor:pointer}
+  .topbar{height:58px;background:#fff;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;padding:0 24px}
+  .brand-mark{width:34px;height:34px;border-radius:9px;background:var(--primary);color:#fff;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:600}
+  .topbar-title{font-size:15px;font-weight:600;color:#111827}
+  .text-btn{border:1px solid var(--border);background:#fff;color:#4b5563;padding:6px 12px;border-radius:7px;font-size:12px;text-decoration:none}
+  .page{max-width:1200px;margin:24px auto;padding:0 20px}
+  .intro{background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;padding:13px 16px;font-size:12.5px;color:#1e40af;line-height:1.7;margin-bottom:18px}
+  .querybar{display:flex;gap:10px;margin-bottom:16px}
+  .querybar input{flex:1;padding:11px 14px;border:1px solid var(--border);border-radius:9px;font-size:14px;outline:0;font-family:inherit}
+  .querybar input:focus{border-color:#93c5fd;box-shadow:0 0 0 3px #dbeafe}
+  .go{border:0;background:var(--primary);color:#fff;padding:0 22px;border-radius:9px;font-size:14px;font-weight:500}
+  .idbar{background:#fff;border:1px solid var(--border);border-radius:9px;padding:11px 14px;margin-bottom:16px;display:flex;gap:14px;align-items:center;flex-wrap:wrap;font-size:12.5px}
+  .idbar label{color:var(--muted)}
+  .idbar input{padding:6px 9px;border:1px solid var(--border);border-radius:6px;font-size:12.5px;font-family:inherit;width:150px}
+  .cols{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+  .col{background:#fff;border:1px solid var(--border);border-radius:12px;overflow:hidden;box-shadow:0 1px 2px rgba(0,0,0,.04)}
+  .col h3{margin:0;padding:13px 15px;font-size:13px;background:#f8fafc;border-bottom:1px solid var(--border);color:#374151}
+  .col.hybrid h3{background:#eff6ff;color:#1d4ed8}
+  .hit{padding:12px 15px;border-bottom:1px solid #f3f4f6;font-size:12.5px;line-height:1.6}
+  .hit:last-child{border-bottom:0}
+  .hit .meta{font-size:11px;color:var(--muted);margin-bottom:5px;display:flex;justify-content:space-between}
+  .hit .score{color:var(--primary);font-weight:600}
+  .hit .text{color:#374151}
+  .empty{padding:30px;text-align:center;color:#9ca3af;font-size:12px}
+  .health{font-size:11.5px;padding:4px 9px;border-radius:10px;background:#f3f4f6;color:#6b7280}
+  .health.ok{background:#ecfdf5;color:#047857}
+  .health.bad{background:#fef2f2;color:#b91c1c}
+  @media(max-width:900px){.cols{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<header class="topbar">
+  <div style="display:flex;align-items:center;gap:12px"><div class="brand-mark">水</div><div class="topbar-title">混合检索实验（BM25 × kNN × RRF）</div><span class="health" id="health">检测中…</span></div>
+  <div><a class="text-btn" href="index.html">问答</a> <a class="text-btn" href="manage.html">文档</a> <a class="text-btn" href="models.html">模型</a></div>
+</header>
+
+<div class="page">
+  <div class="intro">
+    <b>同一问题、三种检索、并排对比</b>：BM25 擅长精确关键词（如"45.50米"），kNN 擅长语义近似（如"水位上限"），
+    RRF（Reciprocal Rank Fusion）按排名融合两路结果，无需手动调权重。
+    <b>行级权限强制生效</b>：切换下方身份头，越权文档一律不返回——过滤条件由服务端强制注入，前端无法绕过。
+  </div>
+
+  <div class="idbar">
+    <label>模拟身份：</label>
+    <label>用户 <input id="userId" value="zhangsan"></label>
+    <label>所属组 <input id="groups" value="water-dept"></label>
+    <span style="color:#9ca3af;font-size:11px">（对应请求头 X-User / X-Groups，生产环境由 JWT 注入）</span>
+  </div>
+
+  <div class="querybar">
+    <input id="q" placeholder="输入问题，如：汛限水位是多少？" value="汛限水位是多少？">
+    <button class="go" onclick="run()">检索对比</button>
+  </div>
+
+  <div class="cols">
+    <div class="col"><h3>① BM25 全文检索</h3><div id="bm25" class="empty">等待检索…</div></div>
+    <div class="col"><h3>② kNN 向量检索</h3><div id="knn" class="empty">等待检索…</div></div>
+    <div class="col hybrid"><h3>③ RRF 混合融合（生产模式）</h3><div id="hybrid" class="empty">等待检索…</div></div>
+  </div>
+</div>
+
+<script>
+function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+function headers(){return {'X-User':document.getElementById('userId').value.trim()||'anonymous','X-Groups':document.getElementById('groups').value.trim()}}
+function render(id,hits,label){
+  const el=document.getElementById(id);
+  if(!hits||!hits.length){el.innerHTML='<div class="empty">无命中（可能越权或知识库为空）</div>';return}
+  el.innerHTML=hits.map(h=>'<div class="hit"><div class="meta"><span>'+esc(h.file)+' · 第'+(Number(h.chunk)+1)+'段</span><span class="score">'+label+' '+(h.score||0).toFixed(4)+'</span></div><div class="text">'+esc(h.text)+'</div></div>').join('');
+}
+async function run(){
+  const q=document.getElementById('q').value.trim();if(!q)return;
+  ['bm25','knn','hybrid'].forEach(id=>document.getElementById(id).innerHTML='<div class="empty">检索中…</div>');
+  try{
+    const r=await fetch('/api/search/compare?q='+encodeURIComponent(q),{headers:headers()});
+    const j=await r.json();if(!r.ok)throw new Error(j.message||('HTTP '+r.status));
+    render('bm25',j.bm25,'BM25');render('knn',j.knn,'余弦');render('hybrid',j.hybrid,'RRF');
+  }catch(e){['bm25','knn','hybrid'].forEach(id=>document.getElementById(id).innerHTML='<div class="empty">失败：'+esc(e.message)+'</div>')}
+}
+async function checkHealth(){
+  try{
+    const j=await (await fetch('/api/search/health')).json();
+    const el=document.getElementById('health');
+    el.textContent=j.healthy?'ES 已连接':'ES 未连接';
+    el.className='health '+(j.healthy?'ok':'bad');
+  }catch(e){}
+}
+checkHealth();
+</script>
+</body>
+</html>

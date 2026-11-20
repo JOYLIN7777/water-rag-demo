@@ -127,6 +127,13 @@ public class DocumentIngestService {
             meta.put("chunkIndex", i);
             meta.put("totalChunks", chunks.size());
             meta.put("uploadedAt", LocalDateTime.now().toString());
+            // 行级权限：上传者为 owner；可见组来自请求头 X-Groups（缺省 public）
+            // 由 UserContext 从 Filter 注入，检索层用同一份规则强制过滤
+            com.joylin.waterkb.security.UserContext.CurrentUser user = com.joylin.waterkb.security.UserContext.get();
+            meta.put("ownerUser", user.userId());
+            java.util.List<String> groups = new java.util.ArrayList<>(user.groups());
+            if (groups.isEmpty()) groups.add("public");
+            meta.put("allowedGroups", groups);
             docs.add(new Document(chunks.get(i), meta));
         }
 
