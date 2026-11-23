@@ -33,7 +33,10 @@
   .tree-node{display:flex;align-items:center;gap:6px;padding:7px 10px;border-radius:7px;cursor:pointer;font-size:12.5px;color:var(--ink-2);user-select:none;margin-bottom:2px}
   .tree-node:hover{background:#eef2f8}
   .tree-node.active{background:var(--primary-soft);color:var(--primary);font-weight:650}
-  .tree-node .caret{width:11px;color:var(--muted);font-size:9px;flex:0 0 11px}
+  .tree-node .caret{width:11px;color:var(--muted);font-size:9px;flex:0 0 11px;cursor:pointer;transition:color .15s}
+  .tree-node .caret:hover{color:var(--primary)}
+  /* 分组父节点：字重更实，与可选中的筛选节点区分 */
+  .tree-parent{font-weight:650;color:var(--ink-2)}
   .tree-node .tn{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .tree-node .cnt{font-size:10px;color:var(--muted);background:#eef2f8;padding:1px 6px;border-radius:8px;flex:0 0 auto}
   .tree-node.active .cnt{background:#fff}
@@ -376,7 +379,7 @@ async function api(path){const r=await fetch(path);if(r.status===401){WrkAuth.go
 const DB={users:[],roles:[],perms:[],allPerms:[],myPerms:[]};
 let userFilter={type:'all',value:''};
 let orgSel={tenant:'',group:''};
-let orgCollapsed=false;
+let orgTreeCollapsed={};   // 各空间节点的折叠状态（key=租户标识）
 
 // 页面级权限校验：非管理员直接显示拒绝页，不暴露任何管理数据
 async function guard(){
@@ -428,19 +431,37 @@ async function loadPerms(){
   }
 }
 
+// 用户树分组折叠状态（默认展开；点分组行切换）
+const U_TREE_COLLAPSED={role:false,tenant:false};
+
 function renderUserTree(){
   const roles=[...new Set(DB.users.flatMap(u=>u.groups||[]))];
   const tenants=[...new Set(DB.users.map(u=>u.tenant))];
-  let h='<div class="tree-node'+(userFilter.type==='all'?' active':'')+'" data-t="all" data-v="">全部用户 <span class="cnt">'+DB.users.length+'</span></div>';
-  h+='<div class="tree-head" style="padding-top:12px">按角色</div>';
-  roles.forEach(g=>{const c=DB.users.filter(u=>(u.groups||[]).includes(g)).length;
-    h+='<div class="tree-node'+(userFilter.type==='role'&&userFilter.value===g?' active':'')+'" data-t="role" data-v="'+esc(g)+'">'+esc(gl(g))+' <span class="cnt">'+c+'</span></div>'});
-  h+='<div class="tree-head" style="padding-top:12px">按空间</div>';
-  tenants.forEach(t=>{const c=DB.users.filter(u=>u.tenant===t).length;
-    h+='<div class="tree-node'+(userFilter.type==='tenant'&&userFilter.value===t?' active':'')+'" data-t="tenant" data-v="'+esc(t)+'">'+esc(tl(t))+' <span class="cnt">'+c+'</span></div>'});
+  const leaf=(t,v,label,c)=>'<div class="tree-node'+(userFilter.type===t&&userFilter.value===v?' active':'')+'" data-t="'+t+'" data-v="'+esc(v)+'">'+
+    '<span class="caret" style="visibility:hidden">▾</span><span class="tn">'+esc(label)+'</span><span class="cnt">'+c+'</span></div>';
+  let h='<div class="tree-node'+(userFilter.type==='all'?' active':'')+'" data-t="all" data-v="">'+
+    '<span class="caret" style="visibility:hidden">▾</span><span class="tn">全部用户</span><span class="cnt">'+DB.users.length+'</span></div>';
+  // 两级分组：分组行可折叠，子行为筛选项
+  const group=(key,label,nodes,c)=>{
+    const folded=!!U_TREE_COLLAPSED[key];
+    h+='<div class="tree-node tree-parent" data-fold="'+key+'">'+
+      '<span class="caret">'+(folded?'▸':'▾')+'</span><span class="tn">'+label+'</span><span class="cnt">'+c+'</span></div>';
+    h+='<div class="tree-children'+(folded?' collapsed':'')+'">'+nodes+'</div>';
+  };
+  group('role','按角色',
+    roles.map(g=>leaf('role',g,gl(g),DB.users.filter(u=>(u.groups||[]).includes(g)).length)).join(''),
+    roles.length);
+  group('tenant','按空间',
+    tenants.map(t=>leaf('tenant',t,tl(t),DB.users.filter(u=>u.tenant===t).length)).join(''),
+    tenants.length);
   $('uTree').innerHTML=h;
-  $('uTree').querySelectorAll('.tree-node').forEach(n=>n.onclick=()=>{
-    userFilter={type:n.dataset.t,value:n.dataset.v};renderUserTree();renderUserTable(1);
+  // 分组行：点击整行折叠/展开（不改变筛选条件）
+  $('uTree').querySelectorAll('.tree-node[data-fold]').forEach(n=>{
+    n.onclick=()=>{U_TREE_COLLAPSED[n.dataset.fold]=!U_TREE_COLLAPSED[n.dataset.fold];renderUserTree()};
+  });
+  // 叶子行：选中筛选，回到第 1 页
+  $('uTree').querySelectorAll('.tree-node[data-t]:not([data-fold])').forEach(n=>{
+    n.onclick=()=>{userFilter={type:n.dataset.t,value:n.dataset.v};renderUserTree();renderUserTable(1)};
   });
 }
 
@@ -635,16 +656,35 @@ function exportUsers(){
 
 function renderOrgTree(){
   const tenants=[...new Set(DB.users.map(u=>u.tenant))];
-  let h='<div class="tree-node'+(orgSel.tenant===''&&orgSel.group===''?' active':'')+'" data-t="" data-g="">全部空间 <span class="cnt">'+DB.users.length+'</span></div>';
+  let h='<div class="tree-node'+(orgSel.tenant===''&&orgSel.group===''?' active':'')+'" data-t="" data-g="">'+
+    '<span class="caret" style="visibility:hidden">▾</span><span class="tn">全部空间</span><span class="cnt">'+DB.users.length+'</span></div>';
   tenants.forEach(t=>{
     const groups=[...new Set(DB.users.filter(u=>u.tenant===t).flatMap(u=>u.groups||[]))];
-    h+='<div class="tree-node'+(orgSel.tenant===t&&orgSel.group===''?' active':'')+'" data-t="'+esc(t)+'" data-g="">'+esc(tl(t))+' <span class="cnt">'+DB.users.filter(u=>u.tenant===t).length+'</span></div>';
-    h+='<div class="tree-children'+(orgCollapsed?' collapsed':'')+'">';
-    groups.forEach(g=>{h+='<div class="tree-node'+(orgSel.tenant===t&&orgSel.group===g?' active':'')+'" data-t="'+esc(t)+'" data-g="'+esc(g)+'">'+esc(gl(g))+' <span class="cnt">'+DB.users.filter(u=>u.tenant===t&&(u.groups||[]).includes(g)).length+'</span></div>'});
+    const folded=!!orgTreeCollapsed[t];
+    // 父节点：点行=筛选该空间，点三角=折叠/展开子层
+    h+='<div class="tree-node'+(orgSel.tenant===t&&orgSel.group===''?' active':'')+'" data-t="'+esc(t)+'" data-g="" data-parent="'+esc(t)+'">'+
+      '<span class="caret">'+(folded?'▸':'▾')+'</span><span class="tn">'+esc(tl(t))+'</span>'+
+      '<span class="cnt">'+DB.users.filter(u=>u.tenant===t).length+'</span></div>';
+    h+='<div class="tree-children'+(folded?' collapsed':'')+'">';
+    groups.forEach(g=>{
+      h+='<div class="tree-node'+(orgSel.tenant===t&&orgSel.group===g?' active':'')+'" data-t="'+esc(t)+'" data-g="'+esc(g)+'">'+
+        '<span class="caret" style="visibility:hidden">▾</span><span class="tn">'+esc(gl(g))+'</span>'+
+        '<span class="cnt">'+DB.users.filter(u=>u.tenant===t&&(u.groups||[]).includes(g)).length+'</span></div>';
+    });
     h+='</div>';
   });
   $('oTtree').innerHTML=h;
-  $('oTtree').querySelectorAll('.tree-node').forEach(n=>n.onclick=()=>{
+  // 空间父节点：三角折叠
+  $('oTtree').querySelectorAll('[data-parent] .caret').forEach(c=>{
+    c.onclick=e=>{
+      e.stopPropagation();
+      const t=c.parentElement.dataset.parent;
+      orgTreeCollapsed[t]=!orgTreeCollapsed[t];
+      renderOrgTree();
+    };
+  });
+  // 节点选择：点行筛选
+  $('oTtree').querySelectorAll('.tree-node[data-t]').forEach(n=>n.onclick=()=>{
     orgSel={tenant:n.dataset.t,group:n.dataset.g};
     $('oPath').textContent=(orgSel.tenant?tl(orgSel.tenant):'全部空间')+(orgSel.group?' / '+gl(orgSel.group):'');
     renderOrgTree();renderOrgTable();
@@ -678,7 +718,13 @@ function showOrgMembers(i){
     list.length?list.map(u=>'<div class="perm-pill" style="margin-bottom:6px"><b>'+esc(u.displayName)+'</b>'+esc(u.username)+' · '+roleTags(u.groups)+'</div>').join(''):
     '<div class="empty-inline">暂无成员</div>'});
 }
-function toggleOrgTree(){orgCollapsed=!orgCollapsed;renderOrgTree()}
+// 一键全展开/全收起：任一层展开时全部收起，全部收起时全部展开
+function toggleOrgTree(){
+  const tenants=[...new Set(DB.users.map(u=>u.tenant))];
+  const anyOpen=tenants.some(t=>!orgTreeCollapsed[t]);
+  tenants.forEach(t=>orgTreeCollapsed[t]=anyOpen);
+  renderOrgTree();
+}
 
 function renderRoleTable(){
   const kw=($('rKw').value||'').trim().toLowerCase();

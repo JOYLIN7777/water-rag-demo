@@ -160,6 +160,8 @@ input[type=text],input[type=password],input:not([type]),select,textarea{
 .field input:focus,.field select:focus,.field textarea:focus,
 input:focus,select:focus,textarea:focus{border-color:var(--primary);box-shadow:0 0 0 3px rgba(59,110,245,.12)}
 input::placeholder,textarea::placeholder{color:#aab3c2}
+/* 不可编辑字段置灰：明确表达"值不可改"，避免看起来像可输入的空框 */
+input:disabled,select:disabled,textarea:disabled{background:#f3f5f9;color:#9aa5b8;border-color:#e6eaf1;cursor:not-allowed;-webkit-text-fill-color:#9aa5b8;opacity:1}
 .hint{font-size:11px;color:var(--muted);line-height:1.7;margin-top:8px}
 
 /* ============ 表格 ============ */
