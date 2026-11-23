@@ -90,9 +90,20 @@
     const a = global.WrkAuth;
     return 'water-rag-sessions:' + (a && a.scope ? a.scope() : 'demo');
   }
+  /**
+   * 本地会话清单。
+   *
+   * <p>只返回"已经提过问"的会话（有标题）。新建会话只是个占位：用户点开一个空会话
+   * 什么也没问就离开，不该在历史里留下一条「会话 179542」——历史会话是记录，
+   * 不是输入框的草稿本。首次提问由 Ask 页调 pushSessionRemote 补上标题后才出现。</p>
+   */
   function loadSessions() {
-    try { return JSON.parse(global.localStorage.getItem(sessionKey()) || '[]'); }
-    catch (e) { return []; }
+    try {
+      const all = JSON.parse(global.localStorage.getItem(sessionKey()) || '[]');
+      return (Array.isArray(all) ? all : []).filter(function (s) {
+        return s && s.id && String(s.title || '').trim();
+      });
+    } catch (e) { return []; }
   }
   function saveSessions(list) {
     global.localStorage.setItem(sessionKey(), JSON.stringify(list));

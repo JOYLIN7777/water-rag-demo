@@ -80,7 +80,14 @@ public class ChatSessionStore {
         return id == null || id.isBlank() ? "anonymous" : id.trim();
     }
 
-    /** 当前账号的会话清单，按最近更新倒序 */
+    /**
+     * 当前账号的会话清单，按最近更新倒序。
+     *
+     * <p>只返回有标题的行：标题是"首次提问"时才补写的，没有标题说明这个会话
+     * 建了但一句没问过。历史会话列表是"记录"，空会话不该占位——否则新建会话、
+     * 切走、再进来，历史里躺着一串「会话 179542」。前端同样按此过滤（双保险：
+     * 换设备、换浏览器时以服务端清单为准）。</p>
+     */
     public List<Map<String, Object>> list() {
         List<Map<String, Object>> out = new ArrayList<>();
         if (jdbc == null) return out;
@@ -90,7 +97,9 @@ public class ChatSessionStore {
             jdbc.query("SELECT session_id, title, "
                             + "(EXTRACT(EPOCH FROM created_at) * 1000)::BIGINT AS created_ms, "
                             + "(EXTRACT(EPOCH FROM updated_at) * 1000)::BIGINT AS updated_ms "
-                            + "FROM chat_session WHERE tenant_id=? AND user_id=? ORDER BY updated_at DESC",
+                            + "FROM chat_session WHERE tenant_id=? AND user_id=? "
+                            + "AND title IS NOT NULL AND title <> '' "
+                            + "ORDER BY updated_at DESC",
                     rs -> {
                         Map<String, Object> m = new LinkedHashMap<>();
                         m.put("id", rs.getString("session_id"));

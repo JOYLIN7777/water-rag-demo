@@ -167,7 +167,10 @@ async function ask(){
     document.getElementById('q').value='';await load();appToast('已生成，新节点挂到选中节点下','ok');
   }catch(e){tip('提问失败：'+e.message,false)}
 }
-const u=new URLSearchParams(location.search).get('sid');if(u)document.getElementById('sid').value=u;
+// 带 ?sid= 进来就直接加载：问答页顶部的"还有其它分支"提示会链到这里，
+// 用户点进来是要看分支的，不是来填一遍会话ID的
+const u=new URLSearchParams(location.search).get('sid');
+if(u){document.getElementById('sid').value=u;load();}
 initShell('settings');
 </script>
 </body>

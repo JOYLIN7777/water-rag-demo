@@ -58,6 +58,22 @@
   .messages{max-width:880px;margin:0 auto}
   .msg-group{margin-bottom:32px}
   .msg-group.user{display:flex;justify-content:flex-end}
+  /* ===== 分支（从这里再问）===== */
+  /* 分叉分隔条：跨整行的一条淡虚线，告诉用户"下面这段是从上面某一轮分出来的" */
+  .branch-seal{max-width:880px;margin:0 auto 14px;display:flex;align-items:center;gap:10px;color:#7c8aa5;font-size:11px;letter-spacing:.2px}
+  .branch-seal::before,.branch-seal::after{content:'';flex:1;height:1px;background:repeating-linear-gradient(90deg,#dbe2ee 0 6px,transparent 6px 11px)}
+  .branch-seal span{white-space:nowrap;border:1px solid #e2e9f5;background:#f7faff;border-radius:20px;padding:3px 11px}
+  /* 回答卡片上的「分支」小标签：说明这条回答不是接着上一轮，而是另起一条 */
+  .branch-chip{font-size:10px;color:#3568d4;background:#eaf1ff;border:1px solid #d3e0fa;border-radius:5px;padding:1px 6px;font-weight:600;letter-spacing:.2px}
+  /* 待分叉的那一轮整组描边，点完「从这里再问」能一眼看出新回答会接到哪儿 */
+  .msg-group.branch-origin .user-bubble{box-shadow:0 0 0 2px rgba(59,110,245,.22)}
+  .msg-group.branch-origin .ai-card{box-shadow:0 0 0 2px rgba(59,110,245,.22)}
+  /* 顶部提示条：会话里还有别的分支没显示时挂一条，避免"切回来记录少了"的错觉 */
+  .branch-note{max-width:880px;margin:0 auto 16px;padding:9px 14px;border:1px solid #dbe6fb;background:#f6f9ff;border-radius:9px;
+    font-size:12px;color:#4b5c78;line-height:1.6;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .branch-note b{color:#2f5fe0}
+  .branch-note a{margin-left:auto;color:#3b6ef5;text-decoration:none;white-space:nowrap;font-size:11.5px}
+  .branch-note a:hover{text-decoration:underline}
   /* 用户气泡：宽度有上限，超宽屏不拉成横幅，保持对话气泡形态 */
   .user-bubble{max-width:min(78%,760px);background:var(--primary-soft);color:#1e3a8a;border:1px solid #d6e4ff;border-radius:14px 14px 4px 14px;padding:12px 18px;font-size:14px;line-height:1.7;white-space:pre-wrap;box-shadow:var(--shadow-sm)}
   /* 回答卡片：占满主区，内部三层（标题栏/正文/引用）用底色与分隔线分层；
@@ -172,6 +188,7 @@
         </div>
         <div class="quick-tip">点击示例可填入输入框，改完再发送</div>
       </div>
+      <div class="branch-note" id="branchNote" style="display:none"></div>
       <div class="messages" id="messages" style="display:none"></div>
     </div>
     <div class="composer-wrap">
@@ -194,6 +211,12 @@
 <script src="assets/app.js"></script>
 <script>
 let sessions=[],currentId='',messages=[],sending=false;
+// 已新建但还没提问的会话 id：占位不落历史列表，也不登记服务端。
+// 用户点开空会话什么也不问就离开，历史里不该多一条「会话 179542」。
+let pendingId='';
+// 「从这里再问」的待分叉点：{sid,parentId,idx}。发送时把它作为 parentId 传给后端，
+// 新问答成为该轮的兄弟分支——全程不动历史、不清画面，原对话一直在。
+let branchCtx=null;
 // 所有本地数据按登录账号分区：换账号登录不会看到上一个账号的会话、消息和草稿
 const SCOPE=(window.WrkAuth&&WrkAuth.scope)?WrkAuth.scope():'demo';
 function sessionKey(){return 'water-rag-sessions:'+SCOPE}
@@ -247,16 +270,19 @@ function storeOf(id){
 }
 function newSession(){
   const id='session-'+Date.now()+'-'+Math.random().toString(36).slice(2,6);
-  const list=readSessions();                              // 先读最新，避免用过期副本覆盖
-  list.unshift({id,title:'',updatedAt:Date.now()});
-  writeSessions(list);
-  // 立刻在服务端登记：否则刷新时服务端清单里没有它，会被同步逻辑当成已删除
-  if(window.Shell)Shell.pushSessionRemote(id,'');
-  switchSession(id);renderSessions();
+  // 只占位：不进 localStorage 清单、不 POST 服务端。提问那一刻由 touchSession 入列，
+  // 这样"新建但一句没问"的会话不会出现在历史会话里。
+  pendingId=id;
+  branchCtx=null;
+  switchSession(id);
+  renderSessions();
 }
 function switchSession(id){
+  // 切到别的会话，未提问的空会话直接丢弃（它本来就没有任何内容可留）
+  if(id!==pendingId)pendingId='';
+  if(branchCtx&&branchCtx.sid!==id)branchCtx=null;
   if(currentId&&currentId!==id){
-    cacheMessages(currentId);                              // 存旧会话消息
+    if(messages.length)cacheMessages(currentId);            // 存旧会话消息（空会话不留缓存垃圾）
     try{sessionStorage.setItem(draftKey(currentId),draftBox.value)}catch(e){} // 存旧会话草稿
   }
   currentId=id;
@@ -281,8 +307,36 @@ function switchSession(id){
     if(sig(fresh)===sig(messages))return;                  // 内容一致就不重绘，消除二次渲染闪烁
     messages=fresh;msgStore[id]=messages;
     cacheMessages(id);renderMessages();scrollBottom(true);
-  }).catch(()=>{});
+  }).catch(()=>{}).then(()=>{
+    // 历史对齐之后再核对分支数：messages 还是缓存里的旧值时，比较结果会失真
+    if(currentId===id&&seq===historySeq)refreshBranchNote(id);
+  });
   renderSessions();
+}
+/**
+ * 顶部提示条：这个会话的树里还有别的分支没显示。
+ *
+ * <p>分支模型的固有行为——当前只显示 head 所在的那条链。用户「从这里再问」之后
+ * 再刷新页面，屏幕上的旧对话会变少，很容易又以为"记录没了"。这里数一下树里的
+ * 用户节点与当前链上的用户节点，多出来的就是藏在其它分支里的提问，直接告诉用户
+ * 去哪看，比让他自己猜要诚实。</p>
+ */
+async function refreshBranchNote(id){
+  const el=document.getElementById('branchNote');
+  if(!el)return;
+  el.style.display='none';el.innerHTML='';
+  try{
+    const r=await fetch('/api/chat/tree?sessionId='+encodeURIComponent(id));
+    if(!r.ok)return;
+    const j=await r.json();
+    if(currentId!==id)return;
+    const inTree=(j.nodes||[]).filter(n=>n&&n.role==='user').length;
+    const shown=messages.filter(m=>m.role==='user').length;
+    if(inTree<=shown)return;
+    el.innerHTML='<span>⑃</span><span>本会话另有 <b>'+(inTree-shown)+'</b> 轮提问保存在其它分支，当前只显示最近一次提问所在的分支</span>'+
+      '<a href="tree.html?sid='+encodeURIComponent(id)+'" target="_blank" rel="noopener">查看会话结构 →</a>';
+    el.style.display='';
+  }catch(e){}
 }
 // 注意：这里原来有个本地版 removeSession（只删内存+localStorage），侧栏 DOM 早已由
 // app.js 统一渲染并绑定它自己的删除逻辑（含后端历史清理），本地这份是死代码且逻辑过时，已删除。
@@ -297,10 +351,18 @@ function fmtSessionTime(ts){
   return (d.getMonth()+1)+'/'+d.getDate()+' '+hm;
 }
 // 更新会话活跃时间；title 传了且会话还没有标题时顺便补上（首个问题即标题）
+// 会话不在清单里说明它还是"未提问的占位"：此刻才真正入列 + 登记服务端。
 function touchSession(id,title){
   const list=readSessions();
   const s=list.find(x=>x.id===id);
-  if(!s)return;
+  if(!s){
+    if(!title)return;            // 没有标题 = 还没提问，继续留在占位状态
+    list.unshift({id,title,updatedAt:Date.now()});
+    writeSessions(list);
+    if(pendingId===id)pendingId='';
+    if(window.Shell)Shell.pushSessionRemote(id,title);
+    return;
+  }
   // 先判断"这次是不是首次产生标题"再赋值：赋值后再判断永远是 false
   const firstTitle=!!(title&&!s.title);
   if(firstTitle)s.title=title;
@@ -316,8 +378,9 @@ function renderSessions(){
   if(window.Shell)Shell.setSession(currentId);
   // 自愈：当前停留的会话如果已经不在了（比如刚在侧栏删掉），立刻切到列表里最新的一条。
   // 不能只依赖删除钩子——钩子只是"通知"，视图正确性应该由渲染这步兜住。
+  // 例外：未提问的占位会话本来就不在清单里，不能因此把它自愈掉。
   const list=Shell.getSessions();
-  if(currentId&&!list.some(s=>s.id===currentId)){
+  if(currentId&&currentId!==pendingId&&!list.some(s=>s.id===currentId)){
     if(list.length)switchSession(list[0].id);
     else if(!sending)newSession();
   }
@@ -385,16 +448,18 @@ function usageTip(u){
     +' · 耗时 '+sec.toFixed(2)+' 秒';
 }
 function msgHtml(m,i){
-  if(m.role==='user')return '<div class="msg-group user"><div class="user-bubble">'+escapeHtml(m.content)+'</div></div>';
+  if(m.role==='user')return (m.branchSeal?'<div class="branch-seal"><span>↳ 从这里重新提问 · 以下为新分支</span></div>':'')+
+    '<div class="msg-group user"><div class="user-bubble">'+escapeHtml(m.content)+'</div></div>';
   const u=m.usage;
   return '<div class="msg-group ai"><div class="ai-card">'+
     '<div class="ai-card-head"><span class="ai-badge">水</span><span class="ai-card-name">水利知识库助手</span>'+
+      (m.branch?'<span class="branch-chip">分支</span>':'')+
       '<span class="ai-state"'+(m.streaming?' style="color:var(--primary)"':'')+'>'+(m.streaming?'生成中…':'')+'</span>'+
       '<span class="ai-card-actions">'+
         '<span class="ai-usage"'+(u?'':' style="display:none"')+(u?' title="'+escapeHtml(usageTip(u))+'"':'')+'>'+
           (u?usageInner(u):'')+'</span>'+
         '<button class="icon-btn ai-cite-count" title="引用片段" style="display:none">▤</button>'+
-        '<button class="icon-btn ai-rewind" onclick="rewindAsk('+i+')" title="回到这一轮重新提问：问题会填回输入框，原分支仍保留在会话结构里">从这里再问</button>'+
+        '<button class="icon-btn ai-rewind" onclick="rewindAsk('+i+')" title="从这一轮重新提问：问题填回输入框，新回答作为分支接在它后面，原对话一条不删">从这里再问</button>'+
         '<button class="icon-btn" title="复制回答到剪贴板" onclick="copyMsg('+i+')">复制</button>'+
       '</span></div>'+
     '<div class="ai-card-body">'+renderMarkdown(m.content)+(m.streaming?'<span class="cursor"></span>':'')+'</div>'+
@@ -451,13 +516,6 @@ function fillAsk(q){
   hideError();
 }
 /**
- * 从这里再问：回退到该轮问题的父节点（新问题成为同级分支），并把原问题填回输入框。
- *
- * <p>回退后用 /api/chat/history 重新拉当前分支链，让画面同步收缩到那一轮——
- * 否则新问题会接在末尾，看起来像是接着最后一条继续问，与"重新问"的语义不符。
- * 旧分支节点一个都没删，仍可在「会话结构」页切回去。</p>
- */
-/**
  * 补齐当前会话消息的 nodeId/parentId。
  *
  * <p>老缓存（本轮之前的版本）与从服务端恢复的历史可能缺 id，缺 id 就定位不到父节点。
@@ -480,42 +538,47 @@ async function syncMsgIds(sessionId){
     return true;
   }catch(e){return false}
 }
+/**
+ * 从这里再问：把该轮的问题填回输入框，并记下"待分叉点"。
+ *
+ * <p>以前的做法是先让后端把 head 回退到该轮父节点，再重拉 history 让画面收缩——
+ * 结果只要点的是第一轮，history 就是空的，整段对话从屏幕上消失，用户以为记录被删了
+ * （数据其实还在 Redis 树里，但问答页再也走不回去）。现在改成<b>只在发送时带上
+ * parentId</b>：后端把新问答挂到该轮父节点下成为兄弟分支，旧分支一个节点都不动，
+ * 屏幕上原有内容也一条不删。</p>
+ */
 async function rewindAsk(i){
   const q=messages[i-1];
-  if(!q||q.role!=='user'){toast('这一轮缺少问题内容，无法回退','err');return}
+  if(!q||q.role!=='user'){toast('这一轮缺少问题内容','err');return}
   const ownerId=currentId;
   let parentId=q.parentId||'';
   if(!parentId&&await syncMsgIds(ownerId))parentId=(messages[i-1]||{}).parentId||'';
-  if(!parentId){showError('这一轮缺少定位信息，请刷新会话后重试。问题已填入输入框，可直接再发一次。');
-    draftBox.value=q.content;draftBox.focus();return}
-  let rewound=false;
-  {
-    try{
-      const r=await fetch('/api/chat/rewind?sessionId='+encodeURIComponent(ownerId)+'&nodeId='+encodeURIComponent(parentId),{method:'POST'});
-      if(!r.ok){const j=await r.json().catch(()=>({}));throw new Error(j.error||('HTTP '+r.status))}
-      rewound=true;
-    }catch(e){
-      showError('回退失败：'+e.message+'。问题已填入输入框，可继续提问。');
-    }
+  // 第一轮问题的父节点就是 root。老缓存里没有 parentId 时按这个兜底，
+  // 否则用户在第一轮点「再问」只会得到"缺少定位信息"，功能等于废了
+  if(!parentId&&messages.findIndex(m=>m.role==='user')===i-1)parentId='root';
+  if(!parentId){
+    showError('这一轮缺少定位信息，问题已填入输入框，可直接再发一次。');
+    draftBox.value=q.content;
+    draftBox.focus();
+    return;
   }
-  if(rewound&&currentId===ownerId){
-    try{
-      const r=await fetch('/api/chat/history?sessionId='+encodeURIComponent(ownerId));
-      const list=await r.json();
-      if(Array.isArray(list)&&currentId===ownerId){
-        messages=list.map(m=>({role:m.role,content:m.content,sources:m.sources||[],streaming:false,
-          usage:m.usage||null,nodeId:m.id||'',parentId:m.parentId||''}));
-        msgStore[ownerId]=messages;
-        cacheMessages(ownerId);
-        renderMessages();scrollBottom(true);
-      }
-    }catch(e){}
-  }
+  branchCtx={sid:ownerId,parentId,idx:i-1};
+  markBranchOrigin(i-1);
   draftBox.value=q.content;
   draftBox.focus();
   try{draftBox.setSelectionRange(draftBox.value.length,draftBox.value.length)}catch(e){}
   hideError();
-  toast(rewound?'已回到这一轮，改完按 Enter 发送（原分支保留在会话结构里）':'问题已填入输入框','ok');
+  toast('已定位到这一轮：发送后新回答作为分支接在它后面，原对话保留','ok');
+}
+/** 高亮"待分叉"的那一轮（问 + 答），让用户知道新回答会接在哪儿 */
+function markBranchOrigin(idx){
+  const box=document.getElementById('messages');
+  if(!box)return;
+  box.querySelectorAll('.branch-origin').forEach(el=>el.classList.remove('branch-origin'));
+  [idx,idx+1].forEach(k=>{
+    const g=box.querySelectorAll('.msg-group')[k];
+    if(g)g.classList.add('branch-origin');
+  });
 }
 function patchCites(card,m,i){
   const zone=card.querySelector('.cite-zone');if(!zone)return;
@@ -594,20 +657,35 @@ async function send(text){
   const q=(text||document.getElementById('question').value).trim();
   if(!q||sending)return;
   const ownerId=currentId;              // 本次回答归属的会话，全程锁定，切换会话不影响它
+  // 「从这里再问」留下的分叉点：取一次就清掉，避免下一轮还挂在旧节点上
+  const fork=branchCtx&&branchCtx.sid===ownerId?branchCtx:null;
+  branchCtx=null;
   clearDraft(ownerId);
   sending=true;document.getElementById('sendBtn').disabled=true;hideError();
   // 首问自动把问题当标题：读—改—写一次完成，别先改内存再写回（会丢标题）
+  // 未提问的占位会话在这里第一次进历史列表（touchSession 里判断）
   touchSession(ownerId, q.length>18?q.slice(0,18)+'…':q);renderSessions();
   const store=storeOf(ownerId);         // 写入归属会话自己的数组，不是全局变量
-  store.push({role:'user',content:q,sources:[],streaming:false});
+  const um={role:'user',content:q,sources:[],streaming:false};
+  if(fork)um.branchSeal=true;           // 标出"这条问题是从上面某一轮重新问的"
+  store.push(um);
   const ai={role:'assistant',content:'',sources:[],streaming:true};
+  if(fork)ai.branch=true;               // 回答卡片打「分支」标签
   store.push(ai);
   if(currentId===ownerId){renderMessages();scrollBottom(true)}
+  if(fork){
+    // 轮次按画面上第几个提问算，不能用 idx/2 推——分支插入后消息不再严格成对
+    const roundNo=store.slice(0,fork.idx).filter(m=>m.role==='user').length+1;
+    toast('已按分支提问：原对话保留，这条回答接在第 '+roundNo+' 轮之后','ok');
+  }
   let finished=false;                 // 是否已收到后端 done 事件
   try{
     const r=await fetch('/api/chat/stream',{
       method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({sessionId:ownerId,question:q})
+      // 带 parentId 就是从该节点分叉：后端只把它的祖先链当上下文，
+      // 新问答成为兄弟分支，原分支的节点一个都不动
+      body:JSON.stringify(fork?{sessionId:ownerId,question:q,parentId:fork.parentId}
+                              :{sessionId:ownerId,question:q})
     });
     if(!r.ok)throw new Error('请求失败（HTTP '+r.status+'）');
     const reader=r.body.getReader(),dec=new TextDecoder();let buf='';
@@ -670,6 +748,7 @@ async function send(text){
     cacheMessages(ownerId,store);       // 落到归属会话的缓存
     if(currentId===ownerId){patchStreaming();finalizeCard();scrollBottom(true)}
     else toast('后台回答已完成','ok');   // 切走了给个轻提示，不打断当前视图
+    if(fork)refreshBranchNote(ownerId);  // 刚分完叉：顶部提示"另有 N 轮在其它分支"
   }
 }
 function quickAsk(q){document.getElementById('question').value=q;send()}
