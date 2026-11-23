@@ -176,14 +176,18 @@
     if (!ts) return '';
     const d = new Date(ts), now = new Date();
     if (isNaN(d.getTime())) return '';
-    // 相对时间（对齐 WorkBuddy 的清单观感）：今天给时间，昨天/更早给"N天前"
-    if (d.toDateString() === now.toDateString()) {
-      return '今天 ' + String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
-    }
+    // 纯相对时间（WorkBuddy 观感）：只说隔了多久——分钟 / 小时 / 天，不说具体钟点
+    let diff = now.getTime() - d.getTime();
+    if (diff < 0) diff = 0;
+    const min = Math.floor(diff / 60000);
+    if (min < 1) return '刚刚';
+    if (min < 60) return min + '分钟前';
+    const hr = Math.floor(min / 60);
+    if (hr < 24) return hr + '小时前';
+    // 跨天按日历日算，避免"昨天 23:59 看成 24小时前"这种别扭表述
     const days = Math.floor((new Date(now.getFullYear(), now.getMonth(), now.getDate())
       - new Date(d.getFullYear(), d.getMonth(), d.getDate())) / 86400000);
-    if (days === 1) return '昨天';
-    if (days >= 2 && days < 30) return days + '天前';
+    if (days < 30) return days + '天前';
     return (d.getMonth() + 1) + '/' + d.getDate();
   }
 
