@@ -44,16 +44,19 @@ a{color:var(--primary);text-decoration:none}
 .session-item{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:9px;color:#c8d3e8;cursor:pointer;transition:all .15s;margin-bottom:3px;text-decoration:none;font-size:12px}
 .session-item:hover{background:rgba(255,255,255,.06)}
 .session-dot{width:7px;height:7px;border-radius:50%;background:#46597c;flex:0 0 7px}
-.session-item .s-title{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-/* ============ 侧栏上传折叠区（深色，全站公共） ============ */
+.session-body{flex:1;min-width:0;display:flex;flex-direction:column;line-height:1.4}
+.session-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#d6e0f5;font-size:12px}
+.session-time{font-size:10px;color:#6f80a4;margin-top:3px}
+.sidebar .session-delete{border:0;background:transparent;color:#6f80a4;font-size:16px;opacity:0;padding:0 3px;line-height:1;flex:0 0 auto;transition:all .15s}
+.sidebar .session-item:hover .session-delete{opacity:1}
+.sidebar .session-delete:hover{color:#ff8fab}
+/* ============ 侧栏上传区（深色，全站公共） ============ */
 .sidebar .upload-area{border-top:1px solid rgba(255,255,255,.09);margin-top:8px;padding-top:8px;flex:0 0 auto}
-.sidebar .upload-toggle{width:100%;display:flex;align-items:center;gap:8px;border:0;background:transparent;color:#9fb0d0;font-size:11.5px;padding:5px 6px;border-radius:7px;cursor:pointer;text-align:left;transition:all .15s}
-.sidebar .upload-toggle:hover{background:rgba(255,255,255,.06);color:#dbe6ff}
-.sidebar .upload-toggle .t{flex:1}
-.sidebar .upload-toggle .caret{font-size:10px;transition:transform .2s;color:#6f80a4;display:inline-block}
-.sidebar .upload-area.open .upload-toggle .caret{transform:rotate(90deg)}
-.sidebar .upload-body{display:none;padding-top:6px}
-.sidebar .upload-area.open .upload-body{display:block}
+.sidebar .upload-title{display:flex;align-items:center;justify-content:space-between;padding:5px 6px 7px;color:#9fb0d0;font-size:11.5px}
+.sidebar .upload-title .t{flex:1}
+.sidebar .upload-manage{font-size:10.5px;color:#7fa4ff;text-decoration:none}
+.sidebar .upload-manage:hover{text-decoration:underline}
+.sidebar .upload-body{padding-top:2px}
 .sidebar .dropzone{border:1.5px dashed rgba(139,164,255,.32);border-radius:10px;padding:15px 10px;text-align:center;cursor:pointer;transition:all .2s;background:rgba(255,255,255,.025)}
 .sidebar .dropzone:hover,.sidebar .dropzone.dragging{border-color:var(--primary-hi);background:rgba(59,110,245,.18)}
 .sidebar .drop-icon{font-size:21px;color:#8fb0ff;line-height:1}
@@ -65,24 +68,12 @@ a{color:var(--primary);text-decoration:none}
 .sidebar .upload-msg.err{background:rgba(224,36,94,.15);color:#ff9fbb;border:1px solid rgba(224,36,94,.28);display:block}
 .sidebar .folder-btn{width:100%;margin-top:8px;padding:8px;border:1px dashed rgba(139,164,255,.3);border-radius:8px;background:transparent;color:#a9b9d8;font-size:11px;transition:all .15s}
 .sidebar .folder-btn:hover{border-color:var(--primary-hi);color:#dbe6ff;background:rgba(59,110,245,.12)}
-.sidebar .doc-list{margin-top:8px;max-height:150px;overflow-y:auto;display:flex;flex-direction:column;gap:2px}
-.sidebar .doc-item{display:flex;align-items:center;gap:6px;padding:6px 7px;border-radius:7px;font-size:11px;color:#b9c6de}
-.sidebar .doc-item:hover{background:rgba(255,255,255,.06)}
-.sidebar .doc-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.sidebar .doc-meta{font-size:10px;color:#6f80a4;flex:0 0 auto}
-.sidebar .doc-delete{border:0;background:transparent;color:#6f80a4;font-size:14px;opacity:0;padding:0 3px;line-height:1;flex:0 0 auto}
-.sidebar .doc-item:hover .doc-delete{opacity:1}
-.sidebar .doc-delete:hover{color:#ff8fab}
-.sidebar .doc-empty{font-size:10.5px;color:#5c6c8d;text-align:center;padding:8px 0}
-.sidebar .doc-more{font-size:10.5px;color:#7fa4ff;text-decoration:none;padding:6px 7px;display:block;text-align:left}
-.sidebar .doc-more:hover{text-decoration:underline}
 .sidebar .session-empty{font-size:11px;color:#5c6c8d;padding:6px 8px}
 
-/* 侧栏底部设置入口 */
-.sidebar .settings-entry{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:8px;color:#b9c6de;text-decoration:none;font-size:12.5px;transition:all .15s;margin-bottom:2px}
-.sidebar .settings-entry:hover{background:rgba(255,255,255,.06);color:#fff}
-.sidebar .settings-entry.active{background:rgba(59,110,245,.22);color:#fff;font-weight:600}
-.sidebar .settings-arrow{margin-left:auto;color:#6f80a4;font-size:16px;line-height:1}
+/* 用户卡片旁的快捷图标（设置 / 退出） */
+.user-icon-btn{border:0;background:transparent;color:#8fa4cc;padding:5px 6px;border-radius:6px;transition:all .15s;display:inline-flex;align-items:center;justify-content:center}
+.user-icon-btn svg{width:15px;height:15px}
+.user-icon-btn:hover{background:rgba(255,255,255,.08);color:#dbe6ff}
 
 /* 侧栏底部用户卡片（登录态） */
 .user-block{display:flex;align-items:center;gap:9px;border-top:1px solid rgba(255,255,255,.09);margin-top:10px;padding:12px 4px 2px}

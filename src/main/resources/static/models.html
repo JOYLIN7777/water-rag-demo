@@ -24,14 +24,13 @@
 
   <div class="page">
     <div class="page-head">
-      <h1 class="page-title">模型配置</h1>
-      <p class="page-desc">统一配置对话模型与向量模型，兼容公有云 API 与内网私有部署的 OpenAI 兼容端点。</p>
+      <h1 class="page-title">模型设置</h1>
+      <p class="page-desc">设置对话模型和文档检索模型，支持公有云服务与内网私有部署。</p>
     </div>
 
     <div class="intro">
-      <b>模型可插拔</b>：公有云（DashScope / DeepSeek）与内网私有部署（vLLM / Ollama / Xinference 等 OpenAI 兼容接口）统一配置。
-      <b>Chat 模型</b>切换即时生效；<b>Embedding 模型</b>切换前会校验向量维度，必须与现有向量库一致，否则拒绝切换以免污染已入库数据。
-      API Key 只回显前 4 后 4，更新时不填即保持原值。
+      对话模型切换后立即生效；文档检索模型切换前会校验向量维度，与已入库数据不一致时会阻止切换，避免影响现有知识库。
+      密钥只显示前 4 后 4 位，更新时不填写即保持原值。
     </div>
 
     <div class="grid">
@@ -41,15 +40,15 @@
           <div class="field" style="flex:2"><label>名称</label><input id="fName" type="text" placeholder="如：内网-Qwen3.5-397B"></div>
           <div class="field"><label>类型</label><select id="fType"><option value="CHAT">CHAT 对话</option><option value="EMBEDDING">EMBEDDING 向量</option></select></div>
         </div>
-        <div class="field"><label>Base URL（OpenAI 兼容端点）</label><input id="fUrl" type="text" placeholder="https://dashscope.aliyuncs.com/compatible-mode 或 http://10.0.0.5:8000/v1"></div>
+        <div class="field"><label>服务地址</label><input id="fUrl" type="text" placeholder="云服务地址或内网模型地址"></div>
         <div class="row">
           <div class="field"><label>模型名</label><input id="fModel" type="text" placeholder="qwen-plus / text-embedding-v3"></div>
-          <div class="field"><label>API Key（内网可留空）</label><input id="fKey" type="password" placeholder="留空表示不校验"></div>
+          <div class="field"><label>访问密钥（内网可留空）</label><input id="fKey" type="password" placeholder="留空表示保持原值"></div>
         </div>
         <div class="field" id="dimField" style="display:none"><label>向量维度（EMBEDDING 必填）</label><input id="fDim" type="number" placeholder="1024"></div>
         <button class="primary-btn" onclick="createModel()">＋ 添加配置</button>
         <div class="msg" id="createMsg"></div>
-        <div class="hint">提示：切 Embedding 模型前请先用「测试」确认端点可达且维度正确；不同维度的向量不能混存在同一个向量库。</div>
+        <div class="hint">提示：切换文档检索模型前，建议先点「测试」确认服务可用；不同维度的模型不能共用同一个知识库。</div>
       </div>
       <div class="card">
         <div class="card-head"><h3>当前生效配置</h3></div>

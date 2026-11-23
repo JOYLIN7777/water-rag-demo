@@ -33,28 +33,28 @@
 <div class="layout" id="sidebarHost">
 <main class="main">
   <header class="topbar">
-    <div class="topbar-left"><div class="topbar-title">企业治理中心</div><span class="topbar-sub">认证 / 权限 / 租户 / 审计</span></div>
+    <div class="topbar-left"><div class="topbar-title">权限与日志</div><span class="topbar-sub">账号权限与操作记录</span></div>
     <span class="status-pill" data-status-pill><span class="status-dot"></span>检测中…</span>
   </header>
 
   <div class="page">
     <div class="page-head">
-      <h1 class="page-title">企业治理中心</h1>
-      <p class="page-desc">集中查看当前登录身份、三层权限视图与审计日志，验证系统的租户隔离与权限控制能力。</p>
+      <h1 class="page-title">权限与日志</h1>
+      <p class="page-desc">查看当前账号可以访问的功能与数据范围，以及最近的操作记录。</p>
     </div>
 
-    <div class="notice">以下所有信息均从服务端按当前登录令牌实时解析，无法在前端伪造；租户隔离与行级权限在数据访问层强制注入。</div>
+    <div class="notice">以下信息均根据当前登录账号由服务端实时计算，前端无法修改。</div>
 
     <div class="card">
       <div class="card-head"><h3>① 当前登录身份</h3><a class="btn btn-sm" href="profile.html">个人中心 →</a></div>
-      <div class="sub">身份来自 JWT claims（sub / groups / tenant），由服务端解析后回显；未登录访问 API 一律 401。</div>
+      <div class="sub">身份由登录信息自动识别，无需手动切换。</div>
       <div class="identity-grid" id="identity">加载中…</div>
     </div>
 
     <div class="card">
       <div class="card-head"><h3>② 权限矩阵（三层权限）</h3>
         <button class="btn btn-sm" onclick="loadPermissions()">刷新权限</button></div>
-      <div class="sub">功能权限控制页面访问，数据权限控制文档可见范围，工具权限控制 Tool Calling 能否触发真实方法。全部按当前用户实时计算。</div>
+      <div class="sub">功能权限决定可以使用哪些功能，数据权限决定可以看到哪些文档，工具权限决定能否调用系统工具。全部按当前账号实时计算。</div>
 
       <div class="layer">功能权限 · 菜单访问</div>
       <div class="perm-grid" id="menuPerms">加载中…</div>
@@ -69,7 +69,7 @@
     <div class="card">
       <div class="card-head"><h3>③ 审计日志</h3>
         <button class="btn btn-sm" onclick="loadAudit()">刷新审计</button></div>
-      <div class="sub">所有 /api/** 请求自动落库（含身份、租户、动作、状态、耗时、IP）；登录失败、令牌越权与工具越权额外显式埋点。查询按当前租户强制过滤。</div>
+      <div class="sub">记录重要的登录与操作行为（含账号、时间、动作、结果与耗时），仅能看到当前空间内的记录。</div>
       <div class="kv" id="auditStats"></div>
       <div class="scroll" style="margin-top:14px;max-height:420px">
         <table><thead><tr><th>时间</th><th>租户</th><th>用户</th><th>动作</th><th>状态</th><th>耗时</th><th>结果</th><th>细节</th></tr></thead><tbody id="auditBody"></tbody></table>
@@ -93,8 +93,8 @@ async function loadIdentity(){
     document.getElementById('identity').innerHTML=
       '<div class="id-cell"><div class="k">用户</div><div class="v">'+esc(j.user)+'</div></div>'+
       '<div class="id-cell"><div class="k">用户组</div><div class="v">'+(j.groups&&j.groups.length?j.groups.map(esc).join('、'):'—')+'</div></div>'+
-      '<div class="id-cell"><div class="k">租户</div><div class="v">'+esc(j.tenant)+'</div></div>'+
-      '<div class="id-cell"><div class="k">认证方式</div><div class="v">'+tag(j.authType==='jwt'?'JWT 令牌':j.authType,'info')+'</div></div>';
+      '<div class="id-cell"><div class="k">所属空间</div><div class="v">'+esc(window.Shell?Shell.tenantLabel(j.tenant):j.tenant)+'</div></div>'+
+      '<div class="id-cell"><div class="k">登录方式</div><div class="v">'+tag('账号密码','info')+'</div></div>';
   }catch(e){document.getElementById('identity').innerHTML='<div class="empty">加载失败</div>'}
 }
 

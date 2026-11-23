@@ -28,27 +28,19 @@
 <div class="layout" id="sidebarHost">
 <main class="main">
   <header class="topbar">
-    <div class="topbar-left"><div class="topbar-title">混合检索实验</div><span class="topbar-sub">BM25 × kNN × RRF</span></div>
+    <div class="topbar-left"><div class="topbar-title">检索对比</div><span class="topbar-sub">找到更准确的答案</span></div>
     <span class="status-pill" data-status-pill><span class="status-dot"></span>检测中…</span>
   </header>
 
   <div class="page">
     <div class="page-head">
-      <h1 class="page-title">混合检索实验</h1>
-      <p class="page-desc">同一问题、三种检索方式并排对比，直观理解全文检索、向量检索与融合排序的差异。</p>
+      <h1 class="page-title">检索对比</h1>
+      <p class="page-desc">同一个问题用不同方式检索，看看哪种结果更符合你的需要。</p>
     </div>
 
     <div class="intro">
-      <b>同一问题、三种检索、并排对比</b>：BM25 擅长精确关键词（如"45.50米"），kNN 擅长语义近似（如"水位上限"），
-      RRF（Reciprocal Rank Fusion）按排名融合两路结果，无需手动调权重。
-      <b>行级权限强制生效</b>：切换下方身份头，越权文档一律不返回——过滤条件由服务端强制注入，前端无法绕过。
-    </div>
-
-    <div class="idbar">
-      <label>模拟身份</label>
-      <label>用户 <input id="userId" type="text" value="zhangsan"></label>
-      <label>所属组 <input id="groups" type="text" value="water-dept"></label>
-      <span style="color:var(--muted);font-size:11px">对应请求头 X-User / X-Groups，生产环境由 JWT 注入</span>
+      关键词检索擅长精确匹配的数值与术语，语义检索擅长意思相近的说法，系统会把两种方式的结果合并排序，得到更全面的答案。
+      检索范围会自动按你的账号权限过滤，你只能看到有权访问的内容。
     </div>
 
     <div class="querybar">
@@ -57,9 +49,9 @@
     </div>
 
     <div class="cols">
-      <div class="col"><h3>① BM25 全文检索</h3><div id="bm25" class="hits"><div class="empty">等待检索…</div></div></div>
-      <div class="col"><h3>② kNN 向量检索</h3><div id="knn" class="hits"><div class="empty">等待检索…</div></div></div>
-      <div class="col hybrid"><h3>③ RRF 混合融合（生产模式）</h3><div id="hybrid" class="hits"><div class="empty">等待检索…</div></div></div>
+      <div class="col"><h3>① 关键词检索</h3><div id="bm25" class="hits"><div class="empty">等待检索…</div></div></div>
+      <div class="col"><h3>② 语义检索</h3><div id="knn" class="hits"><div class="empty">等待检索…</div></div></div>
+      <div class="col hybrid"><h3>③ 智能融合（推荐）</h3><div id="hybrid" class="hits"><div class="empty">等待检索…</div></div></div>
     </div>
   </div>
 </main>
@@ -69,10 +61,13 @@
 <script src="assets/app.js"></script>
 <script>
 function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
-function headers(){return {'X-User':document.getElementById('userId').value.trim()||'anonymous','X-Groups':document.getElementById('groups').value.trim()}}
+function headers(){
+  const u=(window.WrkAuth&&WrkAuth.getUser())||null;
+  return u?{'X-User':u.user||'','X-Groups':(u.groups||[]).join(',')}:{};
+}
 function render(id,hits,label){
   const el=document.getElementById(id);
-  if(!hits||!hits.length){el.innerHTML='<div class="empty">无命中（可能越权或知识库为空）</div>';return}
+  if(!hits||!hits.length){el.innerHTML='<div class="empty">暂无匹配结果</div>';return}
   el.innerHTML=hits.map(h=>'<div class="hit"><div class="meta"><span>'+esc(h.file)+' · 第'+(Number(h.chunk)+1)+'段</span><span class="score">'+label+' '+(h.score||0).toFixed(4)+'</span></div><div class="text">'+esc(h.text)+'</div></div>').join('');
 }
 async function run(){
@@ -81,7 +76,7 @@ async function run(){
   try{
     const r=await fetch('/api/search/compare?q='+encodeURIComponent(q),{headers:headers()});
     const j=await r.json();if(!r.ok)throw new Error(j.message||('HTTP '+r.status));
-    render('bm25',j.bm25,'BM25');render('knn',j.knn,'余弦');render('hybrid',j.hybrid,'RRF');
+    render('bm25',j.bm25,'关键词');render('knn',j.knn,'语义');render('hybrid',j.hybrid,'融合');
   }catch(e){['bm25','knn','hybrid'].forEach(id=>document.getElementById(id).innerHTML='<div class="empty">失败：'+esc(e.message)+'</div>')}
 }
 document.getElementById('q').addEventListener('keydown',e=>{if(e.key==='Enter')run()});

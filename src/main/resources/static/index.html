@@ -440,7 +440,7 @@ async function send(text){
     }
   }catch(e){
     showError(e.message);
-    if(!ai.content)ai.content='（请求失败，请检查后端服务与 API Key 配置）';
+    if(!ai.content)ai.content='（回答生成失败，请稍后重试）';
   }finally{
     ai.streaming=false;sending=false;
     document.getElementById('sendBtn').disabled=false;

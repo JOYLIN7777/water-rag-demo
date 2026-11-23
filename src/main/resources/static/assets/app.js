@@ -23,16 +23,25 @@
   ];
   // 设置页内的功能入口（含功能权限控制）
   const SETTINGS = [
-    { key: 'search', href: 'search.html', label: '检索实验', icon: 'search',
-      desc: '并排对比 BM25 全文检索、kNN 向量检索与 RRF 融合结果', groups: [] },
-    { key: 'models', href: 'models.html', label: '模型配置', icon: 'model',
-      desc: '配置对话 / 向量模型，切换公有云 API 或内网私有化模型', groups: ['admin'] },
-    { key: 'tree', href: 'tree.html', label: '会话树', icon: 'tree',
-      desc: '查看消息分支，从任意节点 fork 开新支或 rewind 回退', groups: [] },
-    { key: 'governance', href: 'governance.html', label: '企业治理', icon: 'shield',
-      desc: '查看登录身份、三层权限矩阵与全量审计日志', groups: ['admin'] }
+    { key: 'search', href: 'search.html', label: '检索对比', icon: 'search',
+      desc: '对比关键词检索、语义检索和融合检索的结果，帮助找到更准的答案', groups: [] },
+    { key: 'tree', href: 'tree.html', label: '问答分支', icon: 'tree',
+      desc: '从任意一条回答继续追问，或回到之前的问题重新提问', groups: [] },
+    { key: 'models', href: 'models.html', label: '模型设置', icon: 'model',
+      desc: '设置对话与向量模型，支持公有云服务和内网私有模型', groups: ['admin'] },
+    { key: 'governance', href: 'governance.html', label: '权限与日志', icon: 'shield',
+      desc: '查看账号权限范围和最近的操作记录', groups: ['admin'] }
   ];
   global.ShellSettings = SETTINGS;
+
+  // 内部标识转中文显示名，避免把 admin / water-dept / default 直接暴露给用户
+  const GROUP_LABELS = {
+    admin: '系统管理员', 'water-dept': '水利业务组', analyst: '水利分析员',
+    viewer: '只读用户', user: '普通用户', ops: '运维人员'
+  };
+  const TENANT_LABELS = { default: '默认空间' };
+  const groupLabel = g => GROUP_LABELS[g] || g;
+  const tenantLabel = t => TENANT_LABELS[t] || t;
 
   const svg = name => '<svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">' + (ICONS[name] || '') + '</svg>';
   const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c =>
@@ -66,7 +75,9 @@
     getSessions: loadSessions,
     saveSessions,
     refreshDocs() { return loadDocs(); },
-    getCurrentUser() { const a = global.WrkAuth; return a ? a.getUser() : null; }
+    getCurrentUser() { const a = global.WrkAuth; return a ? a.getUser() : null; },
+    groupLabel: groupLabel,
+    tenantLabel: tenantLabel
   };
 
   function pickSession(id, ev) {
@@ -181,35 +192,8 @@
     loadDocs();
   }
 
-  const DOC_LIMIT = 2;
-  async function loadDocs() {
-    const el = document.getElementById('docList');
-    if (!el) return;
-    try {
-      const all = await (await fetch('/api/docs/list')).json();
-      const totalChunks = all.reduce((s, d) => s + Number(d.chunks || 0), 0);
-      const badge = document.getElementById('uploadBadge');
-      if (badge) badge.textContent = all.length + ' 个 · ' + totalChunks + ' 片';
-      const list = all.slice().sort((a, b) => String(b.uploadedAt || '').localeCompare(String(a.uploadedAt || '')));
-      if (!list.length) { el.innerHTML = '<div class="doc-empty">知识库暂无文档</div>'; return; }
-      el.innerHTML = list.slice(0, DOC_LIMIT).map(d =>
-        '<div class="doc-item"><span class="doc-name" title="' + esc(d.fileName) + '">' + esc(d.fileName) + '</span>' +
-        '<span class="doc-meta">' + d.chunks + '片</span><button class="doc-delete" title="删除文档">×</button></div>').join('') +
-        (list.length > DOC_LIMIT ? '<a class="doc-more" href="manage.html">查看全部 ' + list.length + ' 个文档 →</a>' : '');
-      el.querySelectorAll('.doc-item').forEach((item, idx) => {
-        const d = list[idx];
-        item.querySelector('.doc-delete').onclick = () => {
-          if (!global.confirm('确定删除「' + d.fileName + '」（' + d.chunks + ' 个切片）吗？')) return;
-          fetch('/api/docs?fileName=' + encodeURIComponent(d.fileName), { method: 'DELETE' })
-            .then(r => r.json()).then(j => {
-              if (j.deletedChunks === undefined) throw new Error(j.message || '删除失败');
-              uploadMsg('✓ 已删除「' + d.fileName + '」（' + j.deletedChunks + ' 个切片）', 'ok');
-              loadDocs();
-            }).catch(e => uploadMsg('✗ 删除失败：' + e.message, 'err'));
-        };
-      });
-    } catch (e) { el.innerHTML = '<div class="doc-empty">文档列表加载失败</div>'; }
-  }
+  // 侧栏只保留上传入口，文档查看/删除统一在「知识库文档」页面完成
+  function loadDocs() { return Promise.resolve(); }
 
   // 递归遍历拖入的文件/目录条目（readEntries 每次最多返回 100 条，需循环读完）
   function walkEntry(entry, out) {
@@ -256,8 +240,6 @@
     if (fi) fi.onchange = e => { uploadFiles(e.target.files); e.target.value = ''; };
     const folder = document.getElementById('folderInput');
     if (folder) folder.onchange = e => { uploadFiles(e.target.files); e.target.value = ''; };
-    const toggle = document.querySelector('.upload-toggle');
-    if (toggle) toggle.onclick = () => document.getElementById('uploadArea').classList.toggle('open');
   }
 
   // ---------- 用户卡片 ----------
@@ -272,7 +254,8 @@
       '<a class="user-avatar" href="profile.html" title="个人中心">' + esc((name || '演').slice(0, 1).toUpperCase()) + '</a>' +
       '<a class="user-meta" href="profile.html" title="个人中心">' +
         '<div class="user-name">' + esc(name) + '</div>' +
-        '<div class="user-tenant">租户 ' + esc(tenant) + '</div></a>' +
+        '<div class="user-tenant">' + esc(tenantLabel(tenant)) + '</div></a>' +
+      '<a class="user-icon-btn" href="settings.html" title="设置">' + svg('settings') + '</a>' +
       '<button class="user-logout" title="退出登录" onclick="WrkAuth.logout()">⏻</button>';
   }
 
@@ -304,23 +287,20 @@
         '<button class="new-chat" onclick="Shell.newSession()">＋ 新建会话</button>' +
         '<div class="section-label">历史会话</div>' +
         '<div class="session-list" id="sessionList"></div>' +
-        '<div class="upload-area" id="uploadArea">' +
-          '<button class="upload-toggle"><span class="caret">▶</span><span class="t">知识库文档</span><span id="uploadBadge">—</span></button>' +
+        '<div class="upload-area open" id="uploadArea">' +
+          '<div class="upload-title"><span class="t">知识库文档</span><a class="upload-manage" href="manage.html" title="查看与管理全部文档">管理 →</a></div>' +
           '<div class="upload-body">' +
             '<div class="dropzone" id="dropzone"><div class="drop-icon">⇪</div>' +
               '<div class="drop-text">点击或拖拽上传文档</div>' +
               '<div class="drop-formats" id="dropFormats">支持多格式</div></div>' +
             '<div class="upload-msg" id="uploadMsg" style="display:none"></div>' +
             '<button class="folder-btn" onclick="document.getElementById(\'folderInput\').click()">📁 选择文件夹上传</button>' +
-            '<div class="doc-list" id="docList"></div>' +
             '<input type="file" id="fileInput" hidden>' +
             '<input type="file" id="folderInput" webkitdirectory multiple hidden>' +
           '</div>' +
         '</div>' +
-        '<a class="settings-entry' + (active === 'settings' ? ' active' : '') + '" href="settings.html" title="设置">' +
-          svg('settings') + '<span>设置</span><span class="settings-arrow">›</span></a>' +
         '<div class="user-block" id="sidebarUserBlock"></div>' +
-        '<div class="sidebar-footer">Spring Boot 3.4 · Spring AI<br>Elasticsearch</div>' +
+        '<div class="sidebar-footer">水利知识库 · 让知识更好用</div>' +
       '</aside>';
     host.insertBefore(aside.firstElementChild, host.firstChild);
 

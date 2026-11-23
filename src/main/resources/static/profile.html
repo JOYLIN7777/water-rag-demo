@@ -26,14 +26,14 @@
 <div class="layout" id="sidebarHost">
 <main class="main">
   <header class="topbar">
-    <div class="topbar-left"><div class="topbar-title">个人中心</div><span class="topbar-sub">账号 / 安全 / 令牌</span></div>
+    <div class="topbar-left"><div class="topbar-title">个人中心</div><span class="topbar-sub">账号与安全</span></div>
     <span class="status-pill" data-status-pill><span class="status-dot"></span>检测中…</span>
   </header>
 
   <div class="page">
     <div class="page-head">
       <h1 class="page-title">个人中心</h1>
-      <p class="page-desc">查看当前登录账号信息、访问令牌状态，并修改登录密码。</p>
+      <p class="page-desc">查看账号信息与登录状态，并可修改登录密码。</p>
     </div>
 
     <div class="profile-head">
@@ -48,14 +48,14 @@
     </div>
 
     <div class="card">
-      <div class="card-head"><h3>访问令牌</h3><button class="btn btn-sm" onclick="WrkAuth.logout()">退出登录</button></div>
-      <div class="sub">采用 access + refresh 双令牌：access 用于访问 API，过期后由 refresh 自动续期；登出会立即使 access 失效。</div>
+      <div class="card-head"><h3>登录状态</h3><button class="btn btn-sm" onclick="WrkAuth.logout()">退出登录</button></div>
+      <div class="sub">登录有效期内无需重复登录，到期前系统会自动续期；退出后本次登录立即失效。</div>
       <div class="info-grid" id="pToken">加载中…</div>
     </div>
 
     <div class="card">
       <div class="card-head"><h3>修改密码</h3></div>
-      <div class="sub">修改后当前令牌仍有效至过期，下次登录需使用新密码。密码以 PBKDF2 加盐哈希存储，服务端不保留明文。</div>
+      <div class="sub">修改后下次登录请使用新密码。密码经过加密存储，系统不会保存明文。</div>
       <form class="pw-form" id="pwForm">
         <div class="field"><label for="oldPwd">当前密码</label>
           <input id="oldPwd" type="password" autocomplete="current-password" placeholder="请输入当前密码"></div>
@@ -85,15 +85,17 @@ async function loadProfile(){
     const r=await fetch('/api/auth/me');
     if(r.status===401){WrkAuth.goLogin();return}
     const j=await r.json();
-    const name=j.user;
+    const name=j.displayName||j.user;
     document.getElementById('pName').textContent=name;
-    document.getElementById('pAvatar').textContent=(name||'演').slice(0,1).toUpperCase();
-    document.getElementById('pSub').textContent='租户 '+j.tenant+' · '+((j.groups||[]).join('、')||'无用户组');
+    document.getElementById('pAvatar').textContent=(name||'演').slice(0,1);
+    const gl=(window.Shell&&Shell.groupLabel)||(x=>x);
+    const tl=(window.Shell&&Shell.tenantLabel)||(x=>x);
+    document.getElementById('pSub').textContent=tl(j.tenant)+' · '+((j.groups||[]).map(gl).join('、')||'普通用户');
     document.getElementById('pInfo').innerHTML=
-      '<div class="info-cell"><div class="k">用户名</div><div class="v">'+esc(j.user)+'</div></div>'+
-      '<div class="info-cell"><div class="k">用户组 / 角色</div><div class="v">'+(j.groups&&j.groups.length?j.groups.map(esc).join('、'):'—')+'</div></div>'+
-      '<div class="info-cell"><div class="k">所属租户</div><div class="v">'+esc(j.tenant)+'</div></div>'+
-      '<div class="info-cell"><div class="k">认证方式</div><div class="v">'+tag(j.authType==='jwt'?'JWT 令牌':j.authType,'info')+'</div></div>';
+      '<div class="info-cell"><div class="k">登录账号</div><div class="v">'+esc(j.user)+'</div></div>'+
+      '<div class="info-cell"><div class="k">角色</div><div class="v">'+(j.groups&&j.groups.length?j.groups.map(g=>esc(gl(g))).join('、'):'—')+'</div></div>'+
+      '<div class="info-cell"><div class="k">所属空间</div><div class="v">'+esc(tl(j.tenant))+'</div></div>'+
+      '<div class="info-cell"><div class="k">登录方式</div><div class="v">'+tag('账号密码','info')+'</div></div>';
 
     // 令牌有效期：从本地 access token 解析 exp，展示剩余时间与进度条
     const tok=WrkAuth.getAccess();const c=tok?parseJwt(tok):null;
@@ -102,10 +104,10 @@ async function loadProfile(){
       const iat=c.iat||(c.exp-remain),total=Math.max(1,c.exp-iat),pct=Math.min(100,Math.round(remain/total*100));
       const mm=Math.floor(remain/60),ss=remain%60;
       document.getElementById('pToken').innerHTML=
-        '<div class="info-cell" style="grid-column:1/-1"><div class="k">access 令牌剩余有效期</div>'+
+        '<div class="info-cell" style="grid-column:1/-1"><div class="k">本次登录剩余时间</div>'+
         '<div class="v">'+mm+' 分 '+String(ss).padStart(2,'0')+' 秒</div>'+
         '<div class="token-bar"><i style="width:'+pct+'%"></i></div>'+
-        '<div class="k" style="margin-top:8px">过期后前端自动用 refresh 令牌续期，无需重新登录</div></div>';
+        '<div class="k" style="margin-top:8px">到期前会自动续期，无需重新登录</div></div>';
     }else{
       document.getElementById('pToken').innerHTML='<div class="info-cell" style="grid-column:1/-1"><div class="v">未获取到令牌信息</div></div>';
     }

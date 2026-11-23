@@ -37,19 +37,18 @@
 <div class="layout" id="sidebarHost">
 <main class="main">
   <header class="topbar">
-    <div class="topbar-left"><div class="topbar-title">会话树</div><span class="topbar-sub">fork / rewind</span></div>
+    <div class="topbar-left"><div class="topbar-title">问答分支</div><span class="topbar-sub">继续追问与回退</span></div>
     <span class="status-pill" data-status-pill><span class="status-dot"></span>检测中…</span>
   </header>
 
   <div class="page">
     <div class="page-head">
-      <h1 class="page-title">会话树</h1>
-      <p class="page-desc">每条消息记住自己的父节点，一个会话可长出多条分支。支持回到旧节点与从任意节点分叉继续提问。</p>
+      <h1 class="page-title">问答分支</h1>
+      <p class="page-desc">从任意一条回答继续追问，或回到之前的问题重新提问，原来的记录都会保留。</p>
     </div>
 
     <div class="intro">
-      <b>pi-mono 风格会话模型</b>：<b>rewind</b> 只把当前位置移回旧节点，不删除任何消息；<b>fork</b> 从旧节点开新支继续提问，旧分支完整保留。
-      上下文只取当前节点到根这条链，兄弟分支不会串进回答。<b>注意</b>：工具副作用（如外部 API 调用）不会随 rewind 回滚，这里回滚的只是对话上下文。
+      回到之前的回答重新提问时，原来的问答记录不会丢失，而是保留为另一条路线。切换路线后，系统会沿当前这条路线继续回答，不会混入其他路线的内容。
     </div>
 
     <div class="toolbar">
@@ -143,7 +142,7 @@ async function rewind(id){
     const r=await fetch('/api/chat/rewind?sessionId='+encodeURIComponent(sid())+'&nodeId='+encodeURIComponent(id),{method:'POST'});
     const j=await r.json();if(!r.ok)throw new Error(j.error||'HTTP '+r.status);
     selectedId=id;await load();appToast('已回到该节点','ok');
-  }catch(e){tip('rewind 失败：'+e.message,false)}
+  }catch(e){tip('回退失败：'+e.message,false)}
 }
 async function forkBranch(){
   const name=document.getElementById('branchName').value.trim();
@@ -153,7 +152,7 @@ async function forkBranch(){
     const r=await fetch('/api/chat/fork?sessionId='+encodeURIComponent(sid())+'&nodeId='+encodeURIComponent(selectedId)+'&name='+encodeURIComponent(name),{method:'POST'});
     const j=await r.json();if(!r.ok)throw new Error(j.error||'HTTP '+r.status);
     document.getElementById('branchName').value='';await load();appToast('分支已标记','ok');
-  }catch(e){tip('fork 失败：'+e.message,false)}
+  }catch(e){tip('新建分支失败：'+e.message,false)}
 }
 async function ask(){
   const q=document.getElementById('q').value.trim();
