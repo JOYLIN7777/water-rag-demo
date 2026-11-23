@@ -62,9 +62,20 @@
   .ai-badge{width:22px;height:22px;border-radius:7px;background:linear-gradient(135deg,var(--primary-hi),var(--primary));color:#fff;display:flex;align-items:center;justify-content:center;font-size:10.5px;font-weight:700;flex:0 0 22px}
   .ai-card-name{font-weight:650;color:var(--ink-2);letter-spacing:.2px}
   .ai-state{margin-left:6px}
-  .ai-card-actions{margin-left:auto;display:flex;gap:4px}
-  .icon-btn{border:0;background:transparent;color:var(--muted);min-width:26px;height:26px;padding:0 7px;border-radius:6px;font-size:12.5px;line-height:1;transition:all .15s;display:inline-flex;align-items:center;justify-content:center;white-space:nowrap}
-  .icon-btn:hover{background:#eef2f8;color:var(--primary)}
+  .ai-card-actions{margin-left:auto;display:flex;align-items:center;gap:6px}
+  /* 操作按钮常显：低对比极简图标在浅底上近乎隐形，用户会以为"要 hover 才出来" */
+  .icon-btn{border:1px solid #e6eaf1;background:#fff;color:#6b7789;height:24px;padding:0 8px;border-radius:6px;font-size:12px;line-height:1;transition:all .15s;display:inline-flex;align-items:center;justify-content:center;white-space:nowrap}
+  .icon-btn:hover{border-color:#b9cbff;background:var(--primary-soft);color:var(--primary)}
+  /* 本次调用的消耗：单次问答的 token 与耗时，属于"响应元数据"，放标题栏右侧最合适；
+     数字用 tabular-nums 对齐，连续问答时纵向扫视不会跳动 */
+  .ai-usage{display:inline-flex;align-items:center;gap:4px;height:24px;padding:0 8px;margin-right:2px;
+    border:1px solid #e8edf6;border-radius:6px;background:#f5f8fd;color:#7a8699;
+    font-size:10.5px;font-weight:500;letter-spacing:.1px;font-variant-numeric:tabular-nums;
+    white-space:nowrap;cursor:default;transition:all .15s}
+  .ai-usage:hover{background:#eef4ff;border-color:#d3e0fa;color:#3b6ef5}
+  .ai-usage b{font-weight:700;color:#475569}
+  .ai-usage:hover b{color:#2f5fe0}
+  .ai-usage .ai-usage-sep{color:#c3cddd;font-weight:400}
   /* 引用计数是"▤ N 篇"文字按钮，必须自适应宽度且不换行 */
   .ai-cite-count{font-size:11px;letter-spacing:.2px}
   .ai-card-body{padding:16px 22px 18px;font-size:14px;line-height:1.85;color:var(--ink)}
@@ -205,8 +216,9 @@ function cacheKey(id){return 'water-rag-msgs:'+SCOPE+':'+id}
 function draftKey(id){return 'water-rag-draft:'+SCOPE+':'+id}
 function cacheMessages(id,list){
   try{const arr=list||msgStore[id]||[];
+    // usage 一并缓存：刷新页面后历史回答的"本次消耗"仍然显示，不会凭空消失
     localStorage.setItem(cacheKey(id),JSON.stringify(arr.filter(m=>!m.streaming).map(m=>
-      ({role:m.role,content:m.content,sources:m.sources||[]}))))}catch(e){}
+      ({role:m.role,content:m.content,sources:m.sources||[],usage:m.usage||null}))))}catch(e){}
 }
 function loadCached(id){
   try{const a=JSON.parse(localStorage.getItem(cacheKey(id))||'[]');return Array.isArray(a)?a:[]}catch(e){return []}
@@ -315,14 +327,31 @@ function renderMarkdown(text){
 }
 // 单条消息 HTML。AI 卡片内预留 .cite-zone / .ai-state / .ai-cite-count 便于【增量】更新，
 // 流式输出时不再重建整列 DOM，从根上消除闪烁。
+function fmtInt(n){return Number(n||0).toLocaleString('en-US')}
+// 本次调用的消耗：主显示"合计 token + 耗时"，明细（输入/输出/模型）放 title 悬浮提示。
+// 只显示合计是为了标题栏不拥挤；需要核对输入输出时鼠标一悬停就有。
+function usageInner(u){
+  const sec=(u.durationMs||0)/1000;
+  const d=sec>=10?Math.round(sec)+'s':sec.toFixed(1)+'s';
+  return '本次 <b>'+fmtInt(u.totalTokens)+'</b> tokens<span class="ai-usage-sep">·</span>'+d;
+}
+function usageTip(u){
+  const sec=(u.durationMs||0)/1000;
+  return '本次调用消耗：输入 '+fmtInt(u.promptTokens)+' tokens / 输出 '+fmtInt(u.completionTokens)
+    +' tokens，合计 '+fmtInt(u.totalTokens)+' tokens · 模型 '+(u.model||'-')
+    +' · 耗时 '+sec.toFixed(2)+' 秒';
+}
 function msgHtml(m,i){
   if(m.role==='user')return '<div class="msg-group user"><div class="user-bubble">'+escapeHtml(m.content)+'</div></div>';
+  const u=m.usage;
   return '<div class="msg-group ai"><div class="ai-card">'+
     '<div class="ai-card-head"><span class="ai-badge">水</span><span class="ai-card-name">水利知识库助手</span>'+
       '<span class="ai-state"'+(m.streaming?' style="color:var(--primary)"':'')+'>'+(m.streaming?'生成中…':'')+'</span>'+
       '<span class="ai-card-actions">'+
+        '<span class="ai-usage"'+(u?'':' style="display:none"')+(u?' title="'+escapeHtml(usageTip(u))+'"':'')+'>'+
+          (u?usageInner(u):'')+'</span>'+
         '<button class="icon-btn ai-cite-count" title="引用片段" style="display:none">▤</button>'+
-        '<button class="icon-btn" title="复制回答" onclick="copyMsg('+i+')">⧉</button>'+
+        '<button class="icon-btn" title="复制回答到剪贴板" onclick="copyMsg('+i+')">复制</button>'+
       '</span></div>'+
     '<div class="ai-card-body">'+renderMarkdown(m.content)+(m.streaming?'<span class="cursor"></span>':'')+'</div>'+
     '<div class="cite-zone"></div>'+
@@ -384,10 +413,18 @@ function patchStreaming(){
 }
 // 回答结束：只做收尾节点修改，不重建 DOM
 function finalizeCard(){
-  const card=document.getElementById('messages').querySelector('.msg-group:last-child');
+  const box=document.getElementById('messages');
+  const card=box.querySelector('.msg-group:last-child');
   if(!card)return;
   const cur=card.querySelector('.cursor');if(cur)cur.remove();
   const st=card.querySelector('.ai-state');if(st){st.textContent='';st.removeAttribute('style')}
+  // 本次消耗是回答结束后才有值的，补进预留的 .ai-usage 节点（不重绘整张卡片）
+  const m=messages[messages.length-1];
+  const us=card.querySelector('.ai-usage');
+  if(us){
+    if(m&&m.usage){us.innerHTML=usageInner(m.usage);us.title=usageTip(m.usage);us.style.display=''}
+    else{us.style.display='none'}
+  }
 }
 function toggleCite(i,k){
   const el=document.getElementById('cite-p-'+i+'-'+k);
@@ -441,7 +478,16 @@ async function send(text){
         const data=dataLines.join('\n');
         if(ev==='sources'){try{ai.sources=JSON.parse(data)}catch(e){}}
         else if(ev==='message')ai.content+=data;
-        else if(ev==='done')finished=true;
+        else if(ev==='done'){
+          finished=true;
+          // done 载荷是 JSON（含本次消耗）；兼容旧格式 [DONE]，解析失败按无用量处理
+          if(data&&data.charAt(0)==='{'){
+            try{
+              const d=JSON.parse(data);
+              if(d&&d.usage)ai.usage=Object.assign({durationMs:d.durationMs||0},d.usage);
+            }catch(e){}
+          }
+        }
       }
       // 流式增量：只 patch 最后一条卡片正文，绝不重建整列 DOM（消除闪烁）
       // 切走后不再触碰 DOM，避免把别的会话内容搅乱

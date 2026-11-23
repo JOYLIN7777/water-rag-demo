@@ -47,7 +47,9 @@ a{color:var(--primary);text-decoration:none}
 .session-body{flex:1;min-width:0;display:flex;flex-direction:column;line-height:1.4}
 .session-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#d6e0f5;font-size:12px}
 .session-time{font-size:10px;color:#6f80a4;margin-top:3px}
-.sidebar .session-delete{border:0;background:transparent;color:#6f80a4;font-size:16px;opacity:0;padding:0 3px;line-height:1;flex:0 0 auto;transition:all .15s}
+/* 删除按钮不做"完全隐形"：常态留 42% 透明度让其始终可见，hover 会话行时变实心红——
+   完全 opacity:0 会让用户以为没有删除入口（"要鼠标放上去才显示"的观感） */
+.sidebar .session-delete{border:0;background:transparent;color:#8fa0c0;font-size:16px;opacity:.42;padding:0 3px;line-height:1;flex:0 0 auto;transition:all .15s}
 .sidebar .session-item:hover .session-delete{opacity:1}
 .sidebar .session-delete:hover{color:#ff8fab}
 /* ============ 侧栏上传区（深色，全站公共） ============ */

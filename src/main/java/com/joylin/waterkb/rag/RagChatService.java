@@ -24,6 +24,7 @@ import reactor.core.publisher.Mono;
 
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
@@ -83,7 +84,9 @@ public class RagChatService {
      * <p>事件类型约定：
      * sources —— 本次回答引用的知识库片段（可溯源）；
      * message —— 回答文本增量（逐 token 推送）；
-     * done —— 结束标记。</p>
+     * done —— 结束标记，载荷为 JSON：{@code {"done":true,"durationMs":1234,
+     * "usage":{"promptTokens":1194,"completionTokens":229,"totalTokens":1423,"model":"qwen-plus"}}}，
+     * 前端据此展示"本次调用的消耗"；降级/熔断分支带 {@code "degraded":true} 且无 usage。</p>
      */
     public Flux<ServerSentEvent<String>> chatStream(String sessionId, String question, String parentId) {
         // 同步捕获身份快照：SSE 的 doFinally 在 Reactor 异步线程执行，
@@ -137,20 +140,42 @@ public class RagChatService {
         // 落库异常必须自己吃掉：SSE 响应已以 text/event-stream 提交，一旦异常外溢到
         // Spring MVC 的 @ExceptionHandler，容器会试图写 JSON 错误体而触发
         // "getOutputStream() has already been called"，最后粗暴关闭连接，浏览器显示 network error。
-        Mono<Void> persist = Mono.fromRunnable(() -> {
+        // 收尾同时把本次消耗（usage/耗时）序列化进 done 载荷——落库与回显用同一份数据，
+        // 保证"页面显示的 token"与"用量统计里的 token"永远对得上。
+        Mono<String> persistThenDone = Mono.fromCallable(() -> {
             if (!degraded[0]) breaker.recordSuccess();
             try {
                 appendExchange(sessionId, tenantAtStart, userAtStart, parentId, question, answerBuf.toString(), hits);
             } catch (Exception e) {
                 log.error("对话历史落库失败（不影响本次回答）", e);
             }
-            // 真实模型调用才算用量：熔断/降级分支没有请求模型，不记
-            if (!degraded[0]) {
+            long durationMs = System.currentTimeMillis() - startAt;
+            Map<String, Object> done = new LinkedHashMap<>();
+            done.put("done", true);
+            done.put("durationMs", durationMs);
+            if (degraded[0]) {
+                // 熔断/降级分支没有真实请求模型，不记用量、也不回消耗值
+                // （回 0 会让用户误以为这次调用免费，属于数据失真）
+                done.put("degraded", true);
+            } else {
                 Usage u = usageRef.get();
-                usageRecorder.record(userAtStart, activeChatModelName(),
-                        u == null || u.getPromptTokens() == null ? 0 : u.getPromptTokens(),
-                        u == null || u.getCompletionTokens() == null ? 0 : u.getCompletionTokens(),
-                        System.currentTimeMillis() - startAt);
+                int promptTokens = u == null || u.getPromptTokens() == null ? 0 : u.getPromptTokens();
+                int completionTokens = u == null || u.getCompletionTokens() == null ? 0 : u.getCompletionTokens();
+                int totalTokens = u == null || u.getTotalTokens() == null
+                        ? promptTokens + completionTokens : u.getTotalTokens();
+                String model = activeChatModelName();
+                usageRecorder.record(userAtStart, model, promptTokens, completionTokens, durationMs);
+                Map<String, Object> usage = new LinkedHashMap<>();
+                usage.put("promptTokens", promptTokens);
+                usage.put("completionTokens", completionTokens);
+                usage.put("totalTokens", totalTokens);
+                usage.put("model", model);
+                done.put("usage", usage);
+            }
+            try {
+                return objectMapper.writeValueAsString(done);
+            } catch (Exception e) {
+                return "[DONE]";
             }
         });
 
@@ -160,10 +185,10 @@ public class RagChatService {
         // 绝不让 onError 传播到 servlet 异步分发，避免连接被异常关闭。
         return Flux.just(sse("sources", sourcesJson))
                 .concatWith(tokens.map(t -> sse("message", t)))
-                .concatWith(persist.thenMany(Mono.just(sse("done", "[DONE]"))))
+                .concatWith(persistThenDone.map(payload -> sse("done", payload)))
                 .onErrorResume(ex -> {
                     log.error("SSE 流异常，已安全收尾", ex);
-                    return Flux.just(sse("done", "[DONE]"));
+                    return Flux.just(sse("done", "{\"done\":true,\"error\":true}"));
                 });
     }
 
