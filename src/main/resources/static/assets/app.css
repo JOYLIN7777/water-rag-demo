@@ -111,8 +111,8 @@ a{color:var(--primary);text-decoration:none}
 .crumb .crumb-current{font-weight:650}
 
 /* ============ 页面容器与页头 ============ */
-/* 内容占满侧栏以右的主区：限宽居中会在宽屏上留出大片空白（廖工 2026-11-23 反馈） */
-.page{max-width:none;margin:0;padding:28px 32px 60px;width:100%}
+/* 后台与功能页按廖工参考截图还原：内容居中限宽 1160px，宽屏两侧留白（2026-11-23） */
+.page{max-width:1160px;margin:0 auto;padding:28px 30px 60px;width:100%}
 .page-head{margin-bottom:20px}
 .page-title{font-size:20px;font-weight:680;color:var(--ink);margin:0 0 5px;letter-spacing:.2px}
 .page-desc{font-size:12.5px;color:var(--ink-2);margin:0;line-height:1.7}
