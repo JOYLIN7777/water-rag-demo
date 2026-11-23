@@ -6,15 +6,15 @@
 <title>管理后台 · 水利知识库</title>
 <link rel="stylesheet" href="assets/app.css">
 <style>
-  .admin-sidebar{width:250px;flex:0 0 250px;background:linear-gradient(180deg,#0d1730 0%,#16223c 100%);color:#c8d3e8;display:flex;flex-direction:column;padding:22px 14px 14px;position:sticky;top:0;height:100vh}
-  .admin-sidebar .brand{padding-bottom:20px}
+  .admin-sidebar{width:232px;flex:0 0 232px;background:linear-gradient(180deg,#0d1730 0%,#16223c 100%);color:#c8d3e8;display:flex;flex-direction:column;padding:20px 12px 12px;position:sticky;top:0;height:100vh;overflow-y:auto}
+  .admin-sidebar .brand{padding-bottom:16px}
   .admin-panel{display:none}
   .admin-panel.active{display:block}
-  .admin-nav-item{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:9px;color:#b9c6de;text-decoration:none;font-size:13px;cursor:pointer;margin-bottom:3px;transition:all .15s;border:0;background:transparent;width:100%;text-align:left}
+  .admin-nav-item{display:flex;align-items:center;gap:10px;padding:8px 11px;border-radius:8px;color:#b9c6de;text-decoration:none;font-size:12.5px;cursor:pointer;margin-bottom:2px;transition:all .15s;border:0;background:transparent;width:100%;text-align:left}
   .admin-nav-item:hover{background:rgba(255,255,255,.06);color:#fff}
   .admin-nav-item.active{background:rgba(124,92,214,.3);color:#fff;font-weight:650}
-  .admin-nav-item .ic{width:18px;text-align:center;font-size:14px;opacity:.9}
-  .admin-back{margin-top:auto;border-top:1px solid rgba(255,255,255,.09);padding-top:12px}
+  .admin-nav-item .ic{width:17px;text-align:center;font-size:13px;opacity:.9}
+  .admin-back{margin-top:auto;border-top:1px solid rgba(255,255,255,.09);padding-top:10px}
   .kv-table td:first-child{color:var(--muted);width:180px;white-space:nowrap}
   .deny{background:#fff;border:1px solid var(--line);border-radius:var(--radius);padding:60px 30px;text-align:center;box-shadow:var(--shadow-sm)}
   .deny-mark{width:56px;height:56px;border-radius:50%;background:#fdeef3;color:var(--danger);display:flex;align-items:center;justify-content:center;font-size:26px;margin:0 auto 16px}
@@ -26,23 +26,61 @@
   .quick-card:hover{border-color:#b9cbff;transform:translateY(-2px);box-shadow:0 8px 22px rgba(59,110,245,.12)}
   .quick-card .qc-t{font-size:14px;font-weight:650;color:var(--ink)}
   .quick-card .qc-d{font-size:12px;color:var(--muted);margin-top:6px;line-height:1.6}
+  /* 企业级工作台：左树 + 右表 + 顶部工具栏 */
+  .workbench{display:flex;background:#fff;border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;box-shadow:var(--shadow-sm);min-height:500px}
+  .tree-pane{width:220px;flex:0 0 220px;border-right:1px solid var(--line);background:#fafbfd;padding:12px 8px}
+  .tree-head{font-size:11px;color:var(--muted);letter-spacing:.5px;padding:4px 10px 10px;font-weight:600}
+  .tree-node{display:flex;align-items:center;gap:6px;padding:7px 10px;border-radius:7px;cursor:pointer;font-size:12.5px;color:var(--ink-2);user-select:none;margin-bottom:2px}
+  .tree-node:hover{background:#eef2f8}
+  .tree-node.active{background:var(--primary-soft);color:var(--primary);font-weight:650}
+  .tree-node .caret{width:11px;color:var(--muted);font-size:9px;flex:0 0 11px}
+  .tree-node .tn{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .tree-node .cnt{font-size:10px;color:var(--muted);background:#eef2f8;padding:1px 6px;border-radius:8px;flex:0 0 auto}
+  .tree-node.active .cnt{background:#fff}
+  .tree-children{padding-left:13px}
+  .tree-children.collapsed{display:none}
+  .data-pane{flex:1;min-width:0;display:flex;flex-direction:column}
+  .toolbar{display:flex;align-items:center;gap:8px;padding:12px 14px;border-bottom:1px solid var(--line);flex-wrap:wrap}
+  .toolbar input,.toolbar select{width:auto;padding:7px 10px;font-size:12px}
+  .toolbar .kw{width:190px}
+  .toolbar .grow{flex:1}
+  .data-table{width:100%;border-collapse:collapse;font-size:12px}
+  .data-table th{padding:10px 12px;background:#f7f9fc;color:var(--muted);font-size:11px;font-weight:600;text-align:left;border-bottom:1px solid var(--line);white-space:nowrap}
+  .data-table td{padding:10px 12px;border-bottom:1px solid #f1f4f9;vertical-align:middle}
+  .data-table tbody tr:hover td{background:#fafcff}
+  .row-idx{color:var(--muted);width:38px}
+  .op-btn{color:var(--primary);background:none;border:none;font-size:12px;padding:2px 6px;cursor:pointer}
+  .op-btn:hover{text-decoration:underline}
+  .op-btn.danger{color:var(--danger)}
+  .table-wrap{flex:1;overflow:auto}
+  .tag-role{display:inline-block;padding:2px 8px;border-radius:10px;font-size:10.5px;margin-right:4px;background:#eef2f8;color:var(--ink-2)}
+  .tag-role.admin{background:#f3efff;color:var(--violet)}
+  .tag-role.analyst{background:var(--primary-soft);color:#25469b}
+  .empty-inline{padding:36px;text-align:center;color:var(--muted);font-size:13px}
+  .node-type{display:inline-block;font-size:10px;padding:2px 7px;border-radius:5px;background:#eef2f8;color:var(--ink-2)}
+  .node-type.menu{background:var(--primary-soft);color:#25469b}
+  .node-type.btn{background:#fef4e6;color:var(--warn)}
 </style>
 </head>
 <body>
-<!-- 页面级权限校验未通过前隐藏主内容 -->
 <div class="layout" id="adminRoot" style="display:none">
   <aside class="admin-sidebar">
     <div class="brand"><div class="brand-mark">管</div>
       <div><div class="brand-title">管理后台</div><div class="brand-sub">水利知识库</div></div></div>
-    <div class="section-label" style="margin-top:6px">管理功能</div>
+    <div class="section-label" style="margin-top:6px">工作台</div>
     <button class="admin-nav-item active" data-panel="overview"><span class="ic">▦</span>概览</button>
+    <div class="section-label" style="margin:14px 0 6px">权限配置目录</div>
     <button class="admin-nav-item" data-panel="users"><span class="ic">◈</span>用户管理</button>
-    <button class="admin-nav-item" data-panel="roles"><span class="ic">❖</span>角色与权限</button>
+    <button class="admin-nav-item" data-panel="org"><span class="ic">⌘</span>组织架构</button>
+    <button class="admin-nav-item" data-panel="roles"><span class="ic">❖</span>角色定义</button>
+    <button class="admin-nav-item" data-panel="perms"><span class="ic">☷</span>菜单权限</button>
+    <div class="section-label" style="margin:14px 0 6px">业务管理</div>
     <button class="admin-nav-item" data-panel="docs"><span class="ic">▤</span>文档管理</button>
     <button class="admin-nav-item" data-panel="models"><span class="ic">◇</span>模型设置</button>
     <button class="admin-nav-item" data-panel="usage"><span class="ic">◷</span>用量统计</button>
+    <div class="section-label" style="margin:14px 0 6px">日志审计</div>
     <button class="admin-nav-item" data-panel="loginlogs"><span class="ic">⎗</span>登录日志</button>
-    <button class="admin-nav-item" data-panel="audit"><span class="ic">☷</span>操作日志</button>
+    <button class="admin-nav-item" data-panel="audit"><span class="ic">≡</span>操作日志</button>
     <div class="admin-back">
       <a class="admin-nav-item" href="index.html"><span class="ic">←</span>返回问答</a>
       <div class="user-block" id="adminUserBlock"></div>
@@ -70,7 +108,7 @@
         <div class="stats" id="ovStats">
           <div class="stat-card"><div class="stat-num">—</div><div class="stat-label">知识库文档</div></div>
           <div class="stat-card"><div class="stat-num">—</div><div class="stat-label">已入库片段</div></div>
-          <div class="stat-card"><div class="stat-num">—</div><div class="stat-label">模型配置</div></div>
+          <div class="stat-card"><div class="stat-num">—</div><div class="stat-label">账号数量</div></div>
           <div class="stat-card"><div class="stat-num">—</div><div class="stat-label">系统状态</div></div>
         </div>
         <div class="quick-cards">
@@ -81,7 +119,7 @@
         </div>
         <div class="card"><div class="card-head"><h3>最近操作</h3>
           <button class="btn btn-sm" onclick="loadOverview()">刷新</button></div>
-          <div class="scroll"><table><thead><tr><th>时间</th><th>账号</th><th>动作</th><th>状态</th><th>耗时</th></tr></thead>
+          <div class="scroll"><table class="data-table"><thead><tr><th>时间</th><th>账号</th><th>动作</th><th>状态</th><th>耗时</th></tr></thead>
             <tbody id="ovAudit"><tr><td colspan="5" class="empty">加载中…</td></tr></tbody></table></div>
         </div>
       </section>
@@ -89,27 +127,84 @@
       <!-- 用户管理 -->
       <section class="admin-panel" data-panel="users">
         <div class="page-head"><h1 class="page-title">用户管理</h1>
-          <p class="page-desc">查看当前系统中的账号及其角色、所属空间。账号由部署配置管理，不提供在线增删改。</p></div>
-        <div class="card"><div class="card-head"><h3>当前账号</h3></div>
-          <table class="kv-table"><tbody id="uIdentity"><tr><td colspan="2" class="empty">加载中…</td></tr></tbody></table></div>
-        <div class="card"><div class="card-head"><h3>账号列表</h3>
-          <button class="btn btn-sm" onclick="loadAdminUsers()">刷新</button></div>
-          <div class="scroll"><table><thead><tr><th>账号</th><th>显示名</th><th>角色 / 组</th><th>所属空间</th><th>状态</th></tr></thead>
-            <tbody id="aUsers"><tr><td colspan="5" class="empty">加载中…</td></tr></tbody></table></div>
-          <div class="hint">密码以加盐哈希存储，任何接口都不会返回密码原文或哈希值。</div>
+          <p class="page-desc">按角色或空间筛选账号。账号由部署配置管理，此处提供查看与导出。</p></div>
+        <div class="workbench">
+          <div class="tree-pane">
+            <div class="tree-head">组织筛选</div>
+            <div id="uTree"></div>
+          </div>
+          <div class="data-pane">
+            <div class="toolbar">
+              <input class="kw" id="uKw" type="text" placeholder="搜索账号 / 显示名…">
+              <select id="uStatus"><option value="">全部状态</option><option value="1">正常</option><option value="0">停用</option></select>
+              <span class="grow"></span>
+              <button class="btn btn-sm" onclick="loadUsersData()">刷新</button>
+              <button class="btn btn-sm" onclick="exportUsers()">导出用户</button>
+            </div>
+            <div class="table-wrap"><table class="data-table">
+              <thead><tr><th class="row-idx">序号</th><th>账号</th><th>显示名</th><th>所属角色</th><th>所属空间</th><th>状态</th><th>操作</th></tr></thead>
+              <tbody id="uTable"><tr><td colspan="7" class="empty">加载中…</td></tr></tbody></table></div>
+          </div>
         </div>
       </section>
 
-      <!-- 角色与权限 -->
-      <section class="admin-panel" data-panel="roles">
-        <div class="page-head"><h1 class="page-title">角色与权限</h1>
-          <p class="page-desc">系统按角色分配权限，管理员拥有全部权限。所有接口在服务端强制校验。</p></div>
-        <div class="card"><div class="card-head"><h3>角色权限矩阵</h3></div>
-          <div class="scroll"><table><thead><tr><th>角色</th><th>拥有的权限</th></tr></thead>
-            <tbody id="uRoles"><tr><td colspan="2" class="empty">加载中…</td></tr></tbody></table></div>
+      <!-- 组织架构 -->
+      <section class="admin-panel" data-panel="org">
+        <div class="page-head"><h1 class="page-title">组织架构</h1>
+          <p class="page-desc">按空间与用户组两级展示组织关系。组织节点来自账号的真实分组，未编造部门层级。</p></div>
+        <div class="workbench">
+          <div class="tree-pane">
+            <div class="tree-head">空间 / 用户组</div>
+            <div id="oTtree"></div>
+          </div>
+          <div class="data-pane">
+            <div class="toolbar">
+              <span id="oPath" style="font-size:12.5px;color:var(--ink)">全部空间</span>
+              <span class="grow"></span>
+              <button class="btn btn-sm" onclick="toggleOrgTree()">展开/收起全部</button>
+            </div>
+            <div class="table-wrap"><table class="data-table">
+              <thead><tr><th class="row-idx">序号</th><th>组织名称</th><th>组织标识</th><th>所属空间</th><th>成员数</th><th>状态</th><th>操作</th></tr></thead>
+              <tbody id="oTable"><tr><td colspan="7" class="empty">加载中…</td></tr></tbody></table></div>
+          </div>
         </div>
-        <div class="card"><div class="card-head"><h3>全部权限码</h3></div>
-          <div class="perm-grid2" id="uPerms"></div></div>
+      </section>
+
+      <!-- 角色定义 -->
+      <section class="admin-panel" data-panel="roles">
+        <div class="page-head"><h1 class="page-title">角色定义</h1>
+          <p class="page-desc">系统内置角色与权限范围。角色权限在服务端强制校验，非管理员无法调用管理接口。</p></div>
+        <div class="card" style="padding:0;border:0;box-shadow:none">
+          <div class="toolbar" style="background:#fff;border:1px solid var(--line);border-bottom:0;border-radius:var(--radius) var(--radius) 0 0">
+            <input class="kw" id="rKw" type="text" placeholder="搜索角色名称 / 标识…">
+            <span class="grow"></span>
+            <button class="btn btn-sm" onclick="renderRoleTable()">刷新</button>
+          </div>
+          <div class="table-wrap" style="border:1px solid var(--line);border-radius:0 0 var(--radius) var(--radius);background:#fff">
+            <table class="data-table">
+              <thead><tr><th class="row-idx">序号</th><th>角色名称</th><th>角色标识</th><th>数据范围</th><th>权限数</th><th>角色权限明细</th><th>操作</th></tr></thead>
+              <tbody id="rTable"><tr><td colspan="7" class="empty">加载中…</td></tr></tbody></table>
+          </div>
+        </div>
+      </section>
+
+      <!-- 菜单权限 -->
+      <section class="admin-panel" data-panel="perms">
+        <div class="page-head"><h1 class="page-title">菜单权限</h1>
+          <p class="page-desc">按模块展示权限节点与权限标识。权限码由服务端拦截器校验，前端只据此控制入口显示。</p></div>
+        <div class="card" style="padding:0;border:0;box-shadow:none">
+          <div class="toolbar" style="background:#fff;border:1px solid var(--line);border-bottom:0;border-radius:var(--radius) var(--radius) 0 0">
+            <input class="kw" id="pKw" type="text" placeholder="查询菜单 / 按钮 / 权限标识…">
+            <span class="grow"></span>
+            <button class="btn btn-sm" onclick="togglePermTree(true)">展开全部</button>
+            <button class="btn btn-sm" onclick="togglePermTree(false)">收起全部</button>
+          </div>
+          <div class="table-wrap" style="border:1px solid var(--line);border-radius:0 0 var(--radius) var(--radius);background:#fff">
+            <table class="data-table">
+              <thead><tr><th>权限名称</th><th>节点类型</th><th>权限标识</th><th>所属模块</th><th>说明</th><th>操作</th></tr></thead>
+              <tbody id="pTable"><tr><td colspan="6" class="empty">加载中…</td></tr></tbody></table>
+          </div>
+        </div>
       </section>
 
       <!-- 文档管理 -->
@@ -119,7 +214,7 @@
         <div class="card"><div class="card-head"><h3>已入库文档</h3>
           <div style="display:flex;gap:8px"><button class="btn btn-sm" onclick="loadDocs()">刷新</button>
             <a class="btn btn-sm btn-primary" href="manage.html">前往上传</a></div></div>
-          <div class="scroll"><table><thead><tr><th>文档名称</th><th>片段数</th><th>上传时间</th><th>操作</th></tr></thead>
+          <div class="scroll"><table class="data-table"><thead><tr><th>文档名称</th><th>片段数</th><th>上传时间</th><th>操作</th></tr></thead>
             <tbody id="dList"><tr><td colspan="4" class="empty">加载中…</td></tr></tbody></table></div>
         </div>
       </section>
@@ -145,7 +240,7 @@
         </div>
         <div class="card"><div class="card-head"><h3>按模型查看</h3>
           <button class="btn btn-sm" onclick="loadUsage()">刷新</button></div>
-          <div class="scroll"><table><thead><tr><th>模型</th><th>请求次数</th><th>输入Token</th><th>输出Token</th></tr></thead>
+          <div class="scroll"><table class="data-table"><thead><tr><th>模型</th><th>请求次数</th><th>输入Token</th><th>输出Token</th></tr></thead>
             <tbody id="uUsage"><tr><td colspan="4" class="empty">加载中…</td></tr></tbody></table></div>
           <div class="hint" id="uUsageHint"></div>
         </div>
@@ -157,18 +252,18 @@
           <p class="page-desc">登录成功与失败的尝试都留有记录，失败原因可追溯。</p></div>
         <div class="card"><div class="card-head"><h3>登录记录</h3>
           <button class="btn btn-sm" onclick="loadLoginLogs()">刷新</button></div>
-          <div class="scroll" style="max-height:520px"><table><thead><tr><th>时间</th><th>账号</th><th>动作</th><th>状态</th><th>结果</th><th>来源IP</th></tr></thead>
+          <div class="scroll" style="max-height:520px"><table class="data-table"><thead><tr><th>时间</th><th>账号</th><th>动作</th><th>状态</th><th>结果</th><th>来源IP</th></tr></thead>
             <tbody id="lList"><tr><td colspan="6" class="empty">加载中…</td></tr></tbody></table></div>
         </div>
       </section>
 
-      <!-- 审计日志 -->
+      <!-- 操作日志 -->
       <section class="admin-panel" data-panel="audit">
         <div class="page-head"><h1 class="page-title">操作日志</h1>
           <p class="page-desc">记录所有接口调用行为，仅管理员可查看。</p></div>
         <div class="card"><div class="card-head"><h3>操作记录</h3>
           <button class="btn btn-sm" onclick="loadAudit()">刷新</button></div>
-          <div class="scroll" style="max-height:520px"><table><thead><tr><th>时间</th><th>账号</th><th>动作</th><th>状态</th><th>耗时</th><th>结果</th></tr></thead>
+          <div class="scroll" style="max-height:520px"><table class="data-table"><thead><tr><th>时间</th><th>账号</th><th>动作</th><th>状态</th><th>耗时</th><th>结果</th></tr></thead>
             <tbody id="aList"><tr><td colspan="6" class="empty">加载中…</td></tr></tbody></table></div>
         </div>
       </section>
@@ -187,6 +282,33 @@ const num=n=>Number(n||0).toLocaleString('zh-CN');
 function statusTag(s){const n=Number(s);return '<span class="tag '+(n>=400?'no':'ok')+'">'+n+'</span>'}
 async function api(path){const r=await fetch(path);if(r.status===401){WrkAuth.goLogin();throw new Error('未登录')}if(!r.ok)throw new Error('请求失败（'+r.status+'）');return r.json()}
 
+// 权限节点定义：覆盖后端全部权限码，按模块分组，节点类型区分菜单/按钮
+const PERM_TREE=[
+  {module:'工作台',items:[
+    {code:'chat:use',name:'智能问答',type:'menu',desc:'进入问答页并使用知识库问答'},
+    {code:'doc:read',name:'知识库文档',type:'menu',desc:'查看文档列表'},
+    {code:'doc:write',name:'上传文档',type:'btn',desc:'上传文档入库并解析切片'},
+    {code:'doc:delete',name:'删除文档',type:'btn',desc:'删除文档及其全部切片'},
+    {code:'search:use',name:'检索对比',type:'menu',desc:'对比不同检索方式的结果'},
+    {code:'tree:use',name:'问答分支',type:'menu',desc:'查看与切换问答分支'}
+  ]},
+  {module:'系统管理',items:[
+    {code:'user:read',name:'用户管理',type:'menu',desc:'查看账号列表'},
+    {code:'user:write',name:'管理用户',type:'btn',desc:'账号增删改接口（预留）'},
+    {code:'admin:access',name:'管理后台',type:'menu',desc:'进入管理后台'},
+    {code:'model:read',name:'模型设置',type:'menu',desc:'查看模型配置'},
+    {code:'model:write',name:'修改模型',type:'btn',desc:'增删改与切换模型'},
+    {code:'audit:read',name:'审计日志',type:'menu',desc:'查看操作与登录日志'},
+    {code:'usage:read',name:'用量统计',type:'menu',desc:'查看模型调用用量'}
+  ]}
+];
+
+// 数据缓存（均来自真实接口）
+const DB={users:[],roles:[],allPerms:[],myPerms:[]};
+let userFilter={type:'all',value:''};
+let orgSel={tenant:'',group:''};
+let orgCollapsed=false;
+
 // 页面级权限校验：非管理员直接显示拒绝页，不暴露任何管理数据
 async function guard(){
   try{
@@ -202,30 +324,198 @@ async function guard(){
       '<a class="user-meta" href="profile.html"><div class="user-name">'+esc(u.displayName||u.user)+'</div>'+
       '<div class="user-tenant">'+esc(tl(u.tenant))+'</div></a>'+
       '<button class="user-logout" title="退出登录" onclick="WrkAuth.logout()">⏻</button>';
-    renderUsers(p);
-    loadAdminUsers();
+    DB.allPerms=p.allPermissions||[];
+    DB.myPerms=p.permissions||[];
+    DB.roles=p.roleMatrix||[];
+    await loadUsersData();
+    renderOrgTree();
+    renderOrgTable();
+    renderRoleTable();
+    renderPermTable();
     return true;
   }catch(e){$('denyBox').style.display='block';return false}
 }
 
-function renderUsers(p){
-  $('uIdentity').innerHTML=
-    '<tr><td>登录账号</td><td>'+esc(p.user)+'</td></tr>'+
-    '<tr><td>角色</td><td>'+((p.groups||[]).map(g=>esc(gl(g))).join('、')||'—')+'</td></tr>'+
-    '<tr><td>所属空间</td><td>'+esc(tl(p.tenant))+'</td></tr>'+
-    '<tr><td>管理员</td><td>'+(p.admin?'<span class="tag ok">是</span>':'<span class="tag off">否</span>')+'</td></tr>'+
-    '<tr><td>拥有权限数</td><td>'+((p.permissions||[]).length)+' 项</td></tr>';
-  const roles=p.roleMatrix||[];
-  $('uRoles').innerHTML=roles.length?roles.map(r=>
-    '<tr><td class="name">'+esc(r.role)+'</td><td>'+((r.permissions||[]).map(x=>'<span class="tag">'+esc(x)+'</span>').join(' '))+'</td></tr>'
-  ).join(''):'<tr><td colspan="2" class="empty">暂无角色数据</td></tr>';
-  const desc={
-    'admin:access':'进入管理后台','chat:use':'智能问答','doc:read':'查看文档','doc:write':'上传文档',
-    'doc:delete':'删除文档','search:use':'检索对比','tree:use':'问答分支','model:read':'查看模型设置',
-    'model:write':'修改模型设置','audit:read':'查看审计日志','usage:read':'查看用量统计',
-    'user:read':'查看用户','user:write':'管理用户'};
-  $('uPerms').innerHTML=(p.allPermissions||[]).map(code=>
-    '<div class="perm-pill"><b>'+esc(code)+'</b>'+esc(desc[code]||'')+'</div>').join('');
+async function loadUsersData(){
+  try{
+    DB.users=await api('/api/admin/users');
+    renderUserTree();renderUserTable();renderOrgTree();
+    const cards=document.querySelectorAll('#ovStats .stat-num');
+    if(cards[2])cards[2].textContent=DB.users.length;
+  }catch(e){$('uTable').innerHTML='<tr><td colspan="7" class="empty">加载失败：'+esc(e.message)+'</td></tr>'}
+}
+
+function roleTags(groups){return (groups||[]).map(g=>'<span class="tag-role '+(g==='admin'?'admin':g==='analyst'?'analyst':'')+'">'+esc(gl(g))+'</span>').join('')||'—'}
+
+function renderUserTree(){
+  const roles=[...new Set(DB.users.flatMap(u=>u.groups||[]))];
+  const tenants=[...new Set(DB.users.map(u=>u.tenant))];
+  let h='<div class="tree-node'+(userFilter.type==='all'?' active':'')+'" data-t="all" data-v="">全部用户 <span class="cnt">'+DB.users.length+'</span></div>';
+  h+='<div class="tree-head" style="padding-top:12px">按角色</div>';
+  roles.forEach(g=>{const c=DB.users.filter(u=>(u.groups||[]).includes(g)).length;
+    h+='<div class="tree-node'+(userFilter.type==='role'&&userFilter.value===g?' active':'')+'" data-t="role" data-v="'+esc(g)+'">'+esc(gl(g))+' <span class="cnt">'+c+'</span></div>'});
+  h+='<div class="tree-head" style="padding-top:12px">按空间</div>';
+  tenants.forEach(t=>{const c=DB.users.filter(u=>u.tenant===t).length;
+    h+='<div class="tree-node'+(userFilter.type==='tenant'&&userFilter.value===t?' active':'')+'" data-t="tenant" data-v="'+esc(t)+'">'+esc(tl(t))+' <span class="cnt">'+c+'</span></div>'});
+  $('uTree').innerHTML=h;
+  $('uTree').querySelectorAll('.tree-node').forEach(n=>n.onclick=()=>{
+    userFilter={type:n.dataset.t,value:n.dataset.v};renderUserTree();renderUserTable();
+  });
+}
+
+function renderUserTable(){
+  const kw=($('uKw').value||'').trim().toLowerCase();
+  const st=$('uStatus').value;
+  let list=DB.users.filter(u=>{
+    if(userFilter.type==='role'&&!(u.groups||[]).includes(userFilter.value))return false;
+    if(userFilter.type==='tenant'&&u.tenant!==userFilter.value)return false;
+    if(kw&&!((u.username+' '+(u.displayName||'')).toLowerCase().includes(kw)))return false;
+    if(st!==''&&String(u.enabled?1:0)!==st)return false;
+    return true;
+  });
+  $('uTable').innerHTML=list.length?list.map((u,i)=>
+    '<tr><td class="row-idx">'+(i+1)+'</td><td class="name">'+esc(u.username)+'</td><td>'+esc(u.displayName)+'</td>'+
+    '<td>'+roleTags(u.groups)+'</td><td>'+esc(tl(u.tenant))+'</td>'+
+    '<td>'+(u.enabled?'<span class="tag ok">正常</span>':'<span class="tag off">停用</span>')+'</td>'+
+    '<td><button class="op-btn" onclick="showUser('+i+')">查看</button></td></tr>'
+  ).join(''):'<tr><td colspan="7" class="empty-inline">没有符合条件的账号</td></tr>';
+  $('uTable')._rows=list;
+}
+$('uKw')&&($('uKw').oninput=renderUserTable);
+$('uStatus')&&($('uStatus').onchange=renderUserTable);
+
+function showUser(i){
+  const u=($('uTable')._rows||[])[i];if(!u)return;
+  Shell.modal({title:'账号详情',okText:'关闭',cancelText:'',body:
+    '<table class="kv-table"><tbody>'+
+    '<tr><td>账号</td><td>'+esc(u.username)+'</td></tr>'+
+    '<tr><td>显示名</td><td>'+esc(u.displayName)+'</td></tr>'+
+    '<tr><td>角色 / 组</td><td>'+roleTags(u.groups)+'</td></tr>'+
+    '<tr><td>所属空间</td><td>'+esc(tl(u.tenant))+'</td></tr>'+
+    '<tr><td>状态</td><td>'+(u.enabled?'正常':'停用')+'</td></tr>'+
+    '</tbody></table><div class="hint">密码以加盐哈希存储，任何接口都不返回密码原文或哈希。</div>'});
+}
+
+function exportUsers(){
+  const rows=[['账号','显示名','角色','所属空间','状态']].concat(
+    DB.users.map(u=>[u.username,u.displayName,(u.groups||[]).map(gl).join(' / '),tl(u.tenant),u.enabled?'正常':'停用']));
+  const csv='\ufeff'+rows.map(r=>r.map(c=>'"'+String(c==null?'':c).replace(/"/g,'""')+'"').join(',')).join('\n');
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));
+  a.download='用户列表.csv';a.click();URL.revokeObjectURL(a.href);
+  appToast('已导出 '+DB.users.length+' 个账号','ok');
+}
+
+function renderOrgTree(){
+  const tenants=[...new Set(DB.users.map(u=>u.tenant))];
+  let h='<div class="tree-node'+(orgSel.tenant===''&&orgSel.group===''?' active':'')+'" data-t="" data-g="">全部空间 <span class="cnt">'+DB.users.length+'</span></div>';
+  tenants.forEach(t=>{
+    const groups=[...new Set(DB.users.filter(u=>u.tenant===t).flatMap(u=>u.groups||[]))];
+    h+='<div class="tree-node'+(orgSel.tenant===t&&orgSel.group===''?' active':'')+'" data-t="'+esc(t)+'" data-g="">'+esc(tl(t))+' <span class="cnt">'+DB.users.filter(u=>u.tenant===t).length+'</span></div>';
+    h+='<div class="tree-children'+(orgCollapsed?' collapsed':'')+'">';
+    groups.forEach(g=>{h+='<div class="tree-node'+(orgSel.tenant===t&&orgSel.group===g?' active':'')+'" data-t="'+esc(t)+'" data-g="'+esc(g)+'">'+esc(gl(g))+' <span class="cnt">'+DB.users.filter(u=>u.tenant===t&&(u.groups||[]).includes(g)).length+'</span></div>'});
+    h+='</div>';
+  });
+  $('oTtree').innerHTML=h;
+  $('oTtree').querySelectorAll('.tree-node').forEach(n=>n.onclick=()=>{
+    orgSel={tenant:n.dataset.t,group:n.dataset.g};
+    $('oPath').textContent=(orgSel.tenant?tl(orgSel.tenant):'全部空间')+(orgSel.group?' / '+gl(orgSel.group):'');
+    renderOrgTree();renderOrgTable();
+  });
+}
+
+function renderOrgTable(){
+  let nodes=[];
+  if(!orgSel.tenant){
+    [...new Set(DB.users.map(u=>u.tenant))].forEach(t=>nodes.push({name:tl(t),code:t,tenant:t,count:DB.users.filter(u=>u.tenant===t).length,type:'空间'}));
+  }else if(!orgSel.group){
+    [...new Set(DB.users.filter(u=>u.tenant===orgSel.tenant).flatMap(u=>u.groups||[]))].forEach(g=>
+      nodes.push({name:gl(g),code:g,tenant:orgSel.tenant,count:DB.users.filter(u=>u.tenant===orgSel.tenant&&(u.groups||[]).includes(g)).length,type:'用户组'}));
+  }else{
+    nodes.push({name:gl(orgSel.group),code:orgSel.group,tenant:orgSel.tenant,
+      count:DB.users.filter(u=>u.tenant===orgSel.tenant&&(u.groups||[]).includes(orgSel.group)).length,type:'用户组'});
+  }
+  $('oTable').innerHTML=nodes.length?nodes.map((n,i)=>
+    '<tr><td class="row-idx">'+(i+1)+'</td><td class="name">'+esc(n.name)+'</td><td class="mono" style="font-size:11px">'+esc(n.code)+'</td>'+
+    '<td>'+esc(tl(n.tenant))+'</td><td>'+n.count+'</td><td><span class="tag ok">正常</span></td>'+
+    '<td><button class="op-btn" onclick="showOrgMembers('+i+')">查看成员</button></td></tr>'
+  ).join(''):'<tr><td colspan="7" class="empty-inline">该节点下暂无成员</td></tr>';
+  $('oTable')._rows=nodes;
+}
+
+function showOrgMembers(i){
+  const n=($('oTable')._rows||[])[i];if(!n)return;
+  const members=DB.users.filter(u=>u.tenant===n.tenant&&(!n.code||(u.groups||[]).includes(n.code)||u.tenant===n.tenant));
+  const list=DB.users.filter(u=>u.tenant===n.tenant&&(n.type==='空间'||(u.groups||[]).includes(n.code)));
+  Shell.modal({title:n.name+' · 成员',okText:'关闭',cancelText:'',body:
+    list.length?list.map(u=>'<div class="perm-pill" style="margin-bottom:6px"><b>'+esc(u.displayName)+'</b>'+esc(u.username)+' · '+roleTags(u.groups)+'</div>').join(''):
+    '<div class="empty-inline">暂无成员</div>'});
+}
+function toggleOrgTree(){orgCollapsed=!orgCollapsed;renderOrgTree()}
+
+function renderRoleTable(){
+  const kw=($('rKw').value||'').trim().toLowerCase();
+  const list=DB.roles.filter(r=>!kw||(r.role+' '+gl(r.role)).toLowerCase().includes(kw));
+  $('rTable').innerHTML=list.length?list.map((r,i)=>{
+    const perms=r.permissions||[];
+    const scope=perms.includes('admin:access')?'全部空间':'本空间';
+    return '<tr><td class="row-idx">'+(i+1)+'</td><td class="name">'+esc(gl(r.role))+'</td>'+
+      '<td class="mono" style="font-size:11px">'+esc(r.role)+'</td><td>'+esc(scope)+'</td>'+
+      '<td>'+perms.length+'</td><td>'+perms.slice(0,3).map(p=>'<span class="tag">'+esc(p)+'</span>').join(' ')+(perms.length>3?' <span class="tag off">+'+(perms.length-3)+'</span>':'')+'</td>'+
+      '<td><button class="op-btn" onclick="showRolePerms('+i+')">查看权限</button></td></tr>';
+  }).join(''):'<tr><td colspan="7" class="empty-inline">没有匹配的角色</td></tr>';
+  $('rTable')._rows=list;
+}
+$('rKw')&&($('rKw').oninput=renderRoleTable);
+
+function showRolePerms(i){
+  const r=($('rTable')._rows||[])[i];if(!r)return;
+  Shell.modal({title:gl(r.role)+' · 权限明细',okText:'关闭',cancelText:'',body:
+    '<div class="perm-grid2">'+(r.permissions||[]).map(p=>'<div class="perm-pill"><b>'+esc(p)+'</b>'+esc(permDesc(p))+'</div>').join('')+'</div>'});
+}
+
+function permDesc(code){
+  const all=PERM_TREE.flatMap(m=>m.items);
+  const hit=all.find(x=>x.code===code);
+  return hit?hit.desc:'系统内置权限';
+}
+
+function renderPermTable(){
+  const kw=($('pKw').value||'').trim().toLowerCase();
+  let html='',total=0;
+  PERM_TREE.forEach(m=>{
+    const items=m.items.filter(x=>!kw||(x.name+' '+x.code+' '+x.desc).toLowerCase().includes(kw));
+    if(!items.length)return;
+    html+='<tr class="perm-group" data-module="'+esc(m.module)+'"><td colspan="6" style="background:#f7f9fc;font-weight:650;color:var(--ink)">▾ '+esc(m.module)+' <span class="tag">'+items.length+'</span></td></tr>';
+    items.forEach(x=>{
+      total++;
+      const roles=DB.roles.filter(r=>(r.permissions||[]).includes(x.code)).map(r=>gl(r.role));
+      html+='<tr data-module="'+esc(m.module)+'"><td style="padding-left:28px" class="name">'+esc(x.name)+'</td>'+
+        '<td><span class="node-type '+x.type+'">'+(x.type==='menu'?'功能菜单':'操作按钮')+'</span></td>'+
+        '<td class="mono" style="font-size:11px">'+esc(x.code)+'</td><td>'+esc(m.module)+'</td>'+
+        '<td style="color:var(--muted)">'+esc(x.desc)+'</td>'+
+        '<td><button class="op-btn" onclick="showPermRoles(\''+esc(x.code)+'\')">查看角色</button></td></tr>';
+    });
+  });
+  $('pTable').innerHTML=html||'<tr><td colspan="6" class="empty-inline">没有匹配的权限节点</td></tr>';
+  $('pTable')._total=total;
+}
+$('pKw')&&($('pKw').oninput=renderPermTable);
+
+function showPermRoles(code){
+  const roles=DB.roles.filter(r=>(r.permissions||[]).includes(code)).map(r=>gl(r.role));
+  Shell.modal({title:'权限 · '+esc(code),okText:'关闭',cancelText:'',body:
+    '<p style="margin:0 0 10px">'+esc(permDesc(code))+'</p>'+
+    '<div class="perm-grid2">'+roles.map(r=>'<div class="perm-pill"><b>'+esc(r)+'</b>拥有此权限</div>').join('')+'</div>'});
+}
+function togglePermTree(expand){
+  $('pTable').querySelectorAll('tr[data-module]').forEach(tr=>{
+    if(tr.classList.contains('perm-group'))return;
+    tr.style.display=expand?'':'none';
+  });
+  $('pTable').querySelectorAll('.perm-group').forEach(tr=>{
+    tr.firstElementChild.innerHTML=(expand?'▾ ':'▸ ')+esc(tr.dataset.module);
+  });
 }
 
 async function loadOverview(){
@@ -236,7 +526,7 @@ async function loadOverview(){
     const health=await api('/api/search/health');
     const cards=$('ovStats').querySelectorAll('.stat-num');
     cards[0].textContent=docs.length;cards[1].textContent=num(chunks);
-    cards[2].textContent=models.length;cards[3].textContent=health.healthy?'正常':'异常';
+    cards[2].textContent=DB.users.length;cards[3].textContent=health.healthy?'正常':'异常';
     const audit=await api('/api/audit/logs?limit=6');
     $('ovAudit').innerHTML=(audit.logs||[]).map(l=>
       '<tr><td>'+esc(String(l.ts||'').slice(5,19))+'</td><td>'+esc(l.user_id)+'</td><td>'+esc(l.action)+'</td>'+
@@ -255,25 +545,16 @@ async function loadDocs(){
     ).join('')||'<tr><td colspan="4" class="empty">知识库暂无文档</td></tr>';
   }catch(e){console.error(e)}
 }
-async function delDoc(name){
-  if(!confirm('确定删除「'+name+'」及其全部片段吗？'))return;
-  try{
-    const r=await fetch('/api/docs?fileName='+encodeURIComponent(name),{method:'DELETE'});
-    const j=await r.json();if(!r.ok)throw new Error(j.message||'删除失败');
-    appToast('已删除文档','ok');loadDocs();
-  }catch(e){appToast('删除失败：'+e.message,'err')}
-}
-
-async function loadAdminUsers(){
-  try{
-    const list=await api('/api/admin/users');
-    $('aUsers').innerHTML=list.map(u=>
-      '<tr><td class="name">'+esc(u.username)+'</td><td>'+esc(u.displayName)+'</td>'+
-      '<td>'+((u.groups||[]).map(g=>'<span class="tag">'+esc(gl(g))+'</span>').join(' '))+'</td>'+
-      '<td>'+esc(tl(u.tenant))+'</td>'+
-      '<td>'+(u.enabled?'<span class="tag ok">正常</span>':'<span class="tag off">停用</span>')+'</td></tr>'
-    ).join('')||'<tr><td colspan="5" class="empty">暂无账号</td></tr>';
-  }catch(e){$('aUsers').innerHTML='<tr><td colspan="5" class="empty">加载失败：'+esc(e.message)+'</td></tr>'}
+function delDoc(name){
+  Shell.modal({title:'删除文档',danger:true,okText:'确认删除',body:
+    '<p style="margin:0">确定删除「'+esc(name)+'」及其全部片段吗？删除后无法恢复。</p>',
+    onOk:async function(close){
+      try{
+        const r=await fetch('/api/docs?fileName='+encodeURIComponent(name),{method:'DELETE'});
+        const j=await r.json();if(!r.ok)throw new Error(j.message||'删除失败');
+        close();appToast('已删除文档','ok');loadDocs();
+      }catch(e){appToast('删除失败：'+e.message,'err')}
+    }});
 }
 
 async function loadLoginLogs(){
@@ -311,9 +592,7 @@ async function loadUsage(){
       '<tr><td class="name">'+esc(m.model)+'</td><td>'+num(m.requests)+'</td><td>'+num(m.inputTokens)+'</td><td>'+num(m.outputTokens)+'</td></tr>'
     ).join('')||'<tr><td colspan="4" class="empty">所选时间范围暂无调用记录</td></tr>';
     $('uUsageHint').textContent=j.hint||'';
-  }catch(e){
-    $('uUsageHint').textContent='暂未获取到用量数据：'+e.message;
-  }
+  }catch(e){$('uUsageHint').textContent='暂未获取到用量数据：'+e.message}
 }
 
 async function loadAudit(){
@@ -326,8 +605,8 @@ async function loadAudit(){
   }catch(e){console.error(e)}
 }
 
-const TITLES={overview:'概览',users:'用户管理',roles:'角色与权限',docs:'文档管理',
-  models:'模型设置',usage:'用量统计',loginlogs:'登录日志',audit:'操作日志'};
+const TITLES={overview:'概览',users:'用户管理',org:'组织架构',roles:'角色定义',perms:'菜单权限',
+  docs:'文档管理',models:'模型设置',usage:'用量统计',loginlogs:'登录日志',audit:'操作日志'};
 document.querySelectorAll('.admin-nav-item[data-panel]').forEach(btn=>{
   btn.onclick=()=>{
     const key=btn.dataset.panel;
@@ -335,7 +614,6 @@ document.querySelectorAll('.admin-nav-item[data-panel]').forEach(btn=>{
     document.querySelectorAll('.admin-panel').forEach(p=>p.classList.toggle('active',p.dataset.panel===key));
     $('panelTitle').textContent=TITLES[key]||'管理后台';
     if(key==='overview')loadOverview();
-    else if(key==='users')loadAdminUsers();
     else if(key==='docs')loadDocs();
     else if(key==='models')loadModelsInfo();
     else if(key==='usage')loadUsage();
