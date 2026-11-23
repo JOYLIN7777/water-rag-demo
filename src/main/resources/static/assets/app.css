@@ -287,10 +287,13 @@ tbody tr:hover td{background:#fafcff}
 .modal-body .field input{margin-top:1px}
 
 /* ============ Toast ============ */
-.toast{position:fixed;right:24px;bottom:24px;background:var(--navy);color:#fff;padding:12px 17px;border-radius:10px;font-size:12.5px;box-shadow:0 12px 32px rgba(16,28,54,.28);z-index:99;opacity:0;transform:translateY(12px);transition:all .25s;pointer-events:none;max-width:360px;line-height:1.5}
+.toast{position:fixed;right:24px;bottom:24px;display:flex;align-items:flex-start;gap:9px;background:#fff;border:1px solid #e2e9f4;border-left:3px solid var(--primary,#3b6ef5);color:#2b3a55;padding:11px 16px 11px 12px;border-radius:10px;font-size:12.5px;box-shadow:0 8px 28px rgba(30,50,90,.16);z-index:99;opacity:0;transform:translateY(12px);transition:all .25s;pointer-events:none;max-width:360px;line-height:1.5}
 .toast.show{opacity:1;transform:none}
-.toast.ok{background:linear-gradient(135deg,#0e9f6e,#0b8a60)}
-.toast.err{background:linear-gradient(135deg,#e0245e,#c41e50)}
+.toast::before{flex:0 0 16px;width:16px;height:16px;border-radius:50%;background:var(--primary,#3b6ef5);color:#fff;font-size:10px;line-height:16px;text-align:center;font-weight:700;content:'i';margin-top:1px}
+.toast.ok{border-left-color:#2f9e6e}
+.toast.ok::before{content:'✓';background:#2f9e6e}
+.toast.err{border-left-color:#d6455c}
+.toast.err::before{content:'!';background:#d6455c}
 
 /* ============ 滚动条 ============ */
 ::-webkit-scrollbar{width:8px;height:8px}

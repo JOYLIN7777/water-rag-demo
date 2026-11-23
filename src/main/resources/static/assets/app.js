@@ -131,14 +131,17 @@
   }
   let syncInFlight = null;
   /**
-   * 拉服务端清单并合并。
+   * 拉服务端清单并对齐本地。
    *
-   * <p>合并规则（服务端是真源）：
+   * <p>对齐规则（服务端是真源，本地条目带 synced 标记区分"来历"）：
    * <ul>
-   *   <li>服务端为空、本地有：升级路径，把本地会话逐条迁上去，本地保留；</li>
-   *   <li>服务端非空：以服务端为准。本地孤儿条目（服务端已经没有的）默认清掉——
-   *       以前永远保留，结果是"在别的端删掉的会话回来阴魂不散"，同一个标题出现好几条；
-   *       只豁免 60 秒内的新条目，保护"刚提问、POST 还没落库、GET 先回来"的竞态窗口；</li>
+   *   <li><b>synced 条目</b>：曾在服务端清单里出现过。此后它在服务端消失就等于
+   *       被删除——本地直接清掉，<b>任何情况下不复活</b>。这是"删掉的会话又回来/
+   *       列表莫名变多"的根治：旧版在服务端清单为空时把本地缓存整体回灌，
+   *       账号换组织、换库清库都会触发，删掉的历史全部诈尸；</li>
+   *   <li><b>未同步条目</b>（没出现过）：两种来历——老版本留下的存量，或刚提问、
+   *       POST 还没落库的竞态。存量在服务端为空时整体迁移上去；竞态条目豁免
+   *       60 秒，60 秒后仍未出现在服务端就清掉；</li>
    *   <li>服务端不可达：本地缓存原样保留，离线也能看历史。</li>
    * </ul></p>
    */
@@ -148,21 +151,30 @@
     syncInFlight = fetch('/api/chat/sessions').then(function (r) { return r.ok ? r.json() : null; }).then(function (rows) {
       if (!Array.isArray(rows)) return;
       const local = loadSessions();
-      if (!rows.length && local.length) {
-        // 升级路径：服务端还没有任何记录，把本地现有会话逐条迁上去
-        local.forEach(function (s) { pushSessionRemote(s.id, s.title || ''); });
-        saveSessions(local);
+      const serverIds = {};
+      rows.forEach(function (r) { serverIds[r.id] = 1; });
+      // 给"服务端见过的"条目盖 synced 章：从此它的生死由服务端说了算
+      local.forEach(function (s) { if (!s.synced && serverIds[s.id]) s.synced = 1; });
+
+      if (!rows.length) {
+        // 服务端清单为空：只有"从未同步过"的条目才值得迁移上去（老版本存量升级）。
+        // synced 条目不回灌——服务端空就是被删光了，回灌等于诈尸
+        const migrate = local.filter(function (s) { return !s.synced; });
+        migrate.forEach(function (s) { pushSessionRemote(s.id, s.title || ''); });
+        saveSessions(migrate);
         renderSessions();
         if (typeof sessionsSyncedHandler === 'function') sessionsSyncedHandler();
         return;
       }
-      const serverIds = {};
-      rows.forEach(function (r) { serverIds[r.id] = 1; });
-      // 只豁免 60 秒内创建的本地条目：那是刚 POST 还没落库的竞态，不是僵尸
+
+      // 服务端非空：以服务端为骨架。本地独有条目只豁免"60 秒内且从未同步过"的
+      // 竞态窗口（刚提问 POST 还在路上）；synced 条目不在服务端 = 已被删除
       const freshCut = Date.now() - 60000;
-      const orphans = local.filter(function (s) { return !serverIds[s.id] && (s.updatedAt || 0) >= freshCut; });
+      const orphans = local.filter(function (s) {
+        return !serverIds[s.id] && !s.synced && (s.updatedAt || 0) >= freshCut;
+      });
       const merged = rows.map(function (r) {
-        return { id: r.id, title: r.title || '', updatedAt: r.updatedAt || 0 };
+        return { id: r.id, title: r.title || '', updatedAt: r.updatedAt || 0, synced: 1 };
       }).concat(orphans);
       saveSessions(merged);
       renderSessions();

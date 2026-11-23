@@ -153,10 +153,15 @@
   .md-body pre code{background:transparent;padding:0;color:inherit}
 
   /* Toast 通知 */
-  .toast{position:fixed;right:24px;bottom:24px;background:var(--navy);color:#fff;padding:12px 17px;border-radius:10px;font-size:12.5px;box-shadow:0 12px 32px rgba(16,28,54,.28);z-index:99;opacity:0;transform:translateY(12px);transition:all .25s;pointer-events:none;max-width:340px;line-height:1.5}
+  /* 右下角提示条：浅色卡片 + 左侧状态色条 + 状态圆点，跟主题同族，
+     不再用大色块——提示是辅助信息，不该比正文还抢眼 */
+  .toast{position:fixed;right:24px;bottom:24px;display:flex;align-items:flex-start;gap:9px;background:#fff;border:1px solid #e2e9f4;border-left:3px solid var(--primary);color:#2b3a55;padding:11px 16px 11px 12px;border-radius:10px;font-size:12.5px;box-shadow:0 8px 28px rgba(30,50,90,.16);z-index:99;opacity:0;transform:translateY(12px);transition:all .25s;pointer-events:none;max-width:340px;line-height:1.5}
   .toast.show{opacity:1;transform:none}
-  .toast.ok{background:linear-gradient(135deg,#0e9f6e,#0b8a60)}
-  .toast.err{background:linear-gradient(135deg,#e0245e,#c41e50)}
+  .toast::before{flex:0 0 16px;width:16px;height:16px;border-radius:50%;background:var(--primary);color:#fff;font-size:10px;line-height:16px;text-align:center;font-weight:700;content:'i';margin-top:1px}
+  .toast.ok{border-left-color:#2f9e6e}
+  .toast.ok::before{content:'✓';background:#2f9e6e}
+  .toast.err{border-left-color:#d6455c}
+  .toast.err::before{content:'!';background:#d6455c}
 
   ::-webkit-scrollbar{width:8px;height:8px}
   ::-webkit-scrollbar-thumb{background:#cfd7e5;border-radius:4px}
@@ -439,7 +444,11 @@ function touchSession(id,title,fullQ){
  * （这就是"当前问题"的总结），没有消息记录就退回"原标题+编号"。
  * 每条只在标题仍重复时拉一次历史，开销可控；改完本地与服务端同步。</p>
  */
+let dedupeRunning=false;
 async function dedupeSessionTitles(){
+  if(dedupeRunning)return;          // 清单同步可能连续触发，重入保护
+  dedupeRunning=true;
+  try{
   const list=Shell.getSessions();
   const groups=Object.create(null);
   list.forEach(s=>{const k=s.title||'';(groups[k]=groups[k]||[]).push(s)});
@@ -471,6 +480,7 @@ async function dedupeSessionTitles(){
       renderSessions();
     }
   }
+  }finally{dedupeRunning=false}
 }
 // 会话列表 DOM 由公共组件 app.js 统一渲染；这里只同步当前会话高亮。
 // 数据仍在本地 sessions 变量（与公共层同源 localStorage），问答逻辑照常使用。
@@ -961,7 +971,9 @@ initShell('index');       // 渲染全站统一侧栏 + 服务探活 + 触发一
   if(!currentId)newSession();
   Shell.setSession(currentId);
   syncSendBtn();                                           // 首屏按钮态归位
-  // 历史遗留的重名会话（同一个问题问过几遍）后台静默区分开，不阻塞首屏
+  // 历史遗留的重名会话（同一个问题问过几遍）后台静默区分开，不阻塞首屏；
+  // 以后每次清单同步回来也再对齐一遍——多标签页、别的端的改动都能被拉平
+  if(window.Shell&&Shell.onSessionsSynced)Shell.onSessionsSynced(function(){dedupeSessionTitles()});
   dedupeSessionTitles();
 })();
 Shell.refreshDocs();      // 侧栏文档清单（公共组件）
