@@ -95,6 +95,18 @@ public class ConversationTreeStore {
      */
     public String append(String sessionId, String tenant, String user, String parentId, String role,
                          String content, List<Map<String, Object>> sources, String branch) {
+        return append(sessionId, tenant, user, parentId, role, content, sources, branch, null);
+    }
+
+    /**
+     * 带「本轮消耗」的追加（assistant 节点用）。
+     *
+     * <p>usage 跟着节点落 Redis：以前只在前端内存里，切一次会话就没了——
+     * 用户看到的"本次 6034 tokens"是实时算的，回看历史就消失，很像是没记账。</p>
+     */
+    public String append(String sessionId, String tenant, String user, String parentId, String role,
+                         String content, List<Map<String, Object>> sources, String branch,
+                         Map<String, Object> usage) {
         String id = UUID.randomUUID().toString();
         String parent = parentId == null || parentId.isBlank() ? ROOT : parentId;
         // 防悬空节点：前端传来的 parentId 必须真实存在，否则拒收并回退到当前 head。
@@ -105,7 +117,7 @@ public class ConversationTreeStore {
             parent = h == null ? ROOT : h;
         }
         TreeNode node = new TreeNode(id, parent, role, content, LocalDateTime.now().toString(),
-                sources == null ? List.of() : sources, branch);
+                sources == null ? List.of() : sources, branch, usage);
         try {
             redis.opsForHash().put(keyFor(TREE, tenant, user, sessionId), id, mapper.writeValueAsString(node));
             redis.opsForValue().set(keyFor(HEAD, tenant, user, sessionId), id);
@@ -234,16 +246,23 @@ public class ConversationTreeStore {
         return sb.length() > 0 ? sb.toString() : "（无）";
     }
 
-    /** 兼容旧接口：当前分支的线性消息列表 */
-    public List<Map<String, String>> historyList(String sessionId) {
-        List<Map<String, String>> out = new ArrayList<>();
+    /**
+     * 兼容旧接口：当前分支的线性消息列表。
+     *
+     * <p>原来只回 role/content/ts/id/parentId，导致切会话后引用片段与本轮消耗全部丢失
+     * （它们只存在于前端内存）。这里把 sources 与 usage 一并带回去，重拉历史即可复原。</p>
+     */
+    public List<Map<String, Object>> historyList(String sessionId) {
+        List<Map<String, Object>> out = new ArrayList<>();
         for (TreeNode n : path(sessionId)) {
-            Map<String, String> m = new LinkedHashMap<>();
+            Map<String, Object> m = new LinkedHashMap<>();
             m.put("role", n.role());
             m.put("content", n.content());
             m.put("ts", n.ts());
             m.put("id", n.id());
             m.put("parentId", n.parentId());
+            m.put("sources", n.sources());
+            m.put("usage", n.usage());
             out.add(m);
         }
         return out;

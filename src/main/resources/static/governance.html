@@ -70,7 +70,7 @@
     <div class="card">
       <div class="card-head"><h3>③ 审计日志</h3>
         <button class="btn btn-sm" onclick="loadAudit()">刷新审计</button></div>
-      <div class="sub">记录重要的登录与操作行为（含账号、时间、动作、结果与耗时），仅能看到当前空间内的记录。</div>
+      <div class="sub">记录重要的登录与操作行为（含账号、时间、动作、结果与耗时），仅能看到当前组织内的记录。</div>
       <div class="kv" id="auditStats"></div>
       <div class="scroll" style="margin-top:14px;max-height:420px">
         <table><thead><tr><th>时间</th><th>租户</th><th>用户</th><th>动作</th><th>状态</th><th>耗时</th><th>结果</th><th>细节</th></tr></thead><tbody id="auditBody"></tbody></table>
@@ -88,13 +88,15 @@ const tag=(txt,cls)=>'<span class="tag '+cls+'">'+esc(txt)+'</span>';
 
 async function loadIdentity(){
   try{
+    // 先取组织名字典：组织名存在服务端，管理员改名后这里要显示新名字而不是裸标识
+    if(window.Shell&&Shell.loadOrgLabels)await Shell.loadOrgLabels();
     const r=await fetch('/api/auth/me');
     if(r.status===401){WrkAuth.goLogin();return}
     const j=await r.json();
     document.getElementById('identity').innerHTML=
       '<div class="id-cell"><div class="k">用户</div><div class="v">'+esc(j.user)+'</div></div>'+
       '<div class="id-cell"><div class="k">用户组</div><div class="v">'+(j.groups&&j.groups.length?j.groups.map(esc).join('、'):'—')+'</div></div>'+
-      '<div class="id-cell"><div class="k">所属空间</div><div class="v">'+esc(window.Shell?Shell.tenantLabel(j.tenant):j.tenant)+'</div></div>'+
+      '<div class="id-cell"><div class="k">所属组织</div><div class="v">'+esc(window.Shell?Shell.tenantLabel(j.tenant):j.tenant)+'</div></div>'+
       '<div class="id-cell"><div class="k">登录方式</div><div class="v">'+tag('账号密码','info')+'</div></div>';
   }catch(e){document.getElementById('identity').innerHTML='<div class="empty">加载失败</div>'}
 }

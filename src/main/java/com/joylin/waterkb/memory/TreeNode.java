@@ -17,6 +17,8 @@ import java.util.Map;
  * @param ts       ISO 时间戳
  * @param sources  该回答引用的知识片段（仅 assistant 有，回显引用卡片用）
  * @param branch   分支名（可选，仅分叉起点标记，用于树视图标注）
+ * @param usage    该轮真实消耗（仅 assistant 有：promptTokens/completionTokens/totalTokens/model/durationMs）。
+ *                 跟着节点一起存，切会话、换浏览器重新拉历史时"本次消耗"才不会凭空消失。
  */
 public record TreeNode(
         String id,
@@ -25,7 +27,8 @@ public record TreeNode(
         String content,
         String ts,
         List<Map<String, Object>> sources,
-        String branch) {
+        String branch,
+        Map<String, Object> usage) {
 
     public TreeNode {
         sources = sources == null ? List.of() : sources;

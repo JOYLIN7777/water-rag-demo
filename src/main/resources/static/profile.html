@@ -72,6 +72,8 @@ function parseJwt(tok){try{return JSON.parse(atob(tok.split('.')[1].replace(/-/g
 
 async function loadProfile(){
   try{
+    // 先取组织名字典：组织名存在服务端，管理员改名后这里要显示新名字而不是裸标识
+    if(window.Shell&&Shell.loadOrgLabels)await Shell.loadOrgLabels();
     const r=await fetch('/api/auth/me');
     if(r.status===401){WrkAuth.goLogin();return}
     const j=await r.json();
@@ -84,7 +86,7 @@ async function loadProfile(){
     document.getElementById('pInfo').innerHTML=
       '<div class="info-cell"><div class="k">登录账号</div><div class="v">'+esc(j.user)+'</div></div>'+
       '<div class="info-cell"><div class="k">角色</div><div class="v">'+(j.groups&&j.groups.length?j.groups.map(g=>esc(gl(g))).join('、'):'—')+'</div></div>'+
-      '<div class="info-cell"><div class="k">所属空间</div><div class="v">'+esc(tl(j.tenant))+'</div></div>'+
+      '<div class="info-cell"><div class="k">所属组织</div><div class="v">'+esc(tl(j.tenant))+'</div></div>'+
       '<div class="info-cell"><div class="k">登录方式</div><div class="v">'+tag('账号密码','info')+'</div></div>';
 
     // 令牌有效期：从本地 access token 解析 exp，展示剩余时间与进度条

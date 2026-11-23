@@ -70,7 +70,7 @@ public class ChatController {
      * 查看当前分支的历史记录（线性链，兼容原有问答页）。
      */
     @GetMapping("/history")
-    public List<Map<String, String>> history(@RequestParam String sessionId) {
+    public List<Map<String, Object>> history(@RequestParam String sessionId) {
         return treeStore.historyList(sessionId);
     }
 

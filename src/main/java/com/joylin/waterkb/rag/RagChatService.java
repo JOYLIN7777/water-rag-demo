@@ -144,13 +144,38 @@ public class RagChatService {
         // 保证"页面显示的 token"与"用量统计里的 token"永远对得上。
         Mono<String> persistThenDone = Mono.fromCallable(() -> {
             if (!degraded[0]) breaker.recordSuccess();
+            long durationMs = System.currentTimeMillis() - startAt;
+
+            // 先把本轮消耗算出来，再落库。两个用途共用这一份数据：
+            // ① model_usage 逐条记录（用量页点总量钻到每一次提问）；
+            // ② 写进 assistant 节点（切会话/换浏览器重看历史，"本次 N tokens"才不会消失）。
+            // 之前先落库后算用量，节点里就没这个字段，回看历史全靠前端内存，一切会话就没了。
+            Map<String, Object> usage = null;
+            if (!degraded[0]) {
+                Usage u = usageRef.get();
+                int promptTokens = u == null || u.getPromptTokens() == null ? 0 : u.getPromptTokens();
+                int completionTokens = u == null || u.getCompletionTokens() == null ? 0 : u.getCompletionTokens();
+                int totalTokens = u == null || u.getTotalTokens() == null
+                        ? promptTokens + completionTokens : u.getTotalTokens();
+                String model = activeChatModelName();
+                usageRecorder.record(userAtStart, model, promptTokens, completionTokens, durationMs,
+                        sessionId, question);
+                usage = new LinkedHashMap<>();
+                usage.put("promptTokens", promptTokens);
+                usage.put("completionTokens", completionTokens);
+                usage.put("totalTokens", totalTokens);
+                usage.put("model", model);
+                usage.put("durationMs", durationMs);
+            }
+
             Map<String, Object> nodes = null;
             try {
-                nodes = appendExchange(sessionId, tenantAtStart, userAtStart, parentId, question, answerBuf.toString(), hits);
+                nodes = appendExchange(sessionId, tenantAtStart, userAtStart, parentId, question,
+                        answerBuf.toString(), hits, usage);
             } catch (Exception e) {
                 log.error("对话历史落库失败（不影响本次回答）", e);
             }
-            long durationMs = System.currentTimeMillis() - startAt;
+
             Map<String, Object> done = new LinkedHashMap<>();
             done.put("done", true);
             done.put("durationMs", durationMs);
@@ -161,19 +186,7 @@ public class RagChatService {
                 // 熔断/降级分支没有真实请求模型，不记用量、也不回消耗值
                 // （回 0 会让用户误以为这次调用免费，属于数据失真）
                 done.put("degraded", true);
-            } else {
-                Usage u = usageRef.get();
-                int promptTokens = u == null || u.getPromptTokens() == null ? 0 : u.getPromptTokens();
-                int completionTokens = u == null || u.getCompletionTokens() == null ? 0 : u.getCompletionTokens();
-                int totalTokens = u == null || u.getTotalTokens() == null
-                        ? promptTokens + completionTokens : u.getTotalTokens();
-                String model = activeChatModelName();
-                usageRecorder.record(userAtStart, model, promptTokens, completionTokens, durationMs);
-                Map<String, Object> usage = new LinkedHashMap<>();
-                usage.put("promptTokens", promptTokens);
-                usage.put("completionTokens", completionTokens);
-                usage.put("totalTokens", totalTokens);
-                usage.put("model", model);
+            } else if (usage != null) {
                 done.put("usage", usage);
             }
             try {
@@ -289,12 +302,16 @@ public class RagChatService {
      * @return {@code questionId/answerId/parentId}；调用方据此在 done 事件里回传，前端才知道刚问的这轮在哪
      */
     private Map<String, Object> appendExchange(String sessionId, String tenant, String user, String parentId, String question,
-                                String answer, List<Document> hits) {
+                                String answer, List<Document> hits, Map<String, Object> usage) {
         // 全程用显式 tenant+user：异步回调线程没有 ThreadLocal 身份，不能读 UserContext
         String parent = parentId == null || parentId.isBlank()
                 ? historyStore.head(sessionId, tenant, user) : parentId;
+        // 会话第一问时 head 还不存在：显式落成 root，别把空串回给前端——
+        // 前端要拿它判断「这一轮是不是第一问」，空串会被当成"没有定位信息"。
+        if (parent == null || parent.isBlank()) parent = ConversationTreeStore.ROOT;
         String userNode = historyStore.append(sessionId, tenant, user, parent, "user", question, null, null);
-        String answerNode = historyStore.append(sessionId, tenant, user, userNode, "assistant", answer, toSourceMaps(hits), null);
+        String answerNode = historyStore.append(sessionId, tenant, user, userNode, "assistant", answer,
+                toSourceMaps(hits), null, usage);
         Map<String, Object> ids = new LinkedHashMap<>();
         ids.put("questionId", userNode);
         ids.put("answerId", answerNode);

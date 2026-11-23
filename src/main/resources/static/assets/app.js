@@ -37,9 +37,23 @@
     admin: '系统管理员', 'water-dept': '水利业务组', analyst: '水利分析员',
     viewer: '只读用户', user: '普通用户', ops: '运维人员'
   };
-  const TENANT_LABELS = { default: '默认空间' };
+  // 组织名（原"空间"）：不再写死成 default→默认空间。服务端 /api/orgs 下发，
+  // 管理员在后台改了组织名，问答页、个人中心的显示同步跟着变。
+  let TENANT_LABELS = { default: '默认组织' };
   const groupLabel = g => GROUP_LABELS[g] || g;
-  const tenantLabel = t => TENANT_LABELS[t] || t;
+  const tenantLabel = t => TENANT_LABELS[t] || t || '默认组织';
+  async function loadOrgLabels() {
+    try {
+      const r = await fetch('/api/orgs');
+      if (!r.ok) return false;
+      const list = await r.json();
+      if (!Array.isArray(list) || !list.length) return false;
+      const next = {};
+      list.forEach(o => { if (o && o.key) next[o.key] = o.name || o.key; });
+      TENANT_LABELS = next;
+      return true;
+    } catch (e) { return false; }
+  }
 
   const svg = name => '<svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">' + (ICONS[name] || '') + '</svg>';
   const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c =>
@@ -170,6 +184,16 @@
     getCurrentUser() { const a = global.WrkAuth; return a ? a.getUser() : null; },
     groupLabel: groupLabel,
     tenantLabel: tenantLabel,
+    /** 重新拉组织名字典（后台改完组织名后调用，界面立即换成新名字） */
+    loadOrgLabels: loadOrgLabels,
+    tenantLabels() { return Object.assign({}, TENANT_LABELS); },
+    /** 用后台已拿到的组织清单直接覆盖字典，省一次 /api/orgs 请求 */
+    setTenantLabels(map) {
+      if (!map || typeof map !== 'object') return;
+      TENANT_LABELS = map;
+    },
+    /** 组织改名后重绘侧栏用户块（显示的是"账号 · 组织名"） */
+    renderUser: renderUser,
     hasPermission: hasPermission,
     /** 诊断用：确认会话切换钩子是否真的绑上了（前端行为异常时先查这里） */
     handlerBound: function () { return typeof sessionChangeHandler === 'function'; },
@@ -789,6 +813,10 @@
    */
   function openModal(opts) {
     opts = opts || {};
+    // cancelText 传空串 = 只要一个关闭/确定按钮（纯展示型弹框）。
+    // 之前用 opts.cancelText || '取消' 兜底，空串被当成"没传"，于是每个只读弹框
+    // 都多出一个毫无作用的「取消」，看着像两套操作。
+    const showCancel = opts.cancelText !== '';
     let mask = document.getElementById('appModal');
     if (!mask) {
       mask = document.createElement('div');
@@ -803,7 +831,7 @@
         '<div class="modal-alert" id="modalAlert" role="alert"></div>' +
         '<div class="modal-body">' + (opts.body || '') + '</div>' +
         '<div class="modal-foot">' +
-          '<button class="btn btn-cancel">' + esc(opts.cancelText || '取消') + '</button>' +
+          (showCancel ? '<button class="btn btn-cancel">' + esc(opts.cancelText || '取消') + '</button>' : '') +
           '<button class="btn ' + (opts.danger ? 'btn-danger' : 'btn-primary') + ' btn-ok">' +
             esc(opts.okText || '确定') + '</button>' +
         '</div>' +
@@ -811,7 +839,8 @@
     mask.classList.add('show');
     modalState = opts;
     mask.querySelector('.modal-close').onclick = closeModal;
-    mask.querySelector('.btn-cancel').onclick = closeModal;
+    const cancelBtn = mask.querySelector('.btn-cancel');
+    if (cancelBtn) cancelBtn.onclick = closeModal;
     mask.onclick = e => { if (e.target === mask) closeModal(); };
     mask.querySelector('.btn-ok').onclick = async () => {
       if (typeof opts.onOk !== 'function') { closeModal(); return; }
@@ -872,6 +901,8 @@
     checkHealth();
     renderAdminEntry();
     loadPermissions();
+    // 组织名先按内置兜底渲染，拿到服务端字典后重绘侧栏用户块（组织名可能已被管理员改过）
+    loadOrgLabels().then(ok => { if (ok) renderUser(); });
     // 会话清单与权限并行拉取：先渲染本地缓存，网络回来后再合并
     syncSessions();
     if (global.setInterval) setInterval(checkHealth, 30000);

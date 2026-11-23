@@ -273,9 +273,11 @@ function switchSession(id){
     if(!Array.isArray(list))return;
     // 流式输出中后端历史还不完整，等回答结束再对齐，避免打断/闪屏
     if(messages.some(m=>m.streaming))return;
-    const sig=a=>JSON.stringify(a.map(m=>[m.role,m.content]));
+    // 签名里带上本轮消耗：本地缓存（老版本没有 usage）与服务端历史内容一致时，
+    // 只比 role/content 会判定"没变化"而不重绘，切回会话就看不到本次消耗。
+    const sig=a=>JSON.stringify(a.map(m=>[m.role,m.content,m.usage?m.usage.totalTokens||0:0]));
     const fresh=list.map(m=>({role:m.role,content:m.content,sources:m.sources||[],streaming:false,
-      nodeId:m.id||'',parentId:m.parentId||''}));
+      usage:m.usage||null,nodeId:m.id||'',parentId:m.parentId||''}));
     if(sig(fresh)===sig(messages))return;                  // 内容一致就不重绘，消除二次渲染闪烁
     messages=fresh;msgStore[id]=messages;
     cacheMessages(id);renderMessages();scrollBottom(true);
@@ -468,7 +470,12 @@ async function syncMsgIds(sessionId){
     const list=await r.json();
     const store=storeOf(sessionId);
     if(!Array.isArray(list)||list.length!==store.length)return false;
-    list.forEach((m,k)=>{store[k].nodeId=m.id||'';store[k].parentId=m.parentId||'';});
+    list.forEach((m,k)=>{
+      store[k].nodeId=m.id||'';
+      store[k].parentId=m.parentId||'';
+      if(m.usage&&!store[k].usage)store[k].usage=m.usage;   // 顺手补上本轮消耗
+      if(m.sources&&m.sources.length&&!store[k].sources.length)store[k].sources=m.sources;
+    });
     cacheMessages(sessionId,store);
     return true;
   }catch(e){return false}
@@ -497,7 +504,7 @@ async function rewindAsk(i){
       const list=await r.json();
       if(Array.isArray(list)&&currentId===ownerId){
         messages=list.map(m=>({role:m.role,content:m.content,sources:m.sources||[],streaming:false,
-          nodeId:m.id||'',parentId:m.parentId||''}));
+          usage:m.usage||null,nodeId:m.id||'',parentId:m.parentId||''}));
         msgStore[ownerId]=messages;
         cacheMessages(ownerId);
         renderMessages();scrollBottom(true);

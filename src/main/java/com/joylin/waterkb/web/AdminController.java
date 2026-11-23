@@ -41,15 +41,60 @@ public class AdminController {
     private final PermissionCatalog permCatalog;
     private final AuditService audit;
     private final PasswordResetService passwordReset;
+    private final com.joylin.waterkb.security.OrgStore orgs;
 
     public AdminController(UserStore users, RolePermissions rolePermissions,
                            PermissionCatalog permCatalog, AuditService audit,
-                           PasswordResetService passwordReset) {
+                           PasswordResetService passwordReset,
+                           com.joylin.waterkb.security.OrgStore orgs) {
         this.users = users;
         this.rolePermissions = rolePermissions;
         this.permCatalog = permCatalog;
         this.audit = audit;
         this.passwordReset = passwordReset;
+        this.orgs = orgs;
+    }
+
+    // ---------- 组织（界面上叫"组织"，底层仍是账号的 tenant 字段） ----------
+
+    /** 组织清单 + 成员数：组织架构页的主数据 */
+    @GetMapping("/orgs")
+    public List<Map<String, Object>> orgList() {
+        Map<String, Integer> counts = new LinkedHashMap<>();
+        for (UserStore.UserAccount u : users.list()) {
+            counts.merge(u.tenant() == null ? "default" : u.tenant(), 1, Integer::sum);
+        }
+        List<Map<String, Object>> out = new ArrayList<>();
+        for (Map<String, Object> m : orgs.list()) {
+            String key = String.valueOf(m.get("key"));
+            Map<String, Object> row = new LinkedHashMap<>(m);
+            row.put("members", counts.getOrDefault(key, 0));
+            out.add(row);
+        }
+        return out;
+    }
+
+    /** 新建组织：标识留空则自动生成 */
+    @PostMapping("/orgs")
+    public Map<String, Object> createOrg(@RequestBody Map<String, Object> body) {
+        String key = orgs.create(str(body.get("name")), str(body.get("key")));
+        return Map.of("message", "组织已创建", "key", key);
+    }
+
+    /** 组织改名：只改显示名，组织标识（数据隔离依据）保持不变 */
+    @PutMapping("/orgs/{key}")
+    public Map<String, Object> renameOrg(@PathVariable String key, @RequestBody Map<String, Object> body) {
+        if (!orgs.rename(key, str(body.get("name")))) throw new IllegalArgumentException("组织不存在：" + key);
+        return Map.of("message", "组织已更新", "key", key);
+    }
+
+    /** 删除组织：默认组织与仍有成员的组织都拒绝 */
+    @DeleteMapping("/orgs/{key}")
+    public Map<String, Object> deleteOrg(@PathVariable String key) {
+        long members = users.list().stream()
+                .filter(u -> key.equals(u.tenant())).count();
+        orgs.delete(key, (int) members);
+        return Map.of("message", "组织已删除", "key", key);
     }
 
     /** 用户列表：只返回可展示字段，绝不带出密码哈希 */

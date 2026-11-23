@@ -8,6 +8,7 @@ import com.joylin.waterkb.usage.UsageRecorder;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.net.URI;
@@ -116,6 +117,24 @@ public class UsageController {
             local.put("hint", "官方用量暂时不可用（" + safeMessage(e) + "），已切换为本系统调用记录。");
             return local;
         }
+    }
+
+    /**
+     * 逐次调用明细：把「今日/本月消耗」钻取到每一次问答。
+     *
+     * <p>只对本系统自己的调用记录可用——官方接口只给汇总，没有单次粒度。
+     * 官方口径命中时前端不给钻取入口，避免点了看不到东西。</p>
+     */
+    @GetMapping("/records")
+    public Map<String, Object> records(@RequestParam(defaultValue = "today") String scope,
+                                       @RequestParam(defaultValue = "200") int limit) {
+        List<Map<String, Object>> rows = recorder.records(scope, limit);
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("scope", "month".equalsIgnoreCase(scope) ? "month" : "today");
+        result.put("records", rows);
+        result.put("count", rows.size());
+        result.put("source", "local");
+        return result;
     }
 
     private long asLong(Object v) {

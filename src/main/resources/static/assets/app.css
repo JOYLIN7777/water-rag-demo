@@ -171,6 +171,21 @@ a{color:var(--primary);text-decoration:none}
 .stat-card::after{content:'';position:absolute;right:-10px;top:-10px;width:70px;height:70px;border-radius:50%;background:var(--primary-soft);opacity:.5}
 .stat-num{font-size:26px;font-weight:700;color:var(--primary);line-height:1.2;position:relative;z-index:1}
 .stat-label{font-size:12px;color:var(--muted);margin-top:6px;position:relative;z-index:1}
+/* 可钻取的统计卡：整卡可点（总消耗 → 每一次消耗）。用边框变色而不是缩放，
+   避免多张卡片并排时hover抖动；键盘 Tab 也能到 */
+.stat-card.drillable{cursor:pointer;transition:border-color .15s,box-shadow .15s}
+.stat-card.drillable:hover{border-color:#b9cbff;box-shadow:0 4px 14px rgba(59,110,245,.12)}
+.stat-card.drillable:focus-visible{outline:2px solid var(--primary);outline-offset:2px}
+.stat-card.drillable.disabled{cursor:default;opacity:.7}
+.stat-card.drillable.disabled:hover{border-color:var(--line);box-shadow:var(--shadow-sm)}
+.drill-tip{display:block;font-size:10.5px;color:var(--primary);margin-top:3px;opacity:.85}
+.stat-card.drillable.disabled .drill-tip{display:none}
+/* 用量明细弹框：表头吸顶，长列表滚动时列名不跑掉 */
+.usage-sum{display:flex;align-items:center;gap:16px;padding:0 0 11px;font-size:12.5px;color:var(--ink-2)}
+.usage-sum b{color:var(--primary);font-variant-numeric:tabular-nums}
+.usage-detail th{position:sticky;top:0;background:#f7f9fc;z-index:1}
+.usage-detail td.q{max-width:520px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.usage-detail .dim{color:var(--muted)}
 
 /* ============ 按钮 ============ */
 .btn,.primary-btn,.text-btn{border-radius:8px;font-size:12.5px;padding:8px 13px;transition:all .15s;display:inline-flex;align-items:center;justify-content:center;gap:6px;line-height:1.3;text-decoration:none}

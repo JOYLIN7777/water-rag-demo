@@ -58,6 +58,10 @@
   .op-btn{color:var(--primary);background:none;border:none;font-size:12px;padding:2px 6px;cursor:pointer}
   .op-btn:hover{text-decoration:underline}
   .op-btn.danger{color:var(--danger)}
+  /* 不可点操作的说明文字：占位但不做成按钮，避免用户以为点得动 */
+  .op-note{display:inline-block;padding:2px 6px;font-size:11.5px;color:var(--muted)}
+  /* 字段下方的补充说明（比 .form-note 轻，不占整块底色） */
+  .form-hint{font-size:11.5px;color:var(--muted);line-height:1.6;margin-top:5px}
   .table-wrap{flex:1;overflow:auto}
   .tag-role{display:inline-block;padding:2px 8px;border-radius:10px;font-size:10.5px;margin-right:4px;background:#eef2f8;color:var(--ink-2)}
   .tag-role.admin{background:#f3efff;color:var(--violet)}
@@ -252,7 +256,7 @@
       <!-- 用户管理 -->
       <section class="admin-panel" data-panel="users">
         <div class="page-head"><h1 class="page-title">用户管理</h1>
-          <p class="page-desc">按角色或空间筛选账号，支持新增、编辑、启停、重置密码与删除。</p></div>
+          <p class="page-desc">按角色或组织筛选账号，支持新增、编辑、启停、重置密码与删除。</p></div>
         <!-- 忘记密码流程的管理侧：用户提交申请后在这里核身发码 -->
         <div class="card" id="resetCard" style="display:none;margin-bottom:14px">
           <div class="card-head"><h3>密码重置申请 <span class="tag warn" id="resetPending">0</span></h3>
@@ -263,7 +267,8 @@
         </div>
         <div class="filter-bar">
           <div class="filter-item"><label for="uKw">关键字</label>
-            <input id="uKw" type="text" placeholder="请输入账号 / 显示名"></div>
+            <input id="uKw" type="text" name="uKwFilter" autocomplete="off" autocorrect="off"
+                   spellcheck="false" data-no-autofill="1" placeholder="点击后输入账号 / 显示名"></div>
           <div class="filter-item"><label for="uStatus">账号状态</label>
             <select id="uStatus"><option value="">全部状态</option><option value="1">正常</option><option value="0">停用</option></select></div>
           <div class="filter-actions">
@@ -285,7 +290,7 @@
               <button class="btn btn-sm" onclick="loadUsersData()">刷新</button>
             </div>
             <div class="table-wrap"><table class="data-table">
-              <thead><tr><th class="row-idx">序号</th><th>账号</th><th>显示名</th><th>所属角色</th><th>所属空间</th><th>账号状态</th><th>操作</th></tr></thead>
+              <thead><tr><th class="row-idx">序号</th><th>账号</th><th>显示名</th><th>所属角色</th><th>所属组织</th><th>账号状态</th><th>操作</th></tr></thead>
               <tbody id="uTable"><tr><td colspan="7" class="empty">加载中…</td></tr></tbody></table></div>
             <div class="pager" id="uPager"></div>
           </div>
@@ -294,21 +299,24 @@
 
       <!-- 组织架构 -->
       <section class="admin-panel" data-panel="org">
-        <div class="page-head"><h1 class="page-title">组织架构</h1>
-          <p class="page-desc">按空间与用户组两级展示组织关系。组织节点来自账号的真实分组，未编造部门层级。</p></div>
+        <div class="page-head"><h1 class="page-title">组织机构</h1>
+          <p class="page-desc">组织是账号的归属单位，也是数据隔离的边界：文档、会话历史与用量都按组织分家，
+            跨组织互相看不到。系统预置一个「默认组织」作为新账号的兜底归属；管理员可新建组织、改名、
+            调整成员归属，组织标识创建后不再变动（它是数据的归属键）。</p></div>
         <div class="workbench">
           <div class="tree-pane">
-            <div class="tree-head">空间 / 用户组</div>
+            <div class="tree-head">组织 / 用户组</div>
             <div id="oTtree"></div>
           </div>
           <div class="data-pane">
             <div class="toolbar">
-              <span id="oPath" style="font-size:12.5px;color:var(--ink)">全部空间</span>
+              <span id="oPath" style="font-size:12.5px;color:var(--ink)">全部组织</span>
               <span class="grow"></span>
+              <button class="btn btn-sm btn-primary" onclick="createOrg()">新建组织</button>
               <button class="btn btn-sm" onclick="toggleOrgTree()">展开/收起全部</button>
             </div>
             <div class="table-wrap"><table class="data-table">
-              <thead><tr><th class="row-idx">序号</th><th>组织名称</th><th>组织标识</th><th>所属空间</th><th>成员数</th><th>状态</th><th>操作</th></tr></thead>
+              <thead><tr><th class="row-idx">序号</th><th>名称</th><th>标识</th><th>所属组织</th><th>成员数</th><th>状态</th><th>操作</th></tr></thead>
               <tbody id="oTable"><tr><td colspan="7" class="empty">加载中…</td></tr></tbody></table></div>
           </div>
         </div>
@@ -394,12 +402,15 @@
       <!-- 用量统计 -->
       <section class="admin-panel" data-panel="usage">
         <div class="page-head"><h1 class="page-title">用量统计</h1>
-          <p class="page-desc">来自模型服务提供方的真实调用量与 Token 消耗。</p></div>
+          <p class="page-desc">来自模型服务提供方的真实调用量与 Token 消耗。点「今日/本月消耗 Token」可以看到每一次调用花了多少、
+            对应哪句提问——排查"今天为什么用了这么多"靠的就是这张逐次明细。</p></div>
         <div class="stats" id="uStats">
           <div class="stat-card"><div class="stat-num">—</div><div class="stat-label">今日请求次数</div></div>
-          <div class="stat-card"><div class="stat-num">—</div><div class="stat-label">今日消耗 Token</div></div>
+          <div class="stat-card drillable" data-scope="today" role="button" tabindex="0" title="点击查看今日每一次消耗">
+            <div class="stat-num">—</div><div class="stat-label">今日消耗 Token<span class="drill-tip">查看明细 ›</span></div></div>
           <div class="stat-card"><div class="stat-num">—</div><div class="stat-label">本月请求次数</div></div>
-          <div class="stat-card"><div class="stat-num">—</div><div class="stat-label">本月消耗 Token</div></div>
+          <div class="stat-card drillable" data-scope="month" role="button" tabindex="0" title="点击查看本月每一次消耗">
+            <div class="stat-num">—</div><div class="stat-label">本月消耗 Token<span class="drill-tip">查看明细 ›</span></div></div>
         </div>
         <div class="card"><div class="card-head"><h3>按模型查看</h3>
           <button class="btn btn-sm" onclick="loadUsage()">刷新</button></div>
@@ -444,7 +455,7 @@
               <div class="pf-account" id="pfAccount"></div>
               <div class="pf-tags" id="pfRoles"></div>
               <div class="pf-meta">
-                <div class="pf-meta-row"><span>所属空间</span><b id="pfTenant">—</b></div>
+                <div class="pf-meta-row"><span>所属组织</span><b id="pfTenant">—</b></div>
                 <div class="pf-meta-row"><span>账号状态</span><b id="pfStatus">—</b></div>
                 <div class="pf-meta-row"><span>权限数量</span><b id="pfPermCount">0 项</b></div>
               </div>
@@ -501,10 +512,10 @@ async function api(path){const r=await fetch(path);if(r.status===401){WrkAuth.go
 // 支持管理员在页面新增/编辑自定义权限节点。
 
 // 数据缓存（均来自真实接口）
-const DB={users:[],roles:[],perms:[],allPerms:[],myPerms:[]};
+const DB={users:[],roles:[],perms:[],allPerms:[],myPerms:[],orgs:[]};
 let userFilter={type:'all',value:''};
 let orgSel={tenant:'',group:''};
-let orgTreeCollapsed={};   // 各空间节点的折叠状态（key=租户标识）
+let orgTreeCollapsed={};   // 各组织节点的折叠状态（key=组织标识）
 
 // 页面级权限校验：非管理员直接显示拒绝页，不暴露任何管理数据
 function showDeny(){
@@ -541,11 +552,37 @@ async function guard(){
 async function loadUsersData(){
   try{
     DB.users=await api('/api/admin/users');
+    await loadOrgs();
     renderUserTree();renderUserTable();renderOrgTree();
     const cards=document.querySelectorAll('#ovStats .stat-num');
     if(cards[2])cards[2].textContent=DB.users.length;
   }catch(e){$('uTable').innerHTML='<tr><td colspan="7" class="empty">加载失败：'+esc(e.message)+'</td></tr>'}
   loadPasswordResets();
+}
+
+/**
+ * 组织清单（含成员数）+ 同步给公共脚本的名称字典。
+ *
+ * <p>界面上「组织」= 账号的 tenant 字段：它是一个数据隔离键，文档、会话、用量
+ * 都按它分家。以前只写死一个 default→默认组织，看着像只能看不能动。</p>
+ */
+async function loadOrgs(){
+  try{
+    DB.orgs=await api('/api/admin/orgs');
+  }catch(e){
+    DB.orgs=DB.orgs&&DB.orgs.length?DB.orgs:[{key:'default',name:'默认组织',members:0,builtin:true}];
+  }
+  // 同步给 Shell.tl()：用户表单、表格、导出、侧栏用的都是同一份名称
+  const map={};DB.orgs.forEach(o=>map[o.key]=o.name);
+  if(window.Shell&&Shell.setTenantLabels)Shell.setTenantLabels(map);
+  return DB.orgs;
+}
+function orgName(key){
+  const hit=(DB.orgs||[]).find(o=>o.key===key);
+  return hit?hit.name:(tl&&tl(key))||key;
+}
+function orgMembers(key){
+  return (DB.users||[]).filter(u=>(u.tenant||'default')===key).length;
 }
 
 // ---------- 密码重置申请（忘记密码流程的管理侧） ----------
@@ -638,7 +675,7 @@ function renderUserTree(){
   group('role','按角色',
     roles.map(g=>leaf('role',g,gl(g),DB.users.filter(u=>(u.groups||[]).includes(g)).length)).join(''),
     roles.length);
-  group('tenant','按空间',
+  group('tenant','按组织',
     tenants.map(t=>leaf('tenant',t,tl(t),DB.users.filter(u=>u.tenant===t).length)).join(''),
     tenants.length);
   $('uTree').innerHTML=h;
@@ -737,8 +774,20 @@ async function toggleUserEnabled(username,checked,el){
   }
 }
 
-$('uKw')&&($('uKw').oninput=()=>renderUserTable(1));
-$('uKw')&&($('uKw').onkeydown=e=>{if(e.key==='Enter')renderUserTable(1)});
+// 关键字框的自动填充防护。
+// 起因：点「重置密码」弹出密码框后，浏览器密码管理器把保存的账号名填进了本框——
+// 而这个框绑了 oninput 即筛，于是列表自己缩成一条，看着像"点了重置密码就自动筛选"。
+// 两层防护：① readonly 过的输入框浏览器不会自动填充（聚焦时解锁，交互不变）；
+// ② 只有焦点在本框时才触发筛选，杜绝"值被外部写入 → 列表自己变"。
+(function bindUserKeyword(){
+  const kw=$('uKw');if(!kw)return;
+  const lock=()=>kw.setAttribute('readonly','readonly');
+  lock();                                   // 首次进入即锁定，等用户点击
+  kw.addEventListener('focus',()=>kw.removeAttribute('readonly'));
+  kw.addEventListener('blur',lock);          // 失焦即上锁：值保留，但浏览器不会再往里填
+  kw.addEventListener('input',()=>{if(document.activeElement===kw)renderUserTable(1)});
+  kw.addEventListener('keydown',e=>{if(e.key==='Enter')renderUserTable(1)});
+})();
 $('uStatus')&&($('uStatus').onchange=()=>renderUserTable(1));
 
 function showUser(i){
@@ -748,7 +797,7 @@ function showUser(i){
     '<tr><td>账号</td><td>'+esc(u.username)+'</td></tr>'+
     '<tr><td>显示名</td><td>'+esc(u.displayName)+'</td></tr>'+
     '<tr><td>角色 / 组</td><td>'+roleTags(u.groups)+'</td></tr>'+
-    '<tr><td>所属空间</td><td>'+esc(tl(u.tenant))+'</td></tr>'+
+    '<tr><td>所属组织</td><td>'+esc(tl(u.tenant))+'</td></tr>'+
     '<tr><td>状态</td><td>'+(u.enabled?'正常':'停用')+'</td></tr>'+
     '</tbody></table><div class="hint">密码以加盐哈希存储，任何接口都不返回密码原文或哈希。</div>'});
 }
@@ -788,18 +837,20 @@ function userForm(u){
     return String(s.user||s.username||s.account||'').toLowerCase();
   })();
   const self=!!(u&&me&&String(u.username||'').toLowerCase()===me);
-  // 所属空间用中文下拉：值为空间标识（代码用），显示为空间名称
-  const tenants=[...new Set([...(DB.users||[]).map(x=>x.tenant||'default'),'default'])];
-  const cur=u?u.tenant:'default';
-  const tenantOpts=tenants.map(t=>'<option value="'+esc(t)+'"'+(t===cur?' selected':'')+'>'+esc(tl(t))+'</option>').join('');
+  // 所属组织下拉：值取组织标识（数据归属用），显示用组织名称。
+  // 组织清单来自 /api/admin/orgs，管理员新建的组织立刻可选。
+  const orgList=(DB.orgs&&DB.orgs.length)?DB.orgs:[{key:'default',name:'默认组织'}];
+  const cur=u?(u.tenant||'default'):'default';
+  const tenantOpts=orgList.map(o=>'<option value="'+esc(o.key)+'"'+(o.key===cur?' selected':'')+'>'+esc(o.name)+'</option>').join('');
   const note=self?'<div class="form-note">正在编辑当前登录的账号：为避免把自己锁在系统外，'
-    +'「账号正常」与「系统管理员」两项不可取消。显示名、所属空间与其它角色可正常修改。</div>':'';
+    +'「账号正常」与「系统管理员」两项不可取消。显示名、所属组织与其它角色可正常修改。</div>':'';
   return note+
     '<div class="field"><label for="fUsername">登录账号</label>'+
       '<input id="fUsername" value="'+v('username')+'"'+(u?' disabled':'')+' autocomplete="off" placeholder="英文字母或数字"></div>'+
     '<div class="field"><label for="fDisplay">显示名称</label>'+
       '<input id="fDisplay" value="'+v('displayName')+'" autocomplete="off" placeholder="例如：张工"></div>'+
-    '<div class="field"><label for="fTenant">所属空间</label><select id="fTenant">'+tenantOpts+'</select></div>'+
+    '<div class="field"><label for="fTenant">所属组织</label><select id="fTenant">'+tenantOpts+'</select>'+
+      '<div class="form-hint">组织决定这个账号能看到哪些文档与会话：跨组织互相不可见。</div></div>'+
     (u?'':'<div class="field"><label for="fPwd">初始密码</label>'+
       '<input id="fPwd" type="password" autocomplete="new-password" placeholder="至少 8 位，请自行设定"></div>')+
     '<div class="field"><label>角色 / 用户组</label>'+groupChecks(u?u.groups:['viewer'],self)+'</div>'+
@@ -867,7 +918,7 @@ function delUser(i){
 }
 
 function exportUsers(){
-  const rows=[['账号','显示名','角色','所属空间','状态']].concat(
+  const rows=[['账号','显示名','角色','所属组织','状态']].concat(
     DB.users.map(u=>[u.username,u.displayName,(u.groups||[]).map(gl).join(' / '),tl(u.tenant),u.enabled?'正常':'停用']));
   const csv='\ufeff'+rows.map(r=>r.map(c=>'"'+String(c==null?'':c).replace(/"/g,'""')+'"').join(',')).join('\n');
   const a=document.createElement('a');
@@ -877,26 +928,27 @@ function exportUsers(){
 }
 
 function renderOrgTree(){
-  const tenants=[...new Set(DB.users.map(u=>u.tenant))];
+  // 组织节点来自组织表（不是从账号里凑），这样新建的空组织也能立刻出现
+  const tenants=(DB.orgs&&DB.orgs.length)?DB.orgs.map(o=>o.key):[...new Set(DB.users.map(u=>u.tenant||'default'))];
   let h='<div class="tree-node'+(orgSel.tenant===''&&orgSel.group===''?' active':'')+'" data-t="" data-g="">'+
-    '<span class="caret" style="visibility:hidden">▾</span><span class="tn">全部空间</span><span class="cnt">'+DB.users.length+'</span></div>';
+    '<span class="caret" style="visibility:hidden">▾</span><span class="tn">全部组织</span><span class="cnt">'+DB.users.length+'</span></div>';
   tenants.forEach(t=>{
-    const groups=[...new Set(DB.users.filter(u=>u.tenant===t).flatMap(u=>u.groups||[]))];
+    const groups=[...new Set(DB.users.filter(u=>(u.tenant||'default')===t).flatMap(u=>u.groups||[]))];
     const folded=!!orgTreeCollapsed[t];
-    // 父节点：点行=筛选该空间，点三角=折叠/展开子层
+    // 父节点：点行=筛选该组织，点三角=折叠/展开子层
     h+='<div class="tree-node'+(orgSel.tenant===t&&orgSel.group===''?' active':'')+'" data-t="'+esc(t)+'" data-g="" data-parent="'+esc(t)+'">'+
-      '<span class="caret">'+(folded?'▸':'▾')+'</span><span class="tn">'+esc(tl(t))+'</span>'+
-      '<span class="cnt">'+DB.users.filter(u=>u.tenant===t).length+'</span></div>';
+      '<span class="caret">'+(folded?'▸':'▾')+'</span><span class="tn">'+esc(orgName(t))+'</span>'+
+      '<span class="cnt">'+orgMembers(t)+'</span></div>';
     h+='<div class="tree-children'+(folded?' collapsed':'')+'">';
     groups.forEach(g=>{
       h+='<div class="tree-node'+(orgSel.tenant===t&&orgSel.group===g?' active':'')+'" data-t="'+esc(t)+'" data-g="'+esc(g)+'">'+
         '<span class="caret" style="visibility:hidden">▾</span><span class="tn">'+esc(gl(g))+'</span>'+
-        '<span class="cnt">'+DB.users.filter(u=>u.tenant===t&&(u.groups||[]).includes(g)).length+'</span></div>';
+        '<span class="cnt">'+DB.users.filter(u=>(u.tenant||'default')===t&&(u.groups||[]).includes(g)).length+'</span></div>';
     });
     h+='</div>';
   });
   $('oTtree').innerHTML=h;
-  // 空间父节点：三角折叠
+  // 组织父节点：三角折叠
   $('oTtree').querySelectorAll('[data-parent] .caret').forEach(c=>{
     c.onclick=e=>{
       e.stopPropagation();
@@ -908,7 +960,7 @@ function renderOrgTree(){
   // 节点选择：点行筛选
   $('oTtree').querySelectorAll('.tree-node[data-t]').forEach(n=>n.onclick=()=>{
     orgSel={tenant:n.dataset.t,group:n.dataset.g};
-    $('oPath').textContent=(orgSel.tenant?tl(orgSel.tenant):'全部空间')+(orgSel.group?' / '+gl(orgSel.group):'');
+    $('oPath').textContent=(orgSel.tenant?orgName(orgSel.tenant):'全部组织')+(orgSel.group?' / '+gl(orgSel.group):'');
     renderOrgTree();renderOrgTable();
   });
 }
@@ -916,33 +968,106 @@ function renderOrgTree(){
 function renderOrgTable(){
   let nodes=[];
   if(!orgSel.tenant){
-    [...new Set(DB.users.map(u=>u.tenant))].forEach(t=>nodes.push({name:tl(t),code:t,tenant:t,count:DB.users.filter(u=>u.tenant===t).length,type:'空间'}));
+    // 顶层：一行一个组织，带成员数；默认组织标记为"内置"，其余可重命名/删除
+    (DB.orgs&&DB.orgs.length?DB.orgs:[{key:'default',name:'默认组织',builtin:true}]).forEach(o=>
+      nodes.push({name:o.name,code:o.key,tenant:o.key,count:orgMembers(o.key),type:'组织',builtin:!!o.builtin}));
   }else if(!orgSel.group){
-    [...new Set(DB.users.filter(u=>u.tenant===orgSel.tenant).flatMap(u=>u.groups||[]))].forEach(g=>
-      nodes.push({name:gl(g),code:g,tenant:orgSel.tenant,count:DB.users.filter(u=>u.tenant===orgSel.tenant&&(u.groups||[]).includes(g)).length,type:'用户组'}));
+    [...new Set(DB.users.filter(u=>(u.tenant||'default')===orgSel.tenant).flatMap(u=>u.groups||[]))].forEach(g=>
+      nodes.push({name:gl(g),code:g,tenant:orgSel.tenant,
+        count:DB.users.filter(u=>(u.tenant||'default')===orgSel.tenant&&(u.groups||[]).includes(g)).length,type:'用户组'}));
   }else{
     nodes.push({name:gl(orgSel.group),code:orgSel.group,tenant:orgSel.tenant,
-      count:DB.users.filter(u=>u.tenant===orgSel.tenant&&(u.groups||[]).includes(orgSel.group)).length,type:'用户组'});
+      count:DB.users.filter(u=>(u.tenant||'default')===orgSel.tenant&&(u.groups||[]).includes(orgSel.group)).length,type:'用户组'});
   }
-  $('oTable').innerHTML=nodes.length?nodes.map((n,i)=>
-    '<tr><td class="row-idx">'+(i+1)+'</td><td class="name">'+esc(n.name)+'</td><td class="mono" style="font-size:11px">'+esc(n.code)+'</td>'+
-    '<td>'+esc(tl(n.tenant))+'</td><td>'+n.count+'</td><td><span class="tag ok">正常</span></td>'+
-    '<td><button class="op-btn" onclick="showOrgMembers('+i+')">查看成员</button></td></tr>'
-  ).join(''):'<tr><td colspan="7" class="empty-inline">该节点下暂无成员</td></tr>';
+  $('oTable').innerHTML=nodes.length?nodes.map((n,i)=>{
+    const ops=n.type==='组织'
+      ? '<button class="op-btn" onclick="showOrgMembers('+i+')">成员</button>'+
+        '<button class="op-btn" onclick="renameOrg('+i+')">重命名</button>'+
+        (n.builtin?'<span class="op-note" title="默认组织是兜底归属，不能删除">内置</span>'
+                  :'<button class="op-btn danger" onclick="deleteOrg('+i+')">删除</button>')
+      : '<button class="op-btn" onclick="showOrgMembers('+i+')">查看成员</button>';
+    const tag=n.type==='组织'?(n.builtin?'<span class="tag info">内置</span>':'<span class="tag ok">正常</span>'):'<span class="tag ok">正常</span>';
+    return '<tr><td class="row-idx">'+(i+1)+'</td><td class="name">'+esc(n.name)+'</td>'+
+      '<td class="mono" style="font-size:11px">'+esc(n.code)+'</td>'+
+      '<td>'+esc(orgName(n.tenant))+'</td><td>'+n.count+'</td><td>'+tag+'</td>'+
+      '<td>'+ops+'</td></tr>';
+  }).join(''):'<tr><td colspan="7" class="empty-inline">该节点下暂无成员</td></tr>';
   $('oTable')._rows=nodes;
 }
 
 function showOrgMembers(i){
   const n=($('oTable')._rows||[])[i];if(!n)return;
-  const members=DB.users.filter(u=>u.tenant===n.tenant&&(!n.code||(u.groups||[]).includes(n.code)||u.tenant===n.tenant));
-  const list=DB.users.filter(u=>u.tenant===n.tenant&&(n.type==='空间'||(u.groups||[]).includes(n.code)));
+  const list=DB.users.filter(u=>(u.tenant||'default')===n.tenant&&(n.type==='组织'||(u.groups||[]).includes(n.code)));
   Shell.modal({title:n.name+' · 成员',okText:'关闭',cancelText:'',body:
     list.length?list.map(u=>'<div class="perm-pill" style="margin-bottom:6px"><b>'+esc(u.displayName)+'</b>'+esc(u.username)+' · '+roleTags(u.groups)+'</div>').join(''):
     '<div class="empty-inline">暂无成员</div>'});
 }
+
+// ---------- 组织的增 / 改 / 删 ----------
+function createOrg(){
+  Shell.modal({title:'新建组织',
+    body:'<div class="form-note">组织是数据隔离的边界：新组织下的成员只能看到本组织的文档、会话与统计。'+
+      '建好后到「用户管理」里把成员改到该组织即可。</div>'+
+      '<div class="field"><label for="oName">组织名称</label>'+
+        '<input id="oName" autocomplete="off" placeholder="例如：水利业务部"></div>'+
+      '<div class="field"><label for="oKey">组织标识（可留空）</label>'+
+        '<input id="oKey" autocomplete="off" placeholder="留空自动生成，如 org-m3k9x">'+
+        '<div class="form-hint">标识用于数据归属，创建后不可修改，只能用英文小写字母、数字和短横线。</div></div>',
+    okText:'创建',onOk:async function(close){
+      const name=($('oName').value||'').trim();
+      if(name.length<2){Shell.modalError('组织名称至少 2 个字');return false}
+      try{
+        await apiWrite('/api/admin/orgs',{method:'POST',headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({name:name,key:($('oKey').value||'').trim()})});
+        close();appToast('组织已创建','ok');await loadOrgs();renderOrgTree();renderOrgTable();
+      }catch(e){Shell.modalError(e.message);return false}
+    }});
+}
+function renameOrg(i){
+  const n=($('oTable')._rows||[])[i];if(!n)return;
+  Shell.modal({title:'重命名组织 · '+n.name,
+    body:'<div class="form-note">只改显示名称，组织标识「'+esc(n.code)+'」不变——'+
+      '它是文档与会话的归属键，改了等于把数据搬走。</div>'+
+      '<div class="field"><label for="oName">组织名称</label>'+
+        '<input id="oName" autocomplete="off" value="'+esc(n.name)+'"></div>',
+    okText:'保存',onOk:async function(close){
+      const name=($('oName').value||'').trim();
+      if(name.length<2){Shell.modalError('组织名称至少 2 个字');return false}
+      try{
+        await apiWrite('/api/admin/orgs/'+encodeURIComponent(n.code),
+          {method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:name})});
+        close();appToast('组织已改名','ok');
+        await loadOrgs();
+        // 名称变了：树、表格、当前路径、侧栏用户块都要跟着刷新
+        $('oPath').textContent=(orgSel.tenant?orgName(orgSel.tenant):'全部组织')+(orgSel.group?' / '+gl(orgSel.group):'');
+        renderOrgTree();renderOrgTable();renderUserTable();renderUserTree();
+        if(window.Shell&&Shell.renderUser)Shell.renderUser();
+      }catch(e){Shell.modalError(e.message);return false}
+    }});
+}
+function deleteOrg(i){
+  const n=($('oTable')._rows||[])[i];if(!n)return;
+  if(n.count>0){
+    Shell.modal({title:'不能删除',okText:'知道了',cancelText:'',
+      body:'<p style="margin:0">「'+esc(n.name)+'」还有 <b>'+n.count+'</b> 个成员。'+
+        '请先到「用户管理」把这些账号改到其它组织，再删除本组织。</p>'});
+    return;
+  }
+  Shell.modal({title:'删除组织',danger:true,okText:'确认删除',
+    body:'<p style="margin:0">确定删除组织「'+esc(n.name)+'」（'+esc(n.code)+'）吗？该组织下当前没有成员。</p>',
+    onOk:async function(close){
+      try{
+        await apiWrite('/api/admin/orgs/'+encodeURIComponent(n.code),{method:'DELETE'});
+        close();appToast('组织已删除','ok');
+        if(orgSel.tenant===n.code)orgSel={tenant:'',group:''};
+        await loadOrgs();renderOrgTree();renderOrgTable();
+      }catch(e){Shell.modalError(e.message);return false}
+    }});
+}
+
 // 一键全展开/全收起：任一层展开时全部收起，全部收起时全部展开
 function toggleOrgTree(){
-  const tenants=[...new Set(DB.users.map(u=>u.tenant))];
+  const tenants=(DB.orgs&&DB.orgs.length)?DB.orgs.map(o=>o.key):[...new Set(DB.users.map(u=>u.tenant||'default'))];
   const anyOpen=tenants.some(t=>!orgTreeCollapsed[t]);
   tenants.forEach(t=>orgTreeCollapsed[t]=anyOpen);
   renderOrgTree();
@@ -953,7 +1078,7 @@ function renderRoleTable(){
   const list=DB.roles.filter(r=>!kw||(r.role+' '+gl(r.role)).toLowerCase().includes(kw));
   $('rTable').innerHTML=list.length?list.map((r,i)=>{
     const perms=r.permissions||[];
-    const scope=perms.includes('admin:access')?'全部空间':'本空间';
+    const scope=perms.includes('admin:access')?'全部组织':'本组织';
     return '<tr><td class="row-idx">'+(i+1)+'</td><td class="name">'+esc(gl(r.role))+'</td>'+
       '<td class="mono" style="font-size:11px">'+esc(r.role)+'</td><td>'+esc(scope)+'</td>'+
       '<td>'+perms.length+'</td><td>'+perms.slice(0,3).map(p=>'<span class="tag">'+esc(p)+'</span>').join(' ')+(perms.length>3?' <span class="tag off">+'+(perms.length-3)+'</span>':'')+'</td>'+
@@ -1362,7 +1487,57 @@ async function loadUsage(){
       '<tr><td class="name">'+esc(m.model)+'</td><td>'+num(m.requests)+'</td><td>'+num(m.inputTokens)+'</td><td>'+num(m.outputTokens)+'</td></tr>'
     ).join('')||'<tr><td colspan="4" class="empty">所选时间范围暂无调用记录</td></tr>';
     $('uUsageHint').textContent=j.hint||'';
+    // 只有本地记录才有逐条明细（官方接口只给汇总），没有就别给可点的假入口
+    const drillable=!!j.localDrill;
+    document.querySelectorAll('#uStats .drillable').forEach(c=>{
+      c.classList.toggle('disabled',!drillable);
+      c.title=drillable?c.title:'官方用量接口只提供汇总，没有单次明细';
+    });
   }catch(e){$('uUsageHint').textContent='暂未获取到用量数据：'+e.message}
+}
+
+/**
+ * 用量钻取：今日/本月 → 每一次调用的 token 与对应提问。
+ *
+ * <p>汇总数字回答不了"为什么今天这么多"，必须能落到单次。明细一次最多 500 条，
+ * 超出时如实提示"只显示最近 N 条"，不做伪分页。</p>
+ */
+async function openUsageRecords(scope){
+  const label=scope==='month'?'本月':'今日';
+  Shell.modal({title:label+'每一次消耗',wide:true,okText:'关闭',cancelText:'',
+    body:'<div class="empty-inline">正在读取明细…</div>'});
+  let j={};
+  try{
+    j=await api('/api/usage/records?scope='+encodeURIComponent(scope)+'&limit=500');
+  }catch(e){
+    const box=document.querySelector('#appModal .modal-body');
+    if(box)box.innerHTML='<div class="empty-inline">明细读取失败：'+esc(e.message)+'</div>';
+    return;
+  }
+  const rows=j.records||[];
+  const box=document.querySelector('#appModal .modal-body');
+  if(!box)return;
+  const sum=rows.reduce((s,r)=>s+(r.totalTokens||0),0);
+  const noQ=rows.filter(r=>!String(r.question||'').trim()).length;
+  const head='<div class="usage-sum"><span>共 <b>'+rows.length+'</b> 次调用</span>'+
+    '<span>合计 <b>'+num(sum)+'</b> tokens</span>'+
+    (rows.length>=500?'<span class="hint">仅显示最近 500 条</span>':'')+
+    (noQ?'<span class="hint">'+noQ+' 条为升级前的历史调用，当时未保存提问</span>':'')+'</div>';
+  box.innerHTML=head+(rows.length?
+    '<div class="table-wrap" style="max-height:60vh"><table class="data-table usage-detail"><thead><tr>'+
+      '<th style="width:132px">时间</th><th>提问</th><th style="width:112px">模型</th>'+
+      '<th style="width:92px">Token</th><th style="width:70px">耗时</th><th style="width:92px">账号</th>'+
+    '</tr></thead><tbody>'+
+    rows.map(r=>{
+      const q=String(r.question||'').trim();
+      return '<tr><td class="mono">'+tsLocal(r.ts)+'</td>'+
+        '<td class="q" title="'+esc(q)+'">'+(q?esc(q.length>46?q.slice(0,46)+'…':q):'<span class="dim">—</span>')+'</td>'+
+        '<td class="mono" style="font-size:11px">'+esc(r.model||'—')+'</td>'+
+        '<td title="输入 '+num(r.promptTokens)+' / 输出 '+num(r.completionTokens)+'">'+num(r.totalTokens)+'</td>'+
+        '<td>'+((r.durationMs||0)/1000).toFixed(1)+'s</td>'+
+        '<td>'+esc(r.user||'—')+'</td></tr>';
+    }).join('')+'</tbody></table></div>'
+    :'<div class="empty-inline">'+label+'还没有调用记录</div>');
 }
 
 async function loadAudit(){
@@ -1411,10 +1586,10 @@ function openProfile(){
   $('pfInfo').innerHTML=
     row('登录账号',esc(u.user||'—'))+
     row('显示名称',esc(name))+
-    row('所属空间',esc(tl(tenant)))+
+    row('所属组织',esc(tl(tenant)))+
     row('角色 / 用户组',roles.length?roleTags(roles):'<span class="tag off">未分配</span>')+
     row('账号状态',enabled?'<span class="tag ok">正常</span>':'<span class="tag off">已停用</span>')+
-    row('数据范围',isAdmin?'全部空间（租户内）':'本空间 · 按角色可见')+
+    row('数据范围',isAdmin?'全部组织（租户内）':'本组织 · 按角色可见')+
     row('权限数量',permCount+' 项')+
     row('认证方式','JWT · 访问令牌 30 分钟自动续期');
 
@@ -1450,6 +1625,13 @@ document.querySelectorAll('.admin-nav-item[data-panel]').forEach(btn=>{
     else if(key==='loginlogs')loadLoginLogs();
     else if(key==='audit')loadAudit();
   };
+});
+
+// 用量卡片钻取：总消耗 → 每一次消耗与对应提问（键盘 Enter/空格同样可用）
+document.querySelectorAll('#uStats .drillable').forEach(c=>{
+  const go=()=>{ if(!c.classList.contains('disabled')) openUsageRecords(c.dataset.scope); };
+  c.onclick=go;
+  c.onkeydown=e=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); go(); } };
 });
 
 initShell('admin');

@@ -37,6 +37,11 @@ public class UsageRecorder {
                     + "user_id VARCHAR(64), model VARCHAR(128), "
                     + "prompt_tokens BIGINT DEFAULT 0, completion_tokens BIGINT DEFAULT 0, "
                     + "duration_ms BIGINT DEFAULT 0)");
+            // 后加的两列：只汇总总量看不出"钱花在哪一次提问上"，明细要能对上问题。
+            // 用 ADD COLUMN IF NOT EXISTS 增量升级，不动历史行（老数据 question 为空，明细里显示"—"）。
+            jdbc.execute("ALTER TABLE model_usage ADD COLUMN IF NOT EXISTS session_id VARCHAR(128)");
+            jdbc.execute("ALTER TABLE model_usage ADD COLUMN IF NOT EXISTS question TEXT");
+            jdbc.execute("CREATE INDEX IF NOT EXISTS idx_model_usage_ts ON model_usage(ts DESC)");
         } catch (Exception ignored) {
             // 表建不出来（如无 DB）只影响本地用量，主链路不受影响
         }
@@ -44,13 +49,57 @@ public class UsageRecorder {
 
     /** 记录一次真实模型调用；任何失败都静默吞掉，绝不影响问答主链路 */
     public void record(String userId, String model, long promptTokens, long completionTokens, long durationMs) {
+        record(userId, model, promptTokens, completionTokens, durationMs, null, null);
+    }
+
+    /**
+     * 记录一次真实模型调用，并带上会话与提问原文。
+     *
+     * <p>带提问是为了让用量页可以"点总量看明细"：只记 token 数的话，
+     * 管理员看到今天涨了 30 万 token 却查不出是哪几次问答花的。</p>
+     */
+    public void record(String userId, String model, long promptTokens, long completionTokens,
+                       long durationMs, String sessionId, String question) {
         try {
-            jdbc.update("INSERT INTO model_usage(user_id,model,prompt_tokens,completion_tokens,duration_ms) "
-                            + "VALUES(?,?,?,?,?)",
+            jdbc.update("INSERT INTO model_usage(user_id,model,prompt_tokens,completion_tokens,duration_ms,"
+                            + "session_id,question) VALUES(?,?,?,?,?,?,?)",
                     userId == null ? "anonymous" : userId,
                     model == null || model.isBlank() ? "unknown" : model,
-                    Math.max(0, promptTokens), Math.max(0, completionTokens), Math.max(0, durationMs));
+                    Math.max(0, promptTokens), Math.max(0, completionTokens), Math.max(0, durationMs),
+                    sessionId == null ? "" : sessionId,
+                    question == null ? "" : question);
         } catch (Exception ignored) { }
+    }
+
+    /**
+     * 逐次调用明细（用量页钻取用）。
+     *
+     * @param scope today=今天 0 点起；month=本月 1 日 0 点起
+     * @param limit 最多返回条数（默认 200，上限 500）
+     */
+    public List<Map<String, Object>> records(String scope, int limit) {
+        int cap = Math.min(Math.max(limit <= 0 ? 200 : limit, 1), 500);
+        LocalDate today = LocalDate.now(ZONE);
+        LocalDate from = "month".equalsIgnoreCase(scope) ? today.withDayOfMonth(1) : today;
+        java.sql.Timestamp start = java.sql.Timestamp.valueOf(from.atStartOfDay(ZONE).toLocalDateTime());
+        List<Map<String, Object>> out = new ArrayList<>();
+        try {
+            jdbc.query("SELECT ts,user_id,model,prompt_tokens,completion_tokens,duration_ms,session_id,question "
+                            + "FROM model_usage WHERE ts >= ? ORDER BY ts DESC LIMIT ?", rs -> {
+                Map<String, Object> row = new LinkedHashMap<>();
+                row.put("ts", rs.getTimestamp("ts") == null ? null : rs.getTimestamp("ts").toLocalDateTime().toString());
+                row.put("user", rs.getString("user_id"));
+                row.put("model", rs.getString("model"));
+                row.put("promptTokens", rs.getLong("prompt_tokens"));
+                row.put("completionTokens", rs.getLong("completion_tokens"));
+                row.put("totalTokens", rs.getLong("prompt_tokens") + rs.getLong("completion_tokens"));
+                row.put("durationMs", rs.getLong("duration_ms"));
+                row.put("sessionId", rs.getString("session_id"));
+                row.put("question", rs.getString("question"));
+                out.add(row);
+            }, start, cap);
+        } catch (Exception ignored) { }
+        return out;
     }
 
     /**
@@ -84,6 +133,8 @@ public class UsageRecorder {
         result.put("totals", totals);
         result.put("models", models);
         result.put("configured", true);
+        // 本地口径才有逐条明细（官方只给汇总），前端据此决定"点卡片看明细"是否可用
+        result.put("localDrill", true);
         result.put("hint", "数据来自本系统的真实调用记录（实时统计）。配置 BAILIAN_WORKSPACE_ID 后可切换为阿里云百炼官方用量。");
         return result;
     }
