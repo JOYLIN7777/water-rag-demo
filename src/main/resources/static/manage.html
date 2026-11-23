@@ -16,8 +16,11 @@
   .dz-sub{font-size:11.5px;color:var(--muted);margin-top:5px}
   .upload-side{flex:1;display:flex;flex-direction:column;justify-content:center;gap:11px;min-width:0}
   .upload-side h4{margin:0;font-size:13px;color:var(--ink);font-weight:650}
-  .fmt-list{display:flex;flex-wrap:wrap;gap:6px}
-  .fmt{border:1px solid var(--line);background:#f7f9fc;color:var(--ink-2);border-radius:6px;padding:3px 8px;font-size:11px}
+  .fmt-list{display:flex;flex-wrap:wrap;gap:5px}
+  .fmt{border:1px solid var(--line);background:#f7f9fc;color:var(--ink-2);border-radius:6px;padding:2px 7px;font-size:10.5px;line-height:1.6}
+  .fmt-groups{display:flex;flex-direction:column;gap:9px;max-height:210px;overflow-y:auto;padding-right:4px}
+  .fmt-group-title{font-size:10px;color:var(--muted);letter-spacing:.4px;margin-bottom:4px}
+  .fmt-total{font-size:11px;color:var(--primary);font-weight:600}
   .folder-btn{border:1px solid #d6e4ff;background:var(--primary-soft);color:#25469b;border-radius:8px;padding:9px 12px;font-size:12px;font-weight:600;transition:all .15s;text-align:center}
   .folder-btn:hover{background:#dbe8ff;border-color:#b9cbff}
   .upload-msg{margin:0 0 16px;background:#f7f9fc;border:1px solid var(--line);color:var(--ink-2)}
@@ -31,7 +34,7 @@
 <main class="main">
   <header class="topbar">
     <div class="topbar-left"><div class="topbar-title">知识库文档管理</div><span class="topbar-sub">/ 文档</span></div>
-    <span class="status-pill" data-status-pill><span class="status-dot"></span><span id="adminEntrySlot" class="admin-slot"></span>检测中…</span>
+    <span class="status-pill" data-status-pill><span class="status-dot"></span>检测中…</span><span id="adminEntrySlot" class="admin-slot"></span>
   </header>
 
   <div class="page">
@@ -53,11 +56,8 @@
         <div class="dz-sub">解析后自动切片并写入检索库，支持多格式</div>
       </div>
       <div class="upload-side">
-        <h4>支持格式</h4>
-        <div class="fmt-list">
-          <span class="fmt">PDF</span><span class="fmt">Word</span><span class="fmt">Excel</span>
-          <span class="fmt">PPT</span><span class="fmt">TXT</span><span class="fmt">Markdown</span>
-        </div>
+        <h4>支持格式 <span class="fmt-total" id="fmtTotal">加载中…</span></h4>
+        <div class="fmt-groups" id="fmtGroups"></div>
         <button class="folder-btn" onclick="document.getElementById('folderInput').click()">📁 选择文件夹批量上传</button>
         <div class="hint" style="margin:0">单个文件最大 500MB，文件夹上传会自动遍历支持的类型。</div>
       </div>
@@ -87,6 +87,32 @@
 <script>
 let docs=[];
 function escapeHtml(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+// 后端返回的扩展名按用途分组展示，避免只显示 6 个让用户误以为支持得少
+const FMT_GROUPS=[
+  {name:'文档',exts:['pdf','doc','docx','rtf','odt','epub','msg','eml','ppt','pptx','odp']},
+  {name:'表格',exts:['xls','xlsx','csv','tsv','ods']},
+  {name:'文本与标记',exts:['txt','md','markdown','json','xml','yaml','yml','ini','properties','log','sql','geojson','topojson']},
+  {name:'代码',exts:['java','js','ts','py','css','htm','html']}
+];
+async function loadFormats(){
+  try{
+    const j=await (await fetch('/api/docs/formats')).json();
+    const all=j.extensions||[];
+    document.getElementById('fmtTotal').textContent='共 '+all.length+' 种';
+    const used=new Set();
+    const html=FMT_GROUPS.map(g=>{
+      const list=g.exts.filter(e=>all.includes(e));
+      list.forEach(e=>used.add(e));
+      if(!list.length)return '';
+      return '<div><div class="fmt-group-title">'+g.name+'</div><div class="fmt-list">'+
+        list.map(e=>'<span class="fmt">'+e.toUpperCase()+'</span>').join('')+'</div></div>';
+    }).join('');
+    const rest=all.filter(e=>!used.has(e));
+    const extra=rest.length?'<div><div class="fmt-group-title">其他</div><div class="fmt-list">'+
+      rest.map(e=>'<span class="fmt">'+e.toUpperCase()+'</span>').join('')+'</div></div>':'';
+    document.getElementById('fmtGroups').innerHTML=html+extra;
+  }catch(e){document.getElementById('fmtTotal').textContent='加载失败'}
+}
 // 后端时间是带纳秒的 ISO 字符串，JS Date 解析不了，截到毫秒
 function fmtTime(s){
   if(!s)return '-';
@@ -175,6 +201,7 @@ document.getElementById('folderInput').onchange=e=>{uploadFiles(e.target.files);
 
 initShell('manage');
 loadDocs();
+loadFormats();
 </script>
 </body>
 </html>

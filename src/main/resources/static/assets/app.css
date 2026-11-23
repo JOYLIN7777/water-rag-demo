@@ -54,8 +54,7 @@ a{color:var(--primary);text-decoration:none}
 .sidebar .upload-area{border-top:1px solid rgba(255,255,255,.09);margin-top:8px;padding-top:8px;flex:0 0 auto}
 .sidebar .upload-title{display:flex;align-items:center;justify-content:space-between;padding:5px 6px 7px;color:#9fb0d0;font-size:11.5px}
 .sidebar .upload-title .t{flex:1}
-.sidebar .upload-manage{font-size:10.5px;color:#7fa4ff;text-decoration:none}
-.sidebar .upload-manage:hover{text-decoration:underline}
+.sidebar .upload-hint{font-size:10px;color:#5f7196}
 .sidebar .upload-body{padding-top:2px}
 .sidebar .dropzone{border:1.5px dashed rgba(139,164,255,.32);border-radius:10px;padding:15px 10px;text-align:center;cursor:pointer;transition:all .2s;background:rgba(255,255,255,.025)}
 .sidebar .dropzone:hover,.sidebar .dropzone.dragging{border-color:var(--primary-hi);background:rgba(59,110,245,.18)}
@@ -180,6 +179,20 @@ tbody tr:hover td{background:#fafcff}
 /* ============ 键值对展示 ============ */
 .kv{display:flex;flex-wrap:wrap;gap:10px 28px;font-size:13px;line-height:2}
 .kv b{color:var(--ink);font-weight:650}
+
+/* ============ 全局自定义弹框 ============ */
+.modal-mask{position:fixed;inset:0;background:rgba(13,23,48,.55);backdrop-filter:blur(3px);z-index:120;display:none;align-items:center;justify-content:center;padding:20px}
+.modal-mask.show{display:flex}
+.modal-box{background:#fff;border-radius:14px;box-shadow:0 24px 70px rgba(10,20,45,.3);width:100%;max-width:460px;max-height:88vh;overflow:auto;animation:modalIn .18s ease-out}
+@keyframes modalIn{from{opacity:0;transform:translateY(10px) scale(.98)}to{opacity:1;transform:none}}
+.modal-head{display:flex;align-items:center;justify-content:space-between;padding:18px 22px;border-bottom:1px solid var(--line)}
+.modal-title{font-size:15px;font-weight:680;color:var(--ink)}
+.modal-close{border:0;background:transparent;color:var(--muted);font-size:20px;line-height:1;padding:2px 6px;border-radius:6px;transition:all .15s}
+.modal-close:hover{background:var(--bg);color:var(--ink)}
+.modal-body{padding:20px 22px;font-size:13px;color:var(--ink-2);line-height:1.7}
+.modal-foot{display:flex;justify-content:flex-end;gap:10px;padding:14px 22px 18px;border-top:1px solid var(--line);background:#fbfcfe}
+.modal-body .field label{font-size:12px}
+.modal-body .field input{margin-top:1px}
 
 /* ============ Toast ============ */
 .toast{position:fixed;right:24px;bottom:24px;background:var(--navy);color:#fff;padding:12px 17px;border-radius:10px;font-size:12.5px;box-shadow:0 12px 32px rgba(16,28,54,.28);z-index:99;opacity:0;transform:translateY(12px);transition:all .25s;pointer-events:none;max-width:360px;line-height:1.5}

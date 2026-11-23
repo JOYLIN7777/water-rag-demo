@@ -105,8 +105,21 @@
 
   function isLoggedIn() { return !!(getAccess() || getRefresh()); }
 
+  /**
+   * 页面级登录守卫：静态页是后端白名单，直接敲 URL 也能打开，
+   * 因此前端必须在渲染前检查登录态——只有 access/refresh 都在才放行。
+   * 退出登录会清掉两者，之后直接访问 /manage.html 会被弹回登录页。
+   */
+  function guardPage() {
+    var publicPages = ['login.html'];
+    var path = location.pathname;
+    if (publicPages.some(function (p) { return path.indexOf(p) >= 0; })) return true;
+    if (!isLoggedIn()) { goLogin(); return false; }
+    return true;
+  }
+
   global.WrkAuth = {
     getAccess, getRefresh, getUser, saveSession, clearSession,
-    doRefresh, logout, goLogin, isLoggedIn, rawFetch
+    doRefresh, logout, goLogin, isLoggedIn, guardPage, rawFetch
   };
 })(window);

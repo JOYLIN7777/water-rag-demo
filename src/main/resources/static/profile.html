@@ -16,8 +16,6 @@
   .info-cell .v{font-size:13.5px;color:var(--ink);font-weight:600;word-break:break-all}
   .token-bar{height:6px;border-radius:3px;background:#eef2f8;overflow:hidden;margin-top:8px}
   .token-bar i{display:block;height:100%;background:linear-gradient(90deg,var(--ok),#5bd0a4);border-radius:3px;transition:width .3s}
-  .pw-form{max-width:440px}
-  .pw-form .field{margin-bottom:15px}
   .err{min-height:20px;font-size:12px;color:var(--danger);margin-top:4px}
   .ok{min-height:20px;font-size:12px;color:var(--ok);margin-top:4px}
 </style>
@@ -27,7 +25,7 @@
 <main class="main">
   <header class="topbar">
     <div class="topbar-left"><div class="topbar-title">个人中心</div><span class="topbar-sub">账号与安全</span></div>
-    <span class="status-pill" data-status-pill><span class="status-dot"></span><span id="adminEntrySlot" class="admin-slot"></span>检测中…</span>
+    <span class="status-pill" data-status-pill><span class="status-dot"></span>检测中…</span><span id="adminEntrySlot" class="admin-slot"></span>
   </header>
 
   <div class="page">
@@ -54,18 +52,9 @@
     </div>
 
     <div class="card">
-      <div class="card-head"><h3>修改密码</h3></div>
+      <div class="card-head"><h3>账号安全</h3></div>
       <div class="sub">修改后下次登录请使用新密码。密码经过加密存储，系统不会保存明文。</div>
-      <form class="pw-form" id="pwForm">
-        <div class="field"><label for="oldPwd">当前密码</label>
-          <input id="oldPwd" type="password" autocomplete="current-password" placeholder="请输入当前密码"></div>
-        <div class="field"><label for="newPwd">新密码</label>
-          <input id="newPwd" type="password" autocomplete="new-password" placeholder="至少 8 位"></div>
-        <div class="field"><label for="newPwd2">确认新密码</label>
-          <input id="newPwd2" type="password" autocomplete="new-password" placeholder="再次输入新密码"></div>
-        <div id="pwMsg"></div>
-        <button class="btn btn-primary" type="submit" id="pwBtn">确认修改</button>
-      </form>
+      <button class="btn btn-primary" type="button" onclick="openPwdModal()">修改密码</button>
     </div>
   </div>
 </main>
@@ -114,29 +103,43 @@ async function loadProfile(){
   }catch(e){document.getElementById('pInfo').innerHTML='<div class="empty">加载失败</div>'}
 }
 
-document.getElementById('pwForm').addEventListener('submit',async function(e){
-  e.preventDefault();
-  const msg=document.getElementById('pwMsg'),btn=document.getElementById('pwBtn');
-  const oldPwd=document.getElementById('oldPwd').value;
-  const newPwd=document.getElementById('newPwd').value;
-  const newPwd2=document.getElementById('newPwd2').value;
-  msg.className='';msg.textContent='';
-  if(newPwd!==newPwd2){msg.className='err';msg.textContent='两次输入的新密码不一致';return}
-  if(newPwd.length<8){msg.className='err';msg.textContent='新密码长度至少 8 位';return}
-  btn.disabled=true;btn.textContent='提交中…';
-  try{
-    const r=await fetch('/api/auth/change-password',{
-      method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({oldPassword:oldPwd,newPassword:newPwd})
-    });
-    const j=await r.json();
-    if(!r.ok){msg.className='err';msg.textContent=j.message||('修改失败（HTTP '+r.status+'）');return}
-    msg.className='ok';msg.textContent='✓ '+j.message;
-    document.getElementById('pwForm').reset();
-    appToast('密码已修改','ok');
-  }catch(err){msg.className='err';msg.textContent='网络异常：'+err.message}
-  finally{btn.disabled=false;btn.textContent='确认修改'}
-});
+// 点击「修改密码」才弹出全局自定义弹框，表单只在弹框内存在
+function openPwdModal(){
+  const body=
+    '<div class="field"><label for="oldPwd">当前密码</label>'+
+      '<input id="oldPwd" type="password" autocomplete="current-password" placeholder="请输入当前密码"></div>'+
+    '<div class="field"><label for="newPwd">新密码</label>'+
+      '<input id="newPwd" type="password" autocomplete="new-password" placeholder="至少 8 位"></div>'+
+    '<div class="field"><label for="newPwd2">确认新密码</label>'+
+      '<input id="newPwd2" type="password" autocomplete="new-password" placeholder="再次输入新密码"></div>'+
+    '<div id="pwMsg" style="min-height:20px;font-size:12px;margin-top:4px"></div>';
+  Shell.modal({
+    title:'修改密码', body:body, okText:'确认修改',
+    onOk:async function(){
+      const msg=document.getElementById('pwMsg');
+      const oldPwd=document.getElementById('oldPwd').value;
+      const newPwd=document.getElementById('newPwd').value;
+      const newPwd2=document.getElementById('newPwd2').value;
+      msg.className='';msg.textContent='';
+      if(!oldPwd){msg.className='err';msg.textContent='请输入当前密码';return false}
+      if(newPwd!==newPwd2){msg.className='err';msg.textContent='两次输入的新密码不一致';return false}
+      if(newPwd.length<8){msg.className='err';msg.textContent='新密码长度至少 8 位';return false}
+      const btn=document.querySelector('#appModal .btn-ok');
+      if(btn){btn.disabled=true;btn.textContent='提交中…'}
+      try{
+        const r=await fetch('/api/auth/change-password',{
+          method:'POST',headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({oldPassword:oldPwd,newPassword:newPwd})
+        });
+        const j=await r.json();
+        if(!r.ok){msg.className='err';msg.textContent=j.message||('修改失败（HTTP '+r.status+'）');return false}
+        appToast('密码已修改，下次登录请使用新密码','ok');
+        return true;
+      }catch(err){msg.className='err';msg.textContent='网络异常：'+err.message;return false}
+      finally{if(btn){btn.disabled=false;btn.textContent='确认修改'}}
+    }
+  });
+}
 
 initShell('profile');
 loadProfile();

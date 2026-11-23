@@ -78,7 +78,9 @@
     getCurrentUser() { const a = global.WrkAuth; return a ? a.getUser() : null; },
     groupLabel: groupLabel,
     tenantLabel: tenantLabel,
-    hasPermission: hasPermission
+    hasPermission: hasPermission,
+    modal: openModal,
+    closeModal: closeModal
   };
 
   function pickSession(id, ev) {
@@ -289,7 +291,7 @@
         '<div class="section-label">历史会话</div>' +
         '<div class="session-list" id="sessionList"></div>' +
         '<div class="upload-area open" id="uploadArea">' +
-          '<div class="upload-title"><span class="t">知识库文档</span><a class="upload-manage" href="manage.html" title="查看与管理全部文档">管理 →</a></div>' +
+          '<div class="upload-title"><span class="t">快速上传</span><span class="upload-hint">拖入即可入库</span></div>' +
           '<div class="upload-body">' +
             '<div class="dropzone" id="dropzone"><div class="drop-icon">⇪</div>' +
               '<div class="drop-text">点击或拖拽上传文档</div>' +
@@ -367,7 +369,57 @@
     t._timer = setTimeout(() => t.classList.remove('show'), 2600);
   }
 
+  // ---------- 全局自定义弹框（替代浏览器原生 confirm/prompt） ----------
+  let modalState = null;
+  function closeModal() {
+    const mask = document.getElementById('appModal');
+    if (mask) { mask.classList.remove('show'); mask.innerHTML = ''; }
+    modalState = null;
+    document.removeEventListener('keydown', onModalKey);
+  }
+  function onModalKey(e) { if (e.key === 'Escape') closeModal(); }
+  /**
+   * 打开弹框。opts: { title, body(HTML), okText, cancelText, onOk(closeFn), danger }
+   * onOk 返回 false 时不关闭，便于表单校验失败时保留弹框。
+   */
+  function openModal(opts) {
+    opts = opts || {};
+    let mask = document.getElementById('appModal');
+    if (!mask) {
+      mask = document.createElement('div');
+      mask.id = 'appModal'; mask.className = 'modal-mask';
+      document.body.appendChild(mask);
+    }
+    mask.innerHTML =
+      '<div class="modal-box" role="dialog" aria-modal="true">' +
+        '<div class="modal-head"><div class="modal-title">' + esc(opts.title || '提示') + '</div>' +
+          '<button class="modal-close" title="关闭">×</button></div>' +
+        '<div class="modal-body">' + (opts.body || '') + '</div>' +
+        '<div class="modal-foot">' +
+          '<button class="btn btn-cancel">' + esc(opts.cancelText || '取消') + '</button>' +
+          '<button class="btn ' + (opts.danger ? 'btn-danger' : 'btn-primary') + ' btn-ok">' +
+            esc(opts.okText || '确定') + '</button>' +
+        '</div>' +
+      '</div>';
+    mask.classList.add('show');
+    modalState = opts;
+    mask.querySelector('.modal-close').onclick = closeModal;
+    mask.querySelector('.btn-cancel').onclick = closeModal;
+    mask.onclick = e => { if (e.target === mask) closeModal(); };
+    mask.querySelector('.btn-ok').onclick = () => {
+      if (typeof opts.onOk === 'function' && opts.onOk(closeModal) === false) return;
+      closeModal();
+    };
+    document.addEventListener('keydown', onModalKey);
+    const first = mask.querySelector('input,textarea,select');
+    if (first) first.focus();
+  }
+  global.appModal = openModal;
+  global.appModalClose = closeModal;
+
   global.initShell = function (active) {
+    // 未登录直接敲静态页地址也要弹回登录页（静态资源是后端白名单，前端必须自查）
+    if (global.WrkAuth && !global.WrkAuth.guardPage()) return;
     renderSidebar(active);
     checkHealth();
     renderAdminEntry();
