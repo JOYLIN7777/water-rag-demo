@@ -125,7 +125,7 @@ function renderTree(){
   document.getElementById('stat').textContent=treeData.nodes.length+' 个节点 · '+Object.keys(treeData.branches||{}).length+' 个命名分支';
   const bl=document.getElementById('branchList');
   const entries=Object.entries(treeData.branches||{});
-  bl.innerHTML=entries.length?entries.map(([name,id])=>esc(name)+' → '+esc(id.slice(0,8))).join('<br>'):'（暂无命名分支）';
+  bl.innerHTML=entries.length?entries.map(([name,id])=>esc(name)+'（'+esc(id.slice(0,8))+'）').join('<br>'):'（暂无命名分支）';
   const hint=selectedId?('选中节点：'+selectedId.slice(0,8)+(selectedId===treeData.head?'（当前）':'')):('当前位置：'+(treeData.head?treeData.head.slice(0,8):'根'));
   document.getElementById('selHint').textContent=hint;
 }
