@@ -49,25 +49,27 @@
   .quick-item:hover{border-color:#b9cbff;background:var(--primary-soft);color:var(--primary);transform:translateY(-2px);box-shadow:0 6px 18px rgba(59,110,245,.12)}
   .quick-item::before{content:'✦';color:var(--primary);margin-right:8px;font-size:11px}
 
-  /* ============ 消息区（参考 FastGPT：文档卡片式 AI 回答 + 内嵌引用角标） ============ */
-  /* 占满主区宽度，随 scroll-area 的 4% 边距留白（廖工 2026-11-23：问答框也要占满） */
+  /* ============ 消息区（FastGPT 式文档卡片：框架占满 + 正文舒适行宽） ============ */
   .messages{margin:0 auto}
-  .msg-group{margin-bottom:30px}
+  .msg-group{margin-bottom:32px}
   .msg-group.user{display:flex;justify-content:flex-end}
-  .user-bubble{max-width:78%;background:var(--primary-soft);color:#1e3a8a;border:1px solid #d6e4ff;border-radius:14px 14px 4px 14px;padding:12px 17px;font-size:14px;line-height:1.7;white-space:pre-wrap;box-shadow:var(--shadow-sm)}
-  /* 回答框：参考 WorkBuddy——轻边框、无重底色头部、左侧色条、正文/引用分区 */
+  /* 用户气泡：宽度有上限，超宽屏不拉成横幅，保持对话气泡形态 */
+  .user-bubble{max-width:min(78%,760px);background:var(--primary-soft);color:#1e3a8a;border:1px solid #d6e4ff;border-radius:14px 14px 4px 14px;padding:12px 18px;font-size:14px;line-height:1.7;white-space:pre-wrap;box-shadow:var(--shadow-sm)}
+  /* 回答卡片：占满主区，内部三层（标题栏/正文/引用）用底色与分隔线分层；
+     正文限舒适行宽靠左排版——宽屏长文一行可读性优先，右侧留白是排版呼吸空间 */
   .ai-card{background:#fff;border:1px solid var(--line);border-left:3px solid var(--primary);border-radius:12px;box-shadow:var(--shadow-sm);overflow:hidden}
-  .ai-card-head{display:flex;align-items:center;gap:8px;padding:12px 17px 2px;font-size:11.5px;color:var(--muted)}
-  .ai-badge{width:20px;height:20px;border-radius:6px;background:linear-gradient(135deg,var(--primary-hi),var(--primary));color:#fff;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700}
-  .ai-card-name{font-weight:600;color:var(--ink-2)}
+  .ai-card-head{display:flex;align-items:center;gap:9px;padding:11px 18px;background:#fbfcfe;border-bottom:1px solid #f1f4f9;font-size:11.5px;color:var(--muted)}
+  .ai-badge{width:22px;height:22px;border-radius:7px;background:linear-gradient(135deg,var(--primary-hi),var(--primary));color:#fff;display:flex;align-items:center;justify-content:center;font-size:10.5px;font-weight:700;flex:0 0 22px}
+  .ai-card-name{font-weight:650;color:var(--ink-2);letter-spacing:.2px}
+  .ai-state{margin-left:6px}
   .ai-card-actions{margin-left:auto;display:flex;gap:4px}
-  .icon-btn{border:0;background:transparent;color:var(--muted);min-width:26px;height:26px;padding:0 6px;border-radius:6px;font-size:12.5px;line-height:1;transition:all .15s;display:inline-flex;align-items:center;justify-content:center;white-space:nowrap}
-  .icon-btn:hover{background:var(--primary-soft);color:var(--primary)}
+  .icon-btn{border:0;background:transparent;color:var(--muted);min-width:26px;height:26px;padding:0 7px;border-radius:6px;font-size:12.5px;line-height:1;transition:all .15s;display:inline-flex;align-items:center;justify-content:center;white-space:nowrap}
+  .icon-btn:hover{background:#eef2f8;color:var(--primary)}
   /* 引用计数是"▤ N 篇"文字按钮，必须自适应宽度且不换行 */
   .ai-cite-count{font-size:11px;letter-spacing:.2px}
-  .ai-card-body{padding:8px 20px 16px;font-size:14px;line-height:1.8;color:var(--ink)}
-  /* 引用区：按文档去重后的角标行，顶部细分隔线 */
-  .cite-zone:not(:empty){border-top:1px solid #f1f4f9;padding:13px 20px 15px;background:#fcfdff}
+  .ai-card-body{padding:16px 22px 18px;font-size:14px;line-height:1.85;color:var(--ink);max-width:940px}
+  /* 引用区：按文档去重后的角标行，与正文用细分隔线 + 淡底色区分 */
+  .cite-zone:not(:empty){border-top:1px solid #f1f4f9;padding:13px 22px 15px;background:#fafbfe}
   .cite-row{display:flex;flex-wrap:wrap;gap:7px}
   .cite-chip{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);background:#fff;color:var(--ink-2);border-radius:7px;padding:5px 9px;font-size:11.5px;cursor:pointer;transition:all .15s;max-width:300px}
   .cite-chip:hover{background:var(--primary-soft);border-color:#b9cbff;color:#25469b}

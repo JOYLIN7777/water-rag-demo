@@ -452,10 +452,10 @@
     const backText = meta.parent ? '返回设置' : (meta.backText || '返回');
     const crumb = meta.parent
       ? '<a href="' + meta.parent + '">' + esc(meta.parentLabel) + '</a>' +
-        '<span class="crumb-sep">›</span><span class="crumb-current">' + esc(meta.label) + '</span>'
+        '<span class="crumb-sep">/</span><span class="crumb-current">' + esc(meta.label) + '</span>'
       : '<span class="crumb-current">' + esc(meta.label) + '</span>';
     host.insertAdjacentHTML('afterbegin',
-      '<div class="topbar-nav-left"><a class="back-link" href="' + backHref + '">← ' + backText + '</a>' +
+      '<div class="topbar-nav-left"><a class="back-link" href="' + backHref + '">' + backText + '</a>' +
       '<div class="crumb">' + crumb + '</div></div>');
     // 面包屑已经表达层级，隐藏原页面标题，避免顶栏重复显示同一名称
     const title = host.querySelector('.topbar-title');

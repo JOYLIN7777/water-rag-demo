@@ -99,13 +99,15 @@ a{color:var(--primary);text-decoration:none}
 .admin-entry{border:1px solid #dcd6ff;background:#f5f2ff;color:#6244c8;font-weight:650}
 .admin-entry:hover{border-color:#bfaeff;background:#ede7ff;color:#4f34ad}
 /* 设置类页面的返回键与层级面包屑：任意一级都可点击回跳 */
-.topbar-nav-left{display:flex;align-items:center;gap:12px;min-width:0}
-.back-link{display:inline-flex;align-items:center;gap:4px;font-size:12.5px;color:var(--muted);text-decoration:none;border:1px solid var(--line);background:#fafbfd;padding:5px 10px;border-radius:7px;white-space:nowrap}
-.back-link:hover{color:var(--primary);border-color:#b9cbff;background:var(--primary-soft)}
-.crumb{display:flex;align-items:center;gap:7px;font-size:13px;color:var(--ink);white-space:nowrap}
-.crumb a{color:var(--muted);text-decoration:none}
-.crumb a:hover{color:var(--primary);text-decoration:underline}
-.crumb .crumb-sep{color:#b6c0d2;font-size:13px}
+.topbar-nav-left{display:flex;align-items:center;gap:14px;min-width:0}
+/* 返回键：ghost 文字按钮，不加箭头图标，用 hover 背景填充表达可点性 */
+.back-link{display:inline-flex;align-items:center;font-size:12.5px;font-weight:600;color:var(--ink-2);text-decoration:none;background:transparent;border:1px solid transparent;padding:5px 12px;border-radius:8px;white-space:nowrap;letter-spacing:.2px;transition:all .15s}
+.back-link:hover{color:var(--primary);background:var(--primary-soft)}
+.back-link:active{transform:translateY(1px)}
+.crumb{display:flex;align-items:center;gap:9px;font-size:13px;color:var(--ink);white-space:nowrap}
+.crumb a{color:var(--muted);text-decoration:none;transition:color .15s}
+.crumb a:hover{color:var(--primary);text-decoration:none}
+.crumb .crumb-sep{color:#c3cddd;font-size:12px;font-weight:500;user-select:none}
 .crumb .crumb-current{font-weight:650}
 
 /* ============ 页面容器与页头 ============ */
