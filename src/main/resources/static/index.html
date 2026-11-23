@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>水利知识库智能问答系统</title>
+<link rel="icon" type="image/svg+xml" href="assets/logo.svg">
 <link rel="stylesheet" href="assets/app.css">
 <style>
   :root{
@@ -42,6 +43,10 @@
   .scroll-area{flex:1;overflow-y:auto;padding:32px 6% 24px}
   .welcome{max-width:760px;margin:8vh auto 0;text-align:center}
   .welcome-mark{width:62px;height:62px;border-radius:17px;background:linear-gradient(135deg,var(--primary-hi),var(--primary));color:#fff;font-size:26px;font-weight:700;display:flex;align-items:center;justify-content:center;margin:0 auto 20px;box-shadow:0 10px 28px rgba(59,110,245,.3)}
+  /* 欢迎区用项目图标（水滴水波）代替一个"水"字：字标在不同字号下重心会飘 */
+  .welcome-mark.has-logo{background:none;box-shadow:none;padding:0}
+  .welcome-mark.has-logo .brand-logo{width:62px;height:62px;border-radius:17px;box-shadow:0 10px 28px rgba(59,110,245,.28)}
+  .quick-tip{font-size:11px;color:var(--muted);margin-top:14px;letter-spacing:.2px}
   .welcome h1{font-size:23px;color:var(--ink);margin:0 0 11px;font-weight:680;letter-spacing:.3px}
   .welcome p{font-size:13.5px;color:var(--ink-2);line-height:1.8;margin:0 auto 30px;max-width:560px}
   .quick-list{display:grid;grid-template-columns:1fr 1fr;gap:11px;max-width:660px;margin:0 auto}
@@ -156,15 +161,16 @@
     </header>
     <div class="scroll-area" id="scrollArea">
       <div class="welcome" id="welcome">
-        <div class="welcome-mark">水</div>
+        <div class="welcome-mark has-logo"><img class="brand-logo" src="assets/logo.svg" alt=""></div>
         <h1>水利知识库智能问答</h1>
         <p>上传规程、报告或表格文档后，基于知识库内容提问。回答下方会标注引用的原文片段，支持多轮追问与会话分支。</p>
         <div class="quick-list">
-          <button class="quick-item" onclick="quickAsk(this.textContent)">云溪水库的汛限水位是多少？</button>
-          <button class="quick-item" onclick="quickAsk(this.textContent)">汛期入库流量超过2000时怎么调度？</button>
-          <button class="quick-item" onclick="quickAsk(this.textContent)">云溪水库现在的实时水位是多少？</button>
-          <button class="quick-item" onclick="quickAsk(this.textContent)">闸门开启有哪些操作原则？</button>
+          <button class="quick-item" onclick="fillAsk(this.textContent)">云溪水库的汛限水位是多少？</button>
+          <button class="quick-item" onclick="fillAsk(this.textContent)">汛期入库流量超过2000时怎么调度？</button>
+          <button class="quick-item" onclick="fillAsk(this.textContent)">云溪水库现在的实时水位是多少？</button>
+          <button class="quick-item" onclick="fillAsk(this.textContent)">闸门开启有哪些操作原则？</button>
         </div>
+        <div class="quick-tip">点击示例可填入输入框，改完再发送</div>
       </div>
       <div class="messages" id="messages" style="display:none"></div>
     </div>
@@ -197,6 +203,10 @@ function sessionKey(){return 'water-rag-sessions:'+SCOPE}
 // 在下次发消息 / 新建会话时整份覆盖回去——这才是"删了又自己回来"的真正根因。
 function readSessions(){sessions=Shell.getSessions();return sessions}
 function writeSessions(list){Shell.saveSessions(list);sessions=list}
+// 启动顺序很关键：会话清单已改为"服务端为准"，
+// 必须等一次清单回来再决定"要不要新建会话"，否则换了浏览器打开页面时，
+// 本地缓存是空的 → 先建了个空会话 → 服务端历史姗姗来迟，用户看到的是空白新会话。
+let booting=true;
 function loadSessions(){
   sessions=Shell.getSessions();
   // 支持从功能页侧栏跳回：?sid=xxx 定位指定会话，?new=1 直接新建会话
@@ -208,7 +218,10 @@ function loadSessions(){
     // 打开时定位到最近更新的会话，而不是数组里碰巧排第一的那个
     const latest=[...sessions].sort((a,b)=>(b.updatedAt||0)-(a.updatedAt||0))[0];
     switchSession(latest.id);
-  }else{newSession()}
+  }else if(!booting){
+    // 服务端清单确实为空才建新会话；还在等清单就先别动手
+    newSession();
+  }
   renderSessions();
 }
 // ============ 按会话隔离的状态（核心：所有会话状态互不干扰）============
@@ -220,8 +233,10 @@ function draftKey(id){return 'water-rag-draft:'+SCOPE+':'+id}
 function cacheMessages(id,list){
   try{const arr=list||msgStore[id]||[];
     // usage 一并缓存：刷新页面后历史回答的"本次消耗"仍然显示，不会凭空消失
+    // nodeId/parentId 也存：离线打开缓存时「从这里再问」仍知道该回退到哪个节点
     localStorage.setItem(cacheKey(id),JSON.stringify(arr.filter(m=>!m.streaming).map(m=>
-      ({role:m.role,content:m.content,sources:m.sources||[],usage:m.usage||null}))))}catch(e){}
+      ({role:m.role,content:m.content,sources:m.sources||[],usage:m.usage||null,
+        nodeId:m.nodeId||'',parentId:m.parentId||''}))))}catch(e){}
 }
 function loadCached(id){
   try{const a=JSON.parse(localStorage.getItem(cacheKey(id))||'[]');return Array.isArray(a)?a:[]}catch(e){return []}
@@ -231,10 +246,12 @@ function storeOf(id){
   return msgStore[id];
 }
 function newSession(){
-  const id='session-'+Date.now();
+  const id='session-'+Date.now()+'-'+Math.random().toString(36).slice(2,6);
   const list=readSessions();                              // 先读最新，避免用过期副本覆盖
   list.unshift({id,title:'',updatedAt:Date.now()});
   writeSessions(list);
+  // 立刻在服务端登记：否则刷新时服务端清单里没有它，会被同步逻辑当成已删除
+  if(window.Shell)Shell.pushSessionRemote(id,'');
   switchSession(id);renderSessions();
 }
 function switchSession(id){
@@ -257,7 +274,8 @@ function switchSession(id){
     // 流式输出中后端历史还不完整，等回答结束再对齐，避免打断/闪屏
     if(messages.some(m=>m.streaming))return;
     const sig=a=>JSON.stringify(a.map(m=>[m.role,m.content]));
-    const fresh=list.map(m=>({role:m.role,content:m.content,sources:m.sources||[],streaming:false}));
+    const fresh=list.map(m=>({role:m.role,content:m.content,sources:m.sources||[],streaming:false,
+      nodeId:m.id||'',parentId:m.parentId||''}));
     if(sig(fresh)===sig(messages))return;                  // 内容一致就不重绘，消除二次渲染闪烁
     messages=fresh;msgStore[id]=messages;
     cacheMessages(id);renderMessages();scrollBottom(true);
@@ -281,9 +299,14 @@ function touchSession(id,title){
   const list=readSessions();
   const s=list.find(x=>x.id===id);
   if(!s)return;
-  if(title&&!s.title)s.title=title;
+  // 先判断"这次是不是首次产生标题"再赋值：赋值后再判断永远是 false
+  const firstTitle=!!(title&&!s.title);
+  if(firstTitle)s.title=title;
   s.updatedAt=Date.now();
   writeSessions(list);
+  // 同步到服务端：只在首次产生标题时把标题发上去，其余情况只刷新时间戳，
+  // 免得把用户后来手动改的名字覆盖回第一个问题
+  if(window.Shell)Shell.patchSessionRemote(id,firstTitle?title:'');
 }
 // 会话列表 DOM 由公共组件 app.js 统一渲染；这里只同步当前会话高亮。
 // 数据仍在本地 sessions 变量（与公共层同源 localStorage），问答逻辑照常使用。
@@ -369,6 +392,7 @@ function msgHtml(m,i){
         '<span class="ai-usage"'+(u?'':' style="display:none"')+(u?' title="'+escapeHtml(usageTip(u))+'"':'')+'>'+
           (u?usageInner(u):'')+'</span>'+
         '<button class="icon-btn ai-cite-count" title="引用片段" style="display:none">▤</button>'+
+        '<button class="icon-btn ai-rewind" onclick="rewindAsk('+i+')" title="回到这一轮重新提问：问题会填回输入框，原分支仍保留在会话结构里">从这里再问</button>'+
         '<button class="icon-btn" title="复制回答到剪贴板" onclick="copyMsg('+i+')">复制</button>'+
       '</span></div>'+
     '<div class="ai-card-body">'+renderMarkdown(m.content)+(m.streaming?'<span class="cursor"></span>':'')+'</div>'+
@@ -389,6 +413,102 @@ function renderMessages(){
       if(card)patchCites(card,m,i);
     }
   });
+  if(has)markAskHints(box);
+}
+/**
+ * 把"引导式提问示例"变成可点击项。
+ *
+ * <p>判定条件刻意收得很窄：只有紧跟在含「例如/示例/比如/可以这样问」的段落之后的列表，
+ * 其条目才算示例。普通的要点列表（调度原则、参数清单）不能被误标成可点击，
+ * 否则用户点一下就把"3.2 米"这种碎片填进输入框了。</p>
+ */
+function markAskHints(root){
+  if(!root)return;
+  root.querySelectorAll('.md-body ul').forEach(ul=>{
+    // renderMarkdown 不给段落加 <p>，换行只被换成 <br>；所以不能只看 previousElementSibling，
+    // 要先跨过紧贴的 <br>，再读它前面那一段连续文本（就是"……例如："这句引导语）。
+    let n=ul.previousSibling;
+    while(n&&n.nodeName==='BR')n=n.previousSibling;
+    let txt='';
+    while(n&&n.nodeType===3&&txt.length<160){txt=n.textContent+txt;n=n.previousSibling;}
+    if(!/例如|示例|比如|可以这样问|试试/.test(txt))return;
+    ul.querySelectorAll('li').forEach(li=>{
+      const q=li.textContent.trim().replace(/[；;。]$/,'').trim();
+      if(!q||q.length>40)return;         // 太长的不是示例句，是可点击会误导的整段话
+      li.classList.add('ask-hint');
+      li.title='点击填入输入框';
+      li.onclick=()=>fillAsk(q);
+    });
+  });
+}
+/** 把一句话填进输入框并聚焦，由用户自己决定发不发 */
+function fillAsk(q){
+  draftBox.value=String(q||'').replace(/^[✦\s]+/,'').trim();
+  draftBox.focus();
+  try{draftBox.setSelectionRange(draftBox.value.length,draftBox.value.length)}catch(e){}
+  hideError();
+}
+/**
+ * 从这里再问：回退到该轮问题的父节点（新问题成为同级分支），并把原问题填回输入框。
+ *
+ * <p>回退后用 /api/chat/history 重新拉当前分支链，让画面同步收缩到那一轮——
+ * 否则新问题会接在末尾，看起来像是接着最后一条继续问，与"重新问"的语义不符。
+ * 旧分支节点一个都没删，仍可在「会话结构」页切回去。</p>
+ */
+/**
+ * 补齐当前会话消息的 nodeId/parentId。
+ *
+ * <p>老缓存（本轮之前的版本）与从服务端恢复的历史可能缺 id，缺 id 就定位不到父节点。
+ * 长度对得上才回填——对不上说明中途有过截断，宁可放弃也不能错位。</p>
+ */
+async function syncMsgIds(sessionId){
+  try{
+    const r=await fetch('/api/chat/history?sessionId='+encodeURIComponent(sessionId));
+    if(!r.ok)return false;
+    const list=await r.json();
+    const store=storeOf(sessionId);
+    if(!Array.isArray(list)||list.length!==store.length)return false;
+    list.forEach((m,k)=>{store[k].nodeId=m.id||'';store[k].parentId=m.parentId||'';});
+    cacheMessages(sessionId,store);
+    return true;
+  }catch(e){return false}
+}
+async function rewindAsk(i){
+  const q=messages[i-1];
+  if(!q||q.role!=='user'){toast('这一轮缺少问题内容，无法回退','err');return}
+  const ownerId=currentId;
+  let parentId=q.parentId||'';
+  if(!parentId&&await syncMsgIds(ownerId))parentId=(messages[i-1]||{}).parentId||'';
+  if(!parentId){showError('这一轮缺少定位信息，请刷新会话后重试。问题已填入输入框，可直接再发一次。');
+    draftBox.value=q.content;draftBox.focus();return}
+  let rewound=false;
+  {
+    try{
+      const r=await fetch('/api/chat/rewind?sessionId='+encodeURIComponent(ownerId)+'&nodeId='+encodeURIComponent(parentId),{method:'POST'});
+      if(!r.ok){const j=await r.json().catch(()=>({}));throw new Error(j.error||('HTTP '+r.status))}
+      rewound=true;
+    }catch(e){
+      showError('回退失败：'+e.message+'。问题已填入输入框，可继续提问。');
+    }
+  }
+  if(rewound&&currentId===ownerId){
+    try{
+      const r=await fetch('/api/chat/history?sessionId='+encodeURIComponent(ownerId));
+      const list=await r.json();
+      if(Array.isArray(list)&&currentId===ownerId){
+        messages=list.map(m=>({role:m.role,content:m.content,sources:m.sources||[],streaming:false,
+          nodeId:m.id||'',parentId:m.parentId||''}));
+        msgStore[ownerId]=messages;
+        cacheMessages(ownerId);
+        renderMessages();scrollBottom(true);
+      }
+    }catch(e){}
+  }
+  draftBox.value=q.content;
+  draftBox.focus();
+  try{draftBox.setSelectionRange(draftBox.value.length,draftBox.value.length)}catch(e){}
+  hideError();
+  toast(rewound?'已回到这一轮，改完按 Enter 发送（原分支保留在会话结构里）':'问题已填入输入框','ok');
 }
 function patchCites(card,m,i){
   const zone=card.querySelector('.cite-zone');if(!zone)return;
@@ -436,6 +556,9 @@ function finalizeCard(){
   if(!card)return;
   const cur=card.querySelector('.cursor');if(cur)cur.remove();
   const st=card.querySelector('.ai-state');if(st){st.textContent='';st.removeAttribute('style')}
+  // 流式过程中反复重写正文会把点击事件冲掉，收尾时统一补一次"示例可点击"
+  const body=card.querySelector('.ai-card-body');
+  if(body)markAskHints(body);
   // 本次消耗是回答结束后才有值的，补进预留的 .ai-usage 节点（不重绘整张卡片）
   const m=messages[messages.length-1];
   const us=card.querySelector('.ai-usage');
@@ -502,6 +625,15 @@ async function send(text){
             try{
               const d=JSON.parse(data);
               if(d&&d.usage)ai.usage=Object.assign({durationMs:d.durationMs||0},d.usage);
+              // 本轮两个节点的 id 由 done 一并带回：不接住的话，刚问完的这一轮
+              // 在页面上没有 parentId，「从这里再问」会以为没有上一轮。
+              if(d&&d.nodes&&store.length>=2){
+                const qn=store[store.length-2],an=store[store.length-1];
+                qn.nodeId=d.nodes.questionId||qn.nodeId;
+                qn.parentId=d.nodes.parentId||qn.parentId||'';
+                an.nodeId=d.nodes.answerId||an.nodeId;
+                an.parentId=d.nodes.questionId||an.parentId||'';
+              }
             }catch(e){}
           }
         }
@@ -583,10 +715,18 @@ function onSessionDeleted(id){
     else newSession();
   }else renderSessions();
 }
-initShell('index');       // 渲染全站统一侧栏 + 服务探活
-loadSessions();           // 初始化会话（内部会 switchSession → Shell.setSession 同步高亮）
+initShell('index');       // 渲染全站统一侧栏 + 服务探活 + 触发一次会话清单同步
+// 先等清单（最多 1.5 秒），再初始化会话；网络慢就直接用本地缓存往下走
+(async function boot(){
+  try{
+    await Promise.race([Shell.syncSessions(),new Promise(r=>setTimeout(r,1500))]);
+  }catch(e){}
+  booting=false;
+  loadSessions();
+  if(!currentId)newSession();
+  Shell.setSession(currentId);
+})();
 Shell.refreshDocs();      // 侧栏文档清单（公共组件）
-Shell.setSession(currentId);
 </script>
 </body>
 </html>

@@ -52,6 +52,15 @@ a{color:var(--primary);text-decoration:none}
 .sidebar .session-delete{border:0;background:transparent;color:#8fa0c0;font-size:16px;opacity:.42;padding:0 3px;line-height:1;flex:0 0 auto;transition:all .15s}
 .sidebar .session-item:hover .session-delete{opacity:1}
 .sidebar .session-delete:hover{color:#ff8fab}
+/* 当前会话选中态：原来只有 :hover，列表里所有会话长得一模一样，
+   用户根本分不清正在看哪一条。用"底色 + 左侧竖条 + 实心圆点"三重信号，
+   深色侧栏上也能一眼扫到（对比度不足时色相靠不住，得靠形状和位置）。 */
+.sidebar .session-item.active{background:rgba(59,110,245,.28);box-shadow:inset 0 0 0 1px rgba(139,164,255,.3)}
+.sidebar .session-item.active .session-name{color:#fff;font-weight:650}
+.sidebar .session-item.active .session-time{color:#a9bce0}
+.sidebar .session-item.active .session-dot{background:var(--primary-hi);box-shadow:0 0 0 3px rgba(91,139,255,.22)}
+.sidebar .session-item.active::before{content:'';position:absolute;left:-6px;top:9px;bottom:9px;width:2.5px;border-radius:2px;background:var(--primary-hi)}
+.sidebar .session-item{position:relative}
 /* ============ 侧栏上传区（深色，全站公共） ============ */
 .sidebar .upload-area{border-top:1px solid rgba(255,255,255,.09);margin-top:8px;padding-top:8px;flex:0 0 auto}
 .sidebar .upload-title{display:flex;align-items:center;justify-content:space-between;padding:5px 6px 7px;color:#9fb0d0;font-size:11.5px}
@@ -78,7 +87,9 @@ a{color:var(--primary);text-decoration:none}
 
 /* 侧栏底部用户卡片（登录态） */
 .user-block{display:flex;align-items:center;gap:9px;border-top:1px solid rgba(255,255,255,.09);margin-top:10px;padding:12px 4px 2px}
-.user-avatar{width:30px;height:30px;border-radius:9px;flex:0 0 30px;background:linear-gradient(135deg,var(--primary-hi),var(--primary));color:#fff;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700}
+/* 头像外观由内部的 .av 提供（按账号名自动生成配色），外层只负责定位与点击区域 */
+.user-avatar{width:30px;height:30px;flex:0 0 30px;display:flex;align-items:center;justify-content:center;text-decoration:none;border-radius:9px}
+.user-avatar:hover{filter:brightness(1.08)}
 .user-meta{flex:1;min-width:0}
 .user-name{font-size:12px;color:#e4ecff;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .user-tenant{font-size:10px;color:#6f80a4;margin-top:2px}
@@ -86,13 +97,29 @@ a{color:var(--primary);text-decoration:none}
 .user-logout:hover{background:rgba(224,36,94,.18);color:#ff9fbb}
 .sidebar-footer{font-size:10px;color:#4e5f80;text-align:center;margin-top:14px;letter-spacing:.2px;line-height:1.7}
 /* 服务状态：从各页顶栏挪到侧栏底部。原来挤在顶栏标题旁边，跟页面内容没有关系，
-   白白占用最显眼的位置；放侧栏当作"系统/环境状态"，视线不打架也更符合中后台惯例 */
-.sidebar-health{display:flex;align-items:center;gap:7px;height:28px;padding:0 10px;margin:0 0 4px;
-  font-size:11px;color:#8fa4c8;border-radius:8px;background:rgba(255,255,255,.045);letter-spacing:.2px}
-.sidebar-health .status-dot{width:6px;height:6px;border-radius:50%;background:var(--ok);flex:0 0 6px;
-  box-shadow:0 0 0 3px rgba(14,159,110,.16)}
-.sidebar-health.off{color:#ffa2b8;background:rgba(224,36,94,.1)}
-.sidebar-health.off .status-dot{background:#ff5d84;box-shadow:0 0 0 3px rgba(224,36,94,.18)}
+   白白占用最显眼的位置；放侧栏当作"系统/环境状态"，视线不打架也更符合中后台惯例。
+   第二版（廖工反馈"太占位、效果不满意"）：去掉整块底色和容器感，只留 4px 圆点 + 10px 小字，
+   与底部版本号同一条视觉层级——它是环境状态，不该跟导航抢注意力。 */
+.sidebar-health{display:flex;align-items:center;gap:5px;height:14px;padding:0 8px;margin:6px 0 0;
+  font-size:9.5px;line-height:1;color:#55668c;background:none;border:0;letter-spacing:.3px;user-select:none}
+.sidebar-health .status-dot{width:4px;height:4px;border-radius:50%;background:#2f9a72;flex:0 0 4px;box-shadow:none}
+.sidebar-health.off{color:#c0647c}
+.sidebar-health.off .status-dot{background:#e0245e;box-shadow:0 0 0 2px rgba(224,36,94,.16)}
+
+/* ============ 自动生成头像 ============
+   不接第三方头像服务：按账号名做一次稳定哈希取色相，取首字上屏。
+   同一个账号在任何页面、任何设备上颜色都一样，且零外部请求。 */
+.av{display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;
+  border-radius:9px;color:#fff;font-weight:700;letter-spacing:0;overflow:hidden;
+  text-shadow:0 1px 2px rgba(0,0,0,.16);user-select:none}
+.av-sm{width:26px;height:26px;font-size:11.5px;border-radius:8px}
+.av-md{width:30px;height:30px;font-size:13px;border-radius:9px}
+.av-lg{width:40px;height:40px;font-size:17px;border-radius:12px}
+.av-xl{width:76px;height:76px;font-size:29px;border-radius:22px}
+
+/* ============ 品牌图标 ============ */
+.brand-logo{width:100%;height:100%;display:block}
+.brand-mark.has-logo{background:none;box-shadow:none;padding:0;overflow:hidden}
 
 /* ============ 主区 ============ */
 .main{flex:1;min-width:0;display:flex;flex-direction:column}
@@ -254,6 +281,92 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,te
 @media(prefers-reduced-motion:reduce){
   *,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}
 }
+
+/* ============ 弹框内错误提示 ============
+   原来表单校验/接口报错统一走右下角 toast：弹框一盖住半屏，toast 又贴在视口右下角，
+   在 1080p 上经常被裁掉一半，用户只看到"点了没反应"。
+   错误必须出现在出错的位置旁边——放弹框头部下方，红色横幅，带图标，且不会自己消失。 */
+.modal-alert{display:none;margin:0;padding:11px 22px;background:#fdeef3;border-bottom:1px solid #f8cfdc;
+  color:#b91c4a;font-size:12.5px;line-height:1.6;word-break:break-word}
+.modal-alert.show{display:flex;gap:8px;align-items:flex-start}
+.modal-alert::before{content:'!';flex:0 0 16px;width:16px;height:16px;border-radius:50%;
+  background:#e0245e;color:#fff;font-size:11px;font-weight:700;line-height:16px;text-align:center;margin-top:1px}
+/* 表单内的说明性提示（不是错误）：用于"为什么某项不能改"这种约束解释 */
+.form-note{background:#f4f8ff;border:1px solid #d6e4ff;color:#28456f;border-radius:8px;
+  padding:9px 12px;font-size:11.5px;line-height:1.65;margin-bottom:14px}
+/* 紧跟在复选框标签后的短说明，与 .form-note 同级语义但更轻，不占整行 */
+.form-inline-note{color:#8195b5;font-size:11px;margin-left:4px}
+
+/* ============ 批量上传：先选文件再上传 ============
+   选文件夹后直接开传是不合适的：一个目录里常混着 .zip / .png / 临时文件，
+   传完才发现垃圾进库了，还得一个个删。先列清单、让人勾选，再上传。 */
+.pick-summary{display:flex;align-items:center;gap:12px;padding:0 0 10px;font-size:12px;color:var(--ink-2);
+  border-bottom:1px solid var(--line);margin-bottom:2px}
+.pick-all{display:inline-flex;align-items:center;gap:7px;font-size:12.5px;font-weight:600;color:var(--ink);
+  cursor:pointer;margin:0;white-space:nowrap}
+.pick-count{margin-left:auto;color:var(--muted);font-variant-numeric:tabular-nums}
+.pick-tip{font-size:11px;color:var(--muted)}
+.pick-list{max-height:320px;overflow:auto;margin:0 -4px;padding:0 4px}
+.pick-row{display:flex;align-items:center;gap:9px;padding:8px 6px;border-bottom:1px solid #f3f5f9;
+  font-size:12px;cursor:pointer;margin:0}
+.pick-row:last-child{border-bottom:0}
+.pick-row:hover{background:#fafcff}
+.pick-row.skip{opacity:.62;cursor:default}
+.pick-row.skip:hover{background:none}
+.pick-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--ink)}
+.pick-path{font-size:10.5px;color:var(--muted);max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;direction:rtl;text-align:left}
+.pick-size{font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums;flex:0 0 auto;min-width:52px;text-align:right}
+.pick-tag{font-size:10.5px;padding:1px 7px;border-radius:9px;background:#f1f4f9;color:var(--muted);flex:0 0 auto}
+.pick-tag.ok{background:#e8f8f1;color:#0b7a54}
+.pick-tag.err{background:#fdeef3;color:#b91c4a}
+.pick-tag.run{background:var(--primary-soft);color:#25469b}
+.pick-bar{height:3px;border-radius:2px;background:#eef2f8;overflow:hidden;margin-top:12px;display:none}
+.pick-bar.show{display:block}
+.pick-bar i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--primary-hi),var(--primary));transition:width .25s}
+.pick-done-tip{font-size:11.5px;color:var(--muted);margin-top:8px;display:none}
+.pick-done-tip.show{display:block}
+
+/* ============ 文档分片树状预览 ============
+   分片是 RAG 的"里子"，能点开看每片原文，才能解释"为什么检索到这一段"。 */
+.chunk-tree{border:1px solid var(--line);border-radius:10px;overflow:auto;max-height:min(56vh,520px);background:#fff}
+.chunk-root{display:flex;align-items:center;gap:8px;padding:10px 13px;background:#f7f9fc;
+  border-bottom:1px solid var(--line);font-size:12.5px;font-weight:650;color:var(--ink);position:sticky;top:0;z-index:1}
+.chunk-root .cf-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.chunk-item{border-bottom:1px solid #f3f5f9}
+.chunk-item:last-child{border-bottom:0}
+.chunk-head{display:flex;align-items:center;gap:9px;padding:9px 13px 9px 22px;cursor:pointer;font-size:12px;color:var(--ink-2);transition:background .12s}
+.chunk-head:hover{background:#fafcff}
+.chunk-caret{width:12px;flex:0 0 12px;font-size:11px;line-height:1;color:#93a4bf;transition:color .15s}
+.chunk-head:hover .chunk-caret{color:var(--primary)}
+.chunk-no{flex:0 0 auto;font-size:10.5px;color:#3568d4;background:#e8f0ff;border-radius:7px;padding:1px 7px;font-variant-numeric:tabular-nums}
+.chunk-preview{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--muted);font-size:11.5px}
+.chunk-len{flex:0 0 auto;font-size:10.5px;color:#a8b2c2;font-variant-numeric:tabular-nums}
+/* 分片正文：默认只露 200px，长文给「展开全文」。不用内层滚动条——
+   树本身已经是一个滚动容器，再套一个会出现两条滚动条并排，看着像没对齐。 */
+.chunk-body{display:none;margin:0 16px 0 43px;padding:10px 13px;background:#fafcff;
+  border-left:2px solid #dbe7fb;border-radius:0 8px 0 0;font-size:12px;line-height:1.8;
+  color:#37445c;white-space:pre-wrap;word-break:break-word;position:relative;
+  max-height:200px;overflow:hidden}
+.chunk-body::after{content:'';position:absolute;left:0;right:0;bottom:0;height:36px;
+  background:linear-gradient(to bottom,rgba(250,252,255,0),#fafcff 88%);pointer-events:none}
+.chunk-item.full .chunk-body{max-height:none;border-radius:0 8px 8px 0}
+.chunk-item.full .chunk-body::after{display:none}
+.chunk-more{display:none;margin:0 16px 12px 43px;padding:4px 2px;border:0;background:none;
+  color:var(--primary);font-size:11.5px;cursor:pointer}
+.chunk-more:hover{text-decoration:underline}
+.chunk-item.open .chunk-more{display:inline-block}
+.chunk-item.open .chunk-body{display:block}
+.chunk-item.open .chunk-caret{color:var(--primary)}
+.chunk-empty{padding:26px;text-align:center;color:var(--muted);font-size:12.5px}
+
+/* ============ 引导式提问：点一下填进输入框 ============
+   模型给的"例如：查询某座水库…"本质就是可执行的提问，让用户手抄一遍纯属浪费。
+   只对"紧跟在含'例如/示例'的段落之后"的列表项生效——普通条目列表不能被误伤。 */
+.md-body li.ask-hint{cursor:pointer;border-radius:6px;transition:background .12s,color .12s;margin-left:-4px;padding:1px 4px}
+.md-body li.ask-hint:hover{background:var(--primary-soft);color:#25469b}
+.md-body li.ask-hint::after{content:'↵';font-size:10px;color:#9fb3d9;margin-left:6px;opacity:0;transition:opacity .12s}
+.md-body li.ask-hint:hover::after{opacity:1}
+
 
 /* ============ 响应式 ============ */
 @media(max-width:900px){

@@ -75,6 +75,22 @@ public class DocumentController {
     }
 
     /**
+     * 单份文档的分片清单（后台"分片预览"树状展开用）。
+     * 只返回切片序号与正文，不带向量；越权由 ES 侧的可见范围查询拦截。
+     */
+    @GetMapping(value = "/chunks", produces = MediaType.APPLICATION_JSON_VALUE)
+    @RequirePermission(Permission.DOC_READ)
+    public Map<String, Object> chunks(@RequestParam String fileName) {
+        Map<String, Object> res = adminRepository.listChunks(fileName);
+        Map<String, Object> out = new java.util.LinkedHashMap<>();
+        out.put("fileName", fileName);
+        out.put("total", res.getOrDefault("total", 0));
+        out.put("truncated", res.getOrDefault("truncated", false));
+        out.put("chunks", res.getOrDefault("chunks", List.of()));
+        return out;
+    }
+
+    /**
      * 删除单个知识文档（按文件名删除其全部切片）。
      */
     @DeleteMapping

@@ -53,4 +53,14 @@ public class VectorStoreAdminRepository {
     public int deleteByFileName(String fileName) {
         return es.deleteByFileName(fileName);
     }
+
+    /** 单份文档的全部切片（供分片树状预览） */
+    public Map<String, Object> listChunks(String fileName) {
+        try {
+            return es.listChunks(fileName);
+        } catch (Exception e) {
+            // ES 未就绪时返回空结果，不让接口 500
+            return Map.of("total", 0, "truncated", false, "chunks", List.of());
+        }
+    }
 }

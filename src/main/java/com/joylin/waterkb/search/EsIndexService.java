@@ -220,6 +220,42 @@ public class EsIndexService {
     }
 
     /**
+     * 某份文档的全部切片（按 chunkIndex 升序），供后台「分片预览」树状展开。
+     *
+     * <p>一次取回而不是分页：单份文档切片数在几十到几百量级（按 300~500 字一片），
+     * 展开时才不用二次请求。上限 1000 片并回传真实总数，超大文档如实告诉调用方
+     * "共 N 片、只返回了 M 片"，不做伪分页。</p>
+     *
+     * <p>权限：必须复用检索同一份 {@link #visibilityQuery()}，否则会出现
+     * "能通过后台看到别人文档的全文切片"的越权读——这比检索越权更直接。</p>
+     */
+    public java.util.Map<String, Object> listChunks(String fileName) {
+        int limit = 1000;
+        String dsl = """
+            {"size":%d,"_source":["chunkIndex","content","uploadedAt"],
+             "query":{"bool":{"must":[{"term":{"fileName":%s}},%s]}},
+             "sort":[{"chunkIndex":{"order":"asc"}}]}
+            """.formatted(limit, quote(fileName), visibilityQuery());
+        JsonNode root = search(props.getIndex(), dsl);
+        JsonNode hits = root.path("hits");
+        int total = hits.path("total").path("value").asInt(0);
+        List<Map<String, Object>> out = new java.util.ArrayList<>();
+        for (JsonNode h : hits.path("hits")) {
+            JsonNode src = h.path("_source");
+            Map<String, Object> m = new java.util.LinkedHashMap<>();
+            m.put("chunkIndex", src.path("chunkIndex").asInt());
+            m.put("content", src.path("content").asText(""));
+            m.put("uploadedAt", src.path("uploadedAt").asText(""));
+            out.add(m);
+        }
+        Map<String, Object> res = new java.util.LinkedHashMap<>();
+        res.put("total", total);
+        res.put("truncated", total > out.size());
+        res.put("chunks", out);
+        return res;
+    }
+
+    /**
      * 账号可见范围（与检索 EsHybridSearchService 同一规则）：
      * 租户隔离 AND（自己上传 OR 组可见 OR public）。管理员看全租户，便于后台维护。
      */

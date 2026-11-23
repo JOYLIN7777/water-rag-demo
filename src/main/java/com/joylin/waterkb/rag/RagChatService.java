@@ -144,8 +144,9 @@ public class RagChatService {
         // 保证"页面显示的 token"与"用量统计里的 token"永远对得上。
         Mono<String> persistThenDone = Mono.fromCallable(() -> {
             if (!degraded[0]) breaker.recordSuccess();
+            Map<String, Object> nodes = null;
             try {
-                appendExchange(sessionId, tenantAtStart, userAtStart, parentId, question, answerBuf.toString(), hits);
+                nodes = appendExchange(sessionId, tenantAtStart, userAtStart, parentId, question, answerBuf.toString(), hits);
             } catch (Exception e) {
                 log.error("对话历史落库失败（不影响本次回答）", e);
             }
@@ -153,6 +154,9 @@ public class RagChatService {
             Map<String, Object> done = new LinkedHashMap<>();
             done.put("done", true);
             done.put("durationMs", durationMs);
+            // 回传本轮两个节点的 id 与父节点：前端「从这里再问」要靠它定位父节点，
+            // 否则刚问完的那一轮在页面上没有 id，只能等下次刷新会话才拿得到。
+            if (nodes != null) done.put("nodes", nodes);
             if (degraded[0]) {
                 // 熔断/降级分支没有真实请求模型，不记用量、也不回消耗值
                 // （回 0 会让用户误以为这次调用免费，属于数据失真）
@@ -279,13 +283,23 @@ public class RagChatService {
      * 同一次问答的两条消息用父子关系绑定，rewind 到 user 即丢弃这次回答，
      * rewind 到 assistant 则完整保留——可精确控制回滚粒度。
      */
-    private void appendExchange(String sessionId, String tenant, String user, String parentId, String question,
+    /**
+     * 落库一轮问答（问 + 答两个节点），并把节点 id 返回给调用方。
+     *
+     * @return {@code questionId/answerId/parentId}；调用方据此在 done 事件里回传，前端才知道刚问的这轮在哪
+     */
+    private Map<String, Object> appendExchange(String sessionId, String tenant, String user, String parentId, String question,
                                 String answer, List<Document> hits) {
         // 全程用显式 tenant+user：异步回调线程没有 ThreadLocal 身份，不能读 UserContext
         String parent = parentId == null || parentId.isBlank()
                 ? historyStore.head(sessionId, tenant, user) : parentId;
         String userNode = historyStore.append(sessionId, tenant, user, parent, "user", question, null, null);
-        historyStore.append(sessionId, tenant, user, userNode, "assistant", answer, toSourceMaps(hits), null);
+        String answerNode = historyStore.append(sessionId, tenant, user, userNode, "assistant", answer, toSourceMaps(hits), null);
+        Map<String, Object> ids = new LinkedHashMap<>();
+        ids.put("questionId", userNode);
+        ids.put("answerId", answerNode);
+        ids.put("parentId", parent == null ? "" : parent);
+        return ids;
     }
 
     /** 把检索命中转成可存入节点 JSON 的来源片段（回显引用卡片用） */

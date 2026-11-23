@@ -27,8 +27,8 @@
   const SETTINGS = [
     { key: 'search', href: 'search.html', label: '检索对比', icon: 'search',
       desc: '对比关键词检索、语义检索和融合检索的结果，帮助找到更准的答案', groups: [] },
-    { key: 'tree', href: 'tree.html', label: '问答分支', icon: 'tree',
-      desc: '从任意一条回答继续追问，或回到之前的问题重新提问', groups: [] }
+    { key: 'tree', href: 'tree.html', label: '会话结构', icon: 'tree',
+      desc: '查看当前会话的消息树与命名分支，可切回任意历史节点', groups: [] }
   ];
   global.ShellSettings = SETTINGS;
 
@@ -45,7 +45,33 @@
   const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c =>
     ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
-  // ---------- 会话数据（与首页同源 localStorage，按账号隔离）----------
+  // ---------- 自动生成头像 ----------
+  // 不接外部头像服务：同一个账号名永远得到同一组色相，换个浏览器打开也一致。
+  // 取首字上屏——中文取第一个汉字，英文取首字母大写，比灰底问号可辨认得多。
+  // 头像配色不用全色环：随机 hue 会冒出荧光绿/洋红，在水系蓝的后台里很突兀。
+  // 这里只用 8 组「蓝—青—靛」邻近色，既有区分度，又始终和主色调同一家族。
+  const AV_PALETTE = [
+    ['#4b7bec', '#2f56d0'], ['#3aa8e0', '#1d76c9'], ['#38b2ac', '#237f8f'],
+    ['#5b8def', '#3355b8'], ['#48a9d8', '#2268a8'], ['#6a7ee8', '#3f46b5'],
+    ['#2fa8c9', '#1b6f96'], ['#4fa3d1', '#2a5fa0']
+  ];
+  function hashHue(s) {
+    let h = 0;
+    for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
+    return h;
+  }
+  function avatar(name, size) {
+    const n = String(name == null || name === '' ? '?' : name).trim();
+    const ch = n.slice(0, 1).toUpperCase();
+    const pair = AV_PALETTE[hashHue(n) % AV_PALETTE.length];
+    return '<span class="av av-' + (size || 'md') + '" style="background:linear-gradient(135deg,' + pair[0] + ',' + pair[1] + ')">' +
+      esc(ch) + '</span>';
+  }
+
+
+  // ---------- 会话清单：服务端为准，localStorage 做首屏缓存 ----------
+  // 以前清单只存浏览器：换电脑、清缓存、换浏览器就全没了，而对话内容其实还在 Redis。
+  // 现在清单落 PostgreSQL（/api/chat/sessions），本地缓存只负责"打开就渲染、不等网络"。
   function sessionKey() {
     const a = global.WrkAuth;
     return 'water-rag-sessions:' + (a && a.scope ? a.scope() : 'demo');
@@ -56,6 +82,58 @@
   }
   function saveSessions(list) {
     global.localStorage.setItem(sessionKey(), JSON.stringify(list));
+  }
+  function pushSessionRemote(id, title) {
+    try {
+      return fetch('/api/chat/sessions', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sessionId: id, title: title || '' })
+      }).catch(function () {});
+    } catch (e) { return Promise.resolve(); }
+  }
+  function patchSessionRemote(id, title) {
+    try {
+      return fetch('/api/chat/sessions/' + encodeURIComponent(id), {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title: title || '' })
+      }).catch(function () {});
+    } catch (e) { return Promise.resolve(); }
+  }
+  function deleteSessionRemote(id) {
+    try {
+      return fetch('/api/chat/sessions/' + encodeURIComponent(id), { method: 'DELETE' }).catch(function () {});
+    } catch (e) { return Promise.resolve(); }
+  }
+  let syncInFlight = null;
+  /**
+   * 拉服务端清单并合并。
+   *
+   * <p>为什么是合并而不是覆盖：服务端为空时本地往往有"上线前就存在的会话"，
+   * 直接覆盖等于把用户历史清零；而新建会话的 POST 与这次 GET 存在竞态，
+   * 覆盖也会把刚建的会话抹掉。所以按 id 取并集，服务端字段优先。</p>
+   */
+  function syncSessions() {
+    // 并发去重：initShell 与页面 boot 都会调一次，共用同一个请求
+    if (syncInFlight) return syncInFlight;
+    syncInFlight = fetch('/api/chat/sessions').then(function (r) { return r.ok ? r.json() : null; }).then(function (rows) {
+      if (!Array.isArray(rows)) return;
+      const local = loadSessions();
+      if (!rows.length && local.length) {
+        // 升级路径：服务端还没有任何记录，把本地现有会话逐条迁上去
+        local.forEach(function (s) { pushSessionRemote(s.id, s.title || ''); });
+      }
+      const serverIds = {};
+      rows.forEach(function (r) { serverIds[r.id] = 1; });
+      const merged = rows.map(function (r) {
+        return { id: r.id, title: r.title || '', updatedAt: r.updatedAt || 0 };
+      }).concat(local.filter(function (s) { return !serverIds[s.id]; }));
+      saveSessions(merged);
+      renderSessions();
+      if (typeof sessionsSyncedHandler === 'function') sessionsSyncedHandler();
+    }).catch(function () { /* 离线时静默走本地缓存 */ }).then(function () {
+      syncInFlight = null;
+    });
+    return syncInFlight;
   }
   function fmtTime(ts) {
     if (!ts) return '';
@@ -70,12 +148,24 @@
 
   // 会话切换回调（首页注册，功能页默认跳回首页定位）
   let sessionChangeHandler = null;
+  let sessionsSyncedHandler = null;
   let currentSessionId = '';
   global.Shell = {
     setSession(id) { currentSessionId = id; renderSessions(); },
     onSessionChange(fn) { sessionChangeHandler = fn; },
+    /** 服务端清单合并完成后通知页面（页面据此决定要不要切会话） */
+    onSessionsSynced(fn) { sessionsSyncedHandler = fn; },
+    syncSessions: syncSessions,
+    pushSessionRemote: pushSessionRemote,
+    patchSessionRemote: patchSessionRemote,
     getSessions: loadSessions,
     saveSessions,
+    avatar: avatar,
+    logout: confirmLogout,
+    /** 选文件后先列清单再上传（知识库文档页也复用这套） */
+    openUploadPicker: openUploadPicker,
+    /** 分片树状预览（后台文档管理与知识库文档页共用） */
+    showChunks: showChunks,
     refreshDocs() { return loadDocs(); },
     getCurrentUser() { const a = global.WrkAuth; return a ? a.getUser() : null; },
     groupLabel: groupLabel,
@@ -86,7 +176,10 @@
     /** 供页面主动清理：删除会话时统一走这里，保证缓存/后端历史/首页副本一起清 */
     purgeSession: purgeSession,
     modal: openModal,
-    closeModal: closeModal
+    closeModal: closeModal,
+    /** 在弹框内显示错误（不要用 toast：弹框盖住屏幕时右下角提示经常被裁掉） */
+    modalError: modalError,
+    clearModalError: clearModalError
   };
 
   function pickSession(id, ev) {
@@ -119,8 +212,8 @@
       const scope = a && a.scope ? a.scope() : 'demo';
       global.localStorage.removeItem('water-rag-msgs:' + scope + ':' + id);
     } catch (e) { /* 缓存清不掉不影响主流程 */ }
-    // 会话列表在本地、问答历史在服务端；不删后端会一直留在库里占空间
-    try { fetch('/api/chat/history?sessionId=' + encodeURIComponent(id), { method: 'DELETE' }); } catch (e) {}
+    // 服务端一条接口同时收掉"清单行 + Redis 消息树"，避免列表删了内容还留着占空间
+    deleteSessionRemote(id);
     // 通知首页同步它内存里的那份副本（只有首页注册了钩子）。
     // 参数顺序：第一个永远是会话 id，第二个才是动作类型——与其它调用点保持一致，
     // 反过来传会让首页把 '__delete__' 当成会话 id 去切换，删了等于没删。
@@ -199,38 +292,270 @@
       loadDocs();
     } catch (e) { uploadMsg('✗ ' + file.name + ' 入库失败：' + e.message, 'err'); }
   }
-  async function uploadFiles(all) {
-    const files = Array.from(all || []).filter(f => !isJunkFile(f.name));
-    if (!files.length) { uploadMsg('✗ 没有可上传的文件', 'err'); return; }
-    if (!supportedExts.size) {
-      try { const d = await (await fetch('/api/docs/formats')).json(); supportedExts = new Set(d.extensions); } catch (e) {}
-    }
-    const valid = files.filter(f => {
-      const i = f.name.lastIndexOf('.');
-      return i >= 0 && supportedExts.has(f.name.slice(i + 1).toLowerCase());
+  /** 单个文件入库，成功返回切片数，失败抛中文原因 */
+  async function ingestOne(file) {
+    const oversize = sizeError(file);
+    if (oversize) throw new Error(oversize);
+    const fd = new FormData(); fd.append('file', file);
+    const started = Date.now();
+    const r = await fetch('/api/docs/upload', { method: 'POST', body: fd });
+    const j = await r.json().catch(function () { return {}; });
+    if (!r.ok || j.chunks === undefined) throw new Error(j.message || ('上传失败（HTTP ' + r.status + '）'));
+    return { chunks: j.chunks, chars: j.chars, secs: ((Date.now() - started) / 1000).toFixed(1) };
+  }
+
+  function extOf(name) {
+    const i = String(name).lastIndexOf('.');
+    return i < 0 ? '' : String(name).slice(i + 1).toLowerCase();
+  }
+
+  /** 把 FileList 变成可展示的候选清单：分出"可上传 / 格式不支持 / 超过上限"三类 */
+  function collectCandidates(all) {
+    const files = Array.from(all || []).filter(function (f) { return !isJunkFile(f.name); });
+    return files.map(function (f) {
+      const ext = extOf(f.name);
+      const supported = !supportedExts.size || supportedExts.has(ext);
+      const oversize = !!(maxFileBytes && f.size > maxFileBytes);
+      const rel = f.webkitRelativePath || '';
+      const cut = rel.lastIndexOf('/');
+      return {
+        file: f, name: f.name, size: f.size, ext: ext,
+        dir: cut > 0 ? rel.slice(0, cut) : '',
+        supported: supported, oversize: oversize
+      };
     });
-    if (!valid.length) { uploadMsg('✗ 没有支持的文档格式（共 ' + files.length + ' 个文件跳过）', 'err'); return; }
-    const area = document.getElementById('uploadArea'); if (area) area.classList.add('open');
-    for (let i = 0; i < valid.length; i++) {
-      const f = valid[i];
-      uploadMsg('[' + (i + 1) + '/' + valid.length + '] 正在解析 ' + f.name + '…');
-      const oversize = sizeError(f);
-      if (oversize) { uploadMsg('[' + (i + 1) + '/' + valid.length + '] ✗ ' + f.name + '：' + oversize, 'err'); continue; }
-      const fd = new FormData(); fd.append('file', f);
+  }
+
+  // 批量上传时的运行态（清单、进度、是否已结束）
+  let pickState = null;
+
+  function pickerRow(it, i) {
+    const bad = !it.supported || it.oversize;
+    const tag = !it.supported ? '<span class="pick-tag">格式不支持</span>'
+      : it.oversize ? '<span class="pick-tag err">超过单文件上限</span>'
+        : '<span class="pick-tag ok">就绪</span>';
+    return '<label class="pick-row' + (bad ? ' skip' : '') + '" data-i="' + i + '">' +
+      '<input type="checkbox" class="pick-cb"' + (bad ? ' disabled' : ' checked') + '>' +
+      '<span class="pick-name" title="' + esc(it.name) + '">' + esc(it.name) + '</span>' +
+      (it.dir ? '<span class="pick-path" title="' + esc(it.dir) + '">' + esc(it.dir) + '</span>' : '') +
+      '<span class="pick-size">' + fmtSize(it.size || 0) + '</span>' + tag + '</label>';
+  }
+
+  /**
+   * 选文件夹 / 多选文件后的第一步：列出清单让人自己挑，而不是一股脑全传。
+   * 一个目录里常混着 zip、图片、临时文件，传完才发现垃圾进库，还得逐个删。
+   */
+  function openUploadPicker(all) {
+    const items = collectCandidates(all);
+    if (!items.length) { uploadMsg('✗ 没有可上传的文件', 'err'); return; }
+    const usable = items.filter(function (x) { return x.supported && !x.oversize; });
+    if (!usable.length) {
+      uploadMsg('✗ 这 ' + items.length + ' 个文件都不支持上传（可在下方格式说明里确认）', 'err');
+      return;
+    }
+    pickState = { items: items, finished: false, done: 0, fail: 0 };
+    const total = items.length, bad = total - usable.length;
+    openModal({
+      title: '选择要上传的文件', wide: true,
+      okText: '上传所选（' + usable.length + '）',
+      body:
+        '<div class="pick-summary">' +
+          '<label class="pick-all"><input type="checkbox" id="pickAll" checked>全选</label>' +
+          '<span class="pick-count" id="pickCount"></span>' +
+          '<span class="pick-tip">取消勾选不需要的文件' + (bad ? '，' + bad + ' 个已自动排除' : '') + '</span>' +
+        '</div>' +
+        '<div class="pick-list" id="pickList">' + items.map(pickerRow).join('') + '</div>' +
+        '<div class="pick-bar" id="pickBar"><i></i></div>' +
+        '<div class="pick-done-tip" id="pickDone"></div>',
+      onOk: async function () {
+        if (pickState && pickState.finished) return true;  // 已传完，再点就是关闭
+        return await runPickedUpload();
+      }
+    });
+    const list = document.getElementById('pickList');
+    function refreshCount() {
+      const rows = Array.prototype.slice.call(list.querySelectorAll('.pick-row:not(.skip)'));
+      const on = rows.filter(function (r) { return r.querySelector('.pick-cb').checked; });
+      const bytes = on.reduce(function (s, r) {
+        return s + (pickState.items[Number(r.dataset.i)].size || 0);
+      }, 0);
+      document.getElementById('pickCount').textContent =
+        '已选 ' + on.length + ' / ' + rows.length + ' 个 · 合计 ' + fmtSize(bytes || 0);
+      const cb = document.getElementById('pickAll');
+      if (cb) {
+        cb.checked = rows.length > 0 && on.length === rows.length;
+        cb.indeterminate = on.length > 0 && on.length < rows.length;
+      }
+      const okBtn = document.querySelector('#appModal .btn-ok');
+      if (okBtn && pickState && !pickState.finished) {
+        okBtn.textContent = '上传所选（' + on.length + '）';
+        okBtn.disabled = on.length === 0;
+      }
+    }
+    list.addEventListener('change', function (e) {
+      if (e.target.classList.contains('pick-cb')) refreshCount();
+    });
+    document.getElementById('pickAll').addEventListener('change', function (e) {
+      list.querySelectorAll('.pick-row:not(.skip) .pick-cb').forEach(function (cb) { cb.checked = e.target.checked; });
+      refreshCount();
+    });
+    refreshCount();
+  }
+
+  /** 逐条上传并回写每行状态；返回 false 表示"不要关弹框" */
+  async function runPickedUpload() {
+    const list = document.getElementById('pickList');
+    if (!list || !pickState) return true;
+    const rows = Array.prototype.slice.call(list.querySelectorAll('.pick-row:not(.skip)'))
+      .filter(function (r) { return r.querySelector('.pick-cb').checked; });
+    if (!rows.length) { modalError('请至少勾选一个文件'); return false; }
+    clearModalError();
+    const okBtn = document.querySelector('#appModal .btn-ok');
+    const cancelBtn = document.querySelector('#appModal .btn-cancel');
+    if (okBtn) { okBtn.disabled = true; okBtn.textContent = '上传中…'; }
+    if (cancelBtn) cancelBtn.disabled = true;
+    list.querySelectorAll('.pick-cb').forEach(function (cb) { cb.disabled = true; });
+    const bar = document.getElementById('pickBar');
+    bar.classList.add('show');
+    let done = 0, fail = 0;
+    for (let k = 0; k < rows.length; k++) {
+      const row = rows[k];
+      const it = pickState.items[Number(row.dataset.i)];
+      const tag = row.querySelector('.pick-tag');
+      tag.className = 'pick-tag run'; tag.textContent = '解析中…';
+      row.style.background = '#f7faff';
+      if (it.dir) uploadMsg('正在解析 ' + it.name + '…');
       try {
-        const r = await fetch('/api/docs/upload', { method: 'POST', body: fd });
-        const j = await r.json();
-        if (!r.ok || j.chunks === undefined) throw new Error(j.message || ('上传失败（HTTP ' + r.status + '）'));
-        uploadMsg('[' + (i + 1) + '/' + valid.length + '] ✓ ' + f.name + '（' + j.chunks + ' 切片）');
+        const res = await ingestOne(it.file);
+        done++;
+        tag.className = 'pick-tag ok'; tag.textContent = '✓ ' + res.chunks + ' 片';
+        row.style.background = '';
+      } catch (e) {
+        fail++;
+        tag.className = 'pick-tag err'; tag.textContent = '✗ 失败';
+        row.title = it.name + '：' + e.message;
+        row.style.background = '#fff7f9';
+      }
+      bar.querySelector('i').style.width = Math.round(((k + 1) / rows.length) * 100) + '%';
+      if (it.dir) uploadMsg('[' + (k + 1) + '/' + rows.length + '] ' + it.name);
+    }
+    pickState.finished = true;
+    pickState.done = done; pickState.fail = fail;
+    const dt = document.getElementById('pickDone');
+    dt.className = 'pick-done-tip show';
+    dt.innerHTML = '✓ 完成：成功 <b>' + done + '</b> 个' + (fail ? '，失败 <b style="color:var(--danger)">' + fail + '</b> 个（鼠标悬停可看原因）' : '') +
+      '。文档已入库，现在可以提问了。';
+    if (okBtn) { okBtn.disabled = false; okBtn.textContent = '完成'; }
+    if (cancelBtn) cancelBtn.disabled = false;
+    toast('文档已入库' + (fail ? '（' + fail + ' 个失败）' : ''), fail ? 'err' : 'ok');
+    loadDocs();
+    return false;   // 保持弹框打开，让用户看到每个文件的结果
+  }
+
+  /** 单文件直接传（不多一步弹框，避免为了传一个文件还要点两次） */
+  async function uploadFiles(all) {
+    const items = collectCandidates(all);
+    const valid = items.filter(function (x) { return x.supported && !x.oversize; });
+    if (!valid.length) {
+      uploadMsg('✗ 没有支持的文档格式（共 ' + items.length + ' 个文件跳过）', 'err');
+      return;
+    }
+    const area = document.getElementById('uploadArea'); if (area) area.classList.add('open');
+    let ok = 0;
+    for (let i = 0; i < valid.length; i++) {
+      const f = valid[i].file;
+      uploadMsg('[' + (i + 1) + '/' + valid.length + '] 正在解析 ' + f.name + '…');
+      try {
+        const res = await ingestOne(f);
+        ok++;
+        uploadMsg('[' + (i + 1) + '/' + valid.length + '] ✓ ' + f.name + '（' + res.chunks + ' 切片，' + res.secs + ' 秒）');
       } catch (e) { uploadMsg('[' + (i + 1) + '/' + valid.length + '] ✗ ' + f.name + '：' + e.message, 'err'); }
     }
-    uploadMsg('✓ 批量上传处理完成，共 ' + valid.length + ' 个文件', 'ok');
+    uploadMsg('✓ 批量上传处理完成，共 ' + ok + ' 个文件', 'ok');
     toast('文档已入库', 'ok');
     loadDocs();
   }
 
   // 侧栏只保留上传入口，文档查看/删除统一在「知识库文档」页面完成
-  function loadDocs() { return Promise.resolve(); }
+  function loadDocs() {
+    // 不在这里拉文档清单：侧栏没有列表。上传完成后用事件通知各页面自行刷新
+    try { document.dispatchEvent(new CustomEvent('docs:updated')); } catch (e) {}
+    return Promise.resolve();
+  }
+
+  // ---------- 文档分片树状预览 ----------
+  // "为什么检索到这一段"是 RAG 最常被追问的问题，能点开每片原文比任何说明都直观。
+  // 层级只用缩进 + 引导线表达，不做折叠面板那种重控件。
+  async function showChunks(fileName) {
+    openModal({
+      title: '分片预览 · ' + fileName, wide: true, okText: '关闭', cancelText: '',
+      body: '<div class="chunk-empty">正在读取分片…</div>'
+    });
+    try {
+      const r = await fetch('/api/docs/chunks?fileName=' + encodeURIComponent(fileName));
+      const j = await r.json().catch(function () { return {}; });
+      if (!r.ok) throw new Error(j.message || ('读取失败（HTTP ' + r.status + '）'));
+      renderChunkTree(fileName, j.chunks || [], null, j.total, j.truncated);
+    } catch (e) {
+      renderChunkTree(fileName, [], e.message);
+    }
+  }
+  function renderChunkTree(fileName, chunks, err, totalCount, truncated) {
+    const box = document.querySelector('#appModal .modal-body');
+    if (!box) return;
+    if (err) { box.innerHTML = '<div class="chunk-empty">加载失败：' + esc(err) + '</div>'; return; }
+    if (!chunks || !chunks.length) { box.innerHTML = '<div class="chunk-empty">这份文档还没有可预览的分片</div>'; return; }
+    const total = chunks.reduce(function (s, c) { return s + String(c.content || '').length; }, 0);
+    const realTotal = totalCount || chunks.length;
+    box.innerHTML = '<div class="chunk-tree">' +
+      '<div class="chunk-root"><span class="cf-name" title="' + esc(fileName) + '">' + esc(fileName) + '</span>' +
+      '<span class="tag">共 ' + realTotal + ' 片</span><span class="tag off">已显示 ' + chunks.length + ' 片 · ' + total.toLocaleString('zh-CN') + ' 字</span>' +
+      '<button class="btn btn-sm chunk-all" style="margin-left:auto">全部展开</button></div>' +
+      (truncated ? '<div class="chunk-empty" style="padding:10px 14px">文档过大，仅显示前 ' + chunks.length + ' 片；检索仍覆盖全文。</div>' : '') +
+      chunks.map(function (c, k) {
+        const txt = String(c.content || '');
+        const open = k === 0;
+        const long = txt.length > 240;
+        return '<div class="chunk-item' + (open ? ' open' : '') + '">' +
+          '<div class="chunk-head">' +
+            '<span class="chunk-caret">' + (open ? '▾' : '▸') + '</span>' +
+            '<span class="chunk-no">第 ' + (Number(c.chunkIndex || 0) + 1) + ' 片</span>' +
+            '<span class="chunk-preview">' + esc(txt.slice(0, 90).replace(/\s+/g, ' ')) + '</span>' +
+            '<span class="chunk-len">' + txt.length + ' 字</span>' +
+          '</div>' +
+          '<div class="chunk-body">' + esc(txt) + '</div>' +
+          (long ? '<button type="button" class="chunk-more" data-len="' + txt.length + '">展开全文（' + txt.length + ' 字）</button>' : '') +
+          '</div>';
+      }).join('') + '</div>';
+    // 事件用 addEventListener 绑定而不是内联 onclick：这些函数在 IIFE 内部，挂不到 window 上
+    box.querySelectorAll('.chunk-head').forEach(function (h) {
+      h.onclick = function () {
+        const item = h.parentNode;
+        item.classList.toggle('open');
+        const c = item.querySelector('.chunk-caret');
+        if (c) c.textContent = item.classList.contains('open') ? '▾' : '▸';
+      };
+    });
+    const all = box.querySelector('.chunk-all');
+    if (all) all.onclick = function () {
+      const items = Array.prototype.slice.call(box.querySelectorAll('.chunk-item'));
+      const anyClosed = items.some(function (x) { return !x.classList.contains('open'); });
+      items.forEach(function (x) {
+        x.classList.toggle('open', anyClosed);
+        const c = x.querySelector('.chunk-caret');
+        if (c) c.textContent = anyClosed ? '▾' : '▸';
+      });
+      all.textContent = anyClosed ? '全部收起' : '全部展开';
+    };
+    box.querySelectorAll('.chunk-more').forEach(function (b) {
+      b.onclick = function (e) {
+        e.stopPropagation();          // 别把点击冒泡到 .chunk-head 去折叠整片
+        const item = b.parentNode;
+        const full = item.classList.toggle('full');
+        b.textContent = full ? '收起' : ('展开全文（' + b.dataset.len + ' 字）');
+      };
+    });
+  }
 
   // 递归遍历拖入的文件/目录条目（readEntries 每次最多返回 100 条，需循环读完）
   function walkEntry(entry, out) {
@@ -258,7 +583,7 @@
       dz.ondrop = e => {
         e.preventDefault(); dz.classList.remove('dragging');
         const items = e.dataTransfer.items;
-        // 拖的是文件夹：递归收集所有文件再批量入库
+        // 拖的是文件夹：递归收集所有文件，然后列清单让人挑（不直接全传）
         if (items && items.length && items[0] && items[0].webkitGetAsEntry) {
           const files = [];
           (async () => {
@@ -266,17 +591,20 @@
               const entry = item.webkitGetAsEntry();
               if (entry) await walkEntry(entry, files);
             }
-            if (files.length) uploadFiles(files);
+            if (files.length) openUploadPicker(files);
           })();
         } else {
-          uploadFiles(e.dataTransfer.files);
+          const fs = e.dataTransfer.files;
+          // 一次拖多个也走清单；只拖一个就直接传，省掉一次确认
+          if (fs && fs.length > 1) openUploadPicker(fs); else uploadFiles(fs);
         }
       };
     }
     const fi = document.getElementById('fileInput');
     if (fi) fi.onchange = e => { uploadFiles(e.target.files); e.target.value = ''; };
+    // 选文件夹：先列清单，用户勾掉不要的再传
     const folder = document.getElementById('folderInput');
-    if (folder) folder.onchange = e => { uploadFiles(e.target.files); e.target.value = ''; };
+    if (folder) folder.onchange = e => { openUploadPicker(e.target.files); e.target.value = ''; };
   }
 
   // ---------- 用户卡片 ----------
@@ -288,12 +616,22 @@
     const box = document.getElementById('sidebarUserBlock');
     if (!box) return;
     box.innerHTML =
-      '<a class="user-avatar" href="profile.html" title="个人中心">' + esc((name || '演').slice(0, 1).toUpperCase()) + '</a>' +
+      '<a class="user-avatar" href="profile.html" title="个人中心">' + avatar(name, 'md') + '</a>' +
       '<a class="user-meta" href="profile.html" title="个人中心">' +
         '<div class="user-name">' + esc(name) + '</div>' +
         '<div class="user-tenant">' + esc(tenantLabel(tenant)) + '</div></a>' +
       '<a class="user-icon-btn" href="settings.html" title="设置">' + svg('settings') + '</a>' +
-      '<button class="user-logout" title="退出登录" onclick="WrkAuth.logout()">⏻</button>';
+      '<button class="user-logout" title="退出登录" onclick="Shell.logout()">⏻</button>';
+  }
+
+  /** 退出登录：一步点了就走太容易误触（这个按钮紧挨着设置），必须二次确认 */
+  function confirmLogout() {
+    openModal({
+      title: '退出登录', danger: true, okText: '确认退出', cancelText: '取消',
+      body: '<p style="margin:0 0 8px">退出后需要重新输入账号密码才能继续使用。</p>' +
+        '<p style="margin:0;color:var(--muted);font-size:12px">未发送的草稿保存在当前浏览器，下次用同一账号登录仍可找回；会话记录已存到服务端，不会丢。</p>',
+      onOk: function () { if (global.WrkAuth) global.WrkAuth.logout(); }
+    });
   }
 
   // ---------- 侧栏 DOM（全站唯一模板）----------
@@ -317,7 +655,7 @@
     const aside = document.createElement('div');
     aside.innerHTML =
       '<aside class="sidebar">' +
-        '<div class="brand"><div class="brand-mark">水</div>' +
+        '<div class="brand"><div class="brand-mark has-logo"><img class="brand-logo" src="assets/logo.svg" alt="水利知识库"></div>' +
           '<div><div class="brand-title">水利知识库</div><div class="brand-sub">RAG 智能问答系统</div></div></div>' +
         '<div class="section-label" style="margin-top:0">工作台</div>' +
         '<nav class="nav-list">' + items + '</nav>' +
@@ -420,6 +758,22 @@
     t._timer = setTimeout(() => t.classList.remove('show'), 2600);
   }
 
+  // ---------- 弹框内的错误横幅 ----------
+  // 为什么不用 toast：弹框遮罩盖住大半屏时，右下角 toast 在矮屏/缩放下常被裁掉一半，
+  // 用户只看到"点了没反应"。错误必须贴着嘴边的出错位置出现，而且不会自己消失。
+  function modalError(msg) {
+    const el = document.getElementById('modalAlert');
+    if (!el) { toast(msg || '操作失败', 'err'); return; }
+    el.textContent = msg || '操作失败';
+    el.classList.add('show');
+    const box = el.closest ? el.closest('.modal-box') : null;
+    if (box) box.scrollTop = 0;
+  }
+  function clearModalError() {
+    const el = document.getElementById('modalAlert');
+    if (el) { el.classList.remove('show'); el.textContent = ''; }
+  }
+
   // ---------- 全局自定义弹框（替代浏览器原生 confirm/prompt） ----------
   let modalState = null;
   function closeModal() {
@@ -446,6 +800,7 @@
         '<div class="modal-head' + (opts.danger ? ' danger' : '') + '"><div class="modal-title">' +
           (opts.danger ? '<span style="margin-right:6px">⚠</span>' : '') + esc(opts.title || '提示') + '</div>' +
           '<button class="modal-close" title="关闭">×</button></div>' +
+        '<div class="modal-alert" id="modalAlert" role="alert"></div>' +
         '<div class="modal-body">' + (opts.body || '') + '</div>' +
         '<div class="modal-foot">' +
           '<button class="btn btn-cancel">' + esc(opts.cancelText || '取消') + '</button>' +
@@ -466,7 +821,7 @@
         keepOpen = (await opts.onOk(closeModal)) === false;
       } catch (e) {
         keepOpen = true;
-        if (global.appToast) global.appToast(e.message || '操作失败', 'err');
+        modalError(e && e.message ? e.message : '操作失败');
       }
       if (!keepOpen) closeModal();
     };
@@ -481,7 +836,7 @@
   const PAGE_NAV = {
     'settings.html': { label: '设置', back: 'index.html', backText: '返回问答' },
     'search.html': { label: '检索对比', parent: 'settings.html', parentLabel: '设置' },
-    'tree.html': { label: '问答分支', parent: 'settings.html', parentLabel: '设置' },
+    'tree.html': { label: '会话结构', parent: 'settings.html', parentLabel: '设置' },
     'models.html': { label: '模型配置', parent: 'settings.html', parentLabel: '设置' },
     'governance.html': { label: '权限与日志', parent: 'settings.html', parentLabel: '设置' },
     'profile.html': { label: '个人中心', back: 'index.html', backText: '返回问答' },
@@ -517,6 +872,8 @@
     checkHealth();
     renderAdminEntry();
     loadPermissions();
+    // 会话清单与权限并行拉取：先渲染本地缓存，网络回来后再合并
+    syncSessions();
     if (global.setInterval) setInterval(checkHealth, 30000);
   };
   global.appToast = toast;

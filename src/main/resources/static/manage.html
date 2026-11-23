@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>知识库文档管理 · 水利知识库</title>
+<link rel="icon" type="image/svg+xml" href="assets/logo.svg">
 <link rel="stylesheet" href="assets/app.css">
 <style>
   /* 上传卡片：左侧拖拽主区 + 右侧说明，状态条默认隐藏不占空白 */
@@ -143,7 +144,9 @@ function render(){
     const tr=document.createElement('tr');
     tr.innerHTML='<td class="doc-name" title="'+escapeHtml(d.fileName)+'">'+escapeHtml(d.fileName)+'</td>'+
       '<td><span class="tag">'+d.chunks+' 片</span></td><td>'+fmtTime(d.uploadedAt)+'</td>'+
-      '<td><button class="btn btn-sm btn-danger">删除</button></td>';
+      '<td><button class="btn btn-sm btn-chunks">查看分片</button>'+
+      '<button class="btn btn-sm btn-danger" style="margin-left:6px">删除</button></td>';
+    tr.querySelector('.btn-chunks').onclick=()=>Shell.showChunks(d.fileName);
     tr.querySelector('.btn-danger').onclick=()=>delDoc(d);
     tbody.appendChild(tr);
   });
@@ -195,9 +198,17 @@ const dz=document.getElementById('dropzone');
 dz.onclick=()=>document.getElementById('fileInput').click();
 dz.ondragover=e=>{e.preventDefault();dz.classList.add('dragging')};
 dz.ondragleave=e=>{e.preventDefault();dz.classList.remove('dragging')};
-dz.ondrop=e=>{e.preventDefault();dz.classList.remove('dragging');uploadFiles(e.dataTransfer.files)};
+dz.ondrop=e=>{
+  e.preventDefault();dz.classList.remove('dragging');
+  const fs=e.dataTransfer.files;
+  // 一次拖多份先列清单让人挑；只拖一份直接传
+  if(fs&&fs.length>1)Shell.openUploadPicker(fs);else uploadFiles(fs);
+};
 document.getElementById('fileInput').onchange=e=>{uploadFiles(e.target.files);e.target.value=''};
-document.getElementById('folderInput').onchange=e=>{uploadFiles(e.target.files);e.target.value=''};
+// 选文件夹：先列清单，勾掉不要的再传
+document.getElementById('folderInput').onchange=e=>{Shell.openUploadPicker(e.target.files);e.target.value=''};
+// 公共上传组件传完会广播 docs:updated，页面据此刷新清单
+document.addEventListener('docs:updated',loadDocs);
 
 initShell('manage');
 loadDocs();

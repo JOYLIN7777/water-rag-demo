@@ -1,5 +1,6 @@
 package com.joylin.waterkb.web;
 
+import com.joylin.waterkb.memory.ChatSessionStore;
 import com.joylin.waterkb.memory.ConversationTreeStore;
 import com.joylin.waterkb.rag.RagChatService;
 import com.joylin.waterkb.security.Permission;
@@ -13,7 +14,9 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.http.codec.ServerSentEvent;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -37,15 +40,18 @@ public class ChatController {
 
     private final RagChatService ragChatService;
     private final ConversationTreeStore treeStore;
+    private final ChatSessionStore sessionStore;
     private final WaterInfoTool waterInfoTool;
     private final ToolPermissionRegistry toolPermissions;
 
     public ChatController(RagChatService ragChatService,
                           ConversationTreeStore treeStore,
+                          ChatSessionStore sessionStore,
                           WaterInfoTool waterInfoTool,
                           ToolPermissionRegistry toolPermissions) {
         this.ragChatService = ragChatService;
         this.treeStore = treeStore;
+        this.sessionStore = sessionStore;
         this.waterInfoTool = waterInfoTool;
         this.toolPermissions = toolPermissions;
     }
@@ -115,6 +121,47 @@ public class ChatController {
     public Map<String, Object> clear(@RequestParam String sessionId) {
         treeStore.clear(sessionId);
         return Map.of("cleared", true, "sessionId", sessionId);
+    }
+
+    // ==================== 会话清单（永久存储） ====================
+    // 侧栏的会话列表以前只存在浏览器 localStorage，换设备/清缓存就全没了。
+    // 现在清单落 PostgreSQL，Redis 只负责消息内容：清缓存后清单还在、点开还能读回历史。
+
+    /** 当前账号的全部会话，按最近更新倒序 */
+    @GetMapping("/sessions")
+    public List<Map<String, Object>> sessions() {
+        return sessionStore.list();
+    }
+
+    /** 新建会话（幂等：同一个 sessionId 重复提交只刷新时间） */
+    @PostMapping("/sessions")
+    public Map<String, Object> createSession(@RequestBody Map<String, Object> body) {
+        String id = String.valueOf(body.getOrDefault("sessionId", "")).trim();
+        if (id.isEmpty()) throw new IllegalArgumentException("sessionId 不能为空");
+        String title = body.get("title") == null ? "" : String.valueOf(body.get("title"));
+        sessionStore.upsert(id, title);
+        return Map.of("ok", true, "sessionId", id);
+    }
+
+    /** 刷新会话：补标题（仅在原标题为空时生效）并更新时间戳 */
+    @PutMapping("/sessions/{sessionId}")
+    public Map<String, Object> touchSession(@PathVariable String sessionId,
+                                            @RequestBody(required = false) Map<String, Object> body) {
+        Object title = body == null ? null : body.get("title");
+        if (title == null || String.valueOf(title).isBlank()) {
+            sessionStore.upsert(sessionId, "");
+        } else {
+            sessionStore.rename(sessionId, String.valueOf(title));
+        }
+        return Map.of("ok", true, "sessionId", sessionId);
+    }
+
+    /** 删除会话：清单行与消息树一起删，避免"列表没了，内容还占着 Redis" */
+    @DeleteMapping("/sessions/{sessionId}")
+    public Map<String, Object> deleteSession(@PathVariable String sessionId) {
+        treeStore.clear(sessionId);
+        boolean removed = sessionStore.delete(sessionId);
+        return Map.of("ok", true, "sessionId", sessionId, "removed", removed);
     }
 
     /**

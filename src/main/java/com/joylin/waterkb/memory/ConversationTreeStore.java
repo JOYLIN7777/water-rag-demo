@@ -136,6 +136,13 @@ public class ConversationTreeStore {
 
     /** rewind：把 head 移到指定节点；节点必须存在，否则拒绝（防止指针悬空）。 */
     public boolean rewind(String sessionId, String nodeId) {
+        // 回退到会话开头：root 是虚拟节点、不存在于 Redis，直接删掉 head 指针即可。
+        // 删掉之后 append(null) 会挂到 root 下，等同于"从第一问重新问一次"。
+        if (ROOT.equals(nodeId)) {
+            redis.delete(key(HEAD, sessionId));
+            refreshTtl(sessionId);
+            return true;
+        }
         if (nodeId == null || !get(sessionId, nodeId).isPresent()) return false;
         redis.opsForValue().set(key(HEAD, sessionId), nodeId);
         refreshTtl(sessionId);
