@@ -120,6 +120,10 @@
   .pager input{width:46px;padding:4px 6px;font-size:12px;border:1px solid var(--line);border-radius:6px;text-align:center}
   /* 概览页卡片区限宽，避免超宽屏把卡片拉得过散（列表/表格页保持铺满） */
   [data-panel="overview"] .quick-cards,[data-panel="overview"] .stats{max-width:1500px}
+  /* 复选项网格：等宽列对齐，标签不折行（新增/编辑账号弹框） */
+  .check-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(132px,1fr));gap:9px 12px;padding-top:4px}
+  .check-grid label{display:inline-flex;align-items:center;gap:7px;font-size:12.5px;white-space:nowrap;margin:0;color:var(--ink-2);cursor:pointer}
+  .check-grid input[type=checkbox]{width:15px;height:15px;min-width:15px;padding:0;margin:0;flex:0 0 15px;accent-color:var(--primary);cursor:pointer}
 </style>
 </head>
 <body>
@@ -342,8 +346,8 @@
           <p class="page-desc">登录成功与失败的尝试都留有记录，失败原因可追溯。</p></div>
         <div class="card"><div class="card-head"><h3>登录记录</h3>
           <button class="btn btn-sm" onclick="loadLoginLogs()">刷新</button></div>
-          <div class="scroll" style="max-height:520px"><table class="data-table"><thead><tr><th>时间</th><th>账号</th><th>动作</th><th>状态</th><th>结果</th><th>来源IP</th></tr></thead>
-            <tbody id="lList"><tr><td colspan="6" class="empty">加载中…</td></tr></tbody></table></div>
+          <div class="scroll" style="max-height:520px"><table class="data-table"><thead><tr><th>时间</th><th>账号</th><th>操作</th><th>状态</th><th>结果</th><th>耗时</th><th>来源 IP</th></tr></thead>
+            <tbody id="lList"><tr><td colspan="7" class="empty">加载中…</td></tr></tbody></table></div>
         </div>
       </section>
 
@@ -355,6 +359,23 @@
           <button class="btn btn-sm" onclick="loadAudit()">刷新</button></div>
           <div class="scroll" style="max-height:520px"><table class="data-table"><thead><tr><th>时间</th><th>账号</th><th>动作</th><th>状态</th><th>耗时</th><th>结果</th></tr></thead>
             <tbody id="aList"><tr><td colspan="6" class="empty">加载中…</td></tr></tbody></table></div>
+        </div>
+      </section>
+
+      <!-- 个人中心：后台内的账号信息与权限范围（不跳转问答系统） -->
+      <section class="admin-panel" data-panel="profile">
+        <div class="page-head"><h1 class="page-title">个人中心</h1>
+          <p class="page-desc">当前登录账号的信息与权限范围，可在此核对自己的操作权限。</p></div>
+        <div class="grid" style="grid-template-columns:minmax(300px,400px) 1fr;align-items:start">
+          <div class="card" style="margin-bottom:0">
+            <div class="card-head"><h3>账号信息</h3>
+              <button class="btn btn-sm" onclick="WrkAuth.logout()">退出登录</button></div>
+            <div id="profileInfo"></div>
+          </div>
+          <div class="card" style="margin-bottom:0">
+            <div class="card-head"><h3>我的权限 <span class="tag" id="profilePermCount">0 项</span></h3></div>
+            <div class="perm-grid2" id="profilePerms"></div>
+          </div>
         </div>
       </section>
     </div>
@@ -391,9 +412,10 @@ async function guard(){
     if(!p.admin&&!(p.permissions||[]).includes('admin:access')){$('denyBox').style.display='block';return false}
     $('adminRoot').style.display='flex';
     const u=WrkAuth.getUser()||{};
+    // 头像/名称进入后台自己的个人中心（后台相对独立，不跳问答系统页面）
     $('adminUserBlock').innerHTML=
-      '<a class="user-avatar" href="profile.html" title="个人中心">'+esc((u.displayName||u.user||'管').slice(0,1))+'</a>'+
-      '<a class="user-meta" href="profile.html"><div class="user-name">'+esc(u.displayName||u.user)+'</div>'+
+      '<a class="user-avatar" href="javascript:void(0)" onclick="openProfile()" title="个人中心">'+esc((u.displayName||u.user||'管').slice(0,1))+'</a>'+
+      '<a class="user-meta" href="javascript:void(0)" onclick="openProfile()"><div class="user-name">'+esc(u.displayName||u.user)+'</div>'+
       '<div class="user-tenant">'+esc(tl(u.tenant))+'</div></a>'+
       '<button class="user-logout" title="退出登录" onclick="WrkAuth.logout()">⏻</button>';
     DB.allPerms=p.allPermissions||[];
@@ -572,17 +594,22 @@ async function apiWrite(path,opts){
 }
 function groupChecks(selected){
   const opts=[['admin','系统管理员'],['analyst','水利分析员'],['viewer','只读用户'],['water-dept','水利业务组'],['ops','运维人员']];
-  return opts.map(([v,l])=>'<label style="display:inline-flex;align-items:center;gap:5px;margin:0 14px 6px 0;font-size:12.5px">'+
-    '<input type="checkbox" name="ug" value="'+v+'"'+((selected||[]).includes(v)?' checked':'')+'>'+l+'</label>').join('');
+  return '<div class="check-grid">'+opts.map(([v,l])=>'<label>'+
+    '<input type="checkbox" name="ug" value="'+v+'"'+((selected||[]).includes(v)?' checked':'')+'>'+
+    '<span>'+l+'</span></label>').join('')+'</div>';
 }
 function userForm(u){
   const v=k=>esc(u?u[k]:'');
+  // 所属空间用中文下拉：值为空间标识（代码用），显示为空间名称
+  const tenants=[...new Set([...(DB.users||[]).map(x=>x.tenant||'default'),'default'])];
+  const cur=u?u.tenant:'default';
+  const tenantOpts=tenants.map(t=>'<option value="'+esc(t)+'"'+(t===cur?' selected':'')+'>'+esc(tl(t))+'</option>').join('');
   return '<div class="field"><label for="fUsername">登录账号</label>'+
       '<input id="fUsername" value="'+v('username')+'"'+(u?' disabled':'')+' placeholder="英文字母或数字"></div>'+
     '<div class="field"><label for="fDisplay">显示名称</label><input id="fDisplay" value="'+v('displayName')+'" placeholder="例如：张工"></div>'+
-    '<div class="field"><label for="fTenant">所属空间</label><input id="fTenant" value="'+(u?v('tenant'):'default')+'"></div>'+
+    '<div class="field"><label for="fTenant">所属空间</label><select id="fTenant">'+tenantOpts+'</select></div>'+
     (u?'':'<div class="field"><label for="fPwd">初始密码</label><input id="fPwd" type="password" placeholder="至少 8 位"></div>')+
-    '<div class="field"><label>角色 / 用户组</label><div style="padding-top:4px">'+groupChecks(u?u.groups:['viewer'])+'</div></div>'+
+    '<div class="field"><label>角色 / 用户组</label>'+groupChecks(u?u.groups:['viewer'])+'</div>'+
     (u?'<div class="field"><label style="display:inline-flex;align-items:center;gap:8px"><input id="fEnabled" type="checkbox"'+(u.enabled?' checked':'')+'>账号正常</label></div>':'');
 }
 function readUserForm(u){
@@ -942,7 +969,7 @@ async function loadOverview(){
     cards[2].textContent=DB.users.length;cards[3].textContent=health.healthy?'正常':'异常';
     const audit=await api('/api/audit/logs?limit=6');
     $('ovAudit').innerHTML=(audit.logs||[]).map(l=>
-      '<tr><td>'+esc(String(l.ts||'').slice(5,19))+'</td><td>'+esc(l.user_id)+'</td><td>'+esc(l.action)+'</td>'+
+      '<tr><td>'+tsLocal(l.ts)+'</td><td>'+esc(l.user_id)+'</td><td>'+esc(actionCn(l.action))+'</td>'+
       '<td>'+statusTag(l.status)+'</td><td>'+esc(l.duration_ms||l.duration||'—')+'</td></tr>').join('')||
       '<tr><td colspan="5" class="empty">暂无记录</td></tr>';
   }catch(e){console.error(e)}
@@ -994,15 +1021,41 @@ function delDoc(name){
     }});
 }
 
+// 后端时间戳为 UTC，界面统一转本地时间显示（MM-DD HH:mm:ss）
+function tsLocal(ts){
+  if(!ts)return '—';
+  const d=new Date(ts);
+  if(isNaN(d.getTime()))return String(ts).slice(5,19);
+  const p=n=>String(n).padStart(2,'0');
+  return p(d.getMonth()+1)+'-'+p(d.getDate())+' '+p(d.getHours())+':'+p(d.getMinutes())+':'+p(d.getSeconds());
+}
+
 async function loadLoginLogs(){
   try{
     const list=await api('/api/admin/login-logs?limit=200');
     $('lList').innerHTML=list.map(l=>
-      '<tr><td>'+esc(String(l.ts||'').slice(5,19))+'</td><td class="name">'+esc(l.user_id)+'</td>'+
-      '<td>'+esc(l.action)+'</td><td>'+statusTag(l.status)+'</td><td>'+esc(l.detail||l.result||'')+'</td>'+
-      '<td>'+esc(l.ip||'')+'</td></tr>'
-    ).join('')||'<tr><td colspan="6" class="empty">暂无登录记录</td></tr>';
-  }catch(e){$('lList').innerHTML='<tr><td colspan="6" class="empty">加载失败：'+esc(e.message)+'</td></tr>'}
+      '<tr><td>'+tsLocal(l.ts)+'</td><td class="name">'+esc(l.user_id)+'</td>'+
+      '<td>'+esc(actionCn(l.action))+'</td><td>'+statusTag(l.status)+'</td>'+
+      '<td>'+resultCn(l.result,l.status)+'</td>'+
+      '<td>'+(l.duration_ms!=null?esc(l.duration_ms)+' ms':'—')+'</td>'+
+      '<td class="mono" style="font-size:11.5px;display:table-cell">'+esc(l.ip||'—')+'</td></tr>'
+    ).join('')||'<tr><td colspan="7" class="empty">暂无登录记录</td></tr>';
+  }catch(e){$('lList').innerHTML='<tr><td colspan="7" class="empty">加载失败：'+esc(e.message)+'</td></tr>'}
+}
+
+// 后端记录的是接口路径与英文结果码，界面统一转中文
+const ACTION_CN={'/api/auth/login':'账号登录','/api/auth/refresh':'令牌刷新'};
+function actionCn(a){
+  const s=String(a||'');
+  for(const k in ACTION_CN){if(s.endsWith(k))return ACTION_CN[k]}
+  return '其他操作';
+}
+const RESULT_CN={SUCCESS:'成功',OK:'成功',DENIED:'已拒绝',ERROR:'异常',FAIL:'失败',FAILED:'失败'};
+function resultCn(r,status){
+  const key=String(r||'').toUpperCase();
+  if(RESULT_CN[key])return RESULT_CN[key];
+  if(Number(status)>=400)return '失败';
+  return '—';
 }
 
 async function loadModelsInfo(){
@@ -1088,15 +1141,43 @@ async function loadAudit(){
   try{
     const j=await api('/api/audit/logs?limit=200');
     $('aList').innerHTML=(j.logs||[]).map(l=>
-      '<tr><td>'+esc(String(l.ts||'').slice(5,19))+'</td><td>'+esc(l.user_id)+'</td><td>'+esc(l.action)+'</td>'+
-      '<td>'+statusTag(l.status)+'</td><td>'+esc(l.duration_ms||l.duration||'—')+'</td><td>'+esc(l.result||'')+'</td></tr>'
+      '<tr><td>'+tsLocal(l.ts)+'</td><td>'+esc(l.user_id)+'</td><td>'+esc(l.action)+'</td>'+
+      '<td>'+statusTag(l.status)+'</td><td>'+esc(l.duration_ms||l.duration||'—')+'</td><td>'+esc(resultCn(l.result,l.status))+'</td></tr>'
     ).join('')||'<tr><td colspan="6" class="empty">暂无记录</td></tr>';
   }catch(e){console.error(e)}
 }
 
 const TITLES={overview:'概览',users:'用户管理',org:'组织架构',roles:'角色定义',perms:'菜单权限',
-  docs:'文档管理',models:'模型设置',usage:'用量统计',loginlogs:'登录日志',audit:'操作日志'};
-function goPanel(key){const b=document.querySelector('.admin-nav-item[data-panel="'+key+'"]');if(b)b.click()}
+  docs:'文档管理',models:'模型设置',usage:'用量统计',loginlogs:'登录日志',audit:'操作日志',profile:'个人中心'};
+// 切面板：优先点侧栏导航项；个人中心等无导航入口的面板直接切换并取消导航高亮
+function goPanel(key){
+  const b=document.querySelector('.admin-nav-item[data-panel="'+key+'"]');
+  if(b){b.click();return}
+  document.querySelectorAll('.admin-nav-item[data-panel]').forEach(x=>x.classList.remove('active'));
+  document.querySelectorAll('.admin-panel').forEach(p=>p.classList.toggle('active',p.dataset.panel===key));
+  $('panelTitle').textContent=TITLES[key]||'管理后台';
+}
+
+// 后台个人中心：账号信息 + 我的权限（复用权限目录的中文说明）
+function openProfile(){
+  const u=WrkAuth.getUser()||{};
+  const acc=(DB.users||[]).find(x=>x.username===String(u.user||'').toLowerCase());
+  $('profileInfo').innerHTML='<table class="kv-table"><tbody>'+
+    '<tr><td>登录账号</td><td>'+esc(u.user||'')+'</td></tr>'+
+    '<tr><td>显示名称</td><td>'+esc(u.displayName||u.user||'')+'</td></tr>'+
+    '<tr><td>所属空间</td><td>'+esc(tl((acc&&acc.tenant)||u.tenant||'default'))+'</td></tr>'+
+    '<tr><td>角色 / 用户组</td><td>'+roleTags((acc&&acc.groups)||u.groups||[])+'</td></tr>'+
+    '<tr><td>账号状态</td><td>'+(acc&&acc.enabled===false?'<span class="tag off">已停用</span>':'<span class="tag ok">正常</span>')+'</td></tr>'+
+    '<tr><td>权限数量</td><td>'+(DB.myPerms||[]).length+' 项</td></tr>'+
+    '</tbody></table>';
+  $('profilePermCount').textContent=(DB.myPerms||[]).length+' 项';
+  $('profilePerms').innerHTML=(DB.myPerms||[]).map(p=>
+    '<div class="perm-pill"><b>'+esc(p)+'</b>'+esc(permDesc(p))+'</div>').join('')||'<div class="empty-inline">暂无权限</div>';
+  // 个人中心无侧栏入口：直接切换面板并取消导航高亮
+  document.querySelectorAll('.admin-nav-item[data-panel]').forEach(x=>x.classList.remove('active'));
+  document.querySelectorAll('.admin-panel').forEach(p=>p.classList.toggle('active',p.dataset.panel==='profile'));
+  $('panelTitle').textContent=TITLES.profile;
+}
 document.querySelectorAll('.admin-nav-item[data-panel]').forEach(btn=>{
   btn.onclick=()=>{
     const key=btn.dataset.panel;
