@@ -124,6 +124,13 @@
   .check-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(132px,1fr));gap:9px 12px;padding-top:4px}
   .check-grid label{display:inline-flex;align-items:center;gap:7px;font-size:12.5px;white-space:nowrap;margin:0;color:var(--ink-2);cursor:pointer}
   .check-grid input[type=checkbox]{width:15px;height:15px;min-width:15px;padding:0;margin:0;flex:0 0 15px;accent-color:var(--primary);cursor:pointer}
+  /* 重置码是一次性凭证：字号要大到能当着用户面核对/口述，等宽字体防 0/O、1/l 混淆 */
+  .reset-code{font-family:ui-monospace,Consolas,monospace;font-size:26px;font-weight:700;letter-spacing:6px;
+    text-align:center;color:#25469b;background:#f4f8ff;border:1px dashed #b9cbff;border-radius:10px;padding:16px 10px}
+  .rs-sub{font-size:11px;color:var(--muted);margin-top:3px;font-weight:400}
+  /* 侧栏待办角标 */
+  .admin-nav-item .nav-count{margin-left:auto;background:#e0245e;color:#fff;border-radius:9px;
+    font-size:10px;font-weight:700;padding:1px 6px;line-height:1.5}
 </style>
 </head>
 <body>
@@ -154,7 +161,7 @@
     <header class="topbar">
       <div class="topbar-left"><div class="brand-crumb"><span>管理后台</span><span class="sep">/</span><span id="panelTitle">概览</span></div>
         <span class="topbar-sub">仅管理员可见</span></div>
-      <span class="status-pill" data-status-pill><span class="status-dot"></span>检测中…</span>
+
     </header>
 
     <div class="page">
@@ -192,6 +199,14 @@
       <section class="admin-panel" data-panel="users">
         <div class="page-head"><h1 class="page-title">用户管理</h1>
           <p class="page-desc">按角色或空间筛选账号，支持新增、编辑、启停、重置密码与删除。</p></div>
+        <!-- 忘记密码流程的管理侧：用户提交申请后在这里核身发码 -->
+        <div class="card" id="resetCard" style="display:none;margin-bottom:14px">
+          <div class="card-head"><h3>密码重置申请 <span class="tag warn" id="resetPending">0</span></h3>
+            <button class="btn btn-sm" onclick="loadPasswordResets()">刷新</button></div>
+          <div class="scroll"><table class="data-table">
+            <thead><tr><th>账号</th><th>申请时间</th><th>来源 IP</th><th>状态</th><th>操作</th></tr></thead>
+            <tbody id="resetTable"></tbody></table></div>
+        </div>
         <div class="filter-bar">
           <div class="filter-item"><label for="uKw">关键字</label>
             <input id="uKw" type="text" placeholder="请输入账号 / 显示名"></div>
@@ -437,6 +452,63 @@ async function loadUsersData(){
     const cards=document.querySelectorAll('#ovStats .stat-num');
     if(cards[2])cards[2].textContent=DB.users.length;
   }catch(e){$('uTable').innerHTML='<tr><td colspan="7" class="empty">加载失败：'+esc(e.message)+'</td></tr>'}
+  loadPasswordResets();
+}
+
+// ---------- 密码重置申请（忘记密码流程的管理侧） ----------
+// 用户在校外/未登录状态下提交申请，管理员在这里核身：批准即生成一次性重置码，
+// 码只存哈希，明文只出现在批准的那一次弹框里，管理员不经手用户的新密码。
+let RESET_ROWS=[];
+async function loadPasswordResets(){
+  try{
+    const rows=await api('/api/admin/password-resets');
+    RESET_ROWS=Array.isArray(rows)?rows:[];
+  }catch(e){RESET_ROWS=[]}
+  renderPasswordResets();
+}
+function renderPasswordResets(){
+  const card=$('resetCard');if(!card)return;
+  const pend=RESET_ROWS.filter(x=>x.status==='PENDING').length;
+  $('resetPending').textContent=pend;
+  // 侧栏「用户管理」挂待办角标：不然管理员不进这个面板就永远不知道有人申请重置
+  const nav=document.querySelector('.admin-nav-item[data-panel="users"]');
+  if(nav){
+    let badge=nav.querySelector('.nav-count');
+    if(pend){
+      if(!badge){badge=document.createElement('span');badge.className='nav-count';nav.appendChild(badge)}
+      badge.textContent=pend;
+    }else if(badge)badge.remove();
+  }
+  if(!RESET_ROWS.length){card.style.display='none';return}
+  card.style.display='';
+  $('resetTable').innerHTML=RESET_ROWS.map(x=>{
+    const pending=x.status==='PENDING';
+    const st=pending?'<span class="tag warn">待审批</span>':'<span class="tag info">已发码 · 待使用</span>';
+    const exp=!pending&&x.expiresAt?'<div class="rs-sub">'+tsLocal(x.expiresAt)+' 前有效</div>':'';
+    const ops=pending
+      ?'<button class="btn btn-sm btn-primary" onclick="approveReset('+x.id+')">批准并发码</button> '+
+       '<button class="btn btn-sm" onclick="rejectReset('+x.id+')">驳回</button>'
+      :'<span class="rs-sub">由 '+esc(x.approvedBy||'—')+' 发放</span>';
+    return '<tr><td class="name">'+esc(x.username)+'</td><td>'+tsLocal(x.requestedAt)+'</td>'+
+      '<td class="mono">'+esc(x.requestIp||'—')+'</td><td>'+st+exp+'</td><td>'+ops+'</td></tr>';
+  }).join('');
+}
+async function approveReset(id){
+  try{
+    const j=await apiWrite('/api/admin/password-resets/'+id+'/approve',{method:'POST'});
+    Shell.modal({title:'重置码已生成',okText:'知道了',cancelText:'关闭',
+      body:'<p style="margin:0 0 12px">请通过可靠渠道告知本人：<b>30 分钟内有效，用一次即作废</b>。</p>'+
+        '<div class="reset-code">'+esc(j.code)+'</div>'+
+        '<p class="hint" style="margin:12px 0 0">系统只保存重置码的哈希，关闭本弹框后无法再次查看。'+
+        '若已丢失，可让用户重新提交申请，或直接在账号列表里为他重置密码。</p>'});
+    loadPasswordResets();
+  }catch(e){appToast(e.message,'err')}
+}
+async function rejectReset(id){
+  try{
+    await apiWrite('/api/admin/password-resets/'+id+'/reject',{method:'POST'});
+    appToast('已驳回该申请','ok');loadPasswordResets();
+  }catch(e){appToast(e.message,'err')}
 }
 
 function roleTags(groups){return (groups||[]).map(g=>'<span class="tag-role '+esc(g)+'">'+esc(gl(g))+'</span>').join('')||'—'}
@@ -610,7 +682,7 @@ function userForm(u){
     '<div class="field"><label for="fTenant">所属空间</label><select id="fTenant">'+tenantOpts+'</select></div>'+
     (u?'':'<div class="field"><label for="fPwd">初始密码</label><input id="fPwd" type="password" placeholder="至少 8 位"></div>')+
     '<div class="field"><label>角色 / 用户组</label>'+groupChecks(u?u.groups:['viewer'])+'</div>'+
-    (u?'<div class="field"><label style="display:inline-flex;align-items:center;gap:8px"><input id="fEnabled" type="checkbox"'+(u.enabled?' checked':'')+'>账号正常</label></div>':'');
+    (u?'<div class="field"><label class="field-check"><input id="fEnabled" type="checkbox"'+(u.enabled?' checked':'')+'>账号正常</label></div>':'');
 }
 function readUserForm(u){
   return {
@@ -1084,7 +1156,7 @@ function modelForm(m){
     '<div class="field"><label for="mfUrl">接口地址</label><input id="mfUrl" value="'+v('baseUrl')+'" placeholder="https://..."></div>'+
     '<div class="field"><label for="mfKey">API Key</label><input id="mfKey" type="password" value="" placeholder="'+(m?'留空表示保持原值':'首次配置必填')+'"></div>'+
     '<div class="field"><label for="mfDim">向量维度（检索模型必填）</label><input id="mfDim" type="number" value="'+(m&&m.dimensions?m.dimensions:'')+'"></div>'+
-    '<div class="field"><label style="display:inline-flex;align-items:center;gap:8px"><input id="mfEnabled" type="checkbox"'+(!m||m.enabled?' checked':'')+'>启用此配置</label></div>';
+    '<div class="field"><label class="field-check"><input id="mfEnabled" type="checkbox"'+(!m||m.enabled?' checked':'')+'>启用此配置</label></div>';
 }
 function editModel(i){
   const m=i==null?null:($('mTable')._rows||[])[i];

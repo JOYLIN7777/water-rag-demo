@@ -1,6 +1,7 @@
 package com.joylin.waterkb.web;
 
 import com.joylin.waterkb.audit.AuditService;
+import com.joylin.waterkb.security.PasswordResetService;
 import com.joylin.waterkb.security.PermissionCatalog;
 import com.joylin.waterkb.security.Permission;
 import com.joylin.waterkb.security.RequirePermission;
@@ -39,13 +40,16 @@ public class AdminController {
     private final RolePermissions rolePermissions;
     private final PermissionCatalog permCatalog;
     private final AuditService audit;
+    private final PasswordResetService passwordReset;
 
     public AdminController(UserStore users, RolePermissions rolePermissions,
-                           PermissionCatalog permCatalog, AuditService audit) {
+                           PermissionCatalog permCatalog, AuditService audit,
+                           PasswordResetService passwordReset) {
         this.users = users;
         this.rolePermissions = rolePermissions;
         this.permCatalog = permCatalog;
         this.audit = audit;
+        this.passwordReset = passwordReset;
     }
 
     /** 用户列表：只返回可展示字段，绝不带出密码哈希 */
@@ -116,6 +120,29 @@ public class AdminController {
             throw new IllegalArgumentException("账号不存在，或新密码不足 8 位");
         }
         return Map.of("message", "密码已重置", "username", name);
+    }
+
+    // ---------- 密码重置申请（忘记密码流程的管理侧） ----------
+
+    /** 待处理的密码重置申请：待审批 + 已发码未使用（后者便于回答"码给了怎么没用"） */
+    @GetMapping("/password-resets")
+    public List<Map<String, Object>> passwordResets() {
+        return passwordReset.list();
+    }
+
+    /** 批准申请：生成一次性重置码并返回明文（仅此一次），由管理员通过可靠渠道告知本人 */
+    @PostMapping("/password-resets/{id}/approve")
+    public Map<String, Object> approvePasswordReset(@PathVariable long id) {
+        String code = passwordReset.approve(id, UserContext.get().userId());
+        return Map.of("code", code, "ttlMinutes", 30,
+                "message", "重置码已生成，请通过可靠渠道告知本人：30 分钟内有效，用一次即作废");
+    }
+
+    /** 驳回申请 */
+    @PostMapping("/password-resets/{id}/reject")
+    public Map<String, Object> rejectPasswordReset(@PathVariable long id) {
+        passwordReset.reject(id, UserContext.get().userId());
+        return Map.of("message", "已驳回该申请");
     }
 
     private boolean isLastAdmin(String candidate) {

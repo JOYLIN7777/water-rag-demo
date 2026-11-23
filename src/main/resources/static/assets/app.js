@@ -81,6 +81,10 @@
     groupLabel: groupLabel,
     tenantLabel: tenantLabel,
     hasPermission: hasPermission,
+    /** 诊断用：确认会话切换钩子是否真的绑上了（前端行为异常时先查这里） */
+    handlerBound: function () { return typeof sessionChangeHandler === 'function'; },
+    /** 供页面主动清理：删除会话时统一走这里，保证缓存/后端历史/首页副本一起清 */
+    purgeSession: purgeSession,
     modal: openModal,
     closeModal: closeModal
   };
@@ -102,18 +106,41 @@
       location.href = 'index.html?new=1';
     }
   }
+  /**
+   * 彻底删掉一个会话：本地消息缓存 + 后端历史树 + 首页内存副本，三处一起清。
+   *
+   * <p>只删 localStorage 里的会话列表是不够的：首页在内存里还留着一份 sessions 副本，
+   * 下一次发消息调 saveSessions() 会把整份旧列表写回去，被删的会话就"自己回来了"。
+   * 这是之前那个 bug 的真正原因。</p>
+   */
+  function purgeSession(id) {
+    try {
+      const a = global.WrkAuth;
+      const scope = a && a.scope ? a.scope() : 'demo';
+      global.localStorage.removeItem('water-rag-msgs:' + scope + ':' + id);
+    } catch (e) { /* 缓存清不掉不影响主流程 */ }
+    // 会话列表在本地、问答历史在服务端；不删后端会一直留在库里占空间
+    try { fetch('/api/chat/history?sessionId=' + encodeURIComponent(id), { method: 'DELETE' }); } catch (e) {}
+    // 通知首页同步它内存里的那份副本（只有首页注册了钩子）。
+    // 参数顺序：第一个永远是会话 id，第二个才是动作类型——与其它调用点保持一致，
+    // 反过来传会让首页把 '__delete__' 当成会话 id 去切换，删了等于没删。
+    if (typeof sessionChangeHandler === 'function') sessionChangeHandler(id, '__delete__');
+  }
+
   function removeSession(id, ev) {
     ev.stopPropagation();
     openModal({ title: '删除会话', danger: true, okText: '确认删除',
-      body: '<p style="margin:0">删除后本地不再显示该会话，确定继续吗？</p>',
+      body: '<p style="margin:0">删除后该会话的问答记录与本地缓存都会清除，无法恢复，确定继续吗？</p>',
       onOk: function (close) {
-        let list = loadSessions().filter(s => s.id !== id);
+        const list = loadSessions().filter(s => s.id !== id);
         saveSessions(list);
+        purgeSession(id);
         close();
-        if (currentSessionId === id) {
-          if (list.length) pickSession(list[0].id);
-          else newSession();
-        } else renderSessions();
+        // 首页由它自己的钩子切换视图；其它页面（检索对比/分支页）没有钩子，这里跳转
+        if (typeof sessionChangeHandler !== 'function' && currentSessionId === id) {
+          if (list.length) pickSession(list[0].id); else newSession();
+        }
+        renderSessions();
       }
     });
   }
@@ -310,6 +337,7 @@
           '</div>' +
         '</div>' +
         '<div class="user-block" id="sidebarUserBlock"></div>' +
+        '<div class="sidebar-health" data-status-pill><span class="status-dot"></span>检测中…</div>' +
         '<div class="sidebar-footer">水利知识库 · 让知识更好用</div>' +
       '</aside>';
     host.insertBefore(aside.firstElementChild, host.firstChild);
@@ -362,9 +390,25 @@
     try { const j = await (await fetch('/api/search/health')).json(); healthy = !!j.healthy; }
     catch (e) { healthy = false; }
     pills.forEach(p => {
-      p.className = 'status-pill' + (healthy ? '' : ' off');
+      // 记住元素自己的基础类（顶栏胶囊 status-pill / 侧栏状态条 sidebar-health），
+      // 只叠加 off。整体重置 className 会把侧栏那条改成顶栏胶囊样式。
+      if (!p.dataset.baseClass) {
+        p.dataset.baseClass = (p.className || 'status-pill').replace(/\boff\b/g, '').trim() || 'status-pill';
+      }
+      p.className = p.dataset.baseClass + (healthy ? '' : ' off');
       p.innerHTML = '<span class="status-dot"></span>' + (healthy ? '服务正常' : '服务不可用');
     });
+  }
+
+  /** 管理后台是独立布局（.admin-sidebar），不走 renderSidebar，单独把状态条塞进侧栏底部 */
+  function injectAdminHealth() {
+    const back = document.querySelector('.admin-sidebar .admin-back');
+    if (!back || document.querySelector('.admin-sidebar .sidebar-health')) return;
+    const el = document.createElement('div');
+    el.className = 'sidebar-health';
+    el.setAttribute('data-status-pill', '');
+    el.innerHTML = '<span class="status-dot"></span>检测中…';
+    back.parentNode.insertBefore(el, back);
   }
 
   function toast(msg, type) {
@@ -469,6 +513,7 @@
     if (global.WrkAuth && !global.WrkAuth.guardPage()) return;
     renderSidebar(active);
     renderTopbarNav();
+    injectAdminHealth();
     checkHealth();
     renderAdminEntry();
     loadPermissions();

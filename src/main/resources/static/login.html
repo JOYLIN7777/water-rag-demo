@@ -44,7 +44,7 @@
   .row-between{display:flex;align-items:center;justify-content:space-between;margin-bottom:22px}
   .checkbox{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--ink-2);cursor:pointer;user-select:none}
   .checkbox input{width:15px;height:15px;accent-color:var(--primary);cursor:pointer}
-  .link{font-size:12px;color:var(--primary);cursor:pointer}
+  .link{font-size:12px;color:var(--primary);cursor:pointer;text-decoration:none}
   .link:hover{text-decoration:underline}
   .login-btn{width:100%;padding:12px;border:0;border-radius:9px;background:linear-gradient(135deg,var(--primary-hi),var(--primary));
        color:#fff;font-size:14px;font-weight:650;letter-spacing:.5px;box-shadow:0 6px 16px rgba(59,110,245,.32);
@@ -106,7 +106,7 @@
       </div>
       <div class="row-between">
         <label class="checkbox"><input type="checkbox" id="remember">记住用户名</label>
-        <span class="link" id="forgotLink" title="联系管理员重置密码">忘记密码？</span>
+        <a class="link" href="forgot.html" title="通过管理员审批重置密码">忘记密码？</a>
       </div>
       <button class="login-btn" type="submit" id="loginBtn">登 录</button>
     </form>
@@ -135,9 +135,6 @@ try{
 document.getElementById('pwEye').onclick=function(){
   var p=document.getElementById('password');
   var show=p.type==='password';p.type=show?'text':'password';this.textContent=show?'隐藏':'显示';
-};
-document.getElementById('forgotLink').onclick=function(){
-  alert('请联系系统管理员，在管理后台的「用户管理」中为您重置密码。');
 };
 function showErr(msg){
   var b=document.getElementById('errBox');b.textContent=msg;b.classList.add('show');

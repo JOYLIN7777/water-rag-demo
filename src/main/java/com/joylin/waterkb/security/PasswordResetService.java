@@ -1,0 +1,222 @@
+package com.joylin.waterkb.security;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.stereotype.Service;
+
+import jakarta.annotation.PostConstruct;
+import java.security.SecureRandom;
+import java.sql.Timestamp;
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+
+/**
+ * 忘记密码：用户提交申请 → 管理员核身批准并发放一次性重置码 → 用户凭码自助设置新密码。
+ *
+ * <p>为什么不直接做"输账号就能改密码"的自助重置：本系统没有邮件/短信通道，
+ * 无验证的自助重置等于把账号交出去。企业内网的通行做法是走审批：管理员核身后
+ * 发一个一次性重置码（30 分钟有效、用一次即废、连续错 5 次作废），用户自己设新密码。
+ * 关键是<b>管理员全程不经手明文密码</b>，只经手一个短期凭证，且全程留痕。</p>
+ *
+ * <p>重置码只存 PBKDF2 哈希（与登录密码同一套 {@link PasswordHasher}），
+ * 库被读走也拿不到可用的码；明文只在批准的那一次响应里返回给管理员。</p>
+ */
+@Service
+public class PasswordResetService {
+
+    private static final Logger log = LoggerFactory.getLogger(PasswordResetService.class);
+
+    /** 重置码字符集：去掉 I/O/0/1 这类肉眼易混字符，管理员口述、用户手抄不易出错 */
+    private static final String ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+    private static final int CODE_LENGTH = 8;
+    /** 有效期：够用户找管理员要码并回来输入，又不至于长期挂着 */
+    private static final int TTL_MINUTES = 30;
+    /** 连续错误上限：防止拿一个已批准的单子暴力猜码 */
+    private static final int MAX_ATTEMPTS = 5;
+    private static final SecureRandom RANDOM = new SecureRandom();
+
+    private final JdbcTemplate jdbc;
+    private final UserStore users;
+    private final PasswordHasher hasher;
+
+    public PasswordResetService(JdbcTemplate jdbc, UserStore users, PasswordHasher hasher) {
+        this.jdbc = jdbc;
+        this.users = users;
+        this.hasher = hasher;
+    }
+
+    @PostConstruct
+    public void init() {
+        try {
+            jdbc.execute("CREATE TABLE IF NOT EXISTS password_reset_request ("
+                    + "id BIGSERIAL PRIMARY KEY, username VARCHAR(64) NOT NULL, "
+                    + "status VARCHAR(16) NOT NULL DEFAULT 'PENDING', code_hash TEXT, "
+                    + "attempts INT NOT NULL DEFAULT 0, request_ip VARCHAR(64), "
+                    + "requested_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, "
+                    + "approved_by VARCHAR(64), approved_at TIMESTAMP, "
+                    + "expires_at TIMESTAMP, used_at TIMESTAMP)");
+            jdbc.execute("CREATE INDEX IF NOT EXISTS idx_prr_status ON password_reset_request(status)");
+            jdbc.execute("CREATE INDEX IF NOT EXISTS idx_prr_user ON password_reset_request(username)");
+        } catch (Exception e) {
+            log.warn("密码重置表初始化失败，忘记密码功能不可用：{}", e.getMessage());
+        }
+    }
+
+    /**
+     * 提交重置申请。
+     *
+     * <p>账号不存在时静默返回，接口对外始终是同一句提示——否则这个免登录接口
+     * 就成了账号枚举器。同一账号已有待审批申请时不重复插入，只刷新时间与来源 IP。</p>
+     */
+    public void request(String username, String ip) {
+        String name = normalize(username);
+        if (name.isBlank()) return;
+        if (users.find(name) == null) {
+            log.info("密码重置申请：账号 {} 不存在，按统一话术受理", name);
+            return;
+        }
+        try {
+            int updated = jdbc.update("UPDATE password_reset_request SET requested_at=CURRENT_TIMESTAMP, "
+                    + "request_ip=? WHERE username=? AND status='PENDING'", ip, name);
+            if (updated == 0) {
+                jdbc.update("INSERT INTO password_reset_request(username,request_ip) VALUES(?,?)", name, ip);
+            }
+            log.info("账号 {} 提交了密码重置申请（来源 {}）", name, ip);
+        } catch (Exception e) {
+            log.warn("密码重置申请落库失败：{}", e.getMessage());
+        }
+    }
+
+    /** 后台待办列表：待审批 + 已发码未使用（后者让管理员能回答"码给了怎么还没用"） */
+    public List<Map<String, Object>> list() {
+        List<Map<String, Object>> out = new ArrayList<>();
+        try {
+            jdbc.query("SELECT id,username,status,attempts,request_ip,requested_at,approved_by,approved_at,"
+                    + "expires_at,used_at FROM password_reset_request "
+                    + "WHERE status IN ('PENDING','APPROVED') "
+                    + "ORDER BY CASE status WHEN 'PENDING' THEN 0 ELSE 1 END, requested_at DESC", rs -> {
+                Map<String, Object> m = new LinkedHashMap<>();
+                m.put("id", rs.getLong("id"));
+                m.put("username", rs.getString("username"));
+                m.put("status", rs.getString("status"));
+                m.put("attempts", rs.getInt("attempts"));
+                m.put("requestIp", rs.getString("request_ip"));
+                m.put("requestedAt", toMillis(rs.getTimestamp("requested_at")));
+                m.put("approvedBy", rs.getString("approved_by"));
+                m.put("approvedAt", toMillis(rs.getTimestamp("approved_at")));
+                m.put("expiresAt", toMillis(rs.getTimestamp("expires_at")));
+                m.put("usedAt", toMillis(rs.getTimestamp("used_at")));
+                out.add(m);
+            });
+        } catch (Exception e) {
+            log.warn("读取密码重置申请失败：{}", e.getMessage());
+        }
+        return out;
+    }
+
+    /**
+     * 批准申请并生成一次性重置码，明文只在这一刻返回。
+     * 已处理过的申请不允许重复批准，避免一单多发。
+     */
+    public String approve(long id, String admin) {
+        String status = queryStatus(id);
+        if (status == null) throw new IllegalArgumentException("重置申请不存在，可能已被清理");
+        if (!"PENDING".equals(status)) throw new IllegalArgumentException("该申请已处理过，不能重复发放重置码");
+        String code = randomCode();
+        int n = jdbc.update("UPDATE password_reset_request SET status='APPROVED', code_hash=?, attempts=0, "
+                        + "approved_by=?, approved_at=LOCALTIMESTAMP, expires_at=? "
+                        + "WHERE id=? AND status='PENDING'",
+                hasher.hash(code), admin, Timestamp.valueOf(LocalDateTime.now().plusMinutes(TTL_MINUTES)), id);
+        if (n == 0) throw new IllegalArgumentException("该申请状态已变化，请刷新后重试");
+        log.info("管理员 {} 为申请 #{} 发放了密码重置码", admin, id);
+        return code;
+    }
+
+    public void reject(long id, String admin) {
+        int n = jdbc.update("UPDATE password_reset_request SET status='REJECTED', approved_by=?, "
+                + "approved_at=LOCALTIMESTAMP WHERE id=? AND status='PENDING'", admin, id);
+        if (n == 0) throw new IllegalArgumentException("该申请已处理过或不存在");
+        log.info("管理员 {} 驳回了密码重置申请 #{}", admin, id);
+    }
+
+    /**
+     * 用户凭重置码设置新密码。
+     *
+     * @return {@code null} 表示成功；否则是给用户直接看的错误文案
+     */
+    public String confirm(String username, String code, String newPassword) {
+        String name = normalize(username);
+        if (name.isBlank() || code == null || code.isBlank()) return "请填写账号与重置码";
+        if (newPassword == null || newPassword.length() < 8) return "新密码至少 8 位";
+        if (users.find(name) == null) return "账号不存在，或重置码已失效";
+        String input = code.trim().toUpperCase();
+        List<Map<String, Object>> rows = new ArrayList<>();
+        try {
+            jdbc.query("SELECT id,code_hash,attempts FROM password_reset_request "
+                    + "WHERE username=? AND status='APPROVED' AND expires_at > LOCALTIMESTAMP "
+                    + "ORDER BY id DESC LIMIT 10", rs -> {
+                Map<String, Object> m = new LinkedHashMap<>();
+                m.put("id", rs.getLong("id"));
+                m.put("codeHash", rs.getString("code_hash"));
+                m.put("attempts", rs.getInt("attempts"));
+                rows.add(m);
+            }, name);
+        } catch (Exception e) {
+            log.warn("校验重置码失败：{}", e.getMessage());
+            return "重置服务暂时不可用，请稍后重试";
+        }
+        if (rows.isEmpty()) return "重置码无效或已过期，请重新提交申请，由管理员重新发放";
+        for (Map<String, Object> row : rows) {
+            Object hash = row.get("codeHash");
+            if (hash != null && hasher.matches(input, String.valueOf(hash))) {
+                if (!users.resetPassword(name, newPassword)) return "新密码不符合要求或账号不可用";
+                jdbc.update("UPDATE password_reset_request SET status='USED', used_at=LOCALTIMESTAMP WHERE id=?",
+                        row.get("id"));
+                log.info("账号 {} 通过重置码完成了密码重置", name);
+                return null;
+            }
+            // 记一次失败；连续错满上限就把单子作废，防暴力猜码
+            int attempts = ((Number) row.get("attempts")).intValue() + 1;
+            jdbc.update("UPDATE password_reset_request SET attempts=attempts+1, "
+                            + "status=CASE WHEN attempts+1>=? THEN 'REJECTED' ELSE status END WHERE id=?",
+                    MAX_ATTEMPTS, row.get("id"));
+            if (attempts >= MAX_ATTEMPTS) {
+                log.warn("账号 {} 的重置申请 #{} 因连续输错已作废", name, row.get("id"));
+                return "重置码连续输错 " + MAX_ATTEMPTS + " 次，本次申请已作废，请重新提交申请";
+            }
+            return "重置码不正确，还可以再试 " + (MAX_ATTEMPTS - attempts) + " 次";
+        }
+        return "重置码不正确";
+    }
+
+    private String queryStatus(long id) {
+        try {
+            List<String> s = jdbc.query("SELECT status FROM password_reset_request WHERE id=?",
+                    (rs, i) -> rs.getString(1), id);
+            return s.isEmpty() ? null : s.get(0);
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private static String normalize(String username) {
+        return username == null ? "" : username.trim().toLowerCase();
+    }
+
+    private static Long toMillis(Timestamp ts) {
+        return ts == null ? null : ts.getTime();
+    }
+
+    /** 生成重置码；用 SecureRandom 而非 Random，避免可预测序列 */
+    private static String randomCode() {
+        StringBuilder sb = new StringBuilder(CODE_LENGTH);
+        for (int i = 0; i < CODE_LENGTH; i++) {
+            sb.append(ALPHABET.charAt(RANDOM.nextInt(ALPHABET.length())));
+        }
+        return sb.toString();
+    }
+}

@@ -3,6 +3,7 @@ package com.joylin.waterkb.web;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.joylin.waterkb.audit.AuditService;
 import com.joylin.waterkb.security.JwtService;
+import com.joylin.waterkb.security.PasswordResetService;
 import com.joylin.waterkb.security.PermissionService;
 import com.joylin.waterkb.security.RefreshTokenStore;
 import com.joylin.waterkb.security.UserContext;
@@ -37,12 +38,13 @@ public class AuthController {
     private final RefreshTokenStore store;
     private final AuditService audit;
     private final PermissionService permissions;
+    private final PasswordResetService passwordReset;
     private final long accessTtl;
     private final long refreshTtl;
     private final boolean issueEndpoint;
 
     public AuthController(JwtService jwt, UserStore users, RefreshTokenStore store, AuditService audit,
-                          PermissionService permissions,
+                          PermissionService permissions, PasswordResetService passwordReset,
                           @Value("${security.auth.access-ttl-seconds:1800}") long accessTtl,
                           @Value("${security.auth.refresh-ttl-seconds:604800}") long refreshTtl,
                           @Value("${security.auth.issue-endpoint:false}") boolean issueEndpoint) {
@@ -51,6 +53,7 @@ public class AuthController {
         this.store = store;
         this.audit = audit;
         this.permissions = permissions;
+        this.passwordReset = passwordReset;
         this.accessTtl = accessTtl;
         this.refreshTtl = refreshTtl;
         this.issueEndpoint = issueEndpoint;
@@ -175,6 +178,46 @@ public class AuthController {
                     .body(Map.of("message", "原密码错误，或新密码长度不足 8 位"));
         }
         return ResponseEntity.ok(Map.of("message", "密码已修改，请使用新密码下次登录"));
+    }
+
+    /**
+     * 忘记密码第一步：提交重置申请。
+     *
+     * <p>这个端点免登录，所以对外话术必须与账号是否存在无关——否则就成了账号枚举器。
+     * 申请落到 password_reset_request 表，管理员在后台「用户管理」里能看到并核身发码。</p>
+     */
+    @PostMapping("/password-reset/request")
+    public ResponseEntity<?> requestPasswordReset(@RequestBody Map<String, String> body,
+                                                  jakarta.servlet.http.HttpServletRequest req) {
+        String username = body == null ? null : body.get("username");
+        passwordReset.request(username, req.getRemoteAddr());
+        String who = username == null || username.isBlank() ? "anonymous" : username.trim().toLowerCase();
+        audit.record(AuditService.of("default", who, "", "POST /api/auth/password-reset/request",
+                "/api/auth/password-reset/request", "Password reset requested",
+                req.getRemoteAddr(), HttpStatus.OK.value(), 0, "ALLOW"));
+        return ResponseEntity.ok(Map.of(
+                "message", "重置申请已提交。请联系系统管理员核身并获取重置码，拿到后在本页输入即可设置新密码。",
+                "ttlMinutes", 30));
+    }
+
+    /** 忘记密码第二步：凭一次性重置码设置新密码（成功即作废该码） */
+    @PostMapping("/password-reset/confirm")
+    public ResponseEntity<?> confirmPasswordReset(@RequestBody Map<String, String> body,
+                                                  jakarta.servlet.http.HttpServletRequest req) {
+        String username = body == null ? null : body.get("username");
+        String code = body == null ? null : body.get("code");
+        String newPassword = body == null ? null : body.get("newPassword");
+        String err = passwordReset.confirm(username, code, newPassword);
+        String who = username == null || username.isBlank() ? "anonymous" : username.trim().toLowerCase();
+        audit.record(AuditService.of("default", who, "", "POST /api/auth/password-reset/confirm",
+                "/api/auth/password-reset/confirm",
+                err == null ? "Password reset completed" : "Password reset failed",
+                req.getRemoteAddr(), err == null ? HttpStatus.OK.value() : HttpStatus.BAD_REQUEST.value(), 0,
+                err == null ? "ALLOW" : "DENIED"));
+        if (err != null) {
+            return ResponseEntity.badRequest().body(Map.of("message", err));
+        }
+        return ResponseEntity.ok(Map.of("message", "密码已重置，请用新密码登录"));
     }
 
     /** 演示 token 签发（默认关闭，作品集需要时打开） */

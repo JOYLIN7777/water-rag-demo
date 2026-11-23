@@ -37,7 +37,9 @@ public class JwtAuthFilter extends OncePerRequestFilter {
 
     /** 无需登录即可访问的路径前缀 */
     private static final Set<String> WHITE_LIST = Set.of(
-            "/api/auth/login", "/api/auth/refresh", "/api/search/health", "/", "/index.html", "/login.html"
+            "/api/auth/login", "/api/auth/refresh", "/api/search/health", "/", "/index.html", "/login.html",
+            // 忘记密码：用户还没登录才需要这两个接口和页面，必须放行
+            "/api/auth/password-reset/request", "/api/auth/password-reset/confirm", "/forgot.html"
     );
 
     private final JwtService jwt;

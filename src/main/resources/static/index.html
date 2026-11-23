@@ -148,11 +148,9 @@
     <header class="topbar">
       <div class="topbar-left">
         <div class="topbar-title">知识库问答</div>
-        <span class="status-pill" id="statusPill" data-status-pill><span class="status-dot"></span>服务正常</span>
+
       </div>
       <div class="topbar-nav">
-        <button class="text-btn" onclick="testTool()" title="直接调用水情工具验证权限">工具演示</button>
-        <button class="text-btn" onclick="clearHistory()">清空历史</button>
         <span id="adminEntrySlot" class="admin-slot"></span>
       </div>
     </header>
@@ -193,8 +191,14 @@ let sessions=[],currentId='',messages=[],sending=false;
 // 所有本地数据按登录账号分区：换账号登录不会看到上一个账号的会话、消息和草稿
 const SCOPE=(window.WrkAuth&&WrkAuth.scope)?WrkAuth.scope():'demo';
 function sessionKey(){return 'water-rag-sessions:'+SCOPE}
+// ===== 会话列表：唯一真源是 localStorage =====
+// 页面内不再维护"可写副本"：每次改动都走「读—改—写」。
+// 之前是内存里存一份 sessions、改完整体写回，结果侧栏删掉的会话会被这份过期副本
+// 在下次发消息 / 新建会话时整份覆盖回去——这才是"删了又自己回来"的真正根因。
+function readSessions(){sessions=Shell.getSessions();return sessions}
+function writeSessions(list){Shell.saveSessions(list);sessions=list}
 function loadSessions(){
-  try{sessions=JSON.parse(localStorage.getItem(sessionKey())||'[]')}catch{sessions=[]}
+  sessions=Shell.getSessions();
   // 支持从功能页侧栏跳回：?sid=xxx 定位指定会话，?new=1 直接新建会话
   const params=new URLSearchParams(location.search);
   const sid=params.get('sid');
@@ -207,7 +211,6 @@ function loadSessions(){
   }else{newSession()}
   renderSessions();
 }
-function saveSessions(){localStorage.setItem(sessionKey(),JSON.stringify(sessions))}
 // ============ 按会话隔离的状态（核心：所有会话状态互不干扰）============
 // msgStore[sid] = 该会话的消息数组；草稿也按 sid 存，切换会话绝不串台。
 let msgStore=Object.create(null);
@@ -228,7 +231,11 @@ function storeOf(id){
   return msgStore[id];
 }
 function newSession(){
-  const id='session-'+Date.now();sessions.unshift({id,title:'',updatedAt:Date.now()});saveSessions();switchSession(id);renderSessions();
+  const id='session-'+Date.now();
+  const list=readSessions();                              // 先读最新，避免用过期副本覆盖
+  list.unshift({id,title:'',updatedAt:Date.now()});
+  writeSessions(list);
+  switchSession(id);renderSessions();
 }
 function switchSession(id){
   if(currentId&&currentId!==id){
@@ -240,7 +247,9 @@ function switchSession(id){
   renderMessages();hideError();
   scrollBottom(true);                                     // 切换会话强制瞬时到底（无平滑动画）
   syncDraft();                                            // 恢复目标会话草稿
-  document.getElementById('treeLink').href='tree.html?sid='+encodeURIComponent(id);
+  // 注意：这里原来有一句把会话 id 写进 treeLink 的代码，但 treeLink 元素早已随
+  // 「问答分支」入口一起删掉，getElementById 返回 null 会抛 TypeError，
+  // 把后面的后端历史加载整段打断（刷新后只剩本地缓存）。别再往这里加依赖 DOM 的语句。
   const seq=++historySeq;
   fetch('/api/chat/history?sessionId='+encodeURIComponent(id)).then(r=>r.json()).then(list=>{
     if(currentId!==id||seq!==historySeq)return;            // 已切走或有过期的旧请求，忽略
@@ -255,11 +264,8 @@ function switchSession(id){
   }).catch(()=>{});
   renderSessions();
 }
-function removeSession(id,ev){
-  ev.stopPropagation();sessions=sessions.filter(s=>s.id!==id);saveSessions();
-  if(!sessions.length){newSession();return}
-  if(currentId===id)switchSession(sessions[0].id);else renderSessions();
-}
+// 注意：这里原来有个本地版 removeSession（只删内存+localStorage），侧栏 DOM 早已由
+// app.js 统一渲染并绑定它自己的删除逻辑（含后端历史清理），本地这份是死代码且逻辑过时，已删除。
 function fmtSessionTime(ts){
   if(!ts)return '';
   const d=new Date(ts),now=new Date();
@@ -270,14 +276,26 @@ function fmtSessionTime(ts){
   if(d.toDateString()===y.toDateString())return '昨天 '+hm;
   return (d.getMonth()+1)+'/'+d.getDate()+' '+hm;
 }
-function touchSession(id){
-  const s=sessions.find(x=>x.id===id);
-  if(s){s.updatedAt=Date.now();saveSessions()}
+// 更新会话活跃时间；title 传了且会话还没有标题时顺便补上（首个问题即标题）
+function touchSession(id,title){
+  const list=readSessions();
+  const s=list.find(x=>x.id===id);
+  if(!s)return;
+  if(title&&!s.title)s.title=title;
+  s.updatedAt=Date.now();
+  writeSessions(list);
 }
 // 会话列表 DOM 由公共组件 app.js 统一渲染；这里只同步当前会话高亮。
 // 数据仍在本地 sessions 变量（与公共层同源 localStorage），问答逻辑照常使用。
 function renderSessions(){
   if(window.Shell)Shell.setSession(currentId);
+  // 自愈：当前停留的会话如果已经不在了（比如刚在侧栏删掉），立刻切到列表里最新的一条。
+  // 不能只依赖删除钩子——钩子只是"通知"，视图正确性应该由渲染这步兜住。
+  const list=Shell.getSessions();
+  if(currentId&&!list.some(s=>s.id===currentId)){
+    if(list.length)switchSession(list[0].id);
+    else if(!sending)newSession();
+  }
 }
 function toast(msg,type){
   const t=document.getElementById('toast');
@@ -448,9 +466,8 @@ async function send(text){
   const ownerId=currentId;              // 本次回答归属的会话，全程锁定，切换会话不影响它
   clearDraft(ownerId);
   sending=true;document.getElementById('sendBtn').disabled=true;hideError();
-  const session=sessions.find(s=>s.id===ownerId);
-  if(session&&!session.title){session.title=q.length>18?q.slice(0,18)+'…':q}
-  touchSession(ownerId);renderSessions();
+  // 首问自动把问题当标题：读—改—写一次完成，别先改内存再写回（会丢标题）
+  touchSession(ownerId, q.length>18?q.slice(0,18)+'…':q);renderSessions();
   const store=storeOf(ownerId);         // 写入归属会话自己的数组，不是全局变量
   store.push({role:'user',content:q,sources:[],streaming:false});
   const ai={role:'assistant',content:'',sources:[],streaming:true};
@@ -547,10 +564,25 @@ async function testTool(){
   }catch(e){showError(e.message)}
 }
 // 侧栏由公共组件 app.js 统一渲染；这里注册会话切换钩子，把侧栏点击接回问答逻辑
-Shell.onSessionChange(function(id){
+// 第二个参数是动作类型：切换会话不传，'__delete__' 表示侧栏刚删掉了一个会话
+Shell.onSessionChange(function(id,action){
+  if(action==='__delete__'){onSessionDeleted(id);return}
   if(id==='__new__')newSession();
   else switchSession(id);
 });
+// 侧栏删除会话后必须同步这里的状态：会话列表以 localStorage 为准，这里重新读一次即可；
+// 同时清掉内存里的消息与本地缓存，否则下次打开还会从缓存把内容渲染出来。
+// 之前不做这步、又用内存副本整体写回，于是被删的会话在下次发消息时"自己回来"。
+function onSessionDeleted(id){
+  sessions=Shell.getSessions();
+  delete msgStore[id];
+  try{localStorage.removeItem(cacheKey(id))}catch(e){}
+  if(currentId===id){
+    currentId='';                       // 先断开，避免 switchSession 把已删会话的缓存写回去
+    if(sessions.length)switchSession(sessions[0].id);
+    else newSession();
+  }else renderSessions();
+}
 initShell('index');       // 渲染全站统一侧栏 + 服务探活
 loadSessions();           // 初始化会话（内部会 switchSession → Shell.setSession 同步高亮）
 Shell.refreshDocs();      // 侧栏文档清单（公共组件）
