@@ -86,6 +86,8 @@ services:
       AI_BASE_URL: ${AI_BASE_URL:-https://dashscope.aliyuncs.com/compatible-mode}
       AI_CHAT_MODEL: ${AI_CHAT_MODEL:-qwen-plus}
       AI_EMBEDDING_MODEL: ${AI_EMBEDDING_MODEL:-text-embedding-v3}
+      # 百炼业务空间 ID：配置后用量统计优先走官方接口，未配置/接口异常自动回退本地调用记录
+      BAILIAN_WORKSPACE_ID: ${BAILIAN_WORKSPACE_ID:-}
       # 容器内用服务名 elasticsearch 访问 ES
       ES_URL: ${ES_URL:-http://elasticsearch:9200}
       # JWT 签名密钥从环境变量传入，绝不写入文件/镜像；未设置时应用用内置 Demo 密钥

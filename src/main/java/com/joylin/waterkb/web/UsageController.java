@@ -64,23 +64,21 @@ public class UsageController {
         this.http = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5)).build();
     }
 
-    /** 今日 / 本月请求次数与 Token 消耗，以及按模型明细 */
+    /**
+     * 今日 / 本月请求次数与 Token 消耗，以及按模型明细。
+     *
+     * <p>统计口径以<b>本系统真实调用记录</b>为主：本系统走 DashScope 兼容模式直连，
+     * 官方 agentstudio 用量接口统计的是工作空间内的 Agent 调用，实测对兼容模式调用
+     * 返回 0。因此官方数据仅在确有数值时才作为对账参考覆盖展示，否则一律以本地记录
+     * 为准，保证页面任何情况都有真实数据。</p>
+     */
     @GetMapping("/summary")
     public Map<String, Object> summary() {
-        // 未配置官方工作空间时直接用本地真实调用记录：任何部署形态下用量页都有数据
+        Map<String, Object> local = recorder.summary();
+        // 未配置官方工作空间：直接用本地真实调用记录
         if (workspaceId.isBlank() || apiKey == null || apiKey.isBlank()) {
-            Map<String, Object> local = recorder.summary();
             return local;
         }
-
-        Map<String, Object> totals = new LinkedHashMap<>();
-        totals.put("todayRequests", 0);
-        totals.put("todayTokens", 0);
-        totals.put("monthRequests", 0);
-        totals.put("monthTokens", 0);
-        Map<String, Object> result = new LinkedHashMap<>();
-        result.put("totals", totals);
-        result.put("models", List.of());
 
         try {
             LocalDate today = LocalDate.now(ZONE);
@@ -92,21 +90,37 @@ public class UsageController {
             accumulate(dayTotals, day);
             Map<String, Object> monthTotals = new LinkedHashMap<>();
             accumulate(monthTotals, month);
-            totals.put("todayRequests", dayTotals.get("requests"));
-            totals.put("todayTokens", dayTotals.get("tokens"));
-            totals.put("monthRequests", monthTotals.get("requests"));
-            totals.put("monthTokens", monthTotals.get("tokens"));
+            long officialMonthRequests = asLong(monthTotals.get("requests"));
 
-            result.put("models", modelRows(month));
-            result.put("configured", true);
-            result.put("hint", "数据来自阿里云百炼官方用量接口，按当前工作空间统计，可能有分钟级延迟。");
-            return result;
+            // 官方有数据才用官方口径（工作空间级，含控制台等全部调用，适合与阿里云账单对账）
+            if (officialMonthRequests > 0) {
+                Map<String, Object> totals = new LinkedHashMap<>();
+                totals.put("todayRequests", dayTotals.get("requests"));
+                totals.put("todayTokens", dayTotals.get("tokens"));
+                totals.put("monthRequests", monthTotals.get("requests"));
+                totals.put("monthTokens", monthTotals.get("tokens"));
+                Map<String, Object> result = new LinkedHashMap<>();
+                result.put("totals", totals);
+                result.put("models", modelRows(month));
+                result.put("configured", true);
+                result.put("localTotals", local.get("totals"));   // 本系统口径供对照
+                result.put("hint", "数据来自阿里云百炼官方用量（工作空间级，含全部来源，可能有分钟级延迟）；本系统的真实调用记录见上方对照。");
+                return result;
+            }
+
+            // 官方返回 0：口径不含兼容模式直连调用，以本地记录为准并说明原因
+            local.put("hint", "阿里云百炼官方用量当前为 0（其口径只统计工作空间内的 Agent 调用，不含本系统的兼容模式直连调用），以下为本系统的真实调用记录。");
+            return local;
         } catch (Exception e) {
             // 官方接口异常时降级为本地记录，避免整页空白
-            Map<String, Object> local = recorder.summary();
             local.put("hint", "官方用量暂时不可用（" + safeMessage(e) + "），已切换为本系统调用记录。");
             return local;
         }
+    }
+
+    private long asLong(Object v) {
+        if (v instanceof Number n) return n.longValue();
+        try { return Long.parseLong(String.valueOf(v)); } catch (Exception e) { return 0L; }
     }
 
     /** 构造官方接口要求的 RFC3339 时间范围请求体 */

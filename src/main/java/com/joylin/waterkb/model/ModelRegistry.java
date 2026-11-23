@@ -80,6 +80,9 @@ public class ModelRegistry {
             OpenAiChatOptions options = OpenAiChatOptions.builder()
                     .model(c.getModel())
                     .temperature(0.3)
+                    // 流式请求显式要求返回 usage（stream_options.include_usage）：
+                    // 默认不返回，导致用量统计的输入/输出 Token 全是 0（2026-11-23 实测）
+                    .streamUsage(true)
                     .build();
             log.info("构建 ChatModel：{} @ {}（缓存 miss）", c.getModel(), c.getBaseUrl());
             return OpenAiChatModel.builder().openAiApi(api).defaultOptions(options).build();
