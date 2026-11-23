@@ -36,11 +36,13 @@
       <div><div class="brand-title">管理后台</div><div class="brand-sub">水利知识库</div></div></div>
     <div class="section-label" style="margin-top:6px">管理功能</div>
     <button class="admin-nav-item active" data-panel="overview"><span class="ic">▦</span>概览</button>
-    <button class="admin-nav-item" data-panel="users"><span class="ic">◈</span>用户与权限</button>
+    <button class="admin-nav-item" data-panel="users"><span class="ic">◈</span>用户管理</button>
+    <button class="admin-nav-item" data-panel="roles"><span class="ic">❖</span>角色与权限</button>
     <button class="admin-nav-item" data-panel="docs"><span class="ic">▤</span>文档管理</button>
     <button class="admin-nav-item" data-panel="models"><span class="ic">◇</span>模型设置</button>
     <button class="admin-nav-item" data-panel="usage"><span class="ic">◷</span>用量统计</button>
-    <button class="admin-nav-item" data-panel="audit"><span class="ic">☷</span>审计日志</button>
+    <button class="admin-nav-item" data-panel="loginlogs"><span class="ic">⎗</span>登录日志</button>
+    <button class="admin-nav-item" data-panel="audit"><span class="ic">☷</span>操作日志</button>
     <div class="admin-back">
       <a class="admin-nav-item" href="index.html"><span class="ic">←</span>返回问答</a>
       <div class="user-block" id="adminUserBlock"></div>
@@ -84,12 +86,24 @@
         </div>
       </section>
 
-      <!-- 用户与权限 -->
+      <!-- 用户管理 -->
       <section class="admin-panel" data-panel="users">
-        <div class="page-head"><h1 class="page-title">用户与权限</h1>
-          <p class="page-desc">系统按角色分配权限，管理员拥有全部权限。所有接口在服务端强制校验。</p></div>
+        <div class="page-head"><h1 class="page-title">用户管理</h1>
+          <p class="page-desc">查看当前系统中的账号及其角色、所属空间。账号由部署配置管理，不提供在线增删改。</p></div>
         <div class="card"><div class="card-head"><h3>当前账号</h3></div>
           <table class="kv-table"><tbody id="uIdentity"><tr><td colspan="2" class="empty">加载中…</td></tr></tbody></table></div>
+        <div class="card"><div class="card-head"><h3>账号列表</h3>
+          <button class="btn btn-sm" onclick="loadAdminUsers()">刷新</button></div>
+          <div class="scroll"><table><thead><tr><th>账号</th><th>显示名</th><th>角色 / 组</th><th>所属空间</th><th>状态</th></tr></thead>
+            <tbody id="aUsers"><tr><td colspan="5" class="empty">加载中…</td></tr></tbody></table></div>
+          <div class="hint">密码以加盐哈希存储，任何接口都不会返回密码原文或哈希值。</div>
+        </div>
+      </section>
+
+      <!-- 角色与权限 -->
+      <section class="admin-panel" data-panel="roles">
+        <div class="page-head"><h1 class="page-title">角色与权限</h1>
+          <p class="page-desc">系统按角色分配权限，管理员拥有全部权限。所有接口在服务端强制校验。</p></div>
         <div class="card"><div class="card-head"><h3>角色权限矩阵</h3></div>
           <div class="scroll"><table><thead><tr><th>角色</th><th>拥有的权限</th></tr></thead>
             <tbody id="uRoles"><tr><td colspan="2" class="empty">加载中…</td></tr></tbody></table></div>
@@ -137,10 +151,21 @@
         </div>
       </section>
 
+      <!-- 登录日志 -->
+      <section class="admin-panel" data-panel="loginlogs">
+        <div class="page-head"><h1 class="page-title">登录日志</h1>
+          <p class="page-desc">登录成功与失败的尝试都留有记录，失败原因可追溯。</p></div>
+        <div class="card"><div class="card-head"><h3>登录记录</h3>
+          <button class="btn btn-sm" onclick="loadLoginLogs()">刷新</button></div>
+          <div class="scroll" style="max-height:520px"><table><thead><tr><th>时间</th><th>账号</th><th>动作</th><th>状态</th><th>结果</th><th>来源IP</th></tr></thead>
+            <tbody id="lList"><tr><td colspan="6" class="empty">加载中…</td></tr></tbody></table></div>
+        </div>
+      </section>
+
       <!-- 审计日志 -->
       <section class="admin-panel" data-panel="audit">
-        <div class="page-head"><h1 class="page-title">审计日志</h1>
-          <p class="page-desc">记录重要的登录与操作行为，仅管理员可查看。</p></div>
+        <div class="page-head"><h1 class="page-title">操作日志</h1>
+          <p class="page-desc">记录所有接口调用行为，仅管理员可查看。</p></div>
         <div class="card"><div class="card-head"><h3>操作记录</h3>
           <button class="btn btn-sm" onclick="loadAudit()">刷新</button></div>
           <div class="scroll" style="max-height:520px"><table><thead><tr><th>时间</th><th>账号</th><th>动作</th><th>状态</th><th>耗时</th><th>结果</th></tr></thead>
@@ -178,6 +203,7 @@ async function guard(){
       '<div class="user-tenant">'+esc(tl(u.tenant))+'</div></a>'+
       '<button class="user-logout" title="退出登录" onclick="WrkAuth.logout()">⏻</button>';
     renderUsers(p);
+    loadAdminUsers();
     return true;
   }catch(e){$('denyBox').style.display='block';return false}
 }
@@ -238,6 +264,29 @@ async function delDoc(name){
   }catch(e){appToast('删除失败：'+e.message,'err')}
 }
 
+async function loadAdminUsers(){
+  try{
+    const list=await api('/api/admin/users');
+    $('aUsers').innerHTML=list.map(u=>
+      '<tr><td class="name">'+esc(u.username)+'</td><td>'+esc(u.displayName)+'</td>'+
+      '<td>'+((u.groups||[]).map(g=>'<span class="tag">'+esc(gl(g))+'</span>').join(' '))+'</td>'+
+      '<td>'+esc(tl(u.tenant))+'</td>'+
+      '<td>'+(u.enabled?'<span class="tag ok">正常</span>':'<span class="tag off">停用</span>')+'</td></tr>'
+    ).join('')||'<tr><td colspan="5" class="empty">暂无账号</td></tr>';
+  }catch(e){$('aUsers').innerHTML='<tr><td colspan="5" class="empty">加载失败：'+esc(e.message)+'</td></tr>'}
+}
+
+async function loadLoginLogs(){
+  try{
+    const list=await api('/api/admin/login-logs?limit=200');
+    $('lList').innerHTML=list.map(l=>
+      '<tr><td>'+esc(String(l.ts||'').slice(5,19))+'</td><td class="name">'+esc(l.user_id)+'</td>'+
+      '<td>'+esc(l.action)+'</td><td>'+statusTag(l.status)+'</td><td>'+esc(l.detail||l.result||'')+'</td>'+
+      '<td>'+esc(l.ip||'')+'</td></tr>'
+    ).join('')||'<tr><td colspan="6" class="empty">暂无登录记录</td></tr>';
+  }catch(e){$('lList').innerHTML='<tr><td colspan="6" class="empty">加载失败：'+esc(e.message)+'</td></tr>'}
+}
+
 async function loadModelsInfo(){
   try{
     const m=await api('/api/models');
@@ -277,7 +326,8 @@ async function loadAudit(){
   }catch(e){console.error(e)}
 }
 
-const TITLES={overview:'概览',users:'用户与权限',docs:'文档管理',models:'模型设置',usage:'用量统计',audit:'审计日志'};
+const TITLES={overview:'概览',users:'用户管理',roles:'角色与权限',docs:'文档管理',
+  models:'模型设置',usage:'用量统计',loginlogs:'登录日志',audit:'操作日志'};
 document.querySelectorAll('.admin-nav-item[data-panel]').forEach(btn=>{
   btn.onclick=()=>{
     const key=btn.dataset.panel;
@@ -285,9 +335,11 @@ document.querySelectorAll('.admin-nav-item[data-panel]').forEach(btn=>{
     document.querySelectorAll('.admin-panel').forEach(p=>p.classList.toggle('active',p.dataset.panel===key));
     $('panelTitle').textContent=TITLES[key]||'管理后台';
     if(key==='overview')loadOverview();
+    else if(key==='users')loadAdminUsers();
     else if(key==='docs')loadDocs();
     else if(key==='models')loadModelsInfo();
     else if(key==='usage')loadUsage();
+    else if(key==='loginlogs')loadLoginLogs();
     else if(key==='audit')loadAudit();
   };
 });
