@@ -60,6 +60,63 @@
   .node-type{display:inline-block;font-size:10px;padding:2px 7px;border-radius:5px;background:#eef2f8;color:var(--ink-2)}
   .node-type.menu{background:var(--primary-soft);color:#25469b}
   .node-type.btn{background:#fef4e6;color:var(--warn)}
+
+  /* ===== 企业级中后台视觉（参考截图：内容占满 + 高密度 + 完整组件） ===== */
+  /* 后台内容占满主区，表格随窗口铺满 */
+  .page{max-width:none;margin:0;padding:20px 24px 36px}
+  /* 顶栏面包屑：管理后台 / 用户管理 */
+  .brand-crumb{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--muted)}
+  .brand-crumb #panelTitle{color:var(--ink);font-weight:650;font-size:14px}
+  .brand-crumb .sep{color:#c3cddd;font-size:12px}
+  /* 筛选条：白卡片 + 内联字段组 + 按钮组 */
+  .filter-bar{display:flex;align-items:flex-end;gap:12px;flex-wrap:wrap;background:#fff;border:1px solid var(--line);border-radius:12px;padding:13px 18px;margin-bottom:14px;box-shadow:var(--shadow-sm)}
+  .filter-item{display:flex;flex-direction:column;gap:5px}
+  .filter-item>label{font-size:11.5px;color:var(--muted);font-weight:500}
+  .filter-item input,.filter-item select{width:200px;padding:7px 10px;font-size:12.5px;border:1px solid #d9e0ec;border-radius:8px;background:#fff;color:var(--ink);outline:0;transition:all .15s}
+  .filter-item input:focus,.filter-item select:focus{border-color:var(--primary);box-shadow:0 0 0 3px rgba(59,110,245,.1)}
+  .filter-actions{display:flex;gap:8px;align-items:center;margin-left:auto}
+  /* 按钮变体：搜索蓝 / 重置白 / 导入橙 / 导出绿 */
+  .btn-search{border:1px solid var(--primary);background:var(--primary);color:#fff;font-weight:600}
+  .btn-search:hover:not(:disabled){background:#2f61e8;border-color:#2f61e8;color:#fff}
+  .btn-amber{border:1px solid #f59e0b;background:#f59e0b;color:#fff;font-weight:600}
+  .btn-amber:hover:not(:disabled){background:#e08c07;border-color:#e08c07;color:#fff}
+  .btn-green{border:1px solid #0e9f6e;background:#0e9f6e;color:#fff;font-weight:600}
+  .btn-green:hover:not(:disabled){background:#0b8a60;border-color:#0b8a60;color:#fff}
+  /* 开关控件：绿色开启 / 灰色关闭 */
+  .switch{position:relative;display:inline-block;width:38px;height:21px;flex:0 0 38px;vertical-align:middle}
+  .switch input{position:absolute;opacity:0;width:100%;height:100%;margin:0;cursor:pointer;z-index:1}
+  .switch .track{position:absolute;inset:0;background:#dfe5ee;border-radius:11px;transition:background .18s}
+  .switch .thumb{position:absolute;top:2px;left:2px;width:17px;height:17px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(16,28,54,.25);transition:left .18s}
+  .switch input:checked~.track{background:#0e9f6e}
+  .switch input:checked~.thumb{left:19px}
+  .switch input:disabled{cursor:not-allowed}
+  .switch input:disabled~.track{opacity:.45}
+  /* 角色彩色标签 */
+  .tag-role{display:inline-block;padding:1px 8px;border-radius:10px;font-size:10.5px;margin-right:4px;background:#eef2f8;color:var(--ink-2);line-height:1.8}
+  .tag-role.admin{background:#f3efff;color:#6d46cf}
+  .tag-role.analyst{background:var(--primary-soft);color:#25469b}
+  .tag-role.viewer{background:#f1f4f9;color:#5c6c8d}
+  .tag-role.water-dept{background:#e6f7f5;color:#0d8f83}
+  .tag-role.ops{background:#fef4e6;color:#c2760a}
+  /* 表格密度：表头 11.5 / 单元格 12.5，行高约 42px */
+  .data-table th{padding:9px 12px;font-size:11.5px;background:#f8fafc}
+  .data-table td{padding:9px 12px;font-size:12.5px}
+  .data-table .name{font-size:12.5px}
+  /* 操作列：彩色文字链接 */
+  .op-btn{font-size:12px;padding:2px 5px}
+  .op-btn.warn{color:var(--warn)}
+  .op-btn.danger{color:var(--danger)}
+  /* 分页器 */
+  .pager{display:flex;align-items:center;gap:8px;padding:11px 16px;font-size:12px;color:var(--muted);border-top:1px solid var(--line);flex-wrap:wrap;background:#fff}
+  .pg-btn{min-width:28px;height:28px;padding:0 8px;border:1px solid var(--line);background:#fff;border-radius:6px;font-size:12px;color:var(--ink-2);transition:all .15s}
+  .pg-btn:hover:not(:disabled){border-color:var(--primary);color:var(--primary)}
+  .pg-btn.on{background:var(--primary);border-color:var(--primary);color:#fff;font-weight:600}
+  .pg-btn:disabled{opacity:.4}
+  .pager .pg-sep{color:#c3cddd;padding:0 2px}
+  .pager .pg-info{margin-left:auto;display:flex;align-items:center;gap:8px}
+  .pager input{width:46px;padding:4px 6px;font-size:12px;border:1px solid var(--line);border-radius:6px;text-align:center}
+  /* 概览页卡片区限宽，避免超宽屏把卡片拉得过散（列表/表格页保持铺满） */
+  [data-panel="overview"] .quick-cards,[data-panel="overview"] .stats{max-width:1500px}
 </style>
 </head>
 <body>
@@ -88,7 +145,7 @@
   </aside>
   <main class="main">
     <header class="topbar">
-      <div class="topbar-left"><div class="topbar-title" id="panelTitle">概览</div>
+      <div class="topbar-left"><div class="brand-crumb"><span>管理后台</span><span class="sep">/</span><span id="panelTitle">概览</span></div>
         <span class="topbar-sub">仅管理员可见</span></div>
       <span class="status-pill" data-status-pill><span class="status-dot"></span>检测中…</span>
     </header>
@@ -127,24 +184,34 @@
       <!-- 用户管理 -->
       <section class="admin-panel" data-panel="users">
         <div class="page-head"><h1 class="page-title">用户管理</h1>
-          <p class="page-desc">按角色或空间筛选账号。账号由部署配置管理，此处提供查看与导出。</p></div>
-        <div class="workbench">
+          <p class="page-desc">按角色或空间筛选账号，支持新增、编辑、启停、重置密码与删除。</p></div>
+        <div class="filter-bar">
+          <div class="filter-item"><label for="uKw">关键字</label>
+            <input id="uKw" type="text" placeholder="请输入账号 / 显示名"></div>
+          <div class="filter-item"><label for="uStatus">账号状态</label>
+            <select id="uStatus"><option value="">全部状态</option><option value="1">正常</option><option value="0">停用</option></select></div>
+          <div class="filter-actions">
+            <button class="btn btn-sm btn-search" onclick="renderUserTable(1)">搜索</button>
+            <button class="btn btn-sm" onclick="resetUserFilter()">重置</button>
+            <button class="btn btn-sm btn-green" onclick="exportUsers()">导出用户</button>
+            <button class="btn btn-sm btn-amber" onclick="createUser()">＋ 新增账号</button>
+          </div>
+        </div>
+        <div class="workbench" style="min-height:auto">
           <div class="tree-pane">
             <div class="tree-head">组织筛选</div>
             <div id="uTree"></div>
           </div>
           <div class="data-pane">
             <div class="toolbar">
-              <input class="kw" id="uKw" type="text" placeholder="搜索账号 / 显示名…">
-              <select id="uStatus"><option value="">全部状态</option><option value="1">正常</option><option value="0">停用</option></select>
+              <span id="uFilterHint" style="font-size:12px;color:var(--muted)">全部用户</span>
               <span class="grow"></span>
               <button class="btn btn-sm" onclick="loadUsersData()">刷新</button>
-              <button class="btn btn-sm" onclick="exportUsers()">导出用户</button>
-              <button class="btn btn-sm btn-primary" onclick="createUser()">＋ 新增账号</button>
             </div>
             <div class="table-wrap"><table class="data-table">
-              <thead><tr><th class="row-idx">序号</th><th>账号</th><th>显示名</th><th>所属角色</th><th>所属空间</th><th>状态</th><th>操作</th></tr></thead>
+              <thead><tr><th class="row-idx">序号</th><th>账号</th><th>显示名</th><th>所属角色</th><th>所属空间</th><th>账号状态</th><th>操作</th></tr></thead>
               <tbody id="uTable"><tr><td colspan="7" class="empty">加载中…</td></tr></tbody></table></div>
+            <div class="pager" id="uPager"></div>
           </div>
         </div>
       </section>
@@ -347,7 +414,7 @@ async function loadUsersData(){
   }catch(e){$('uTable').innerHTML='<tr><td colspan="7" class="empty">加载失败：'+esc(e.message)+'</td></tr>'}
 }
 
-function roleTags(groups){return (groups||[]).map(g=>'<span class="tag-role '+(g==='admin'?'admin':g==='analyst'?'analyst':'')+'">'+esc(gl(g))+'</span>').join('')||'—'}
+function roleTags(groups){return (groups||[]).map(g=>'<span class="tag-role '+esc(g)+'">'+esc(gl(g))+'</span>').join('')||'—'}
 
 // 加载权限节点目录（持久化在 perm_node 表）
 async function loadPerms(){
@@ -373,33 +440,96 @@ function renderUserTree(){
     h+='<div class="tree-node'+(userFilter.type==='tenant'&&userFilter.value===t?' active':'')+'" data-t="tenant" data-v="'+esc(t)+'">'+esc(tl(t))+' <span class="cnt">'+c+'</span></div>'});
   $('uTree').innerHTML=h;
   $('uTree').querySelectorAll('.tree-node').forEach(n=>n.onclick=()=>{
-    userFilter={type:n.dataset.t,value:n.dataset.v};renderUserTree();renderUserTable();
+    userFilter={type:n.dataset.t,value:n.dataset.v};renderUserTree();renderUserTable(1);
   });
 }
 
-function renderUserTable(){
+// 用户列表分页状态（前端分页，20 条/页）
+const USER_PAGE={page:1,size:20};
+
+function userFiltered(){
   const kw=($('uKw').value||'').trim().toLowerCase();
   const st=$('uStatus').value;
-  let list=DB.users.filter(u=>{
+  return DB.users.filter(u=>{
     if(userFilter.type==='role'&&!(u.groups||[]).includes(userFilter.value))return false;
     if(userFilter.type==='tenant'&&u.tenant!==userFilter.value)return false;
     if(kw&&!((u.username+' '+(u.displayName||'')).toLowerCase().includes(kw)))return false;
     if(st!==''&&String(u.enabled?1:0)!==st)return false;
     return true;
   });
-  $('uTable').innerHTML=list.length?list.map((u,i)=>
-    '<tr><td class="row-idx">'+(i+1)+'</td><td class="name">'+esc(u.username)+'</td><td>'+esc(u.displayName)+'</td>'+
-    '<td>'+roleTags(u.groups)+'</td><td>'+esc(tl(u.tenant))+'</td>'+
-    '<td>'+(u.enabled?'<span class="tag ok">正常</span>':'<span class="tag off">停用</span>')+'</td>'+
-    '<td><button class="op-btn" onclick="showUser('+i+')">详情</button>'+
-    '<button class="op-btn" onclick="editUser('+i+')">编辑</button>'+
-    '<button class="op-btn" onclick="resetUserPwd('+i+')">重置密码</button>'+
-    '<button class="op-btn danger" onclick="delUser('+i+')">删除</button></td></tr>'
-  ).join(''):'<tr><td colspan="7" class="empty-inline">没有符合条件的账号</td></tr>';
-  $('uTable')._rows=list;
 }
-$('uKw')&&($('uKw').oninput=renderUserTable);
-$('uStatus')&&($('uStatus').onchange=renderUserTable);
+
+function renderUserTable(page){
+  if(typeof page==='number')USER_PAGE.page=page;
+  const list=userFiltered(), total=list.length, size=USER_PAGE.size;
+  const pages=Math.max(1,Math.ceil(total/size));
+  if(USER_PAGE.page>pages)USER_PAGE.page=pages;
+  const start=(USER_PAGE.page-1)*size;
+  const rows=list.slice(start,start+size);
+  $('uTable').innerHTML=rows.length?rows.map((u,i)=>{
+    const gi=start+i;   // 全量索引，详情/编辑弹框按它取数据
+    const sw='<label class="switch" title="'+(u.enabled?'点击停用该账号':'点击启用该账号')+'">'+
+      '<input type="checkbox"'+(u.enabled?' checked':'')+' onchange="toggleUserEnabled(\''+esc(u.username)+'\',this.checked,this)">'+
+      '<span class="track"></span><span class="thumb"></span></label>'+
+      '<span style="margin-left:8px;font-size:11.5px;color:'+(u.enabled?'var(--ok)':'var(--muted)')+'">'+(u.enabled?'正常':'停用')+'</span>';
+    return '<tr><td class="row-idx">'+(gi+1)+'</td>'+
+      '<td><a class="name" href="javascript:void(0)" style="color:var(--primary);text-decoration:none" onclick="showUser('+gi+')">'+esc(u.username)+'</a></td>'+
+      '<td>'+esc(u.displayName)+'</td><td>'+roleTags(u.groups)+'</td><td>'+esc(tl(u.tenant))+'</td>'+
+      '<td>'+sw+'</td>'+
+      '<td><button class="op-btn" onclick="editUser('+gi+')">编辑</button>'+
+      '<button class="op-btn warn" onclick="resetUserPwd('+gi+')">重置密码</button>'+
+      '<button class="op-btn danger" onclick="delUser('+gi+')">删除</button></td></tr>';
+  }).join(''):'<tr><td colspan="7" class="empty-inline">没有符合条件的账号</td></tr>';
+  $('uTable')._rows=list;
+  const fh=$('uFilterHint');
+  if(fh)fh.textContent='共 '+total+' 个账号'+(userFilter.type!=='all'?'（已按'+(userFilter.type==='role'?gl(userFilter.value):tl(userFilter.value))+'筛选）':'');
+  renderPager('uPager',total,USER_PAGE.page,size,'renderUserTable');
+}
+
+// 通用分页器：首页/上一页/页码窗口/下一页/末页 + 总数
+function renderPager(id,total,page,size,fn){
+  const host=$(id);if(!host)return;
+  const pages=Math.max(1,Math.ceil(total/size));
+  const html=['<span>共 '+total+' 条</span>','<span style="color:#c3cddd">|</span>','<span>每页 '+size+' 条</span>'];
+  const btn=(p,label,extra,dis)=>'<button class="pg-btn'+(extra||'')+'"'+(dis?' disabled':'')+' onclick="'+fn+'('+p+')">'+label+'</button>';
+  html.push(btn(page-1,'上一页','',page<=1));
+  const win=new Set([1,pages]);
+  for(let p=Math.max(1,page-2);p<=Math.min(pages,page+2);p++)win.add(p);
+  let prev=0;
+  [...win].sort((a,b)=>a-b).forEach(p=>{
+    if(prev&&p-prev>1)html.push('<span class="pg-sep">…</span>');
+    html.push(btn(p,String(p),p===page?' on':''));
+    prev=p;
+  });
+  html.push(btn(page+1,'下一页','',page>=pages));
+  html.push('<span class="pg-info">第 '+page+' / '+pages+' 页</span>');
+  host.innerHTML=html.join('');
+}
+
+function resetUserFilter(){
+  $('uKw').value='';$('uStatus').value='';
+  userFilter={type:'all',value:''};
+  renderUserTree();renderUserTable(1);
+}
+
+// 账号启停开关：PUT 整体更新，失败回滚开关状态
+async function toggleUserEnabled(username,checked,el){
+  const u=DB.users.find(x=>x.username===username);if(!u)return;
+  try{
+    await apiWrite('/api/admin/users/'+encodeURIComponent(username),{method:'PUT',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({displayName:u.displayName,tenant:u.tenant,groups:u.groups,enabled:checked})});
+    u.enabled=checked;
+    appToast(checked?'账号已启用':'账号已停用','ok');
+    renderUserTable();
+  }catch(e){
+    el.checked=!checked;   // 回滚 UI
+    appToast(e.message,'err');
+  }
+}
+
+$('uKw')&&($('uKw').oninput=()=>renderUserTable(1));
+$('uKw')&&($('uKw').onkeydown=e=>{if(e.key==='Enter')renderUserTable(1)});
+$('uStatus')&&($('uStatus').onchange=()=>renderUserTable(1));
 
 function showUser(i){
   const u=($('uTable')._rows||[])[i];if(!u)return;
