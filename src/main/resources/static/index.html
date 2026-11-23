@@ -133,6 +133,9 @@
   .composer-tool:hover{background:var(--primary-soft);color:var(--primary);border-color:#dbe5ff}
   .send-btn{border:0;background:linear-gradient(135deg,var(--primary-hi),var(--primary));color:#fff;padding:8px 18px;border-radius:10px;font-size:12.5px;font-weight:600;transition:all .18s;box-shadow:0 3px 10px rgba(59,110,245,.28);display:flex;align-items:center;gap:6px;margin-left:auto}
   .send-btn:hover:not(:disabled){transform:translateY(-1px);box-shadow:0 5px 16px rgba(59,110,245,.36)}
+  /* 生成中的「停止生成」态：红色系，与发送按钮一眼区分开 */
+  .send-btn.stop{background:linear-gradient(135deg,#e05a6d,#c74457);box-shadow:0 3px 10px rgba(224,90,109,.28)}
+  .send-btn.stop:hover{transform:translateY(-1px);box-shadow:0 5px 16px rgba(224,90,109,.36)}
   .composer-tip{text-align:center;font-size:10.5px;color:var(--muted);margin-top:9px;letter-spacing:.2px}
 
   /* ============ Markdown 正文 ============ */
@@ -209,7 +212,7 @@
         <div class="composer-bar">
           <span class="composer-tool" title="基于知识库检索作答"><span style="color:var(--primary)">◈</span> 知识库问答</span>
           <button class="composer-tool" onclick="document.getElementById('fileInput').click()" title="上传文档到知识库">⇪ 上传文档</button>
-          <button class="send-btn" id="sendBtn" onclick="send()">发送 <span style="opacity:.75">↵</span></button>
+          <button class="send-btn" id="sendBtn" onclick="sendOrStop()">发送 <span style="opacity:.75">↵</span></button>
         </div>
       </div>
       <div class="composer-tip">回答基于知识库生成，关键数据请以正式规程为准</div>
@@ -221,7 +224,28 @@
 <script src="assets/auth.js"></script>
 <script src="assets/app.js"></script>
 <script>
-let sessions=[],currentId='',messages=[],sending=false;
+let sessions=[],currentId='',messages=[];
+// ===== 多会话并发生成与终止 =====
+// 忙碌状态按会话隔离：A 会话在跑时切到 B 照样提问，两个回答并行推进。
+// 以前是全局一个 sending 锁死整个页面，只能干等——但回答本来就归属各自的会话
+// （ownerId 全程锁定、切走后台继续），入口没理由被别的会话堵住。
+const busyIds=new Set();               // 正在生成回答的会话 id
+const abortMap=Object.create(null);    // 会话 id -> AbortController（点「停止」用）
+function isBusy(id){return busyIds.has(id)}
+function syncSendBtn(){
+  const btn=document.getElementById('sendBtn');
+  if(!btn)return;
+  const busy=isBusy(currentId);
+  btn.dataset.busy=busy?'1':'';
+  btn.classList.toggle('stop',busy);
+  btn.innerHTML=busy?'■ 停止生成':'发送 <span style="opacity:.75">↵</span>';
+}
+function sendOrStop(){if(isBusy(currentId))stopGenerate();else send()}
+function stopGenerate(){
+  const ac=abortMap[currentId];
+  if(!ac)return;
+  ac.abort();                          // fetch 抛 AbortError，catch 分支负责收尾提示
+}
 // 已新建但还没提问的会话 id：占位不落历史列表，也不登记服务端。
 // 用户点开空会话什么也不问就离开，历史里不该多一条「会话 179542」。
 let pendingId='';
@@ -302,6 +326,7 @@ function switchSession(id){
   currentId=id;
   messages=storeOf(id);                                   // 切到目标会话自己的数组
   renderMessages();hideError();
+  syncSendBtn();                                          // 按钮切到目标会话的忙闲态（别的会话在跑不影响这里）
   scrollBottom(true);                                     // 切换会话强制瞬时到底（无平滑动画）
   syncDraft();                                            // 恢复目标会话草稿
   // 注意：这里原来有一句把会话 id 写进 treeLink 的代码，但 treeLink 元素早已随
@@ -462,7 +487,7 @@ function renderSessions(){
       const latest=list.slice().sort((a,b)=>(b.updatedAt||0)-(a.updatedAt||0))[0];
       switchSession(latest.id);
     }
-    else if(!sending)newSession();
+    else newSession();
   }
 }
 function toast(msg,type){
@@ -761,14 +786,19 @@ function showError(msg){const el=document.getElementById('errorBar');el.textCont
 function hideError(){document.getElementById('errorBar').style.display='none'}
 async function send(text){
   const q=(text||document.getElementById('question').value).trim();
-  if(!q||sending)return;
+  // 只挡"当前会话自己在生成"：别的会话在跑不影响这里（多会话并发提问）
+  if(!q||isBusy(currentId))return;
   const ownerId=currentId;              // 本次回答归属的会话，全程锁定，切换会话不影响它
   // 「从这里再问」留下的分叉点：取一次就清掉，避免下一轮还挂在旧节点上
   const fork=branchCtx&&branchCtx.sid===ownerId?branchCtx:null;
   branchCtx=null;
   clearQuote();
   clearDraft(ownerId);
-  sending=true;document.getElementById('sendBtn').disabled=true;hideError();
+  busyIds.add(ownerId);syncSendBtn();hideError();
+  // 中止控制器：点「停止生成」时中断 SSE 连接，后端 doOnCancel 会把
+  // 提问与已生成的部分回答落库，保证刷新/切回后画面一致
+  const ac=new AbortController();abortMap[ownerId]=ac;
+  let aborted=false;
   // 首问自动把问题当标题：读—改—写一次完成，别先改内存再写回（会丢标题）
   // 未提问的占位会话在这里第一次进历史列表（touchSession 里判断）
   // fullQ 传完整原文：标题与已有会话撞名时用完整表述区分（不再出现两条一模一样）
@@ -793,7 +823,8 @@ async function send(text){
       // 带 parentId 就是从该节点分叉：后端只把它的祖先链当上下文，
       // 新问答成为兄弟分支，原分支的节点一个都不动
       body:JSON.stringify(fork?{sessionId:ownerId,question:q,parentId:fork.parentId}
-                              :{sessionId:ownerId,question:q})
+                              :{sessionId:ownerId,question:q}),
+      signal:ac.signal
     });
     if(!r.ok)throw new Error('请求失败（HTTP '+r.status+'）');
     const reader=r.body.getReader(),dec=new TextDecoder();let buf='';
@@ -841,9 +872,14 @@ async function send(text){
   }catch(e){
     // 浏览器 fetch 底层断网时 e.message 就是英文 "network error"。
     // 已收到 done 或已有正文都视为成功收尾，绝不再弹刺眼的红色错误条。
+    aborted=ac.signal.aborted;
     const networkLike=/network|fetch|failed|abort|terminated/i.test(e.message||'');
     if(finished){
       // 正常完成，无需提示
+    }else if(aborted){
+      // 用户主动停止：已生成的部分保留在画面上（服务端落库的是同一段内容，
+      // 刷新/切回不会"复活"成别的版本）
+      toast('已停止生成，已收到的部分保留','ok');
     }else if(ai.content){
       if(currentId===ownerId)toast('连接中断，已保留收到的回答','err');
     }else{
@@ -851,11 +887,12 @@ async function send(text){
       showError(networkLike?'连接中断，请检查网络后重试':'回答生成失败，请稍后重试');
     }
   }finally{
-    ai.streaming=false;sending=false;
-    document.getElementById('sendBtn').disabled=false;
+    busyIds.delete(ownerId);delete abortMap[ownerId];
+    ai.streaming=false;
     cacheMessages(ownerId,store);       // 落到归属会话的缓存
+    syncSendBtn();                      // 按钮反映"当前会话"的忙闲：切走后回来状态也是对的
     if(currentId===ownerId){patchStreaming();finalizeCard();scrollBottom(true)}
-    else toast('后台回答已完成','ok');   // 切走了给个轻提示，不打断当前视图
+    else if(!aborted&&!finished)toast('后台回答已完成','ok');   // 切走了给个轻提示
     if(fork)refreshBranchNote(ownerId);  // 刚分完叉：顶部提示"另有 N 轮在其它分支"
   }
 }
@@ -873,7 +910,11 @@ draftBox.addEventListener('input',()=>{
   try{sessionStorage.setItem(draftKey(currentId),draftBox.value)}catch(e){}
 });
 draftBox.addEventListener('keydown',e=>{
-  if(e.key==='Enter'&&!e.shiftKey&&!e.isComposing){e.preventDefault();send()}
+  if(e.key==='Enter'&&!e.shiftKey&&!e.isComposing){
+    e.preventDefault();
+    // 生成中 Enter 不发送也不误触停止——想停就点「停止生成」按钮，防止手滑
+    if(!isBusy(currentId))send();
+  }
 });
 async function clearHistory(){
   try{
@@ -919,6 +960,7 @@ initShell('index');       // 渲染全站统一侧栏 + 服务探活 + 触发一
   loadSessions();
   if(!currentId)newSession();
   Shell.setSession(currentId);
+  syncSendBtn();                                           // 首屏按钮态归位
   // 历史遗留的重名会话（同一个问题问过几遍）后台静默区分开，不阻塞首屏
   dedupeSessionTitles();
 })();

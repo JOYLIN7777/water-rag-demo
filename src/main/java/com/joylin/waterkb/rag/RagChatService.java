@@ -27,6 +27,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
@@ -142,7 +143,11 @@ public class RagChatService {
         // "getOutputStream() has already been called"，最后粗暴关闭连接，浏览器显示 network error。
         // 收尾同时把本次消耗（usage/耗时）序列化进 done 载荷——落库与回显用同一份数据，
         // 保证"页面显示的 token"与"用量统计里的 token"永远对得上。
+        // persisted 防重复写：正常完成与"客户端中断补写"只能发生一个
+        // （用户点停止时 doOnCancel 补落库，恰在 persistThenDone 执行后取消时不重复）。
+        AtomicBoolean persisted = new AtomicBoolean(false);
         Mono<String> persistThenDone = Mono.fromCallable(() -> {
+            if (!persisted.compareAndSet(false, true)) return "[DONE]";
             if (!degraded[0]) breaker.recordSuccess();
             long durationMs = System.currentTimeMillis() - startAt;
 
@@ -200,12 +205,29 @@ public class RagChatService {
         // concatWith 是串行订阅：sources → 所有 message → persist 完成 → done
         // onErrorResume 是最后一道保险：任何残余异常都收敛成 done 事件，
         // 绝不让 onError 传播到 servlet 异步分发，避免连接被异常关闭。
+        // doOnCancel 是「停止生成」的落库兜底：客户端中断 SSE 后整个 Flux 在此终止，
+        // concatWith 里的 persistThenDone 不会再订阅——不补写的话这轮提问整体消失，
+        // 页面只剩本地缓存撑着，刷新/切回就变成不完整状态。
+        // 补写内容 = 提问 + 已生成的部分回答（文末标明是手动停止），不记用量。
         return Flux.just(sse("sources", sourcesJson))
                 .concatWith(tokens.map(t -> sse("message", t)))
                 .concatWith(persistThenDone.map(payload -> sse("done", payload)))
                 .onErrorResume(ex -> {
                     log.error("SSE 流异常，已安全收尾", ex);
                     return Flux.just(sse("done", "{\"done\":true,\"error\":true}"));
+                })
+                .doOnCancel(() -> {
+                    if (!persisted.compareAndSet(false, true)) return;
+                    try {
+                        String partial = answerBuf.toString();
+                        String text = partial.isBlank()
+                                ? "（已手动停止生成）"
+                                : partial + (partial.endsWith("…") ? "" : "……")
+                                  + "（已手动停止生成，以上为停止前已收到的部分）";
+                        appendExchange(sessionId, tenantAtStart, userAtStart, parentId, question, text, hits, null);
+                    } catch (Exception e) {
+                        log.warn("停止生成后的部分落库失败：{}", e.getMessage());
+                    }
                 });
     }
 
