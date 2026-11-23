@@ -23,6 +23,20 @@
   ];
   const svg = name => '<svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">' + (ICONS[name] || '') + '</svg>';
 
+  // 与首页共用同一份 localStorage 会话数据，保证从任意功能页都能回到指定会话
+  function recentSessions() {
+    try {
+      const list = JSON.parse(global.localStorage.getItem('water-rag-sessions') || '[]');
+      return Array.isArray(list)
+        ? list.slice().sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0)).slice(0, 8)
+        : [];
+    } catch (e) { return []; }
+  }
+  function escapeHtml(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, c =>
+      ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  }
+
   function renderSidebar(active) {
     const host = document.getElementById('sidebarHost');
     if (!host) return;
@@ -33,6 +47,12 @@
       '<a class="nav-item' + (n.key === active ? ' active' : '') + '" href="' + n.href + '" title="' + n.label + '">' +
       svg(n.icon) + '<span>' + n.label + '</span></a>'
     ).join('');
+    // 历史会话：与首页同源，点击带 sid 跳回首页自动定位
+    const sess = recentSessions();
+    const sessHtml = sess.length
+      ? sess.map(s => '<a class="session-item" href="index.html?sid=' + encodeURIComponent(s.id) + '" title="' + escapeHtml(s.title || '未命名会话') + '">' +
+          '<span class="session-dot"></span><span class="s-title">' + escapeHtml(s.title || '未命名会话') + '</span></a>').join('')
+      : '<div style="font-size:11px;color:#5c6c8d;padding:6px 8px">暂无会话</div>';
     const aside = document.createElement('div');
     aside.innerHTML =
       '<aside class="sidebar">' +
@@ -40,11 +60,35 @@
           '<div class="brand-mark">水</div>' +
           '<div><div class="brand-title">水利知识库</div><div class="brand-sub">RAG 智能问答系统</div></div>' +
         '</div>' +
-        '<div class="section-label">工作台</div>' +
+        '<div class="section-label" style="margin-top:0">工作台</div>' +
         '<nav class="nav-list">' + items + '</nav>' +
+        '<a class="new-chat" href="index.html?new=1">＋ 新建会话</a>' +
+        '<div class="section-label">历史会话</div>' +
+        '<div class="session-list">' + sessHtml + '</div>' +
+        renderUserBlock() +
         '<div class="sidebar-footer">Spring Boot 3.4 · Spring AI<br>Elasticsearch</div>' +
       '</aside>';
     host.insertBefore(aside.firstElementChild, host.firstChild);
+    bindLogout();
+  }
+
+  // 侧栏底部用户卡片：显示当前登录用户，未登录时提示登录
+  function renderUserBlock() {
+    const auth = global.WrkAuth;
+    const u = auth && auth.getUser && auth.getUser();
+    const name = u ? (u.displayName || u.user) : '演示用户';
+    const tenant = u ? u.tenant : 'default';
+    const initial = (name || 'U').slice(0, 1).toUpperCase();
+    return '<div class="user-block">' +
+        '<div class="user-avatar">' + escapeHtml(initial) + '</div>' +
+        '<div class="user-meta"><div class="user-name" title="' + escapeHtml(name) + '">' + escapeHtml(name) + '</div>' +
+        '<div class="user-tenant">租户 ' + escapeHtml(tenant) + '</div></div>' +
+        '<button class="user-logout" id="logoutBtn" title="退出登录" onclick="WrkAuth.logout()">⏻</button>' +
+      '</div>';
+  }
+
+  function bindLogout() {
+    // 退出按钮用内联 onclick 调 WrkAuth.logout，这里无需额外绑定；保留钩子便于后续扩展
   }
 
   async function checkHealth() {

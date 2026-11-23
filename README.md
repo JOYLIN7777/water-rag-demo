@@ -12,8 +12,9 @@
 | RAG 问答链路 | 提问 → 向量化 → ES 混合检索 → 外置 Prompt 模板拼装上下文 → 大模型流式生成（SSE）；含来源溯源与超时/API 异常熔断降级（返回检索原文） |
 | 模型可插拔 | 数据库配置 CHAT/EMBEDDING 模型，API Key 脱敏、连通性测试、切换即时生效；兼容公有云 API 与内网私有化模型（OpenAI 兼容协议） |
 | 会话树 | pi-mono 风格消息树：**fork**（从任意历史节点开新支）/ **rewind**（只移动当前位置不删节点）；上下文只取祖先链，兄弟分支不串 |
-| 认证与治理 | 零依赖 JWT（HS256）Bearer 认证，sub/groups/tenant claims；**工具权限白名单**（默认拒绝）；**审计日志**落 PostgreSQL，覆盖所有 API + 401 + 工具越权 |
-| Web 前端 | 零依赖静态页（手写渲染，无需 npm）：问答页、文档管理、检索实验、模型配置、会话树、企业治理中心 |
+| 登录与认证 | **用户名密码登录页** + JWT（HS256）双令牌：access 30 分钟 / refresh 7 天，刷新轮换、登出拉黑、refresh 令牌禁止访问业务 API；密码 PBKDF2 加盐慢哈希（零新增依赖，明文不驻留）；claims 携带 sub/groups/tenant；未登录访问 API 一律 401 |
+| 认证与治理 | 全局 Bearer 拦截 + **工具权限白名单**（默认拒绝）；**审计日志**落 PostgreSQL，覆盖所有 API + 登录失败 + 401 + 工具越权；`REQUIRE_LOGIN=false` 可切回 X-User 演示头模式 |
+| Web 前端 | 零依赖静态页（手写渲染，无需 npm）：登录页、问答页、文档管理、检索实验、模型配置、会话树、企业治理中心；全站统一侧栏，401 自动刷新令牌 |
 
 ## 架构图
 
@@ -76,7 +77,14 @@ mvn -DskipTests package
 docker compose up -d --build app
 
 # 4. 浏览器访问 http://localhost:8080（容器 8080 已映射到宿主机）
+#    首次会跳转登录页，演示账号：admin / Admin@123456（管理员）、analyst / Analyst@123456（分析员）
 ```
+
+登录配置（`application.yml` 的 `security.auth`）：
+- `require-login`（默认 `true`）：未登录访问 API 一律 401；设 `REQUIRE_LOGIN=false` 可切回 `X-User/X-Groups` 演示头模式，方便作品集现场演示免登录链路。
+- `users`：初始账号串，格式 `用户名|密码|组(逗号分隔)|租户|显示名`，多个账号用 `;` 分隔；可用环境变量 `AUTH_USERS` 整体覆盖。密码启动时经 PBKDF2 加盐哈希后只保留哈希，明文不驻留内存。
+- `access-ttl-seconds` / `refresh-ttl-seconds`：access 令牌 30 分钟，refresh 令牌 7 天；刷新时旧 refresh 立即轮换失效，登出会把 access 拉黑到自然过期。
+- 生产务必替换演示密码、改用数据库用户表并开启 HTTPS；JWT 密钥用 `JWT_SECRET` 注入。
 
 容器网络说明：容器内通过服务名 `postgres` 访问数据库（compose 内置 DNS），通过
 `host.docker.internal` 访问宿主机的 Redis；两处地址由 `application.yml` 的环境变量
@@ -201,13 +209,14 @@ water-rag-demo
 ## 测试
 
 ```bash
-mvn test   # 38 例：切片5 + 熔断6 + 多格式7 + RRF/DSL/权限5 + JWT4 + 工具权限5 + 脱敏3 + 其他
+mvn test   # 43 例：切片5 + 熔断6 + 多格式9 + RRF/DSL/权限6 + 认证5 + JWT4 + 工具权限5 + 脱敏/其他3
 mvn package -DskipTests   # 打包后 docker compose up -d --build app
 ```
 
 测试覆盖说明：
 - `DocumentIngestServiceTest`：Mockito 捕获 `vectorStore.add()` 参数，验证 xlsx 表头语义、csv 引号转义、docx 经 Tika 真实解析、非法/空文件拒绝，**无需真实数据库和 API Key**；
 - `EsHybridSearchServiceTest`：RRF 跨路去重/Top-K 截断、BM25 与 kNN DSL 结构、权限 filter 强制注入租户与用户组；
+- `AuthServiceTest`：PBKDF2 加盐不可逆、正确/错误密码校验、损坏哈希不抛异常、用户库加载认证、access/refresh 令牌类型区分；
 - `JwtServiceTest`：合法 token、篡改签名、过期、格式错误四类路径；
 - `ToolPermissionRegistryTest`：默认拒绝、组命中放行、管理员放行、未注册工具拒绝；
 - `ParagraphSplitterTest` / `LlmCircuitBreakerTest` / `ModelConfigTest`：切片边界、熔断状态机、API Key 脱敏。
@@ -218,10 +227,11 @@ mvn package -DskipTests   # 打包后 docker compose up -d --build app
 
 | 演示项 | 操作 | 预期效果 |
 |---|---|---|
-| 认证 | 治理页签发演示 Token，用 `Authorization: Bearer xxx` 调 `/api/auth/me` | 返回 JWT 里的用户/组/租户；伪造或过期 Token 返回 401 |
-| 多租户 | 分别以 `X-Tenant: dept-a` / `dept-b` 上传同名文件 | 两租户检索/列表互不可见；跨租户删除返回"不存在" |
-| 行级权限 | 匿名 / water-dept 组用户查同一问题 | 匿名只见 public 文档，组内用户可见内部文档 |
-| 工具权限 | 匿名 / outsider / water-dept 调 `/api/chat/tool/water` | 前两者返回 PERMISSION_DENIED，后者返回水情数据 |
+| 登录认证 | 登录页用 `admin/Admin@123456` 登录，错误密码再试一次 | 正确登录跳问答页并回显用户；错误密码 401；未登录直访 API 也 401 |
+| 令牌安全 | 登录响应里的 refresh token 拿来调 `/api/docs/list`；再用它刷新后拿旧 refresh 重放 | refresh 访问业务 API 被拒（401）；旧 refresh 重放被拒；登出后 access 立即失效 |
+| 多租户 | 用 `admin`（default 租户）登录，另配 `X-Tenant` 头或换租户账号上传同名文件 | 不同租户检索/列表互不可见；跨租户删除返回"不存在" |
+| 行级权限 | 分别以有/无 `water-dept` 组的账号查同一问题 | 组内用户可见内部文档，无组用户只见 public 文档 |
+| 工具权限 | 分别用 admin（含 water-dept）与其他组账号调 `/api/chat/tool/water` | 无权限组返回 PERMISSION_DENIED，water-dept 组返回水情数据 |
 | 会话树 | 问答页顶栏进「会话树」，从历史节点 fork 或 rewind | 新分支保留旧分支；切回旧分支上下文不串 |
 | 审计 | 治理页查看审计日志 | 每次 API 调用、401、工具越权均有记录，按租户隔离 |
 
@@ -231,7 +241,7 @@ mvn package -DskipTests   # 打包后 docker compose up -d --build app
 - 表格单 sheet 最多读 5000 行、100 列（防内存溢出，可在 `DocumentIngestService` 常量调整）；
 - ES 中文用 standard analyzer 按字符切分，BM25 召回宽、精度低，靠向量检索弥补；生产可换 IK 分词插件；
 - RRF 在应用层实现（两次 ES 往返），兼容 ES 8.13；ES 8.15+ 可换原生 retriever 减一次往返；
-- JWT 用 HS256 共享密钥 + 演示签发端点；生产应对接真实 IdP 的 JWKS 验签并关闭签发端点；
+- JWT 用 HS256 共享密钥（手写零依赖实现），演示签发端点 `/api/auth/token` 默认关闭；生产应对接真实 IdP 的 JWKS 验签；用户库目前是配置文件内存实现，生产应换数据库用户表；
 - 会话树节点目前不裁剪（永久保留），大体量场景需加节点上限与冷归档；
 - 多轮追问可加 query 改写（把"那它的校核水位呢"改写成独立问题再检索）；
 - 工具权限目前是内存规则表，生产应落到数据库并支持运行时配置。

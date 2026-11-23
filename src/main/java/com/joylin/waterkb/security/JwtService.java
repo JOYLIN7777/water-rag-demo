@@ -55,8 +55,18 @@ public class JwtService {
 
     public boolean enabled() { return enabled; }
 
-    /** 签一个演示 token（生产环境由 IdP 签发，此端点应关闭） */
+    /** 签一个演示 token（生产环境由 IdP 签发，此端点应关闭）。默认 access 类型，兼容旧调用。 */
     public String issue(String user, List<String> groups, String tenant, long ttlSeconds) {
+        return issue(user, groups, tenant, ttlSeconds, "access", java.util.UUID.randomUUID().toString());
+    }
+
+    /**
+     * 签发带类型与 jti 的 token。
+     * @param type access / refresh —— 刷新令牌只能用于换票，不能访问业务接口
+     * @param jti  令牌唯一 ID，登出时据此拉黑
+     */
+    public String issue(String user, List<String> groups, String tenant, long ttlSeconds,
+                        String type, String jti) {
         try {
             Map<String, Object> header = new LinkedHashMap<>();
             header.put("alg", "HS256");
@@ -70,6 +80,8 @@ public class JwtService {
             claims.put("iat", now);
             claims.put("exp", now + ttlSeconds);
             claims.put("iss", "water-rag-demo");
+            claims.put("type", type);
+            claims.put("jti", jti);
 
             String h = URL_ENCODER.encodeToString(mapper.writeValueAsBytes(header));
             String p = URL_ENCODER.encodeToString(mapper.writeValueAsBytes(claims));
@@ -77,6 +89,18 @@ public class JwtService {
             return signingInput + "." + URL_ENCODER.encodeToString(hmac(signingInput));
         } catch (Exception e) {
             throw new IllegalStateException("JWT 签发失败", e);
+        }
+    }
+
+    /** 解析 token 的 claims（仅供登录链路内部使用，调用方必须先验签） */
+    public JsonNode parseClaimsUnverified(String token) {
+        if (token == null) return null;
+        try {
+            String[] parts = token.split("\\.");
+            if (parts.length != 3) return null;
+            return mapper.readTree(URL_DECODER.decode(parts[1]));
+        } catch (Exception e) {
+            return null;
         }
     }
 

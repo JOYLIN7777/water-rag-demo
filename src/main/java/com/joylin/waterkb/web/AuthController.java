@@ -1,50 +1,137 @@
 package com.joylin.waterkb.web;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.joylin.waterkb.audit.AuditService;
 import com.joylin.waterkb.security.JwtService;
+import com.joylin.waterkb.security.RefreshTokenStore;
 import com.joylin.waterkb.security.UserContext;
+import com.joylin.waterkb.security.UserStore;
+import com.joylin.waterkb.security.UserStore.UserAccount;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 /**
- * 认证演示端点（作品集用：现场签 token → 带 token 访问 → 看身份生效）。
+ * 认证端点：真实登录（用户名密码 → access + refresh）、刷新、登出、身份回显。
  *
- * <p>生产环境必须关闭 /token 端点（security.jwt.issue-endpoint=false），
- * 由真正的 IdP 签发 token；这里保留是为了让评审能一键复现 OIDC 链路。</p>
+ * <p>另保留 {@code /token} 演示签发端点（作品集现场一键复现 OIDC 链路用），
+ * 可通过 {@code security.auth.issue-endpoint=false} 关闭。</p>
  */
 @RestController
 @RequestMapping("/api/auth")
 public class AuthController {
 
     private final JwtService jwt;
+    private final UserStore users;
+    private final RefreshTokenStore store;
+    private final AuditService audit;
+    private final long accessTtl;
+    private final long refreshTtl;
+    private final boolean issueEndpoint;
 
-    public AuthController(JwtService jwt) {
+    public AuthController(JwtService jwt, UserStore users, RefreshTokenStore store, AuditService audit,
+                          @Value("${security.auth.access-ttl-seconds:1800}") long accessTtl,
+                          @Value("${security.auth.refresh-ttl-seconds:604800}") long refreshTtl,
+                          @Value("${security.auth.issue-endpoint:false}") boolean issueEndpoint) {
         this.jwt = jwt;
+        this.users = users;
+        this.store = store;
+        this.audit = audit;
+        this.accessTtl = accessTtl;
+        this.refreshTtl = refreshTtl;
+        this.issueEndpoint = issueEndpoint;
     }
 
-    /** 签发演示 token：sub=用户，groups=组，tenant=租户，TTL 默认 1 小时 */
-    @PostMapping("/token")
-    public Map<String, Object> token(@RequestParam String user,
-                                     @RequestParam(required = false, defaultValue = "") String groups,
-                                     @RequestParam(required = false, defaultValue = "default") String tenant,
-                                     @RequestParam(required = false, defaultValue = "3600") long ttlSeconds) {
-        List<String> list = java.util.Arrays.stream(groups.split(","))
-                .map(String::trim).filter(s -> !s.isEmpty()).toList();
-        return Map.of(
-                "token", jwt.issue(user, list, tenant, ttlSeconds),
+    /** 登录：校验用户名密码，签发 access + refresh。密码错误与用户不存在返回同样错误，防用户枚举。 */
+    @PostMapping("/login")
+    public ResponseEntity<?> login(@RequestBody Map<String, String> body,
+                                   jakarta.servlet.http.HttpServletRequest req) {
+        String username = body == null ? null : body.get("username");
+        String password = body == null ? null : body.get("password");
+        UserAccount u = users.authenticate(username, password);
+        if (u == null) {
+            audit.record(AuditService.of("default", username == null ? "anonymous" : username, "",
+                    "POST /api/auth/login", "/api/auth/login", "Login failed",
+                    req.getRemoteAddr(), HttpStatus.UNAUTHORIZED.value(), 0, "DENIED"));
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(Map.of("code", 401, "message", "用户名或密码错误"));
+        }
+        String accessJti = UUID.randomUUID().toString();
+        String refreshJti = UUID.randomUUID().toString();
+        String access = jwt.issue(u.username(), u.groups(), u.tenant(), accessTtl, "access", accessJti);
+        String refresh = jwt.issue(u.username(), u.groups(), u.tenant(), refreshTtl, "refresh", refreshJti);
+        store.saveRefresh(refreshJti, u.username(), refreshTtl);
+
+        audit.record(AuditService.of(u.tenant(), u.username(), String.join(",", u.groups()),
+                "POST /api/auth/login", "/api/auth/login", "Login success",
+                req.getRemoteAddr(), HttpStatus.OK.value(), 0, "ALLOW"));
+        return ResponseEntity.ok(Map.of(
+                "accessToken", access,
+                "refreshToken", refresh,
                 "tokenType", "Bearer",
-                "expiresIn", ttlSeconds,
-                "user", user,
-                "groups", list,
-                "tenant", tenant);
+                "expiresIn", accessTtl,
+                "user", u.username(),
+                "displayName", u.displayName(),
+                "groups", u.groups(),
+                "tenant", u.tenant()));
     }
 
-    /** 回显当前请求解析出的身份（验证 JWT 是否生效、租户/组是否正确） */
+    /** 刷新：refresh token 换新的 access + refresh（旧 refresh 立即作废，防重放） */
+    @PostMapping("/refresh")
+    public ResponseEntity<?> refresh(@RequestBody Map<String, String> body) {
+        String token = body == null ? null : body.get("refreshToken");
+        UserContext.CurrentUser principal = token == null ? null : jwt.verify(token);
+        JsonNode claims = jwt.parseClaimsUnverified(token);
+        if (principal == null || claims == null || !"refresh".equals(claims.path("type").asText(""))) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(Map.of("code", 401, "message", "无效或过期的刷新令牌"));
+        }
+        String oldJti = claims.path("jti").asText("");
+        if (!store.isRefreshValid(oldJti, principal.userId())) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(Map.of("code", 401, "message", "刷新令牌已失效，请重新登录"));
+        }
+        store.removeRefresh(oldJti);
+        String accessJti = UUID.randomUUID().toString();
+        String refreshJti = UUID.randomUUID().toString();
+        String access = jwt.issue(principal.userId(), principal.groups(), principal.tenantId(), accessTtl, "access", accessJti);
+        String refresh = jwt.issue(principal.userId(), principal.groups(), principal.tenantId(), refreshTtl, "refresh", refreshJti);
+        store.saveRefresh(refreshJti, principal.userId(), refreshTtl);
+        return ResponseEntity.ok(Map.of(
+                "accessToken", access, "refreshToken", refresh,
+                "tokenType", "Bearer", "expiresIn", accessTtl));
+    }
+
+    /** 登出：拉黑当前 access 的 jti + 删除对应 refresh（需带当前 access token） */
+    @PostMapping("/logout")
+    public ResponseEntity<?> logout(jakarta.servlet.http.HttpServletRequest req) {
+        String auth = req.getHeader("Authorization");
+        if (auth != null && auth.startsWith("Bearer ")) {
+            String token = auth.substring(7).trim();
+            JsonNode claims = jwt.parseClaimsUnverified(token);
+            if (claims != null) {
+                String jti = claims.path("jti").asText(null);
+                store.blacklist(jti, claims.path("exp").asLong(0) - System.currentTimeMillis() / 1000);
+            }
+        }
+        UserContext.CurrentUser u = UserContext.get();
+        audit.record(AuditService.of(u.tenantId(), u.userId(), String.join(",", u.groups()),
+                "POST /api/auth/logout", "/api/auth/logout", "Logout",
+                req.getRemoteAddr(), HttpStatus.OK.value(), 0, "ALLOW"));
+        return ResponseEntity.ok(Map.of("message", "已退出登录"));
+    }
+
+    /** 回显当前身份 */
     @GetMapping("/me")
     public Map<String, Object> me() {
         UserContext.CurrentUser u = UserContext.get();
@@ -54,5 +141,23 @@ public class AuthController {
                 "tenant", u.tenantId(),
                 "authType", u.authType(),
                 "anonymous", u.isAnonymous());
+    }
+
+    /** 演示 token 签发（默认关闭，作品集需要时打开） */
+    @PostMapping("/token")
+    public ResponseEntity<?> token(@RequestParam String user,
+                                   @RequestParam(required = false, defaultValue = "") String groups,
+                                   @RequestParam(required = false, defaultValue = "default") String tenant,
+                                   @RequestParam(required = false, defaultValue = "3600") long ttlSeconds) {
+        if (!issueEndpoint) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(Map.of("message", "演示签发端点已关闭"));
+        }
+        List<String> list = java.util.Arrays.stream(groups.split(","))
+                .map(String::trim).filter(s -> !s.isEmpty()).toList();
+        return ResponseEntity.ok(Map.of(
+                "token", jwt.issue(user, list, tenant, ttlSeconds),
+                "tokenType", "Bearer", "expiresIn", ttlSeconds,
+                "user", user, "groups", list, "tenant", tenant));
     }
 }

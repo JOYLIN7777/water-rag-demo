@@ -58,12 +58,24 @@ spring:
         initialize-schema: false
         dimensions: 1024
 
-# ============ 认证：JWT / OIDC 骨架 ============
+# ============ 认证：企业登录 + JWT / OIDC 骨架 ============
 security:
   jwt:
     # 密钥必须由环境变量注入；默认值仅用于本地 Demo，生产务必覆盖
     secret: ${JWT_SECRET:water-rag-demo-dev-secret-change-in-prod}
     enabled: ${JWT_ENABLED:true}
+  auth:
+    # true=未登录访问 API 一律 401（生产，默认）；false=降级到 X-User 演示头（作品集现场演示）
+    require-login: ${REQUIRE_LOGIN:true}
+    # access 令牌 30 分钟，refresh 令牌 7 天
+    access-ttl-seconds: ${ACCESS_TTL:1800}
+    refresh-ttl-seconds: ${REFRESH_TTL:604800}
+    # 演示签发端点：默认关闭，需要现场复现 OIDC 链路时打开
+    issue-endpoint: ${ISSUE_ENDPOINT:false}
+    # 初始账号：多个账号用分号分隔，单个格式 用户名|密码|组(逗号分隔)|租户|显示名。
+    # 密码可用环境变量整体覆盖（AUTH_USERS），启动时 PBKDF2 哈希，明文不驻留内存对象。
+    # 生产务必改密码并改用数据库用户表；默认 admin 仅用于本地/作品集演示。
+    users: "${AUTH_USERS:admin|Admin@123456|admin,water-dept|default|系统管理员;analyst|Analyst@123456|water-dept|default|水利分析员}"
 
 # ============ Elasticsearch：混合检索底座 ============
 # 容器内用服务名 elasticsearch；本地直连用 localhost
