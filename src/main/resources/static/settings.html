@@ -33,7 +33,7 @@
   <div class="page">
     <div class="page-head">
       <h1 class="page-title">设置</h1>
-      <p class="page-desc">更多功能都放在这里，按需使用即可。标注「管理员」的项目仅管理员可用。</p>
+      <p class="page-desc">更多功能都放在这里，按需使用即可。只显示当前账号有权使用的功能。</p>
     </div>
 
     <div class="setting-grid" id="settingGrid">加载中…</div>
@@ -58,19 +58,19 @@ function renderSettings(){
   const user=WrkAuth.getUser();
   const groups=user&&Array.isArray(user.groups)?user.groups:[];
   const isAdmin=groups.indexOf('admin')>=0;
-  document.getElementById('settingGrid').innerHTML=defs.map(s=>{
+  const visible=defs.filter(s=>{
     const need=s.groups||[];
-    const allowed=!need.length||isAdmin||need.some(g=>groups.indexOf(g)>=0);
-    // 未登录演示模式显示全部
-    const demo=!user;
-    const ok=allowed||demo;
-    return '<a class="setting-card'+(ok?'':' locked')+'" href="'+(ok?s.href:'#')+'" '+(ok?'':'title="当前账号无权访问"')+'>'+
+    // 无权限的入口不展示：不给用户看点了会被拒绝的功能
+    if(!user)return true;                       // 未登录演示模式暂无，guardPage 会跳登录
+    return !need.length||isAdmin||need.some(g=>groups.indexOf(g)>=0);
+  });
+  document.getElementById('settingGrid').innerHTML=visible.length?visible.map(s=>
+    '<a class="setting-card" href="'+s.href+'">'+
       '<span class="setting-icon">'+icon(s.icon)+'</span>'+
-      '<span class="setting-text"><span class="setting-name">'+esc(s.label)+
-        (ok?'':' <span class="tag off">需管理员</span>')+'</span>'+
+      '<span class="setting-text"><span class="setting-name">'+esc(s.label)+'</span>'+
       '<span class="setting-desc">'+esc(s.desc)+'</span>'+
-      '<span class="setting-go">'+(ok?'进入功能 →':'当前账号无权限')+'</span></span></a>';
-  }).join('');
+      '<span class="setting-go">进入功能 →</span></span></a>').join('')
+    :'<div class="card"><div class="empty-inline">当前账号暂无可使用的设置项</div></div>';
 }
 
 initShell('settings');

@@ -48,16 +48,22 @@ public class ConversationTreeStore {
     private static final String BRANCH = "water:rag:branches:";
 
     /**
-     * Redis key 加租户前缀：同名 sessionId 在不同租户下是完全隔离的两棵树。
-     * 从 UserContext 取租户，调用方无法传参切换——这是多租户隔离的关键落点。
+     * Redis key = 前缀 + 租户 + 账号 + sessionId。
+     *
+     * <p>账号必须进 key：只按租户隔离时，默认配置下所有账号同属 default 租户，
+     * 不同账号用同一个 sessionId 会读到同一棵树（可跨账号读、续写、删除）。
+     * 把 userId 作为 key 的一段后，sessionId 即使相同也天然落在各自命名空间，
+     * 无需额外的 sessionId↔用户绑定表，也不怕前端传可预测的 sessionId。</p>
      */
     private String key(String prefix, String sessionId) {
-        return keyFor(prefix, UserContext.get().tenantId(), sessionId);
+        UserContext.CurrentUser u = UserContext.get();
+        return keyFor(prefix, u.tenantId(), u.userId(), sessionId);
     }
 
-    private String keyFor(String prefix, String tenant, String sessionId) {
-        String t = tenant == null || tenant.isBlank() ? "default" : tenant;
-        return prefix + t + ":" + sessionId;
+    private String keyFor(String prefix, String tenant, String user, String sessionId) {
+        String t = tenant == null || tenant.isBlank() ? "default" : tenant.trim();
+        String u = user == null || user.isBlank() ? "anonymous" : user.trim();
+        return prefix + t + ":" + u + ":" + sessionId;
     }
 
     private final StringRedisTemplate redis;
@@ -78,34 +84,35 @@ public class ConversationTreeStore {
      */
     public String append(String sessionId, String parentId, String role, String content,
                          List<Map<String, Object>> sources, String branch) {
-        return append(sessionId, UserContext.get().tenantId(), parentId, role, content, sources, branch);
+        UserContext.CurrentUser u = UserContext.get();
+        return append(sessionId, u.tenantId(), u.userId(), parentId, role, content, sources, branch);
     }
 
     /**
-     * 显式传租户的 append——给 Reactor 异步回调用。
-     * ThreadLocal 在 SSE 流完成时已被 Filter 清除，异步线程读不到原租户，
-     * 必须由同步阶段捕获身份快照传进来，否则消息会串到 default 租户。
+     * 显式传租户+账号的 append——给 Reactor 异步回调用。
+     * ThreadLocal 在 SSE 流完成时已被 Filter 清除，异步线程读不到原身份，
+     * 必须由同步阶段捕获身份快照传进来，否则消息会串到其他账号/租户。
      */
-    public String append(String sessionId, String tenant, String parentId, String role, String content,
-                         List<Map<String, Object>> sources, String branch) {
+    public String append(String sessionId, String tenant, String user, String parentId, String role,
+                         String content, List<Map<String, Object>> sources, String branch) {
         String id = UUID.randomUUID().toString();
         String parent = parentId == null || parentId.isBlank() ? ROOT : parentId;
         // 防悬空节点：前端传来的 parentId 必须真实存在，否则拒收并回退到当前 head。
         // 不校验的话树会悄悄长出孤儿分支——节点还在 Redis 里但画不出来、检索不到。
-        if (!ROOT.equals(parent) && get(sessionId, tenant, parent).isEmpty()) {
+        if (!ROOT.equals(parent) && get(sessionId, tenant, user, parent).isEmpty()) {
             log.warn("parentId={} 不存在，回退到当前 head", parent);
-            String h = head(sessionId, tenant);
+            String h = head(sessionId, tenant, user);
             parent = h == null ? ROOT : h;
         }
         TreeNode node = new TreeNode(id, parent, role, content, LocalDateTime.now().toString(),
                 sources == null ? List.of() : sources, branch);
         try {
-            redis.opsForHash().put(keyFor(TREE, tenant, sessionId), id, mapper.writeValueAsString(node));
-            redis.opsForValue().set(keyFor(HEAD, tenant, sessionId), id);
+            redis.opsForHash().put(keyFor(TREE, tenant, user, sessionId), id, mapper.writeValueAsString(node));
+            redis.opsForValue().set(keyFor(HEAD, tenant, user, sessionId), id);
             if (branch != null && !branch.isBlank()) {
-                redis.opsForHash().put(keyFor(BRANCH, tenant, sessionId), branch, id);
+                redis.opsForHash().put(keyFor(BRANCH, tenant, user, sessionId), branch, id);
             }
-            refreshTtl(sessionId, tenant);
+            refreshTtl(sessionId, tenant, user);
         } catch (Exception e) {
             log.warn("消息树写入失败（不影响本次回答）", e);
         }
@@ -114,11 +121,17 @@ public class ConversationTreeStore {
 
     /** 当前 head（null 表示会话还没有消息） */
     public String head(String sessionId) {
-        return head(sessionId, UserContext.get().tenantId());
+        UserContext.CurrentUser u = UserContext.get();
+        return head(sessionId, u.tenantId(), u.userId());
     }
 
-    public String head(String sessionId, String tenant) {
-        return redis.opsForValue().get(keyFor(HEAD, tenant, sessionId));
+    public String head(String sessionId, String tenant, String user) {
+        try {
+            return redis.opsForValue().get(keyFor(HEAD, tenant, user, sessionId));
+        } catch (Exception e) {
+            log.warn("读取会话 head 失败，按无历史处理：{}", e.getMessage());
+            return null;
+        }
     }
 
     /** rewind：把 head 移到指定节点；节点必须存在，否则拒绝（防止指针悬空）。 */
@@ -131,16 +144,17 @@ public class ConversationTreeStore {
 
     /** 取单个节点 */
     public java.util.Optional<TreeNode> get(String sessionId, String nodeId) {
-        return get(sessionId, UserContext.get().tenantId(), nodeId);
+        UserContext.CurrentUser u = UserContext.get();
+        return get(sessionId, u.tenantId(), u.userId(), nodeId);
     }
 
-    public java.util.Optional<TreeNode> get(String sessionId, String tenant, String nodeId) {
-        Object raw = redis.opsForHash().get(keyFor(TREE, tenant, sessionId), nodeId);
-        if (raw == null) return java.util.Optional.empty();
+    public java.util.Optional<TreeNode> get(String sessionId, String tenant, String user, String nodeId) {
         try {
+            Object raw = redis.opsForHash().get(keyFor(TREE, tenant, user, sessionId), nodeId);
+            if (raw == null) return java.util.Optional.empty();
             return java.util.Optional.of(mapper.readValue(raw.toString(), TreeNode.class));
         } catch (Exception e) {
-            log.warn("节点反序列化失败：{}", nodeId, e);
+            log.warn("读取节点失败：{}", nodeId, e);
             return java.util.Optional.empty();
         }
     }
@@ -234,15 +248,16 @@ public class ConversationTreeStore {
     }
 
     private void refreshTtl(String sessionId) {
-        refreshTtl(sessionId, UserContext.get().tenantId());
+        UserContext.CurrentUser u = UserContext.get();
+        refreshTtl(sessionId, u.tenantId(), u.userId());
     }
 
-    private void refreshTtl(String sessionId, String tenant) {
+    private void refreshTtl(String sessionId, String tenant, String user) {
         if (props.getHistoryTtlHours() > 0) {
             Duration ttl = Duration.ofHours(props.getHistoryTtlHours());
-            redis.expire(keyFor(TREE, tenant, sessionId), ttl);
-            redis.expire(keyFor(HEAD, tenant, sessionId), ttl);
-            redis.expire(keyFor(BRANCH, tenant, sessionId), ttl);
+            redis.expire(keyFor(TREE, tenant, user, sessionId), ttl);
+            redis.expire(keyFor(HEAD, tenant, user, sessionId), ttl);
+            redis.expire(keyFor(BRANCH, tenant, user, sessionId), ttl);
         }
     }
 }

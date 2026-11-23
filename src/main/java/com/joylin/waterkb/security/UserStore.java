@@ -2,11 +2,14 @@ package com.joylin.waterkb.security;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 
 import jakarta.annotation.PostConstruct;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -30,12 +33,24 @@ public class UserStore {
      */
     private final String configuredUsers;
     private final PasswordHasher hasher;
+    /** 可为 null：单测与无数据库环境只走内存用户库 */
+    private final JdbcTemplate jdbc;
     private final Map<String, UserAccount> users = new LinkedHashMap<>();
 
+    /** 兼容单测：不接数据库，纯内存 */
     public UserStore(PasswordHasher hasher,
                      @Value("${security.auth.users:}") String configuredUsers) {
+        this(hasher, configuredUsers, null);
+    }
+
+    /** 生产构造：后台维护的账号写入 app_users，重启后仍生效 */
+    @Autowired
+    public UserStore(PasswordHasher hasher,
+                     @Value("${security.auth.users:}") String configuredUsers,
+                     JdbcTemplate jdbc) {
         this.hasher = hasher;
         this.configuredUsers = configuredUsers == null ? "" : configuredUsers;
+        this.jdbc = jdbc;
     }
 
     @PostConstruct
@@ -60,6 +75,103 @@ public class UserStore {
         if (users.isEmpty()) {
             log.warn("未配置任何登录账号，登录接口将不可用。请配置 security.auth.users");
         }
+        loadFromDatabase();
+    }
+
+    /** 数据库账号覆盖同名的配置账号，保证后台编辑的结果重启后不丢失 */
+    private void loadFromDatabase() {
+        if (jdbc == null) return;
+        try {
+            jdbc.execute("CREATE TABLE IF NOT EXISTS app_users ("
+                    + "username VARCHAR(64) PRIMARY KEY, password_hash TEXT NOT NULL, "
+                    + "groups TEXT NOT NULL, tenant VARCHAR(64) NOT NULL, "
+                    + "display_name VARCHAR(128), enabled BOOLEAN NOT NULL DEFAULT TRUE, "
+                    + "updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)");
+            jdbc.query("SELECT username,password_hash,groups,tenant,display_name,enabled FROM app_users", rs -> {
+                String username = rs.getString("username").trim().toLowerCase();
+                List<String> groups = Arrays.stream(rs.getString("groups").split(","))
+                        .map(String::trim).filter(s -> !s.isEmpty()).toList();
+                users.put(username, new UserAccount(username, rs.getString("password_hash"), groups,
+                        rs.getString("tenant"), rs.getString("display_name"), rs.getBoolean("enabled")));
+            });
+            log.info("已从 app_users 载入账号，当前账号数 {}", users.size());
+        } catch (Exception e) {
+            log.warn("账号持久化表不可用，后台修改仅在本次运行生效：{}", e.getMessage());
+        }
+    }
+
+    private void persist(UserAccount u) {
+        if (jdbc == null) return;
+        try {
+            jdbc.update("INSERT INTO app_users(username,password_hash,groups,tenant,display_name,enabled,updated_at) "
+                            + "VALUES(?,?,?,?,?,?,CURRENT_TIMESTAMP) ON CONFLICT(username) DO UPDATE SET "
+                            + "password_hash=EXCLUDED.password_hash, groups=EXCLUDED.groups, "
+                            + "tenant=EXCLUDED.tenant, display_name=EXCLUDED.display_name, "
+                            + "enabled=EXCLUDED.enabled, updated_at=CURRENT_TIMESTAMP",
+                    u.username(), u.passwordHash(), String.join(",", u.groups()), u.tenant(),
+                    u.displayName(), u.enabled());
+        } catch (Exception e) {
+            throw new IllegalStateException("账号保存失败：" + e.getMessage(), e);
+        }
+    }
+
+    /** 后台新增账号；用户名小写唯一，初始密码至少 8 位 */
+    public boolean create(String username, String rawPassword, List<String> groups,
+                          String tenant, String displayName) {
+        String name = username == null ? "" : username.trim().toLowerCase();
+        if (name.isBlank() || users.containsKey(name)) return false;
+        if (rawPassword == null || rawPassword.length() < 8) return false;
+        UserAccount u = new UserAccount(name, hasher.hash(rawPassword),
+                groups == null || groups.isEmpty() ? List.of("viewer") : groups,
+                tenant == null || tenant.isBlank() ? "default" : tenant.trim(),
+                displayName == null || displayName.isBlank() ? name : displayName.trim(), true);
+        users.put(name, u);
+        persist(u);
+        log.info("后台创建账号 {}", name);
+        return true;
+    }
+
+    /** 后台编辑：显示名、角色组、租户、启用状态（不改密码） */
+    public boolean update(String username, String displayName, List<String> groups,
+                          String tenant, boolean enabled) {
+        String name = username == null ? "" : username.trim().toLowerCase();
+        UserAccount u = users.get(name);
+        if (u == null) return false;
+        UserAccount next = new UserAccount(name, u.passwordHash(),
+                groups == null || groups.isEmpty() ? u.groups() : groups,
+                tenant == null || tenant.isBlank() ? u.tenant() : tenant.trim(),
+                displayName == null || displayName.isBlank() ? u.displayName() : displayName.trim(),
+                enabled);
+        users.put(name, next);
+        persist(next);
+        log.info("后台更新账号 {}", name);
+        return true;
+    }
+
+    /** 后台删除账号；禁止删除自己由接口层校验 */
+    public boolean delete(String username) {
+        String name = username == null ? "" : username.trim().toLowerCase();
+        if (!users.containsKey(name)) return false;
+        users.remove(name);
+        if (jdbc != null) {
+            try { jdbc.update("DELETE FROM app_users WHERE username=?", name); }
+            catch (Exception e) { throw new IllegalStateException("账号删除失败：" + e.getMessage(), e); }
+        }
+        log.info("后台删除账号 {}", name);
+        return true;
+    }
+
+    /** 后台重置密码（不校验原密码） */
+    public boolean resetPassword(String username, String newPassword) {
+        String name = username == null ? "" : username.trim().toLowerCase();
+        UserAccount u = users.get(name);
+        if (u == null || newPassword == null || newPassword.length() < 8) return false;
+        UserAccount next = new UserAccount(name, hasher.hash(newPassword), u.groups(),
+                u.tenant(), u.displayName(), u.enabled());
+        users.put(name, next);
+        persist(next);
+        log.info("后台重置账号密码 {}", name);
+        return true;
     }
 
     /** 校验用户名密码，成功返回账号，失败返回 null。用户名比较忽略大小写。 */

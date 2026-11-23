@@ -196,12 +196,11 @@ public class EsIndexService {
         }
     }
 
-    /** 按文件名删除（先 _delete_by_query，再 refresh）——强制带当前租户 */
+    /** 按文件名删除（先 _delete_by_query，再 refresh）——强制带租户与账号可见范围 */
     public int deleteByFileName(String fileName) {
-        String tenant = com.joylin.waterkb.security.UserContext.get().tenantId();
         // fileName 本身就是 keyword 类型，没有 .keyword 子字段
         String dsl = "{\"query\":{\"bool\":{\"must\":["
-                + "{\"term\":{\"fileName\":" + quote(fileName) + "}}," + tenantClause(tenant) + "]}}}";
+                + "{\"term\":{\"fileName\":" + quote(fileName) + "}}," + visibilityQuery() + "]}}}";
         try {
             return postJson("/" + props.getIndex() + "/_delete_by_query?refresh=true", dsl).path("deleted").asInt();
         } catch (Exception e) {
@@ -209,16 +208,34 @@ public class EsIndexService {
         }
     }
 
-    /** 文档清单：按 fileName 聚合切片数与权限字段，只看当前租户 */
+    /** 文档清单：按 fileName 聚合切片数与权限字段，只看当前账号可见的文档 */
     public JsonNode listDocuments() {
-        String tenant = com.joylin.waterkb.security.UserContext.get().tenantId();
         String dsl = """
             {"size":0,"query":%s,"aggs":{"files":{"terms":{"field":"fileName","size":1000},
               "aggs":{"latest":{"max":{"field":"uploadedAt"}},
                       "owner":{"terms":{"field":"ownerUser","size":1}},
                       "groups":{"terms":{"field":"allowedGroups","size":10}}}}}}
-            """.formatted(tenantQuery(tenant));
+            """.formatted(visibilityQuery());
         return search(props.getIndex(), dsl).path("aggregations").path("files").path("buckets");
+    }
+
+    /**
+     * 账号可见范围（与检索 EsHybridSearchService 同一规则）：
+     * 租户隔离 AND（自己上传 OR 组可见 OR public）。管理员看全租户，便于后台维护。
+     */
+    private String visibilityQuery() {
+        com.joylin.waterkb.security.UserContext.CurrentUser user =
+                com.joylin.waterkb.security.UserContext.get();
+        if (user.hasGroup("admin")) return tenantQuery(user.tenantId());
+        StringBuilder sb = new StringBuilder("{\"bool\":{\"filter\":[")
+                .append(tenantClause(user.tenantId()))
+                .append(",{\"bool\":{\"should\":[")
+                .append("{\"term\":{\"ownerUser\":").append(quote(user.userId())).append("}}")
+                .append(",{\"term\":{\"allowedGroups\":\"public\"}}");
+        for (String group : user.groups()) {
+            sb.append(",{\"term\":{\"allowedGroups\":").append(quote(group)).append("}}");
+        }
+        return sb.append("],\"minimum_should_match\":1}}]}}").toString();
     }
 
     /** 租户过滤子句：tenantId=当前租户；历史无该字段的数据仅在 default 租户下可见 */

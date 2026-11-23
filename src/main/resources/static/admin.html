@@ -22,7 +22,7 @@
   .perm-pill{background:#f8fafc;border:1px solid var(--line);border-radius:8px;padding:10px 12px;font-size:12px;color:var(--ink-2)}
   .perm-pill b{display:block;color:var(--primary);font-size:12px;margin-bottom:3px}
   .quick-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:14px;margin-bottom:18px}
-  .quick-card{display:block;background:#fff;border:1px solid var(--line);border-radius:var(--radius);padding:18px 20px;text-decoration:none;box-shadow:var(--shadow-sm);transition:all .18s}
+  .quick-card{display:block;width:100%;text-align:left;font-family:inherit;cursor:pointer;background:#fff;border:1px solid var(--line);border-radius:var(--radius);padding:18px 20px;text-decoration:none;box-shadow:var(--shadow-sm);transition:all .18s}
   .quick-card:hover{border-color:#b9cbff;transform:translateY(-2px);box-shadow:0 8px 22px rgba(59,110,245,.12)}
   .quick-card .qc-t{font-size:14px;font-weight:650;color:var(--ink)}
   .quick-card .qc-d{font-size:12px;color:var(--muted);margin-top:6px;line-height:1.6}
@@ -112,10 +112,10 @@
           <div class="stat-card"><div class="stat-num">—</div><div class="stat-label">系统状态</div></div>
         </div>
         <div class="quick-cards">
-          <a class="quick-card" href="manage.html"><div class="qc-t">文档管理 ↗</div><div class="qc-d">上传、查看与删除知识库文档</div></a>
-          <a class="quick-card" href="models.html"><div class="qc-t">模型设置 ↗</div><div class="qc-d">配置对话与文档检索模型</div></a>
-          <a class="quick-card" href="governance.html"><div class="qc-t">权限与日志 ↗</div><div class="qc-d">查看权限范围与操作记录</div></a>
-          <a class="quick-card" href="search.html"><div class="qc-t">检索对比 ↗</div><div class="qc-d">对比不同检索方式的结果</div></a>
+          <button class="quick-card" onclick="goPanel('users')"><div class="qc-t">用户与权限 →</div><div class="qc-d">新增账号、调整角色、启停与重置密码</div></button>
+          <button class="quick-card" onclick="goPanel('docs')"><div class="qc-t">文档管理 →</div><div class="qc-d">在此直接上传、查看与删除知识库文档</div></button>
+          <button class="quick-card" onclick="goPanel('models')"><div class="qc-t">模型设置 →</div><div class="qc-d">在此直接新增、编辑、启用和测试模型</div></button>
+          <button class="quick-card" onclick="goPanel('audit')"><div class="qc-t">操作日志 →</div><div class="qc-d">查看管理员操作与系统审计记录</div></button>
         </div>
         <div class="card"><div class="card-head"><h3>最近操作</h3>
           <button class="btn btn-sm" onclick="loadOverview()">刷新</button></div>
@@ -140,6 +140,7 @@
               <span class="grow"></span>
               <button class="btn btn-sm" onclick="loadUsersData()">刷新</button>
               <button class="btn btn-sm" onclick="exportUsers()">导出用户</button>
+              <button class="btn btn-sm btn-primary" onclick="createUser()">＋ 新增账号</button>
             </div>
             <div class="table-wrap"><table class="data-table">
               <thead><tr><th class="row-idx">序号</th><th>账号</th><th>显示名</th><th>所属角色</th><th>所属空间</th><th>状态</th><th>操作</th></tr></thead>
@@ -211,11 +212,19 @@
       <section class="admin-panel" data-panel="docs">
         <div class="page-head"><h1 class="page-title">文档管理</h1>
           <p class="page-desc">管理知识库中的文档，删除会同时移除其全部片段。</p></div>
-        <div class="card"><div class="card-head"><h3>已入库文档</h3>
-          <div style="display:flex;gap:8px"><button class="btn btn-sm" onclick="loadDocs()">刷新</button>
-            <a class="btn btn-sm btn-primary" href="manage.html">前往上传</a></div></div>
-          <div class="scroll"><table class="data-table"><thead><tr><th>文档名称</th><th>片段数</th><th>上传时间</th><th>操作</th></tr></thead>
-            <tbody id="dList"><tr><td colspan="4" class="empty">加载中…</td></tr></tbody></table></div>
+        <div class="card" style="padding:0">
+          <div class="toolbar" style="background:#fff;border:1px solid var(--line);border-bottom:0;border-radius:var(--radius) var(--radius) 0 0">
+            <input type="file" id="adminDocFiles" multiple hidden onchange="adminUploadDocs()">
+            <button class="btn btn-sm btn-primary" onclick="document.getElementById('adminDocFiles').click()">＋ 选择文件</button>
+            <span id="adminUploadMsg" style="font-size:12px;color:var(--muted)">可多选文件，也可直接拖到下方列表</span>
+            <span class="grow"></span>
+            <button class="btn btn-sm" onclick="loadDocs()">刷新</button>
+          </div>
+          <div class="table-wrap" style="border:1px solid var(--line);border-radius:0 0 var(--radius) var(--radius);background:#fff"
+               ondragover="event.preventDefault()" ondrop="adminDropDocs(event)">
+            <table class="data-table"><thead><tr><th>文档名称</th><th>片段数</th><th>上传人</th><th>上传时间</th><th>操作</th></tr></thead>
+              <tbody id="dList"><tr><td colspan="5" class="empty">加载中…</td></tr></tbody></table>
+          </div>
         </div>
       </section>
 
@@ -223,9 +232,18 @@
       <section class="admin-panel" data-panel="models">
         <div class="page-head"><h1 class="page-title">模型设置</h1>
           <p class="page-desc">查看当前生效的对话与检索模型，完整配置请到模型设置页。</p></div>
-        <div class="card"><div class="card-head"><h3>当前生效配置</h3>
-          <a class="btn btn-sm btn-primary" href="models.html">前往配置</a></div>
-          <table class="kv-table"><tbody id="mInfo"><tr><td colspan="2" class="empty">加载中…</td></tr></tbody></table></div>
+        <div class="card" style="padding:0">
+          <div class="toolbar" style="background:#fff;border:1px solid var(--line);border-bottom:0;border-radius:var(--radius) var(--radius) 0 0">
+            <span style="font-size:12.5px;color:var(--ink)">模型配置（带「生效中」的为当前使用配置）</span>
+            <span class="grow"></span>
+            <button class="btn btn-sm" onclick="loadModelsInfo()">刷新</button>
+            <button class="btn btn-sm btn-primary" onclick="editModel(null)">＋ 新增模型</button>
+          </div>
+          <div class="table-wrap" style="border:1px solid var(--line);border-radius:0 0 var(--radius) var(--radius);background:#fff">
+            <table class="data-table"><thead><tr><th>名称</th><th>类型</th><th>模型标识</th><th>接口地址</th><th>状态</th><th>操作</th></tr></thead>
+              <tbody id="mTable"><tr><td colspan="6" class="empty">加载中…</td></tr></tbody></table>
+          </div>
+        </div>
       </section>
 
       <!-- 用量统计 -->
@@ -377,7 +395,10 @@ function renderUserTable(){
     '<tr><td class="row-idx">'+(i+1)+'</td><td class="name">'+esc(u.username)+'</td><td>'+esc(u.displayName)+'</td>'+
     '<td>'+roleTags(u.groups)+'</td><td>'+esc(tl(u.tenant))+'</td>'+
     '<td>'+(u.enabled?'<span class="tag ok">正常</span>':'<span class="tag off">停用</span>')+'</td>'+
-    '<td><button class="op-btn" onclick="showUser('+i+')">查看</button></td></tr>'
+    '<td><button class="op-btn" onclick="showUser('+i+')">详情</button>'+
+    '<button class="op-btn" onclick="editUser('+i+')">编辑</button>'+
+    '<button class="op-btn" onclick="resetUserPwd('+i+')">重置密码</button>'+
+    '<button class="op-btn danger" onclick="delUser('+i+')">删除</button></td></tr>'
   ).join(''):'<tr><td colspan="7" class="empty-inline">没有符合条件的账号</td></tr>';
   $('uTable')._rows=list;
 }
@@ -394,6 +415,86 @@ function showUser(i){
     '<tr><td>所属空间</td><td>'+esc(tl(u.tenant))+'</td></tr>'+
     '<tr><td>状态</td><td>'+(u.enabled?'正常':'停用')+'</td></tr>'+
     '</tbody></table><div class="hint">密码以加盐哈希存储，任何接口都不返回密码原文或哈希。</div>'});
+}
+
+async function apiWrite(path,opts){
+  const r=await fetch(path,opts);
+  let j={};try{j=await r.json()}catch(e){}
+  if(!r.ok)throw new Error(j.message||('请求失败（'+r.status+'）'));
+  return j;
+}
+function groupChecks(selected){
+  const opts=[['admin','系统管理员'],['analyst','水利分析员'],['viewer','只读用户'],['water-dept','水利业务组'],['ops','运维人员']];
+  return opts.map(([v,l])=>'<label style="display:inline-flex;align-items:center;gap:5px;margin:0 14px 6px 0;font-size:12.5px">'+
+    '<input type="checkbox" name="ug" value="'+v+'"'+((selected||[]).includes(v)?' checked':'')+'>'+l+'</label>').join('');
+}
+function userForm(u){
+  const v=k=>esc(u?u[k]:'');
+  return '<div class="field"><label for="fUsername">登录账号</label>'+
+      '<input id="fUsername" value="'+v('username')+'"'+(u?' disabled':'')+' placeholder="英文字母或数字"></div>'+
+    '<div class="field"><label for="fDisplay">显示名称</label><input id="fDisplay" value="'+v('displayName')+'" placeholder="例如：张工"></div>'+
+    '<div class="field"><label for="fTenant">所属空间</label><input id="fTenant" value="'+(u?v('tenant'):'default')+'"></div>'+
+    (u?'':'<div class="field"><label for="fPwd">初始密码</label><input id="fPwd" type="password" placeholder="至少 8 位"></div>')+
+    '<div class="field"><label>角色 / 用户组</label><div style="padding-top:4px">'+groupChecks(u?u.groups:['viewer'])+'</div></div>'+
+    (u?'<div class="field"><label style="display:inline-flex;align-items:center;gap:8px"><input id="fEnabled" type="checkbox"'+(u.enabled?' checked':'')+'>账号正常</label></div>':'');
+}
+function readUserForm(u){
+  return {
+    username:($('fUsername').value||'').trim(),
+    displayName:($('fDisplay').value||'').trim(),
+    tenant:($('fTenant').value||'').trim(),
+    password:u?undefined:($('fPwd').value||''),
+    groups:Array.prototype.slice.call(document.querySelectorAll('input[name=ug]:checked')).map(x=>x.value),
+    enabled:u?$('fEnabled').checked:true
+  };
+}
+function createUser(){
+  Shell.modal({title:'新增账号',body:userForm(null),okText:'创建',onOk:async function(close){
+    const f=readUserForm(null);
+    if(!f.username){appToast('请填写登录账号','err');return false}
+    if(!f.password||f.password.length<8){appToast('初始密码至少 8 位','err');return false}
+    try{
+      await apiWrite('/api/admin/users',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(f)});
+      close();appToast('账号已创建','ok');loadUsersData();
+    }catch(e){appToast(e.message,'err');return false}
+  }});
+}
+function editUser(i){
+  const u=($('uTable')._rows||[])[i];if(!u)return;
+  Shell.modal({title:'编辑账号 · '+u.username,body:userForm(u),okText:'保存',onOk:async function(close){
+    const f=readUserForm(u);
+    try{
+      await apiWrite('/api/admin/users/'+encodeURIComponent(u.username),
+        {method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(f)});
+      close();appToast('账号已更新','ok');loadUsersData();
+    }catch(e){appToast(e.message,'err');return false}
+  }});
+}
+function resetUserPwd(i){
+  const u=($('uTable')._rows||[])[i];if(!u)return;
+  Shell.modal({title:'重置密码 · '+u.username,
+    body:'<p style="margin:0 0 10px;color:var(--muted);font-size:12.5px">重置后旧密码立即失效，新密码至少 8 位。</p>'+
+      '<div class="field"><label for="fNewPwd">新密码</label><input id="fNewPwd" type="password" placeholder="至少 8 位"></div>',
+    okText:'确认重置',onOk:async function(close){
+      const pwd=($('fNewPwd').value||'').trim();
+      if(pwd.length<8){appToast('新密码至少 8 位','err');return false}
+      try{
+        await apiWrite('/api/admin/users/'+encodeURIComponent(u.username)+'/reset-password',
+          {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({password:pwd})});
+        close();appToast('密码已重置','ok');
+      }catch(e){appToast(e.message,'err');return false}
+    }});
+}
+function delUser(i){
+  const u=($('uTable')._rows||[])[i];if(!u)return;
+  Shell.modal({title:'删除账号',danger:true,okText:'确认删除',
+    body:'<p style="margin:0">确定删除账号「'+esc(u.displayName||u.username)+'」（'+esc(u.username)+'）吗？该账号将无法登录。</p>',
+    onOk:async function(close){
+      try{
+        await apiWrite('/api/admin/users/'+encodeURIComponent(u.username),{method:'DELETE'});
+        close();appToast('账号已删除','ok');loadUsersData();
+      }catch(e){appToast(e.message,'err');return false}
+    }});
 }
 
 function exportUsers(){
@@ -540,10 +641,34 @@ async function loadDocs(){
     const docs=await api('/api/docs/list');
     const list=docs.slice().sort((a,b)=>String(b.uploadedAt||'').localeCompare(String(a.uploadedAt||'')));
     $('dList').innerHTML=list.map(d=>
-      '<tr><td class="name">'+esc(d.fileName)+'</td><td>'+num(d.chunks)+'</td><td>'+esc(String(d.uploadedAt||'').slice(0,19))+'</td>'+
+      '<tr><td class="name">'+esc(d.fileName)+'</td><td>'+num(d.chunks)+'</td><td>'+esc(d.ownerUser||'—')+'</td>'+
+      '<td>'+esc(String(d.uploadedAt||'').slice(0,19))+'</td>'+
       '<td><button class="btn btn-sm btn-danger" onclick="delDoc('+JSON.stringify(d.fileName).replace(/"/g,'&quot;')+')">删除</button></td></tr>'
-    ).join('')||'<tr><td colspan="4" class="empty">知识库暂无文档</td></tr>';
+    ).join('')||'<tr><td colspan="5" class="empty">知识库暂无文档</td></tr>';
   }catch(e){console.error(e)}
+}
+function adminDropDocs(e){
+  e.preventDefault();
+  if(e.dataTransfer&&e.dataTransfer.files&&e.dataTransfer.files.length)adminUploadDocs(e.dataTransfer.files);
+}
+async function adminUploadDocs(picked){
+  const files=picked?Array.prototype.slice.call(picked)
+    :Array.prototype.slice.call(($('adminDocFiles')||{files:[]}).files||[]);
+  if(!files.length)return;
+  let ok=0,fail=0;
+  for(let i=0;i<files.length;i++){
+    const fd=new FormData();fd.append('file',files[i]);
+    $('adminUploadMsg').textContent='正在入库 '+files[i].name+'（'+(i+1)+'/'+files.length+'）…';
+    try{
+      const r=await fetch('/api/docs/upload',{method:'POST',body:fd});
+      const j=await r.json().catch(()=>({}));
+      if(!r.ok)throw new Error(j.message||'上传失败');
+      ok++;
+    }catch(e){fail++;console.error(e)}
+  }
+  $('adminUploadMsg').textContent='完成：成功 '+ok+' 个'+(fail?'，失败 '+fail+' 个':'');
+  if($('adminDocFiles'))$('adminDocFiles').value='';
+  appToast('文档入库完成','ok');loadDocs();
 }
 function delDoc(name){
   Shell.modal({title:'删除文档',danger:true,okText:'确认删除',body:
@@ -571,14 +696,66 @@ async function loadLoginLogs(){
 async function loadModelsInfo(){
   try{
     const m=await api('/api/models');
-    const chat=m.find(x=>x.type==='CHAT'&&x.active),emb=m.find(x=>x.type==='EMBEDDING'&&x.active);
-    $('mInfo').innerHTML=
-      '<tr><td>对话模型</td><td>'+(chat?esc(chat.name)+' <span class="tag ok">生效中</span>':'<span class="tag off">未配置</span>')+'</td></tr>'+
-      '<tr><td>接口地址</td><td class="mono">'+esc(chat?chat.baseUrl:'—')+'</td></tr>'+
-      '<tr><td>检索模型</td><td>'+(emb?esc(emb.name)+' <span class="tag ok">生效中</span>':'<span class="tag off">未配置</span>')+'</td></tr>'+
-      '<tr><td>向量维度</td><td>'+(emb?esc(emb.dimensions||'—'):'—')+'</td></tr>'+
-      '<tr><td>配置总数</td><td>'+m.length+' 项</td></tr>';
-  }catch(e){console.error(e)}
+    $('mTable')._rows=m;
+    $('mTable').innerHTML=m.length?m.map((x,i)=>
+      '<tr><td class="name">'+esc(x.name)+'</td><td>'+(x.type==='CHAT'?'对话模型':'检索模型')+'</td>'+
+      '<td class="mono" style="font-size:11px">'+esc(x.model)+'</td>'+
+      '<td class="mono" style="font-size:11px;max-width:210px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(x.baseUrl||'')+'</td>'+
+      '<td>'+(x.active?'<span class="tag ok">生效中</span>':x.enabled?'<span class="tag">已启用</span>':'<span class="tag off">已停用</span>')+'</td>'+
+      '<td><button class="op-btn" onclick="editModel('+i+')">编辑</button>'+
+        (x.active?'':'<button class="op-btn" onclick="activateModel('+x.id+')">启用</button>')+
+        '<button class="op-btn" onclick="testModel('+x.id+')">测试</button>'+
+        (x.active?'':'<button class="op-btn danger" onclick="delModel('+x.id+')">删除</button>')+'</td></tr>').join('')
+      :'<tr><td colspan="6" class="empty">暂无模型配置</td></tr>';
+  }catch(e){$('mTable').innerHTML='<tr><td colspan="6" class="empty">加载失败：'+esc(e.message)+'</td></tr>'}
+}
+function modelForm(m){
+  const v=k=>esc(m?m[k]:'');
+  return '<div class="field"><label for="mfName">配置名称</label><input id="mfName" value="'+v('name')+'" placeholder="例如：生产对话模型"></div>'+
+    '<div class="field"><label for="mfType">类型</label><select id="mfType">'+
+      '<option value="CHAT"'+(m&&m.type==='CHAT'?' selected':'')+'>对话模型</option>'+
+      '<option value="EMBEDDING"'+(m&&m.type==='EMBEDDING'?' selected':'')+'>检索模型</option></select></div>'+
+    '<div class="field"><label for="mfModel">模型标识</label><input id="mfModel" value="'+v('model')+'" placeholder="例如：qwen-plus"></div>'+
+    '<div class="field"><label for="mfUrl">接口地址</label><input id="mfUrl" value="'+v('baseUrl')+'" placeholder="https://..."></div>'+
+    '<div class="field"><label for="mfKey">API Key</label><input id="mfKey" type="password" value="" placeholder="'+(m?'留空表示保持原值':'首次配置必填')+'"></div>'+
+    '<div class="field"><label for="mfDim">向量维度（检索模型必填）</label><input id="mfDim" type="number" value="'+(m&&m.dimensions?m.dimensions:'')+'"></div>'+
+    '<div class="field"><label style="display:inline-flex;align-items:center;gap:8px"><input id="mfEnabled" type="checkbox"'+(!m||m.enabled?' checked':'')+'>启用此配置</label></div>';
+}
+function editModel(i){
+  const m=i==null?null:($('mTable')._rows||[])[i];
+  Shell.modal({title:m?'编辑模型 · '+m.name:'新增模型',body:modelForm(m),okText:'保存',onOk:async function(close){
+    const type=$('mfType').value;
+    const p={name:$('mfName').value.trim(),type,baseUrl:$('mfUrl').value.trim(),
+      apiKey:$('mfKey').value.trim(),model:$('mfModel').value.trim(),
+      dimensions:$('mfDim').value?Number($('mfDim').value):null,enabled:$('mfEnabled').checked};
+    if(!p.name||!p.model||!p.baseUrl){appToast('请填写名称、模型标识和接口地址','err');return false}
+    if(type==='EMBEDDING'&&!p.dimensions){appToast('检索模型必须填写向量维度','err');return false}
+    if(!m&&!p.apiKey){appToast('请填写 API Key（仅保存在服务端）','err');return false}
+    try{
+      await apiWrite(m?'/api/models/'+m.id:'/api/models',
+        {method:m?'PUT':'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(p)});
+      close();appToast(m?'模型配置已更新':'模型配置已创建','ok');loadModelsInfo();
+    }catch(e){appToast(e.message,'err');return false}
+  }});
+}
+async function activateModel(id){
+  try{const j=await apiWrite('/api/models/'+id+'/activate',{method:'POST'});appToast(j.message||'已启用','ok');loadModelsInfo()}
+  catch(e){appToast(e.message,'err')}
+}
+async function testModel(id){
+  try{
+    const j=await apiWrite('/api/models/'+id+'/test',{method:'POST'});
+    Shell.modal({title:'连通性测试 · '+j.name,okText:'关闭',cancelText:'',
+      body:'<pre style="white-space:pre-wrap;font-size:12px;line-height:1.7;margin:0">'+esc(JSON.stringify(j.result,null,2))+'</pre>'});
+  }catch(e){appToast(e.message,'err')}
+}
+function delModel(id){
+  Shell.modal({title:'删除模型配置',danger:true,okText:'确认删除',
+    body:'<p style="margin:0">删除后无法恢复。正在使用的配置需先启用其他模型。</p>',
+    onOk:async function(close){
+      try{await apiWrite('/api/models/'+id,{method:'DELETE'});close();appToast('配置已删除','ok');loadModelsInfo()}
+      catch(e){appToast(e.message,'err');return false}
+    }});
 }
 
 async function loadUsage(){
@@ -607,6 +784,7 @@ async function loadAudit(){
 
 const TITLES={overview:'概览',users:'用户管理',org:'组织架构',roles:'角色定义',perms:'菜单权限',
   docs:'文档管理',models:'模型设置',usage:'用量统计',loginlogs:'登录日志',audit:'操作日志'};
+function goPanel(key){const b=document.querySelector('.admin-nav-item[data-panel="'+key+'"]');if(b)b.click()}
 document.querySelectorAll('.admin-nav-item[data-panel]').forEach(btn=>{
   btn.onclick=()=>{
     const key=btn.dataset.panel;

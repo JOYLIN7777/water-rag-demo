@@ -22,15 +22,13 @@
     { key: 'manage', href: 'manage.html', label: '知识库文档', icon: 'doc', groups: [] }
   ];
   // 设置页内的功能入口（含功能权限控制）
+  // 设置只放面向普通用户的功能；模型配置、权限审计等管理动作统一收进管理后台，
+  // 避免管理员在问答侧和管理后台之间来回跳。
   const SETTINGS = [
     { key: 'search', href: 'search.html', label: '检索对比', icon: 'search',
       desc: '对比关键词检索、语义检索和融合检索的结果，帮助找到更准的答案', groups: [] },
     { key: 'tree', href: 'tree.html', label: '问答分支', icon: 'tree',
-      desc: '从任意一条回答继续追问，或回到之前的问题重新提问', groups: [] },
-    { key: 'models', href: 'models.html', label: '模型设置', icon: 'model',
-      desc: '设置对话与向量模型，支持公有云服务和内网私有模型', groups: ['admin'] },
-    { key: 'governance', href: 'governance.html', label: '权限与日志', icon: 'shield',
-      desc: '查看账号权限范围和最近的操作记录', groups: ['admin'] }
+      desc: '从任意一条回答继续追问，或回到之前的问题重新提问', groups: [] }
   ];
   global.ShellSettings = SETTINGS;
 
@@ -47,13 +45,17 @@
   const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c =>
     ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
-  // ---------- 会话数据（与首页同源 localStorage）----------
+  // ---------- 会话数据（与首页同源 localStorage，按账号隔离）----------
+  function sessionKey() {
+    const a = global.WrkAuth;
+    return 'water-rag-sessions:' + (a && a.scope ? a.scope() : 'demo');
+  }
   function loadSessions() {
-    try { return JSON.parse(global.localStorage.getItem('water-rag-sessions') || '[]'); }
+    try { return JSON.parse(global.localStorage.getItem(sessionKey()) || '[]'); }
     catch (e) { return []; }
   }
   function saveSessions(list) {
-    global.localStorage.setItem('water-rag-sessions', JSON.stringify(list));
+    global.localStorage.setItem(sessionKey(), JSON.stringify(list));
   }
   function fmtTime(ts) {
     if (!ts) return '';
@@ -102,13 +104,18 @@
   }
   function removeSession(id, ev) {
     ev.stopPropagation();
-    if (!global.confirm('确定删除该会话的本地记录吗？')) return;
-    let list = loadSessions().filter(s => s.id !== id);
-    saveSessions(list);
-    if (currentSessionId === id) {
-      if (list.length) pickSession(list[0].id);
-      else newSession();
-    } else renderSessions();
+    openModal({ title: '删除会话', danger: true, okText: '确认删除',
+      body: '<p style="margin:0">删除后本地不再显示该会话，确定继续吗？</p>',
+      onOk: function (close) {
+        let list = loadSessions().filter(s => s.id !== id);
+        saveSessions(list);
+        close();
+        if (currentSessionId === id) {
+          if (list.length) pickSession(list[0].id);
+          else newSession();
+        } else renderSessions();
+      }
+    });
   }
 
   function renderSessions() {
@@ -406,9 +413,17 @@
     mask.querySelector('.modal-close').onclick = closeModal;
     mask.querySelector('.btn-cancel').onclick = closeModal;
     mask.onclick = e => { if (e.target === mask) closeModal(); };
-    mask.querySelector('.btn-ok').onclick = () => {
-      if (typeof opts.onOk === 'function' && opts.onOk(closeModal) === false) return;
-      closeModal();
+    mask.querySelector('.btn-ok').onclick = async () => {
+      if (typeof opts.onOk !== 'function') { closeModal(); return; }
+      let keepOpen = false;
+      try {
+        // 支持异步 onOk：表单保存接口返回 Promise，await 后才能判断要不要保留弹框
+        keepOpen = (await opts.onOk(closeModal)) === false;
+      } catch (e) {
+        keepOpen = true;
+        if (global.appToast) global.appToast(e.message || '操作失败', 'err');
+      }
+      if (!keepOpen) closeModal();
     };
     document.addEventListener('keydown', onModalKey);
     const first = mask.querySelector('input,textarea,select');
@@ -417,10 +432,42 @@
   global.appModal = openModal;
   global.appModalClose = closeModal;
 
+  // ---------- 设置类页面：返回键 + 可点击的层级面包屑 ----------
+  const PAGE_NAV = {
+    'settings.html': { label: '设置', back: 'index.html', backText: '返回问答' },
+    'search.html': { label: '检索对比', parent: 'settings.html', parentLabel: '设置' },
+    'tree.html': { label: '问答分支', parent: 'settings.html', parentLabel: '设置' },
+    'models.html': { label: '模型配置', parent: 'settings.html', parentLabel: '设置' },
+    'governance.html': { label: '权限与日志', parent: 'settings.html', parentLabel: '设置' },
+    'profile.html': { label: '个人中心', back: 'index.html', backText: '返回问答' },
+    'manage.html': { label: '知识库文档', back: 'index.html', backText: '返回问答' }
+  };
+  function renderTopbarNav() {
+    const file = location.pathname.split('/').pop() || 'index.html';
+    const meta = PAGE_NAV[file];
+    const host = document.querySelector('.topbar-left');
+    if (!meta || !host || host.querySelector('.topbar-nav-left')) return;
+    const backHref = meta.parent || meta.back || 'index.html';
+    const backText = meta.parent ? '返回设置' : (meta.backText || '返回');
+    const crumb = meta.parent
+      ? '<a href="' + meta.parent + '">' + esc(meta.parentLabel) + '</a>' +
+        '<span class="crumb-sep">›</span><span class="crumb-current">' + esc(meta.label) + '</span>'
+      : '<span class="crumb-current">' + esc(meta.label) + '</span>';
+    host.insertAdjacentHTML('afterbegin',
+      '<div class="topbar-nav-left"><a class="back-link" href="' + backHref + '">← ' + backText + '</a>' +
+      '<div class="crumb">' + crumb + '</div></div>');
+    // 面包屑已经表达层级，隐藏原页面标题，避免顶栏重复显示同一名称
+    const title = host.querySelector('.topbar-title');
+    const sub = host.querySelector('.topbar-sub');
+    if (title) title.style.display = 'none';
+    if (sub) sub.style.display = 'none';
+  }
+
   global.initShell = function (active) {
     // 未登录直接敲静态页地址也要弹回登录页（静态资源是后端白名单，前端必须自查）
     if (global.WrkAuth && !global.WrkAuth.guardPage()) return;
     renderSidebar(active);
+    renderTopbarNav();
     checkHealth();
     renderAdminEntry();
     loadPermissions();

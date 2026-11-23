@@ -84,13 +84,13 @@
   /* ============ 输入区（参考 FastGPT：居中受限宽度 + 底部工具栏） ============ */
   .composer-wrap{flex:0 0 auto;padding:14px 6% 16px;background:linear-gradient(transparent,var(--bg) 18%)}
   .error-bar{max-width:860px;margin:0 auto 9px;padding:9px 13px;border-radius:8px;background:#fdeef3;color:#b91c4a;font-size:12.5px;border:1px solid #f8cfdc;box-shadow:var(--shadow-sm)}
-  .composer{max-width:860px;margin:0 auto;background:#fff;border:1px solid #d9e0ec;border-radius:14px;box-shadow:var(--shadow-md);transition:all .18s;padding:12px 14px 10px}
+  .composer{max-width:860px;margin:0 auto;background:#fff;border:1px solid #d9e0ec;border-radius:16px;box-shadow:var(--shadow-md);transition:all .18s;padding:15px 17px 11px}
   .composer:focus-within{border-color:var(--primary);box-shadow:0 0 0 4px rgba(59,110,245,.1),var(--shadow-md)}
-  .composer textarea{width:100%;resize:none;border:0;outline:0;font-size:14px;line-height:1.6;max-height:160px;min-height:26px;color:var(--ink);background:transparent;display:block}
-  .composer-bar{display:flex;align-items:center;gap:8px;margin-top:8px}
-  .composer-tool{border:0;background:transparent;color:var(--muted);font-size:11.5px;padding:5px 8px;border-radius:6px;display:inline-flex;align-items:center;gap:5px}
-  .composer-tool:hover{background:var(--primary-soft);color:var(--primary)}
-  .send-btn{border:0;background:linear-gradient(135deg,var(--primary-hi),var(--primary));color:#fff;padding:8px 16px;border-radius:8px;font-size:12.5px;font-weight:600;transition:all .18s;box-shadow:0 3px 10px rgba(59,110,245,.28);display:flex;align-items:center;gap:6px;margin-left:auto}
+  .composer textarea{width:100%;resize:none;border:0;outline:0;font-size:15px;line-height:1.65;max-height:160px;min-height:28px;color:var(--ink);background:transparent;display:block}
+  .composer-bar{display:flex;align-items:center;gap:8px;margin-top:11px;padding-top:10px;border-top:1px solid #f0f3f8}
+  .composer-tool{border:1px solid transparent;background:transparent;color:var(--muted);font-size:12px;padding:5px 9px;border-radius:7px;display:inline-flex;align-items:center;gap:5px;white-space:nowrap}
+  .composer-tool:hover{background:var(--primary-soft);color:var(--primary);border-color:#dbe5ff}
+  .send-btn{border:0;background:linear-gradient(135deg,var(--primary-hi),var(--primary));color:#fff;padding:8px 18px;border-radius:10px;font-size:12.5px;font-weight:600;transition:all .18s;box-shadow:0 3px 10px rgba(59,110,245,.28);display:flex;align-items:center;gap:6px;margin-left:auto}
   .send-btn:hover:not(:disabled){transform:translateY(-1px);box-shadow:0 5px 16px rgba(59,110,245,.36)}
   .composer-tip{text-align:center;font-size:10.5px;color:var(--muted);margin-top:9px;letter-spacing:.2px}
 
@@ -176,8 +176,11 @@
 <script src="assets/app.js"></script>
 <script>
 let sessions=[],currentId='',messages=[],sending=false;
+// 所有本地数据按登录账号分区：换账号登录不会看到上一个账号的会话、消息和草稿
+const SCOPE=(window.WrkAuth&&WrkAuth.scope)?WrkAuth.scope():'demo';
+function sessionKey(){return 'water-rag-sessions:'+SCOPE}
 function loadSessions(){
-  try{sessions=JSON.parse(localStorage.getItem('water-rag-sessions')||'[]')}catch{sessions=[]}
+  try{sessions=JSON.parse(localStorage.getItem(sessionKey())||'[]')}catch{sessions=[]}
   // 支持从功能页侧栏跳回：?sid=xxx 定位指定会话，?new=1 直接新建会话
   const params=new URLSearchParams(location.search);
   const sid=params.get('sid');
@@ -190,13 +193,13 @@ function loadSessions(){
   }else{newSession()}
   renderSessions();
 }
-function saveSessions(){localStorage.setItem('water-rag-sessions',JSON.stringify(sessions))}
+function saveSessions(){localStorage.setItem(sessionKey(),JSON.stringify(sessions))}
 // ============ 按会话隔离的状态（核心：所有会话状态互不干扰）============
 // msgStore[sid] = 该会话的消息数组；草稿也按 sid 存，切换会话绝不串台。
 let msgStore=Object.create(null);
 let historySeq=0; // 会话切换请求序号，忽略过期响应，避免闪屏
-function cacheKey(id){return 'water-rag-msgs:'+id}
-function draftKey(id){return 'water-rag-draft:'+id}
+function cacheKey(id){return 'water-rag-msgs:'+SCOPE+':'+id}
+function draftKey(id){return 'water-rag-draft:'+SCOPE+':'+id}
 function cacheMessages(id,list){
   try{const arr=list||msgStore[id]||[];
     localStorage.setItem(cacheKey(id),JSON.stringify(arr.filter(m=>!m.streaming).map(m=>
@@ -413,6 +416,7 @@ async function send(text){
   const ai={role:'assistant',content:'',sources:[],streaming:true};
   store.push(ai);
   if(currentId===ownerId){renderMessages();scrollBottom(true)}
+  let finished=false;                 // 是否已收到后端 done 事件
   try{
     const r=await fetch('/api/chat/stream',{
       method:'POST',headers:{'Content-Type':'application/json'},
@@ -434,14 +438,27 @@ async function send(text){
         const data=dataLines.join('\n');
         if(ev==='sources'){try{ai.sources=JSON.parse(data)}catch(e){}}
         else if(ev==='message')ai.content+=data;
+        else if(ev==='done')finished=true;
       }
       // 流式增量：只 patch 最后一条卡片正文，绝不重建整列 DOM（消除闪烁）
       // 切走后不再触碰 DOM，避免把别的会话内容搅乱
       if(currentId===ownerId){patchStreaming();scrollBottom()}
+      // 收到 done 就主动收尾：不再继续 read()，避免等服务端关闭 TCP 时
+      // 某些网络环境下 fetch 抛出 "network error" 把正常回答标成失败
+      if(finished)break;
     }
   }catch(e){
-    showError(e.message);
-    if(!ai.content)ai.content='（回答生成失败，请稍后重试）';
+    // 浏览器 fetch 底层断网时 e.message 就是英文 "network error"。
+    // 已收到 done 或已有正文都视为成功收尾，绝不再弹刺眼的红色错误条。
+    const networkLike=/network|fetch|failed|abort|terminated/i.test(e.message||'');
+    if(finished){
+      // 正常完成，无需提示
+    }else if(ai.content){
+      if(currentId===ownerId)toast('连接中断，已保留收到的回答','err');
+    }else{
+      ai.content='（回答生成失败，请稍后重试）';
+      showError(networkLike?'连接中断，请检查网络后重试':'回答生成失败，请稍后重试');
+    }
   }finally{
     ai.streaming=false;sending=false;
     document.getElementById('sendBtn').disabled=false;

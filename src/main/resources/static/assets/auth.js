@@ -106,6 +106,15 @@
   function isLoggedIn() { return !!(getAccess() || getRefresh()); }
 
   /**
+   * 当前账号的数据命名空间。会话列表、消息缓存、草稿等 localStorage/sessionStorage
+   * 都必须带这个前缀——否则同一浏览器切换账号会直接看到上一个账号的会话。
+   */
+  function scope() {
+    const u = getUser();
+    return u && u.user ? String(u.user) : 'demo';
+  }
+
+  /**
    * 页面级登录守卫：静态页是后端白名单，直接敲 URL 也能打开，
    * 因此前端必须在渲染前检查登录态——只有 access/refresh 都在才放行。
    * 退出登录会清掉两者，之后直接访问 /manage.html 会被弹回登录页。
@@ -119,7 +128,7 @@
   }
 
   global.WrkAuth = {
-    getAccess, getRefresh, getUser, saveSession, clearSession,
+    getAccess, getRefresh, getUser, saveSession, clearSession, scope,
     doRefresh, logout, goLogin, isLoggedIn, guardPage, rawFetch
   };
 })(window);

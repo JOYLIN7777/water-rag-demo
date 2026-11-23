@@ -122,16 +122,29 @@ public class RagChatService {
         }
 
         // 统一收尾：先落库（同步、可观测），再发 done。所有分支（正常/熔断/降级）都经过这里。
+        // 落库异常必须自己吃掉：SSE 响应已以 text/event-stream 提交，一旦异常外溢到
+        // Spring MVC 的 @ExceptionHandler，容器会试图写 JSON 错误体而触发
+        // "getOutputStream() has already been called"，最后粗暴关闭连接，浏览器显示 network error。
         Mono<Void> persist = Mono.fromRunnable(() -> {
             if (!degraded[0]) breaker.recordSuccess();
-            appendExchange(sessionId, tenantAtStart, parentId, question, answerBuf.toString(), hits);
+            try {
+                appendExchange(sessionId, tenantAtStart, userAtStart, parentId, question, answerBuf.toString(), hits);
+            } catch (Exception e) {
+                log.error("对话历史落库失败（不影响本次回答）", e);
+            }
         });
 
         // ===== 阶段 6：包装成 SSE 事件流 =====
         // concatWith 是串行订阅：sources → 所有 message → persist 完成 → done
+        // onErrorResume 是最后一道保险：任何残余异常都收敛成 done 事件，
+        // 绝不让 onError 传播到 servlet 异步分发，避免连接被异常关闭。
         return Flux.just(sse("sources", sourcesJson))
                 .concatWith(tokens.map(t -> sse("message", t)))
-                .concatWith(persist.thenMany(Mono.just(sse("done", "[DONE]"))));
+                .concatWith(persist.thenMany(Mono.just(sse("done", "[DONE]"))))
+                .onErrorResume(ex -> {
+                    log.error("SSE 流异常，已安全收尾", ex);
+                    return Flux.just(sse("done", "[DONE]"));
+                });
     }
 
     /**
@@ -196,13 +209,13 @@ public class RagChatService {
      * 同一次问答的两条消息用父子关系绑定，rewind 到 user 即丢弃这次回答，
      * rewind 到 assistant 则完整保留——可精确控制回滚粒度。
      */
-    private void appendExchange(String sessionId, String tenant, String parentId, String question,
+    private void appendExchange(String sessionId, String tenant, String user, String parentId, String question,
                                 String answer, List<Document> hits) {
-        // 全程用显式 tenant：异步回调线程没有 ThreadLocal 身份，不能读 UserContext
+        // 全程用显式 tenant+user：异步回调线程没有 ThreadLocal 身份，不能读 UserContext
         String parent = parentId == null || parentId.isBlank()
-                ? historyStore.head(sessionId, tenant) : parentId;
-        String userNode = historyStore.append(sessionId, tenant, parent, "user", question, null, null);
-        historyStore.append(sessionId, tenant, userNode, "assistant", answer, toSourceMaps(hits), null);
+                ? historyStore.head(sessionId, tenant, user) : parentId;
+        String userNode = historyStore.append(sessionId, tenant, user, parent, "user", question, null, null);
+        historyStore.append(sessionId, tenant, user, userNode, "assistant", answer, toSourceMaps(hits), null);
     }
 
     /** 把检索命中转成可存入节点 JSON 的来源片段（回显引用卡片用） */

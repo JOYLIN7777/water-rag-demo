@@ -2,6 +2,7 @@ package com.joylin.waterkb.security;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.joylin.waterkb.audit.AuditService;
+import jakarta.servlet.DispatcherType;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.http.MediaType;
@@ -35,6 +36,12 @@ public class PermissionInterceptor implements HandlerInterceptor {
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler)
             throws IOException {
+        // SSE 这类异步请求在流完成后会触发一次 ASYNC dispatch 重新经过拦截器链。
+        // 那时身份 Filter 的 finally 已清理 ThreadLocal（get() 得到 anonymous），
+        // 且响应已用 getOutputStream() 提交——放行这次 dispatch，否则会误判匿名、
+        // 走 403 分支调 getWriter()，与 getOutputStream() 冲突导致连接被异常关闭，
+        // 浏览器端表现为流式回答后冒出 network error。
+        if (request.getDispatcherType() == DispatcherType.ASYNC) return true;
         if (!(handler instanceof HandlerMethod hm)) return true;
 
         RequirePermission ann = hm.getMethodAnnotation(RequirePermission.class);

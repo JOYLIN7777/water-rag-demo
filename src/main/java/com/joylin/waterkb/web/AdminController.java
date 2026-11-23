@@ -6,22 +6,28 @@ import com.joylin.waterkb.security.RequirePermission;
 import com.joylin.waterkb.security.RolePermissions;
 import com.joylin.waterkb.security.UserContext;
 import com.joylin.waterkb.security.UserStore;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
 /**
- * 管理后台的只读聚合接口：用户、角色、菜单权限、登录日志。
+ * 管理后台接口：用户查询与维护、角色权限、登录日志。
  *
- * <p>只做查询，不提供用户增删改——当前用户库是内存实现，
- * 做 CRUD 会是"看起来能改、重启就丢"的假功能，对作品集是减分项。
- * 真实的写操作应接数据库用户表后开放。全部端点要求 ADMIN_ACCESS 权限。</p>
+ * <p>账号 CRUD 写入 app_users 表，重启后仍生效；写操作全部要求 ADMIN_ACCESS 权限。
+ * 防止管理员把自己锁在外面：禁止删除自己、禁止把自己禁用或移除 admin 组、
+ * 禁止删除/降级最后一个管理员。</p>
  */
 @RestController
 @RequestMapping("/api/admin")
@@ -52,6 +58,80 @@ public class AdminController {
             out.add(m);
         }
         return out;
+    }
+
+    /** 新增账号 */
+    @PostMapping("/users")
+    public Map<String, Object> createUser(@RequestBody Map<String, Object> body) {
+        String username = str(body.get("username"));
+        if (!users.create(username, str(body.get("password")), strList(body.get("groups")),
+                str(body.get("tenant")), str(body.get("displayName")))) {
+            throw new IllegalArgumentException("账号已存在，或初始密码不足 8 位");
+        }
+        return Map.of("message", "账号已创建", "username", username.toLowerCase());
+    }
+
+    /** 编辑账号：显示名、角色组、空间、启用状态 */
+    @PutMapping("/users/{username}")
+    public Map<String, Object> updateUser(@PathVariable String username, @RequestBody Map<String, Object> body) {
+        String name = username.toLowerCase();
+        String me = UserContext.get().userId();
+        List<String> groups = strList(body.get("groups"));
+        boolean enabled = !body.containsKey("enabled") || Boolean.parseBoolean(String.valueOf(body.get("enabled")));
+        if (name.equals(me) && (!enabled || !groups.contains("admin"))) {
+            throw new IllegalArgumentException("不能禁用自己或移除自己的管理员角色");
+        }
+        UserStore.UserAccount before = users.find(name);
+        if (before != null && before.groups().contains("admin")
+                && (!enabled || !groups.contains("admin")) && isLastAdmin(name)) {
+            throw new IllegalArgumentException("不能停用或降级最后一个管理员");
+        }
+        if (!users.update(name, str(body.get("displayName")), groups, str(body.get("tenant")), enabled)) {
+            throw new IllegalArgumentException("账号不存在：" + name);
+        }
+        return Map.of("message", "账号已更新", "username", name);
+    }
+
+    /** 删除账号：保护自己与最后一个管理员 */
+    @DeleteMapping("/users/{username}")
+    public Map<String, Object> deleteUser(@PathVariable String username) {
+        String name = username.toLowerCase();
+        if (name.equals(UserContext.get().userId())) {
+            throw new IllegalArgumentException("不能删除当前登录账号");
+        }
+        if (isLastAdmin(name)) throw new IllegalArgumentException("不能删除最后一个管理员");
+        if (!users.delete(name)) throw new IllegalArgumentException("账号不存在：" + name);
+        return Map.of("message", "账号已删除", "username", name);
+    }
+
+    /** 重置密码：不要求原密码，仅管理员可操作 */
+    @PostMapping("/users/{username}/reset-password")
+    public Map<String, Object> resetPassword(@PathVariable String username, @RequestBody Map<String, Object> body) {
+        String name = username.toLowerCase();
+        if (!users.resetPassword(name, str(body.get("password")))) {
+            throw new IllegalArgumentException("账号不存在，或新密码不足 8 位");
+        }
+        return Map.of("message", "密码已重置", "username", name);
+    }
+
+    private boolean isLastAdmin(String candidate) {
+        int admins = 0;
+        for (UserStore.UserAccount u : users.list()) {
+            if (u.enabled() && u.groups().contains("admin") && !u.username().equals(candidate)) admins++;
+        }
+        return admins == 0;
+    }
+
+    private static String str(Object v) { return v == null ? "" : String.valueOf(v).trim(); }
+
+    @SuppressWarnings("unchecked")
+    private static List<String> strList(Object v) {
+        if (v instanceof List<?> list) {
+            return list.stream().map(String::valueOf).map(String::trim).filter(s -> !s.isEmpty()).toList();
+        }
+        String s = str(v);
+        return s.isEmpty() ? List.of() : Arrays.stream(s.split(",")).map(String::trim)
+                .filter(x -> !x.isEmpty()).toList();
     }
 
     /** 角色 → 权限码矩阵 */
