@@ -52,8 +52,15 @@
   .session-item:hover .session-delete{opacity:1}
   .session-delete:hover{color:#ff8fab;background:rgba(255,255,255,.08)}
 
-  .upload-area{border-top:1px solid rgba(255,255,255,.09);padding-top:4px;margin-top:10px}
-  .upload-area .section-label{margin-top:14px}
+  /* 上传区默认折叠，把空间让给历史会话列表 */
+  .upload-area{border-top:1px solid rgba(255,255,255,.09);margin-top:8px;padding-top:8px;flex:0 0 auto}
+  .upload-toggle{width:100%;display:flex;align-items:center;gap:8px;border:0;background:transparent;color:#9fb0d0;font-size:11.5px;padding:5px 6px;border-radius:7px;cursor:pointer;text-align:left;transition:all .15s}
+  .upload-toggle:hover{background:rgba(255,255,255,.06);color:#dbe6ff}
+  .upload-toggle .t{flex:1}
+  .upload-toggle .caret{font-size:10px;transition:transform .2s;color:#6f80a4}
+  .upload-area.open .upload-toggle .caret{transform:rotate(90deg)}
+  .upload-body{display:none;padding-top:6px}
+  .upload-area.open .upload-body{display:block}
   .dropzone{border:1.5px dashed rgba(139,164,255,.32);border-radius:10px;padding:15px 10px;text-align:center;cursor:pointer;transition:all .2s;background:rgba(255,255,255,.025)}
   .dropzone:hover,.dropzone.dragging{border-color:var(--primary-hi);background:rgba(59,110,245,.18)}
   .drop-icon{font-size:21px;color:#8fb0ff;line-height:1}
@@ -107,21 +114,27 @@
   .msg-group{margin-bottom:30px}
   .msg-group.user{display:flex;justify-content:flex-end}
   .user-bubble{max-width:78%;background:var(--primary-soft);color:#1e3a8a;border:1px solid #d6e4ff;border-radius:14px 14px 4px 14px;padding:12px 17px;font-size:14px;line-height:1.7;white-space:pre-wrap;box-shadow:var(--shadow-sm)}
-  .ai-card{background:#fff;border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow-sm);overflow:hidden}
-  .ai-card-head{display:flex;align-items:center;gap:8px;padding:10px 16px;background:#fafbfd;border-bottom:1px solid var(--line);font-size:11.5px;color:var(--muted)}
-  .ai-badge{width:22px;height:22px;border-radius:6px;background:linear-gradient(135deg,var(--primary-hi),var(--primary));color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700}
+  /* 回答框：参考 WorkBuddy——轻边框、无重底色头部、左侧色条、正文/引用分区 */
+  .ai-card{background:#fff;border:1px solid var(--line);border-left:3px solid var(--primary);border-radius:12px;box-shadow:var(--shadow-sm);overflow:hidden}
+  .ai-card-head{display:flex;align-items:center;gap:8px;padding:12px 17px 2px;font-size:11.5px;color:var(--muted)}
+  .ai-badge{width:20px;height:20px;border-radius:6px;background:linear-gradient(135deg,var(--primary-hi),var(--primary));color:#fff;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700}
   .ai-card-name{font-weight:600;color:var(--ink-2)}
   .ai-card-actions{margin-left:auto;display:flex;gap:4px}
   .icon-btn{border:0;background:transparent;color:var(--muted);width:26px;height:26px;border-radius:6px;font-size:12.5px;line-height:1;transition:all .15s}
   .icon-btn:hover{background:var(--primary-soft);color:var(--primary)}
-  .ai-card-body{padding:15px 18px;font-size:14px;line-height:1.75;color:var(--ink)}
-  /* 引用角标行：参考 FastGPT 的 #1 检索 0.8534 */
-  .cite-row{display:flex;flex-wrap:wrap;gap:6px;padding:0 18px 13px}
-  .cite-chip{display:inline-flex;align-items:center;gap:5px;border:1px solid #dbe6ff;background:#f7faff;color:#25469b;border-radius:7px;padding:4px 9px;font-size:11.5px;cursor:pointer;transition:all .15s;max-width:260px}
-  .cite-chip:hover{background:var(--primary-soft);border-color:#b9cbff}
-  .cite-num{background:var(--primary);color:#fff;border-radius:5px;padding:0 5px;font-size:10px;font-weight:700;flex:0 0 auto}
+  .ai-card-body{padding:8px 20px 16px;font-size:14px;line-height:1.8;color:var(--ink)}
+  /* 引用区：按文档去重后的角标行，顶部细分隔线 */
+  .cite-zone:not(:empty){border-top:1px solid #f1f4f9;padding:13px 20px 15px;background:#fcfdff}
+  .cite-row{display:flex;flex-wrap:wrap;gap:7px}
+  .cite-chip{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);background:#fff;color:var(--ink-2);border-radius:7px;padding:5px 9px;font-size:11.5px;cursor:pointer;transition:all .15s;max-width:300px}
+  .cite-chip:hover{background:var(--primary-soft);border-color:#b9cbff;color:#25469b}
+  .cite-num{background:var(--primary);color:#fff;border-radius:5px;padding:1px 6px;font-size:10px;font-weight:700;flex:0 0 auto}
   .cite-file{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .cite-preview{border-top:1px dashed #dbe6ff;margin:0 18px 13px;padding:10px 12px;background:#fbfcff;border-radius:7px;font-size:12px;color:var(--ink-2);line-height:1.7;display:none;white-space:pre-wrap}
+  .cite-multi{flex:0 0 auto;font-size:10px;color:#8a95a8;background:#f1f4f9;border-radius:9px;padding:1px 6px}
+  .cite-preview{border:1px solid var(--line);margin-top:10px;padding:6px 12px;background:#fff;border-radius:8px;font-size:12px;color:var(--ink-2);line-height:1.7;display:none}
+  .cite-seg{padding:8px 0;border-bottom:1px dashed #eef1f6}
+  .cite-seg:last-child{border-bottom:0}
+  .cite-seg-no{display:inline-block;font-size:10.5px;color:#3568d4;background:#e8f0ff;border-radius:8px;padding:1px 7px;margin-right:8px}
   .cite-preview.open{display:block}
   .cursor{display:inline-block;width:7px;height:15px;background:var(--primary);vertical-align:text-bottom;margin-left:2px;animation:blink 1s steps(2) infinite}
   @keyframes blink{50%{opacity:0}}
@@ -191,20 +204,23 @@
     <button class="new-chat" onclick="newSession()">＋ 新建会话</button>
     <div class="section-label">历史会话</div>
     <div class="session-list" id="sessionList"></div>
-    <div class="upload-area">
-      <div class="section-label">知识库文档</div>
-      <div class="dropzone" id="dropzone">
-        <div class="drop-icon">⇪</div>
-        <div class="drop-text" id="dropText">点击或拖拽上传文档</div>
-        <div class="drop-formats" id="dropFormats">txt / md / pdf / docx / xlsx / pptx 等 36 种格式</div>
+    <div class="upload-area" id="uploadArea">
+      <button class="upload-toggle" onclick="document.getElementById('uploadArea').classList.toggle('open')">
+        <span class="caret">▶</span><span class="t">知识库文档</span><span id="uploadBadge">—</span>
+      </button>
+      <div class="upload-body">
+        <div class="dropzone" id="dropzone">
+          <div class="drop-icon">⇪</div>
+          <div class="drop-text">点击或拖拽上传文档</div>
+          <div class="drop-formats" id="dropFormats">txt / md / pdf / docx / xlsx / pptx 等 36 种格式</div>
+        </div>
+        <div class="upload-msg" id="uploadMsg" style="display:none"></div>
+        <button class="folder-btn" onclick="document.getElementById('folderInput').click()">📁 选择文件夹上传</button>
+        <div class="doc-list" id="docList"></div>
+        <input type="file" id="fileInput" hidden>
+        <input type="file" id="folderInput" webkitdirectory hidden>
       </div>
-      <div class="upload-msg" id="uploadMsg" style="display:none"></div>
-      <button class="folder-btn" onclick="document.getElementById('folderInput').click()">📁 选择文件夹上传</button>
-      <div class="doc-list" id="docList"></div>
-      <input type="file" id="fileInput" hidden>
-      <input type="file" id="folderInput" webkitdirectory hidden>
     </div>
-    <div class="sidebar-footer">Spring Boot 3.4 · Spring AI · Elasticsearch</div>
   </aside>
 
   <main class="main">
@@ -432,18 +448,32 @@ function renderMessages(){
 }
 function patchCites(card,m,i){
   const zone=card.querySelector('.cite-zone');if(!zone)return;
-  const n=(m.sources||[]).length;
-  if(zone.dataset.n===String(n))return;   // 引用没变化就不动，避免重复重绘
-  zone.dataset.n=String(n);
+  const src=m.sources||[];
+  // 同一文档的多个片段合并成一个引用角标，避免文件名重复刷屏
+  const groups=new Map();
+  src.forEach(s=>{
+    const name=s.fileName||'(未知文档)';
+    if(!groups.has(name))groups.set(name,[]);
+    groups.get(name).push(s);
+  });
+  const gkey=src.length+'|'+groups.size+'|'+[...groups.keys()].join('~');
+  if(zone.dataset.g===gkey)return;        // 分组没变化就不重绘，避免闪烁
+  zone.dataset.g=gkey;
   const cnt=card.querySelector('.ai-cite-count');
-  if(!n){zone.innerHTML='';if(cnt)cnt.style.display='none';return}
-  if(cnt){cnt.style.display='';cnt.textContent='▤ '+n}
-  const chips=m.sources.map((s,k)=>
-    '<span class="cite-chip" onclick="toggleCite('+i+','+k+')" title="查看引用原文">'+
-      '<span class="cite-num">'+(k+1)+'</span><span class="cite-file">'+escapeHtml(s.fileName)+' · 第'+(Number(s.chunkIndex)+1)+'段</span></span>').join('');
-  const previews=m.sources.map((s,k)=>
-    '<div class="cite-preview" id="cite-p-'+i+'-'+k+'">'+escapeHtml(s.preview||'')+'</div>').join('');
-  zone.innerHTML='<div class="cite-row">'+chips+'</div>'+previews;
+  if(!src.length){zone.innerHTML='';if(cnt)cnt.style.display='none';return}
+  if(cnt){cnt.style.display='';cnt.textContent='▤ '+groups.size+' 篇'}
+  let num=0;
+  const chips=[],previews=[];
+  groups.forEach((segs,name)=>{
+    const g=++num;
+    chips.push('<span class="cite-chip" onclick="toggleCite('+i+','+g+')" title="展开该文档的 '+segs.length+' 个引用片段">'+
+      '<span class="cite-num">'+g+'</span><span class="cite-file">'+escapeHtml(name)+'</span>'+
+      (segs.length>1?'<span class="cite-multi">'+segs.length+'段</span>':'')+'</span>');
+    const list=segs.map(s=>'<div class="cite-seg"><span class="cite-seg-no">第'+(Number(s.chunkIndex)+1)+'段</span>'+
+      escapeHtml(s.preview||'')+'</div>').join('');
+    previews.push('<div class="cite-preview" id="cite-p-'+i+'-'+g+'">'+list+'</div>');
+  });
+  zone.innerHTML='<div class="cite-row">'+chips.join('')+'</div>'+previews.join('');
 }
 // 流式增量：只更新最后一条 AI 卡片的正文与引用，【绝不重建整列】，因此不会闪。
 function patchStreaming(){
@@ -604,6 +634,7 @@ document.getElementById('fileInput').onchange=e=>{uploadFile(e.target.files[0]);
 document.getElementById('folderInput').onchange=e=>{uploadFolderFiles([...e.target.files]);e.target.value=''};
 async function uploadFile(file){
   if(!file)return;
+  document.getElementById('uploadArea').classList.add('open'); // 上传时自动展开，让进度/结果可见
   const msg=document.getElementById('uploadMsg');
   msg.className='upload-msg';msg.style.display='block';
   const oversize=sizeError(file);
@@ -642,6 +673,7 @@ const JUNK_FILES=new Set(['desktop.ini','thumbs.db','.ds_store','~$temp.hta']);
 const isJunkFile=name=>name.startsWith('.')||JUNK_FILES.has(name.toLowerCase());
 
 async function uploadFolderFiles(all){
+  document.getElementById('uploadArea').classList.add('open');
   const msg=document.getElementById('uploadMsg');
   msg.className='upload-msg';msg.style.display='block';
   if(!all.length){msg.className='upload-msg err';msg.textContent='✗ 文件夹是空的';return}
@@ -704,6 +736,9 @@ async function loadDocs(){
   const el=document.getElementById('docList');
   try{
     const all=await (await fetch('/api/docs/list')).json();
+    // 折叠态也要能看到知识库规模
+    const totalChunks=all.reduce((s,d)=>s+Number(d.chunks||0),0);
+    document.getElementById('uploadBadge').textContent=all.length+' 个 · '+totalChunks+' 片';
     // 按上传时间倒序（uploadedAt 是 ISO 字符串，可直接字典序比较）
     const list=[...all].sort((a,b)=>String(b.uploadedAt||'').localeCompare(String(a.uploadedAt||'')));
     el.innerHTML='';
