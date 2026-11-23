@@ -7,6 +7,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * 权限聚合服务：把散落在各处的权限规则聚合成一份"当前用户能做什么"的视图，
@@ -23,25 +24,28 @@ import java.util.Map;
 public class PermissionService {
 
     private final ToolPermissionRegistry toolRegistry;
+    private final RolePermissions rolePermissions;
 
-    /** 功能菜单定义：key / 名称 / 需要的组（空=所有认证用户） */
+    /** 功能菜单定义：名称 / 地址 / 需要的权限码（空=所有认证用户） */
     private static final List<Map<String, Object>> MENUS = List.of(
             menu("智能问答", "index.html", List.of()),
             menu("知识库文档", "manage.html", List.of()),
-            menu("检索实验", "search.html", List.of()),
-            menu("模型配置", "models.html", List.of("admin")),
-            menu("会话树", "tree.html", List.of()),
-            menu("企业治理", "governance.html", List.of("admin")),
+            menu("检索对比", "search.html", List.of()),
+            menu("问答分支", "tree.html", List.of()),
+            menu("模型设置", "models.html", List.of(Permission.MODEL_READ)),
+            menu("权限与日志", "governance.html", List.of(Permission.AUDIT_READ)),
+            menu("管理后台", "admin.html", List.of(Permission.ADMIN_ACCESS)),
             menu("个人中心", "profile.html", List.of())
     );
 
-    public PermissionService(ToolPermissionRegistry toolRegistry) {
+    public PermissionService(ToolPermissionRegistry toolRegistry, RolePermissions rolePermissions) {
         this.toolRegistry = toolRegistry;
+        this.rolePermissions = rolePermissions;
     }
 
-    private static Map<String, Object> menu(String name, String href, List<String> groups) {
+    private static Map<String, Object> menu(String name, String href, List<String> permissions) {
         Map<String, Object> m = new LinkedHashMap<>();
-        m.put("name", name); m.put("href", href); m.put("groups", groups);
+        m.put("name", name); m.put("href", href); m.put("permissions", permissions);
         return m;
     }
 
@@ -51,12 +55,13 @@ public class PermissionService {
         boolean admin = u.hasGroup("admin");
         boolean anonymous = u.isAnonymous();
 
-        // 功能权限
+        // 功能权限：按权限码判定，与服务端接口拦截使用同一套规则
+        Set<String> owned = rolePermissions.permissionsOf(u);
         List<Map<String, Object>> menus = new ArrayList<>();
         for (Map<String, Object> m : MENUS) {
             @SuppressWarnings("unchecked")
-            List<String> need = (List<String>) m.get("groups");
-            boolean allowed = anonymous ? need.isEmpty() : (admin || need.isEmpty() || need.stream().anyMatch(u::hasGroup));
+            List<String> need = (List<String>) m.get("permissions");
+            boolean allowed = need.isEmpty() || need.stream().anyMatch(owned::contains);
             Map<String, Object> item = new LinkedHashMap<>(m);
             item.put("allowed", allowed);
             menus.add(item);
@@ -79,6 +84,9 @@ public class PermissionService {
         result.put("authType", u.authType());
         result.put("anonymous", anonymous);
         result.put("admin", admin);
+        result.put("permissions", owned);          // 前端按权限码控制入口显示
+        result.put("allPermissions", Permission.ALL);
+        result.put("roleMatrix", rolePermissions.roleMatrix());
         result.put("menus", menus);
         result.put("data", data);
         result.put("tools", tools);

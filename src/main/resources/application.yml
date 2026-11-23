@@ -75,7 +75,7 @@ security:
     # 初始账号：多个账号用分号分隔，单个格式 用户名|密码|组(逗号分隔)|租户|显示名。
     # 密码可用环境变量整体覆盖（AUTH_USERS），启动时 PBKDF2 哈希，明文不驻留内存对象。
     # 生产务必改密码并改用数据库用户表；默认 admin 仅用于本地/作品集演示。
-    users: "${AUTH_USERS:admin|Admin@123456|admin,water-dept|default|系统管理员;analyst|Analyst@123456|water-dept|default|水利分析员}"
+    users: "${AUTH_USERS:admin|Admin@123456|admin,water-dept|default|系统管理员;analyst|Analyst@123456|water-dept,analyst|default|水利分析员}"
 
 # ============ Elasticsearch：混合检索底座 ============
 # 容器内用服务名 elasticsearch；本地直连用 localhost

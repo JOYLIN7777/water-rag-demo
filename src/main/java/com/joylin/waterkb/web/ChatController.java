@@ -2,6 +2,8 @@ package com.joylin.waterkb.web;
 
 import com.joylin.waterkb.memory.ConversationTreeStore;
 import com.joylin.waterkb.rag.RagChatService;
+import com.joylin.waterkb.security.Permission;
+import com.joylin.waterkb.security.RequirePermission;
 import com.joylin.waterkb.tool.ToolPermissionRegistry;
 import com.joylin.waterkb.tool.WaterInfoTool;
 import com.joylin.waterkb.web.dto.ChatRequest;
@@ -30,6 +32,7 @@ import java.util.Map;
  */
 @RestController
 @RequestMapping("/api/chat")
+@RequirePermission(Permission.CHAT_USE)
 public class ChatController {
 
     private final RagChatService ragChatService;

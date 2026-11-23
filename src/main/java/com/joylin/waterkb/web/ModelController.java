@@ -3,6 +3,8 @@ package com.joylin.waterkb.web;
 import com.joylin.waterkb.model.ModelConfig;
 import com.joylin.waterkb.model.ModelConfigRepository;
 import com.joylin.waterkb.model.ModelRegistry;
+import com.joylin.waterkb.security.Permission;
+import com.joylin.waterkb.security.RequirePermission;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -23,6 +25,7 @@ import java.util.Map;
  */
 @RestController
 @RequestMapping("/api/models")
+@RequirePermission(Permission.MODEL_READ)
 public class ModelController {
 
     private final ModelConfigRepository repository;
@@ -62,6 +65,7 @@ public class ModelController {
     }
 
     @PostMapping
+    @RequirePermission(Permission.MODEL_WRITE)
     public Map<String, Object> create(@RequestBody ModelConfig body) {
         validate(body);
         repository.insert(body.getName(), body.getType(), body.getBaseUrl(), body.getApiKey(),
@@ -70,6 +74,7 @@ public class ModelController {
     }
 
     @PutMapping("/{id}")
+    @RequirePermission(Permission.MODEL_WRITE)
     public Map<String, Object> update(@PathVariable long id, @RequestBody ModelConfig body) {
         validate(body);
         if (repository.update(id, body.getName(), body.getType(), body.getBaseUrl(), body.getApiKey(),
@@ -83,6 +88,7 @@ public class ModelController {
     }
 
     @DeleteMapping("/{id}")
+    @RequirePermission(Permission.MODEL_WRITE)
     public Map<String, Object> delete(@PathVariable long id) {
         ModelConfig c = repository.findById(id);
         if (c == null) throw new IllegalArgumentException("模型配置不存在：" + id);
@@ -93,6 +99,7 @@ public class ModelController {
 
     /** 激活：维度校验 → 更新 active → 清缓存 + 换代理 */
     @PostMapping("/{id}/activate")
+    @RequirePermission(Permission.MODEL_WRITE)
     public Map<String, Object> activate(@PathVariable long id) {
         ModelConfig c = repository.findById(id);
         if (c == null) throw new IllegalArgumentException("模型配置不存在：" + id);
@@ -105,6 +112,7 @@ public class ModelController {
 
     /** 连通性测试：真实调用模型端点，返回耗时与错误 */
     @PostMapping("/{id}/test")
+    @RequirePermission(Permission.MODEL_WRITE)
     public Map<String, Object> test(@PathVariable long id) {
         ModelConfig c = repository.findById(id);
         if (c == null) throw new IllegalArgumentException("模型配置不存在：" + id);

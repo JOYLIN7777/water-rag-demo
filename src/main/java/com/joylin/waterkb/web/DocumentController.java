@@ -2,6 +2,8 @@ package com.joylin.waterkb.web;
 
 import com.joylin.waterkb.rag.DocumentIngestService;
 import com.joylin.waterkb.rag.VectorStoreAdminRepository;
+import com.joylin.waterkb.security.Permission;
+import com.joylin.waterkb.security.RequirePermission;
 import com.joylin.waterkb.web.dto.UploadResult;
 import org.springframework.boot.autoconfigure.web.servlet.MultipartProperties;
 import org.springframework.http.MediaType;
@@ -43,6 +45,7 @@ public class DocumentController {
      * 支持的格式与解析服务共用同一份定义（避免两处硬编码不一致）。
      */
     @PostMapping("/upload")
+    @RequirePermission(Permission.DOC_WRITE)
     public UploadResult upload(@RequestParam("file") MultipartFile file) throws IOException {
         String name = file.getOriginalFilename();
         Set<String> allowed = DocumentIngestService.getSupportedExtensions();
@@ -66,6 +69,7 @@ public class DocumentController {
      * 知识库文档清单（按文件名聚合：切片数、最近上传时间）。
      */
     @GetMapping(value = "/list", produces = MediaType.APPLICATION_JSON_VALUE)
+    @RequirePermission(Permission.DOC_READ)
     public List<Map<String, Object>> list() {
         return adminRepository.listDocuments();
     }
@@ -74,6 +78,7 @@ public class DocumentController {
      * 删除单个知识文档（按文件名删除其全部切片）。
      */
     @DeleteMapping
+    @RequirePermission(Permission.DOC_DELETE)
     public Map<String, Object> delete(@RequestParam String fileName) {
         int deleted = adminRepository.deleteByFileName(fileName);
         if (deleted == 0) {

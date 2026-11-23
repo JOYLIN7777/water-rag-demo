@@ -1,6 +1,8 @@
 package com.joylin.waterkb.web;
 
 import com.joylin.waterkb.audit.AuditService;
+import com.joylin.waterkb.security.Permission;
+import com.joylin.waterkb.security.RequirePermission;
 import com.joylin.waterkb.security.UserContext;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -14,6 +16,7 @@ import java.util.Map;
  */
 @RestController
 @RequestMapping("/api/audit")
+@RequirePermission(Permission.AUDIT_READ)
 public class AuditController {
 
     private final AuditService audit;
