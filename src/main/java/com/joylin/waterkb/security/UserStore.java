@@ -74,6 +74,19 @@ public class UserStore {
         return username == null ? null : users.get(username.trim().toLowerCase());
     }
 
+    /**
+     * 修改密码：校验原密码后替换为新密码哈希。返回是否成功。
+     * 账号值对象不可变，这里按 key 重建一个新 UserAccount 覆盖。
+     */
+    public boolean changePassword(String username, String oldPassword, String newPassword) {
+        UserAccount u = authenticate(username, oldPassword);
+        if (u == null || newPassword == null || newPassword.length() < 8) return false;
+        users.put(u.username(), new UserAccount(
+                u.username(), hasher.hash(newPassword), u.groups(), u.tenant(), u.displayName(), u.enabled()));
+        log.info("用户 {} 密码已更新", u.username());
+        return true;
+    }
+
     public List<UserAccount> list() {
         return new ArrayList<>(users.values());
     }

@@ -13,8 +13,9 @@
 | 模型可插拔 | 数据库配置 CHAT/EMBEDDING 模型，API Key 脱敏、连通性测试、切换即时生效；兼容公有云 API 与内网私有化模型（OpenAI 兼容协议） |
 | 会话树 | pi-mono 风格消息树：**fork**（从任意历史节点开新支）/ **rewind**（只移动当前位置不删节点）；上下文只取祖先链，兄弟分支不串 |
 | 登录与认证 | **用户名密码登录页** + JWT（HS256）双令牌：access 30 分钟 / refresh 7 天，刷新轮换、登出拉黑、refresh 令牌禁止访问业务 API；密码 PBKDF2 加盐慢哈希（零新增依赖，明文不驻留）；claims 携带 sub/groups/tenant；未登录访问 API 一律 401 |
-| 认证与治理 | 全局 Bearer 拦截 + **工具权限白名单**（默认拒绝）；**审计日志**落 PostgreSQL，覆盖所有 API + 登录失败 + 401 + 工具越权；`REQUIRE_LOGIN=false` 可切回 X-User 演示头模式 |
-| Web 前端 | 零依赖静态页（手写渲染，无需 npm）：登录页、问答页、文档管理、检索实验、模型配置、会话树、企业治理中心；全站统一侧栏，401 自动刷新令牌 |
+| 三层权限 | 功能权限（菜单按角色过滤）+ 数据权限（租户隔离 + 行级 owner/组/public）+ 工具权限（白名单默认拒绝）；`/api/auth/permissions` 聚合视图，管理菜单仅 admin 可见 |
+| 认证与治理 | 全局 Bearer 拦截 + 审计日志落 PostgreSQL（覆盖所有 API + 登录失败 + 401 + 工具越权）；个人中心支持改密；`REQUIRE_LOGIN=false` 可切回 X-User 演示头模式 |
+| Web 前端 | 零依赖静态页（手写渲染，无需 npm）：登录页、问答页、文档管理、检索实验、模型配置、会话树、企业治理中心、个人中心；**全站共用同一侧栏渲染组件**（切换零结构差异），401 自动刷新令牌 |
 
 ## 架构图
 
@@ -84,6 +85,8 @@ docker compose up -d --build app
 - `require-login`（默认 `true`）：未登录访问 API 一律 401；设 `REQUIRE_LOGIN=false` 可切回 `X-User/X-Groups` 演示头模式，方便作品集现场演示免登录链路。
 - `users`：初始账号串，格式 `用户名|密码|组(逗号分隔)|租户|显示名`，多个账号用 `;` 分隔；可用环境变量 `AUTH_USERS` 整体覆盖。密码启动时经 PBKDF2 加盐哈希后只保留哈希，明文不驻留内存。
 - `access-ttl-seconds` / `refresh-ttl-seconds`：access 令牌 30 分钟，refresh 令牌 7 天；刷新时旧 refresh 立即轮换失效，登出会把 access 拉黑到自然过期。
+- 个人中心（`/profile.html`）可查看账号/令牌有效期并改密（`POST /api/auth/change-password`）。用户库是内存实现，改密在运行期生效，**容器重启后回落到配置里的初始密码**；持久化需接数据库用户表。
+- 三层权限：`/api/auth/permissions` 聚合返回功能菜单 / 数据权限 / 工具权限；侧栏管理类菜单（模型配置、企业治理）仅 admin 组可见，未登录演示模式显示全部菜单。
 - 生产务必替换演示密码、改用数据库用户表并开启 HTTPS；JWT 密钥用 `JWT_SECRET` 注入。
 
 容器网络说明：容器内通过服务名 `postgres` 访问数据库（compose 内置 DNS），通过
@@ -105,7 +108,7 @@ docker compose up -d postgres
 mvn spring-boot:run
 
 # 浏览器直接访问 http://localhost:8080（零依赖静态页，应用自身托管）
-# 页面入口：问答 / 会话树 / 检索实验 / 模型配置 / 文档管理 / 企业治理
+# 页面入口：问答 / 会话树 / 检索实验 / 模型配置 / 文档管理 / 企业治理 / 个人中心
 ```
 
 若想把 Redis 也放进 Docker：`docker compose --profile docker-redis up -d --build app`，
@@ -229,6 +232,8 @@ mvn package -DskipTests   # 打包后 docker compose up -d --build app
 |---|---|---|
 | 登录认证 | 登录页用 `admin/Admin@123456` 登录，错误密码再试一次 | 正确登录跳问答页并回显用户；错误密码 401；未登录直访 API 也 401 |
 | 令牌安全 | 登录响应里的 refresh token 拿来调 `/api/docs/list`；再用它刷新后拿旧 refresh 重放 | refresh 访问业务 API 被拒（401）；旧 refresh 重放被拒；登出后 access 立即失效 |
+| 三层权限矩阵 | 治理页看「权限矩阵」：功能菜单 / 数据权限 / 工具权限；分别用 admin 与 analyst 登录对比 | admin 全部菜单可见；analyst 看不到「模型配置/企业治理」；数据权限显示租户隔离与行级范围 |
+| 个人中心 | 进「个人中心」看令牌剩余有效期，输原密码改新密码后用新密码重新登录 | 显示令牌倒计时；错误原密码 400；改密成功后再用旧密码登录失败、新密码成功 |
 | 多租户 | 用 `admin`（default 租户）登录，另配 `X-Tenant` 头或换租户账号上传同名文件 | 不同租户检索/列表互不可见；跨租户删除返回"不存在" |
 | 行级权限 | 分别以有/无 `water-dept` 组的账号查同一问题 | 组内用户可见内部文档，无组用户只见 public 文档 |
 | 工具权限 | 分别用 admin（含 water-dept）与其他组账号调 `/api/chat/tool/water` | 无权限组返回 PERMISSION_DENIED，water-dept 组返回水情数据 |

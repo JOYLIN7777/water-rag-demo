@@ -3,6 +3,7 @@ package com.joylin.waterkb.web;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.joylin.waterkb.audit.AuditService;
 import com.joylin.waterkb.security.JwtService;
+import com.joylin.waterkb.security.PermissionService;
 import com.joylin.waterkb.security.RefreshTokenStore;
 import com.joylin.waterkb.security.UserContext;
 import com.joylin.waterkb.security.UserStore;
@@ -35,11 +36,13 @@ public class AuthController {
     private final UserStore users;
     private final RefreshTokenStore store;
     private final AuditService audit;
+    private final PermissionService permissions;
     private final long accessTtl;
     private final long refreshTtl;
     private final boolean issueEndpoint;
 
     public AuthController(JwtService jwt, UserStore users, RefreshTokenStore store, AuditService audit,
+                          PermissionService permissions,
                           @Value("${security.auth.access-ttl-seconds:1800}") long accessTtl,
                           @Value("${security.auth.refresh-ttl-seconds:604800}") long refreshTtl,
                           @Value("${security.auth.issue-endpoint:false}") boolean issueEndpoint) {
@@ -47,6 +50,7 @@ public class AuthController {
         this.users = users;
         this.store = store;
         this.audit = audit;
+        this.permissions = permissions;
         this.accessTtl = accessTtl;
         this.refreshTtl = refreshTtl;
         this.issueEndpoint = issueEndpoint;
@@ -141,6 +145,36 @@ public class AuthController {
                 "tenant", u.tenantId(),
                 "authType", u.authType(),
                 "anonymous", u.isAnonymous());
+    }
+
+    /** 当前用户的完整权限视图：功能菜单 + 数据权限 + 工具权限 */
+    @GetMapping("/permissions")
+    public Map<String, Object> permissions() {
+        return permissions.currentPermissions();
+    }
+
+    /** 修改密码：校验原密码，新密码至少 8 位；成功后旧 token 仍有效到过期（可主动登出） */
+    @PostMapping("/change-password")
+    public ResponseEntity<?> changePassword(@RequestBody Map<String, String> body,
+                                            jakarta.servlet.http.HttpServletRequest req) {
+        UserContext.CurrentUser u = UserContext.get();
+        if (u.isAnonymous()) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(Map.of("code", 401, "message", "请先登录"));
+        }
+        String oldPwd = body == null ? null : body.get("oldPassword");
+        String newPwd = body == null ? null : body.get("newPassword");
+        boolean ok = users.changePassword(u.userId(), oldPwd, newPwd);
+        audit.record(AuditService.of(u.tenantId(), u.userId(), String.join(",", u.groups()),
+                "POST /api/auth/change-password", "/api/auth/change-password",
+                ok ? "Password changed" : "Password change failed",
+                req.getRemoteAddr(), ok ? HttpStatus.OK.value() : HttpStatus.BAD_REQUEST.value(), 0,
+                ok ? "ALLOW" : "DENIED"));
+        if (!ok) {
+            return ResponseEntity.badRequest()
+                    .body(Map.of("message", "原密码错误，或新密码长度不足 8 位"));
+        }
+        return ResponseEntity.ok(Map.of("message", "密码已修改，请使用新密码下次登录"));
     }
 
     /** 演示 token 签发（默认关闭，作品集需要时打开） */
