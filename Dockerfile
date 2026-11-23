@@ -29,4 +29,9 @@ ENV TZ=Asia/Shanghai
 EXPOSE 8080
 
 # 用环境变量覆盖配置（DB_HOST / REDIS_HOST / AI_API_KEY 等由 compose 注入）
-ENTRYPOINT ["java", "-jar", "/app/app.jar"]
+#
+# -Djava.net.preferIPv4Stack=true：容器默认只有 IPv4 桥接网络，而 dashscope 这类
+# 域名的 DNS 常常先返回 IPv6（2408:...）。JDK 的 HttpClient 拿到 IPv6 就直接连，
+# 连不通时报的是 UnresolvedAddressException（看着像"域名解析失败"，其实是没路由），
+# 也不会自动回落 IPv4——表现为上传/问答偶发失败、重试又好了。强制走 IPv4 栈即可。
+ENTRYPOINT ["java", "-Djava.net.preferIPv4Stack=true", "-jar", "/app/app.jar"]

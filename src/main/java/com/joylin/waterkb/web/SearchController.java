@@ -2,6 +2,8 @@ package com.joylin.waterkb.web;
 
 import com.joylin.waterkb.search.EsHybridSearchService;
 import com.joylin.waterkb.search.EsIndexService;
+import com.joylin.waterkb.security.Permission;
+import com.joylin.waterkb.security.RequirePermission;
 import com.joylin.waterkb.security.UserContext;
 import org.springframework.ai.document.Document;
 import org.springframework.web.bind.annotation.*;
@@ -27,7 +29,9 @@ public class SearchController {
         this.es = es;
     }
 
-    /** 三种模式对比（带来源片段），一次请求返回三组结果 */
+    /** 三种模式对比（带来源片段），一次请求返回三组结果。
+     *  权限：search:use——菜单权限页没勾「检索对比」的角色，接口层同样拒绝（前端隐藏入口只是第一道门） */
+    @RequirePermission(Permission.SEARCH_USE)
     @GetMapping("/compare")
     public Map<String, Object> compare(@RequestParam String q) {
         return Map.of(

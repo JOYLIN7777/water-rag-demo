@@ -30,9 +30,9 @@ public class PermissionService {
     /** 功能菜单定义：名称 / 地址 / 需要的权限码（空=所有认证用户） */
     private static final List<Map<String, Object>> MENUS = List.of(
             menu("智能问答", "index.html", List.of()),
-            menu("知识库文档", "manage.html", List.of()),
-            menu("检索对比", "search.html", List.of()),
-            menu("问答分支", "tree.html", List.of()),
+            menu("知识库文档", "manage.html", List.of(Permission.DOC_READ)),
+            menu("检索对比", "search.html", List.of(Permission.SEARCH_USE)),
+            menu("问答分支", "tree.html", List.of(Permission.TREE_USE)),
             menu("模型设置", "models.html", List.of(Permission.MODEL_READ)),
             menu("权限与日志", "governance.html", List.of(Permission.AUDIT_READ)),
             menu("管理后台", "admin.html", List.of(Permission.ADMIN_ACCESS)),

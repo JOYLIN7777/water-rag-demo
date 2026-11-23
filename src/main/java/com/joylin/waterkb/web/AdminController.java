@@ -42,17 +42,23 @@ public class AdminController {
     private final AuditService audit;
     private final PasswordResetService passwordReset;
     private final com.joylin.waterkb.security.OrgStore orgs;
+    private final com.joylin.waterkb.search.EsIndexService es;
+    private final com.joylin.waterkb.memory.ChatSessionStore chatSessions;
 
     public AdminController(UserStore users, RolePermissions rolePermissions,
                            PermissionCatalog permCatalog, AuditService audit,
                            PasswordResetService passwordReset,
-                           com.joylin.waterkb.security.OrgStore orgs) {
+                           com.joylin.waterkb.security.OrgStore orgs,
+                           com.joylin.waterkb.search.EsIndexService es,
+                           com.joylin.waterkb.memory.ChatSessionStore chatSessions) {
         this.users = users;
         this.rolePermissions = rolePermissions;
         this.permCatalog = permCatalog;
         this.audit = audit;
         this.passwordReset = passwordReset;
         this.orgs = orgs;
+        this.es = es;
+        this.chatSessions = chatSessions;
     }
 
     // ---------- 组织（界面上叫"组织"，底层仍是账号的 tenant 字段） ----------
@@ -105,13 +111,60 @@ public class AdminController {
         return Map.of("message", "组织已更新", "key", key);
     }
 
-    /** 删除组织：默认组织、有子组织、仍有成员的组织都拒绝 */
+    /**
+     * 删除组织。
+     *
+     * <p>有子组织仍然拒绝（要先把子组织处理掉）。有成员/文档/会话时给一条出路：
+     * 带 moveTo 就三样一起迁到目标组织再删——只迁账号是上一版的漏洞：
+     * 账号换了组织，文档的 tenantId 还挂在旧键上，组织一删这批文档就成了
+     * "系统里有、谁都看不到、也删不掉"的孤儿（实测丢过 3724 个分片）。
+     * 不带 moveTo 又确实有数据，直接拒绝，并说清各有几条。</p>
+     */
     @DeleteMapping("/orgs/{key}")
-    public Map<String, Object> deleteOrg(@PathVariable String key) {
-        long members = users.list().stream()
-                .filter(u -> key.equals(u.tenant())).count();
-        orgs.delete(key, (int) members);
-        return Map.of("message", "组织已删除", "key", key);
+    public Map<String, Object> deleteOrg(@PathVariable String key,
+                                         @RequestParam(required = false) String moveTo) {
+        List<UserStore.UserAccount> members = users.list().stream()
+                .filter(u -> key.equals(u.tenant())).toList();
+        long docs = es.countByTenant(key);
+        int sessions = chatSessions.countByTenant(key);
+        String target = moveTo == null ? "" : moveTo.trim();
+        boolean moving = !target.isEmpty();
+
+        if (!moving && (!members.isEmpty() || docs > 0 || sessions > 0)) {
+            throw new IllegalArgumentException("该组织下还有 " + members.size() + " 个账号、"
+                    + docs + " 个知识库分片、" + sessions + " 个会话。请选择迁移目标，连数据一起搬走后再删");
+        }
+
+        int movedUsers = 0;
+        long movedDocs = 0;
+        int movedSessions = 0;
+        if (moving) {
+            if (target.equals(key)) throw new IllegalArgumentException("不能把数据迁到正在删除的组织");
+            if (!orgs.exists(target)) throw new IllegalArgumentException("目标组织不存在：" + target);
+            for (UserStore.UserAccount u : members) {
+                if (users.update(u.username(), u.displayName(), u.groups(), target, u.enabled())) movedUsers++;
+            }
+            movedDocs = es.migrateTenant(key, target);
+            movedSessions = chatSessions.migrateTenant(key, target);
+        }
+
+        long left = users.list().stream().filter(u -> key.equals(u.tenant())).count();
+        orgs.delete(key, (int) left);
+
+        StringBuilder msg = new StringBuilder("组织已删除");
+        if (movedUsers + movedDocs + movedSessions > 0) {
+            msg.append("，迁到 ").append(target).append("：")
+                    .append(movedUsers).append(" 个账号、")
+                    .append(movedDocs).append(" 个分片、")
+                    .append(movedSessions).append(" 个会话");
+        }
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("message", msg.toString());
+        out.put("key", key);
+        out.put("movedUsers", movedUsers);
+        out.put("movedDocs", movedDocs);
+        out.put("movedSessions", movedSessions);
+        return out;
     }
 
     /** 用户列表：只返回可展示字段，绝不带出密码哈希 */
@@ -186,10 +239,24 @@ public class AdminController {
 
     // ---------- 密码重置申请（忘记密码流程的管理侧） ----------
 
-    /** 待处理的密码重置申请：待审批 + 已发码未使用（后者便于回答"码给了怎么没用"） */
+    /**
+     * 待处理的密码重置申请：待审批 + 已发码未使用（后者便于回答"码给了怎么没用"）。
+     *
+     * <p>顺带把账号的显示名带上：消息是给人看的，「r25user 申请重置密码」谁是谁得对半天。
+     * 显示名由服务端查账号表得出，不依赖前端是否刚好加载过用户列表——
+     * 刚建的账号在新开的页面里也能正确显示中文名。</p>
+     */
     @GetMapping("/password-resets")
     public List<Map<String, Object>> passwordResets() {
-        return passwordReset.list();
+        List<Map<String, Object>> rows = passwordReset.list();
+        for (Map<String, Object> row : rows) {
+            String name = str(row.get("username"));
+            String display = "";
+            UserStore.UserAccount acc = users.find(name);
+            if (acc != null && acc.displayName() != null) display = acc.displayName().trim();
+            row.put("displayName", display);
+        }
+        return rows;
     }
 
     /** 批准申请：生成一次性重置码并返回明文（仅此一次），由管理员通过可靠渠道告知本人 */

@@ -25,9 +25,9 @@
   // 设置只放面向普通用户的功能；模型配置、权限审计等管理动作统一收进管理后台，
   // 避免管理员在问答侧和管理后台之间来回跳。
   const SETTINGS = [
-    { key: 'search', href: 'search.html', label: '检索对比', icon: 'search',
+    { key: 'search', href: 'search.html', label: '检索对比', icon: 'search', perm: 'search:use',
       desc: '对比关键词检索、语义检索和融合检索的结果，帮助找到更准的答案', groups: [] },
-    { key: 'tree', href: 'tree.html', label: '会话结构', icon: 'tree',
+    { key: 'tree', href: 'tree.html', label: '会话结构', icon: 'tree', perm: 'tree:use',
       desc: '查看当前会话的消息树与命名分支，可切回任意历史节点', groups: [] }
   ];
   global.ShellSettings = SETTINGS;
@@ -39,9 +39,9 @@
   };
   // 组织名（原"空间"）：不再写死成 default→默认空间。服务端 /api/orgs 下发，
   // 管理员在后台改了组织名，问答页、个人中心的显示同步跟着变。
-  let TENANT_LABELS = { default: '默认组织' };
+  let TENANT_LABELS = { default: '顶层组织' };
   const groupLabel = g => GROUP_LABELS[g] || g;
-  const tenantLabel = t => TENANT_LABELS[t] || t || '默认组织';
+  const tenantLabel = t => TENANT_LABELS[t] || t || '顶层组织';
   async function loadOrgLabels() {
     try {
       const r = await fetch('/api/orgs');
@@ -133,9 +133,14 @@
   /**
    * 拉服务端清单并合并。
    *
-   * <p>为什么是合并而不是覆盖：服务端为空时本地往往有"上线前就存在的会话"，
-   * 直接覆盖等于把用户历史清零；而新建会话的 POST 与这次 GET 存在竞态，
-   * 覆盖也会把刚建的会话抹掉。所以按 id 取并集，服务端字段优先。</p>
+   * <p>合并规则（服务端是真源）：
+   * <ul>
+   *   <li>服务端为空、本地有：升级路径，把本地会话逐条迁上去，本地保留；</li>
+   *   <li>服务端非空：以服务端为准。本地孤儿条目（服务端已经没有的）默认清掉——
+   *       以前永远保留，结果是"在别的端删掉的会话回来阴魂不散"，同一个标题出现好几条；
+   *       只豁免 60 秒内的新条目，保护"刚提问、POST 还没落库、GET 先回来"的竞态窗口；</li>
+   *   <li>服务端不可达：本地缓存原样保留，离线也能看历史。</li>
+   * </ul></p>
    */
   function syncSessions() {
     // 并发去重：initShell 与页面 boot 都会调一次，共用同一个请求
@@ -146,12 +151,19 @@
       if (!rows.length && local.length) {
         // 升级路径：服务端还没有任何记录，把本地现有会话逐条迁上去
         local.forEach(function (s) { pushSessionRemote(s.id, s.title || ''); });
+        saveSessions(local);
+        renderSessions();
+        if (typeof sessionsSyncedHandler === 'function') sessionsSyncedHandler();
+        return;
       }
       const serverIds = {};
       rows.forEach(function (r) { serverIds[r.id] = 1; });
+      // 只豁免 60 秒内创建的本地条目：那是刚 POST 还没落库的竞态，不是僵尸
+      const freshCut = Date.now() - 60000;
+      const orphans = local.filter(function (s) { return !serverIds[s.id] && (s.updatedAt || 0) >= freshCut; });
       const merged = rows.map(function (r) {
         return { id: r.id, title: r.title || '', updatedAt: r.updatedAt || 0 };
-      }).concat(local.filter(function (s) { return !serverIds[s.id]; }));
+      }).concat(orphans);
       saveSessions(merged);
       renderSessions();
       if (typeof sessionsSyncedHandler === 'function') sessionsSyncedHandler();
@@ -164,11 +176,15 @@
     if (!ts) return '';
     const d = new Date(ts), now = new Date();
     if (isNaN(d.getTime())) return '';
-    const hm = String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
-    if (d.toDateString() === now.toDateString()) return '今天 ' + hm;
-    const y = new Date(now); y.setDate(y.getDate() - 1);
-    if (d.toDateString() === y.toDateString()) return '昨天 ' + hm;
-    return (d.getMonth() + 1) + '/' + d.getDate() + ' ' + hm;
+    // 相对时间（对齐 WorkBuddy 的清单观感）：今天给时间，昨天/更早给"N天前"
+    if (d.toDateString() === now.toDateString()) {
+      return '今天 ' + String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+    }
+    const days = Math.floor((new Date(now.getFullYear(), now.getMonth(), now.getDate())
+      - new Date(d.getFullYear(), d.getMonth(), d.getDate())) / 86400000);
+    if (days === 1) return '昨天';
+    if (days >= 2 && days < 30) return days + '天前';
+    return (d.getMonth() + 1) + '/' + d.getDate();
   }
 
   // 会话切换回调（首页注册，功能页默认跳回首页定位）
@@ -185,6 +201,8 @@
     patchSessionRemote: patchSessionRemote,
     getSessions: loadSessions,
     saveSessions,
+    /** 相对时间格式化（今天 HH:MM / 昨天 / N天前 / M/D）：个人中心等处复用 */
+    fmtTime: fmtTime,
     avatar: avatar,
     logout: confirmLogout,
     /** 选文件后先列清单再上传（知识库文档页也复用这套） */
@@ -208,6 +226,8 @@
     /** 组织改名后重绘侧栏用户块（显示的是"账号 · 组织名"） */
     renderUser: renderUser,
     hasPermission: hasPermission,
+    /** 等权限清单就绪：功能页守卫用它保证判定时权限已加载 */
+    permsReady: function () { return loadPermissions(); },
     /** 诊断用：确认会话切换钩子是否真的绑上了（前端行为异常时先查这里） */
     handlerBound: function () { return typeof sessionChangeHandler === 'function'; },
     /** 供页面主动清理：删除会话时统一走这里，保证缓存/后端历史/首页副本一起清 */
@@ -282,11 +302,10 @@
     if (!list.length) { el.innerHTML = '<div class="session-empty">暂无会话，点击上方新建</div>'; return; }
     el.innerHTML = list.map(s => {
       const short = String(s.id || '').startsWith('session-') ? s.id.slice(8, 14) : String(s.id || '').slice(0, 8);
-      return '<div class="session-item' + (s.id === currentSessionId ? ' active' : '') + '" data-sid="' + esc(s.id) + '">' +
-        '<span class="session-dot"></span><span class="session-body">' +
+      return '<div class="session-item' + (s.id === currentSessionId ? ' active' : '') + '" data-sid="' + esc(s.id) + '" title="' + esc(s.title || '') + '">' +
         '<span class="session-name">' + esc(s.title || ('会话 ' + short)) + '</span>' +
-        '<span class="session-time">' + esc(fmtTime(s.updatedAt)) + '</span></span>' +
-        '<button class="session-delete" title="删除本地会话">×</button></div>';
+        '<span class="session-time">' + esc(fmtTime(s.updatedAt)) + '</span>' +
+        '<button class="session-delete" title="删除会话">×</button></div>';
     }).join('');
     el.querySelectorAll('.session-item').forEach(item => {
       const id = item.getAttribute('data-sid');
@@ -393,17 +412,45 @@
    * <p>不支持的浏览器（Firefox/Safari、以及 http 内网地址——该 API 要求安全上下文）
    * 自动退回原来的 webkitdirectory input，功能不丢，只是会看到那条原生确认。</p>
    */
-  async function pickFolder() {
+  /**
+   * 选文件夹批量上传。
+   *
+   * <p>为什么优先用 showDirectoryPicker 而不是 &lt;input webkitdirectory&gt;：
+   * 后者会弹浏览器原生的「将 N 个文件上传到此网站?」确认，CSS/JS 都消不掉；
+   * 前者弹的是系统文件夹框，选完就能列清单。</p>
+   *
+   * <p>但那句「允许此网站查看和复制文件？」是 Chrome 的文件系统权限提示，
+   * 属于浏览器安全边界，代码里没有"始终允许"这种选项，每次调用 picker 都会问一遍。
+   * 能做的是<b>不重复调用 picker</b>：把上次选中的目录句柄留住，同一页面内再点
+   * 先用 queryPermission 探一下权限还在不在，在就直接扫（不再弹框）。
+   * 刷新页面后句柄丢失，需要重新授权一次——这是浏览器的规矩，绕不过去。</p>
+   *
+   * @param forceNew true = 忽略缓存重新选目录（界面上那个"换文件夹"）
+   */
+  let dirHandleCache = null;
+
+  async function pickFolder(forceNew) {
     if (typeof global.showDirectoryPicker !== 'function') {
       const inp = document.getElementById('folderInput');
       if (inp) inp.click(); else toast('当前浏览器不支持选择文件夹', 'err');
       return;
     }
     let dir = null;
-    try {
-      dir = await global.showDirectoryPicker({ mode: 'read' });
-    } catch (e) {
-      return;   // 用户取消选择，不用提示
+    if (!forceNew && dirHandleCache) {
+      try {
+        const st = await dirHandleCache.queryPermission({ mode: 'read' });
+        if (st === 'granted') dir = dirHandleCache;
+      } catch (e) { dir = null; }
+    }
+    if (!dir) {
+      try {
+        // id 让浏览器记住上次停在哪；startIn 给个合理起点
+        dir = await global.showDirectoryPicker({ mode: 'read', id: 'kb-folder', startIn: 'documents' });
+      } catch (e) {
+        return;   // 用户取消选择，不用提示
+      }
+      dirHandleCache = dir;
+      markFolderPicked();
     }
     const picked = [];
     const walk = async function (handle, prefix) {
@@ -429,11 +476,24 @@
     openUploadPicker(picked);
   }
 
+  /** 记住目录之后，把"换文件夹"入口和说明亮出来，避免用户以为再也换不了 */
+  function markFolderPicked() {
+    const other = document.getElementById('folderOther');
+    if (other) other.style.display = '';
+    const hint = document.getElementById('folderHint');
+    if (hint) hint.textContent = '这个文件夹已记住：再点按钮直接读取，不再弹授权框。换目录点右边的 ↻。';
+  }
+
   /**
    * 选文件夹 / 多选文件后的第一步：列出清单让人自己挑，而不是一股脑全传。
    * 一个目录里常混着 zip、图片、临时文件，传完才发现垃圾进库，还得逐个删。
    */
   function openUploadPicker(all) {
+    // 上一批还在跑就别开新清单：两个循环同时往同一个知识库灌，重复入库很难收拾
+    if (uploadJob && uploadJob.running) {
+      uploadMsg('✗ 上一批还在后台解析（' + uploadJob.done + '/' + uploadJob.total + '），等它跑完再传下一批', 'err');
+      return;
+    }
     const items = collectCandidates(all);
     if (!items.length) { uploadMsg('✗ 没有可上传的文件', 'err'); return; }
     const usable = items.filter(function (x) { return x.supported && !x.oversize; });
@@ -493,57 +553,100 @@
   }
 
   /** 逐条上传并回写每行状态；返回 false 表示"不要关弹框" */
+  /**
+   * 上传任务状态，与弹框 DOM 解耦。
+   *
+   * <p>文件是一个一个 POST 上去的，只要页面还在，请求就会继续跑完；但 closeModal
+   * 会把 .modal-mask 的 innerHTML 清空，之前那版在循环末尾直接取 #pickDone 更新结果，
+   * 一关弹框就抛 TypeError，收尾的 toast 与列表刷新全被吞掉——用户看到的是
+   * "关掉之后再也没反应"，其实文件已经进库了。</p>
+   *
+   * <p>现在每处 UI 更新都先判节点还在不在（isConnected），收尾只按任务本身结算，
+   * 弹框在就顺便刷弹框、不在就只提示。上传中途关窗口 = 转到后台继续，不中断。</p>
+   */
+  let uploadJob = null;
+
   async function runPickedUpload() {
+    if (uploadJob && uploadJob.running) {
+      modalError('上一批还在后台解析（' + uploadJob.done + '/' + uploadJob.total + '），等它跑完再传新的');
+      return false;
+    }
     const list = document.getElementById('pickList');
     if (!list || !pickState) return true;
     const rows = Array.prototype.slice.call(list.querySelectorAll('.pick-row:not(.skip)'))
       .filter(function (r) { return r.querySelector('.pick-cb').checked; });
     if (!rows.length) { modalError('请至少勾选一个文件'); return false; }
     clearModalError();
+    const job = { running: true, total: rows.length, done: 0, fail: 0, token: pickState };
+    uploadJob = job;
     const okBtn = document.querySelector('#appModal .btn-ok');
     const cancelBtn = document.querySelector('#appModal .btn-cancel');
     if (okBtn) { okBtn.disabled = true; okBtn.textContent = '上传中…'; }
     if (cancelBtn) cancelBtn.disabled = true;
+    // 标题上先说清楚，免得有人盯着进度不敢关
+    const titleEl = document.querySelector('#appModal .modal-title');
+    if (titleEl) titleEl.textContent = '上传中（可关闭窗口，后台会继续）';
     list.querySelectorAll('.pick-cb').forEach(function (cb) { cb.disabled = true; });
     const bar = document.getElementById('pickBar');
-    bar.classList.add('show');
-    let done = 0, fail = 0;
+    if (bar) bar.classList.add('show');
     for (let k = 0; k < rows.length; k++) {
       const row = rows[k];
       const it = pickState.items[Number(row.dataset.i)];
       const tag = row.querySelector('.pick-tag');
-      tag.className = 'pick-tag run'; tag.textContent = '解析中…';
-      row.style.background = '#f7faff';
+      if (tag && row.isConnected) {
+        tag.className = 'pick-tag run'; tag.textContent = '解析中…';
+        row.style.background = '#f7faff';
+      }
       if (it.dir) uploadMsg('正在解析 ' + it.name + '…');
       try {
         const res = await ingestOne(it.file);
-        done++;
-        tag.className = 'pick-tag ok'; tag.textContent = '✓ ' + res.chunks + ' 片';
-        row.style.background = '';
+        job.done++;
+        if (row.isConnected && tag) {
+          tag.className = 'pick-tag ok'; tag.textContent = '✓ ' + res.chunks + ' 片';
+          row.style.background = '';
+        }
       } catch (e) {
-        fail++;
-        tag.className = 'pick-tag err'; tag.textContent = '✗ 失败';
-        row.title = it.name + '：' + e.message;
-        row.style.background = '#fff7f9';
+        job.fail++;
+        if (row.isConnected && tag) {
+          tag.className = 'pick-tag err'; tag.textContent = '✗ 失败';
+          row.title = it.name + '：' + e.message;
+          row.style.background = '#fff7f9';
+        }
       }
-      bar.querySelector('i').style.width = Math.round(((k + 1) / rows.length) * 100) + '%';
+      if (bar && bar.isConnected) {
+        const fill = bar.querySelector('i');
+        if (fill) fill.style.width = Math.round(((k + 1) / rows.length) * 100) + '%';
+      }
       if (it.dir) uploadMsg('[' + (k + 1) + '/' + rows.length + '] ' + it.name);
     }
-    pickState.finished = true;
-    pickState.done = done; pickState.fail = fail;
+    job.running = false;
+    const done = job.done, fail = job.fail;
+    // 弹框还在、且还是我这一批（没被新清单顶掉）才更新弹框
+    if (job.token === pickState) {
+      pickState.finished = true;
+      pickState.done = done; pickState.fail = fail;
+    }
     const dt = document.getElementById('pickDone');
-    dt.className = 'pick-done-tip show';
-    dt.innerHTML = '✓ 完成：成功 <b>' + done + '</b> 个' + (fail ? '，失败 <b style="color:var(--danger)">' + fail + '</b> 个（鼠标悬停可看原因）' : '') +
-      '。文档已入库，现在可以提问了。';
-    if (okBtn) { okBtn.disabled = false; okBtn.textContent = '完成'; }
-    if (cancelBtn) cancelBtn.disabled = false;
-    toast('文档已入库' + (fail ? '（' + fail + ' 个失败）' : ''), fail ? 'err' : 'ok');
+    if (dt && job.token === pickState) {
+      dt.className = 'pick-done-tip show';
+      dt.innerHTML = '✓ 完成：成功 <b>' + done + '</b> 个' + (fail ? '，失败 <b style="color:var(--danger)">' + fail + '</b> 个（鼠标悬停可看原因）' : '') +
+        '。文档已入库，现在可以提问了。';
+      if (okBtn) { okBtn.disabled = false; okBtn.textContent = '完成'; }
+      if (cancelBtn) cancelBtn.disabled = false;
+      const t2 = document.querySelector('#appModal .modal-title');
+      if (t2) t2.textContent = '选择要上传的文件';
+    }
+    toast('文档已入库 ' + done + ' 个' + (fail ? '（' + fail + ' 个失败）' : ''), fail ? 'err' : 'ok');
     loadDocs();
     return false;   // 保持弹框打开，让用户看到每个文件的结果
   }
 
   /** 单文件直接传（不多一步弹框，避免为了传一个文件还要点两次） */
   async function uploadFiles(all) {
+    if (uploadJob && uploadJob.running) {
+      uploadMsg('✗ 上一批还在后台解析（' + uploadJob.done + '/' + uploadJob.total + '），等它跑完再传', 'err');
+      return;
+    }
     const items = collectCandidates(all);
     const valid = items.filter(function (x) { return x.supported && !x.oversize; });
     if (!valid.length) {
@@ -789,14 +892,20 @@
   function hasPermission(code) {
     return ownedPermissions.has(code);
   }
+  // 权限清单的加载 promise：功能页守卫要等它回来再判定，否则拿空集合会把有权限的人也拦住
+  let permsReady = null;
   async function loadPermissions() {
-    try {
-      const r = await fetch('/api/auth/permissions');
-      if (!r.ok) return;
-      const j = await r.json();
-      ownedPermissions = new Set(j.permissions || []);
-      renderAdminEntry();
-    } catch (e) { /* 权限接口失败时保持默认不显示，默认拒绝 */ }
+    if (permsReady) return permsReady;
+    permsReady = (async function () {
+      try {
+        const r = await fetch('/api/auth/permissions');
+        if (!r.ok) return;
+        const j = await r.json();
+        ownedPermissions = new Set(j.permissions || []);
+        renderAdminEntry();
+      } catch (e) { /* 权限接口失败时保持默认不显示，默认拒绝 */ }
+    })();
+    return permsReady;
   }
   // 右上角管理后台入口：仅拥有 admin:access 才显示，免登录跳转（同源共享会话令牌）
   function renderAdminEntry() {
@@ -880,6 +989,10 @@
   let modalState = null;
   function closeModal() {
     const mask = document.getElementById('appModal');
+    // 上传还在跑：关窗口不等于中断。不说这一句，用户会以为白传了、再传一遍。
+    if (uploadJob && uploadJob.running && mask && mask.querySelector('#pickList')) {
+      toast('已转到后台继续解析，跑完会提示', 'ok');
+    }
     if (mask) { mask.classList.remove('show'); mask.innerHTML = ''; }
     modalState = null;
     document.removeEventListener('keydown', onModalKey);

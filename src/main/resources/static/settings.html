@@ -54,16 +54,14 @@ const ICONS={
 };
 function icon(name){return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">'+(ICONS[name]||'')+'</svg>'}
 
-function renderSettings(){
+async function renderSettings(){
   const defs=window.ShellSettings||[];
-  const user=WrkAuth.getUser();
-  const groups=user&&Array.isArray(user.groups)?user.groups:[];
-  const isAdmin=groups.indexOf('admin')>=0;
+  // 等权限清单回来再判定：否则拿空集合会把有权限的入口也藏掉
+  if(window.Shell&&Shell.permsReady)await Shell.permsReady();
   const visible=defs.filter(s=>{
-    const need=s.groups||[];
-    // 无权限的入口不展示：不给用户看点了会被拒绝的功能
-    if(!user)return true;                       // 未登录演示模式暂无，guardPage 会跳登录
-    return !need.length||isAdmin||need.some(g=>groups.indexOf(g)>=0);
+    // 按权限码过滤（菜单权限页勾了才显示）；没配 perm 的入口所有人可见
+    if(s.perm&&window.Shell&&Shell.hasPermission)return Shell.hasPermission(s.perm);
+    return true;
   });
   document.getElementById('settingGrid').innerHTML=visible.length?visible.map(s=>
     '<a class="setting-card" href="'+s.href+'">'+

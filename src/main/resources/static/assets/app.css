@@ -41,25 +41,22 @@ a{color:var(--primary);text-decoration:none}
 .new-chat{width:100%;padding:11px;border:1px solid rgba(139,164,255,.28);border-radius:9px;background:linear-gradient(135deg,rgba(59,110,245,.28),rgba(59,110,245,.16));color:#e8efff;font-size:13.5px;font-weight:600;transition:all .18s;display:flex;align-items:center;justify-content:center;gap:7px;text-decoration:none}
 .new-chat:hover{background:rgba(59,110,245,.42);border-color:rgba(139,164,255,.5);transform:translateY(-1px)}
 .session-list{flex:1;overflow-y:auto;min-height:40px;margin:0 -4px;padding:0 4px}
-.session-item{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:9px;color:#c8d3e8;cursor:pointer;transition:all .15s;margin-bottom:3px;text-decoration:none;font-size:12px}
+/* 单行布局（对齐 WorkBuddy 的任务列表）：标题占一行，右侧灰色相对时间；
+   圆点和两行结构去掉——列表长的时候单行能多看一倍条目 */
+.session-item{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:9px;color:#c8d3e8;cursor:pointer;transition:all .15s;margin-bottom:2px;text-decoration:none;font-size:12px}
 .session-item:hover{background:rgba(255,255,255,.06)}
-.session-dot{width:7px;height:7px;border-radius:50%;background:#46597c;flex:0 0 7px}
-.session-body{flex:1;min-width:0;display:flex;flex-direction:column;line-height:1.4}
-.session-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#d6e0f5;font-size:12px}
-.session-time{font-size:10px;color:#6f80a4;margin-top:3px}
+.session-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#d6e0f5;font-size:12.5px}
+.session-time{flex:0 0 auto;font-size:11px;color:#6f80a4}
 /* 删除按钮不做"完全隐形"：常态留 42% 透明度让其始终可见，hover 会话行时变实心红——
    完全 opacity:0 会让用户以为没有删除入口（"要鼠标放上去才显示"的观感） */
-.sidebar .session-delete{border:0;background:transparent;color:#8fa0c0;font-size:16px;opacity:.42;padding:0 3px;line-height:1;flex:0 0 auto;transition:all .15s}
+.sidebar .session-delete{border:0;background:transparent;color:#8fa0c0;font-size:15px;opacity:.42;padding:0 2px;line-height:1;flex:0 0 auto;transition:all .15s}
 .sidebar .session-item:hover .session-delete{opacity:1}
 .sidebar .session-delete:hover{color:#ff8fab}
-/* 当前会话选中态：原来只有 :hover，列表里所有会话长得一模一样，
-   用户根本分不清正在看哪一条。用"底色 + 左侧竖条 + 实心圆点"三重信号，
-   深色侧栏上也能一眼扫到（对比度不足时色相靠不住，得靠形状和位置）。 */
+/* 当前会话选中态：底色 + 左侧竖条，双信号在深色侧栏上一眼可辨 */
 .sidebar .session-item.active{background:rgba(59,110,245,.28);box-shadow:inset 0 0 0 1px rgba(139,164,255,.3)}
 .sidebar .session-item.active .session-name{color:#fff;font-weight:650}
 .sidebar .session-item.active .session-time{color:#a9bce0}
-.sidebar .session-item.active .session-dot{background:var(--primary-hi);box-shadow:0 0 0 3px rgba(91,139,255,.22)}
-.sidebar .session-item.active::before{content:'';position:absolute;left:-6px;top:9px;bottom:9px;width:2.5px;border-radius:2px;background:var(--primary-hi)}
+.sidebar .session-item.active::before{content:'';position:absolute;left:-6px;top:8px;bottom:8px;width:2.5px;border-radius:2px;background:var(--primary-hi)}
 .sidebar .session-item{position:relative}
 /* ============ 侧栏上传区（深色，全站公共） ============ */
 .sidebar .upload-area{border-top:1px solid rgba(255,255,255,.09);margin-top:8px;padding-top:8px;flex:0 0 auto}

@@ -165,7 +165,7 @@
   .pager .pg-info{margin-left:auto;display:flex;align-items:center;gap:8px}
   .pager input{width:46px;padding:4px 6px;font-size:12px;border:1px solid var(--line);border-radius:6px;text-align:center}
   /* 概览页卡片区限宽，避免超宽屏把卡片拉得过散（列表/表格页保持铺满） */
-  [data-panel="overview"] .quick-cards,[data-panel="overview"] .stats{max-width:1500px}
+  /* 概览页已移除，相关的 .quick-cards / .stats 限宽规则一并删除 */
   /* 复选项网格：等宽列对齐，标签不折行（新增/编辑账号弹框） */
   .check-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(132px,1fr));gap:9px 12px;padding-top:4px}
   .check-grid label{display:inline-flex;align-items:center;gap:7px;font-size:12.5px;white-space:nowrap;margin:0;color:var(--ink-2);cursor:pointer}
@@ -173,6 +173,9 @@
   /* 重置码是一次性凭证：字号要大到能当着用户面核对/口述，等宽字体防 0/O、1/l 混淆 */
   .reset-code{font-family:ui-monospace,Consolas,monospace;font-size:26px;font-weight:700;letter-spacing:6px;
     text-align:center;color:#25469b;background:#f4f8ff;border:1px dashed #b9cbff;border-radius:10px;padding:16px 10px}
+  /* 复制按钮贴在码框右上角，不挤占大字居中 */
+  .reset-code-wrap{position:relative}
+  .reset-code-wrap .copy-btn{position:absolute;right:8px;top:8px;font-size:11px;padding:3px 9px}
   .rs-sub{font-size:11px;color:var(--muted);margin-top:3px;font-weight:400}
   /* 侧栏待办角标 */
   .admin-nav-item .nav-count{margin-left:auto;background:#e0245e;color:#fff;border-radius:9px;
@@ -236,10 +239,9 @@
   <aside class="admin-sidebar">
     <div class="brand"><div class="brand-mark has-logo"><img class="brand-logo" src="assets/logo.svg" alt=""></div>
       <div><div class="brand-title">管理后台</div><div class="brand-sub">水利知识库</div></div></div>
-    <div class="section-label" style="margin-top:6px">工作台</div>
-    <button class="admin-nav-item active" data-panel="overview"><span class="ic">▦</span>概览</button>
-    <div class="section-label" style="margin:14px 0 6px">权限配置目录</div>
-    <button class="admin-nav-item" data-panel="users"><span class="ic">◈</span>用户管理</button>
+    <!-- 概览页已去掉：后台进来直接是用户管理，管理动作都在下面这几组里 -->
+    <div class="section-label" style="margin-top:6px">权限配置目录</div>
+    <button class="admin-nav-item active" data-panel="users"><span class="ic">◈</span>用户管理</button>
     <button class="admin-nav-item" data-panel="org"><span class="ic">⌘</span>组织架构</button>
     <button class="admin-nav-item" data-panel="roles"><span class="ic">❖</span>角色定义</button>
     <button class="admin-nav-item" data-panel="perms"><span class="ic">☷</span>菜单权限</button>
@@ -270,31 +272,8 @@
     </header>
 
     <div class="page">
-      <!-- 概览 -->
-      <section class="admin-panel active" data-panel="overview">
-        <div class="page-head"><h1 class="page-title">概览</h1>
-          <p class="page-desc">知识库与系统的整体运行情况，一屏掌握。</p></div>
-        <div class="stats" id="ovStats">
-          <div class="stat-card"><div class="stat-num">—</div><div class="stat-label">知识库文档</div></div>
-          <div class="stat-card"><div class="stat-num">—</div><div class="stat-label">已入库片段</div></div>
-          <div class="stat-card"><div class="stat-num">—</div><div class="stat-label">账号数量</div></div>
-          <div class="stat-card"><div class="stat-num">—</div><div class="stat-label">系统状态</div></div>
-        </div>
-        <div class="quick-cards">
-          <button class="quick-card" onclick="goPanel('users')"><div class="qc-t">用户与权限</div><div class="qc-d">新增账号、调整角色、启停与重置密码</div></button>
-          <button class="quick-card" onclick="goPanel('docs')"><div class="qc-t">文档管理</div><div class="qc-d">在此直接上传、查看与删除知识库文档</div></button>
-          <button class="quick-card" onclick="goPanel('models')"><div class="qc-t">模型设置</div><div class="qc-d">在此直接新增、编辑、启用和测试模型</div></button>
-          <button class="quick-card" onclick="goPanel('audit')"><div class="qc-t">操作日志</div><div class="qc-d">查看管理员操作与系统审计记录</div></button>
-        </div>
-        <div class="card"><div class="card-head"><h3>最近操作</h3>
-          <button class="btn btn-sm" onclick="loadOverview()">刷新</button></div>
-          <div class="scroll"><table class="data-table"><thead><tr><th>时间</th><th>账号</th><th>动作</th><th>状态</th><th>耗时</th></tr></thead>
-            <tbody id="ovAudit"><tr><td colspan="5" class="empty">加载中…</td></tr></tbody></table></div>
-        </div>
-      </section>
-
       <!-- 用户管理 -->
-      <section class="admin-panel" data-panel="users">
+      <section class="admin-panel active" data-panel="users">
         <div class="page-head"><h1 class="page-title">用户管理</h1>
           <p class="page-desc">左侧按组织架构筛选账号，右侧维护账号。组织节点上点「＋」可直接把新账号挂到该组织下；
             密码重置申请已移到右上角「消息中心」，不再占用本页版面。</p></div>
@@ -605,8 +584,6 @@ async function loadUsersData(){
     await loadOrgs();
     fillRoleFilter();
     renderUserTree();renderUserTable();renderOrgTree();renderOrgTable();renderOrgMembers();renderOrgHead();
-    const cards=document.querySelectorAll('#ovStats .stat-num');
-    if(cards[2])cards[2].textContent=DB.users.length;
   }catch(e){$('uTable').innerHTML='<tr><td colspan="7" class="empty">加载失败：'+esc(e.message)+'</td></tr>'}
   loadPasswordResets();
 }
@@ -615,13 +592,14 @@ async function loadUsersData(){
  * 组织清单（含成员数）+ 同步给公共脚本的名称字典。
  *
  * <p>界面上「组织」= 账号的 tenant 字段：它是一个数据隔离键，文档、会话、用量
- * 都按它分家。以前只写死一个 default→默认组织，看着像只能看不能动。</p>
+ * 都按它分家。组织全部可改名、可调上级、可删除，没有"内置"这种动不了的角色；
+ * 唯一的约束是至少要留一个，否则账号失去归属。</p>
  */
 async function loadOrgs(){
   try{
     DB.orgs=await api('/api/admin/orgs');
   }catch(e){
-    DB.orgs=DB.orgs&&DB.orgs.length?DB.orgs:[{key:'default',name:'默认组织',members:0,builtin:true}];
+    DB.orgs=DB.orgs&&DB.orgs.length?DB.orgs:[{key:'default',name:'顶层组织',members:0,builtin:false}];
   }
   // 同步给 Shell.tl()：用户表单、表格、导出、侧栏用的都是同一份名称
   const map={};DB.orgs.forEach(o=>map[o.key]=o.name);
@@ -654,8 +632,65 @@ async function loadPasswordResets(){
  * 都先看到别人的申请，而它本质是一条通知。现在收进顶栏铃铛——有待办才亮红点，
  * 点开才展开列表，业务页回到干净的用户管理。</p>
  */
-function renderPasswordResets(){
-  const pend=RESET_ROWS.filter(x=>x.status==='PENDING').length;
+// ==================== 消息中心 ====================
+// 消息中心是「所有待办通知的收件箱」，不是密码重置专属页面。
+// 结构按多来源设计：msgCollectAll() 把各来源统一成 {kind,title,sub,ops,pending}，
+// 排序、角标、空态都在这一层做。以后加系统公告、账号变更、证书到期之类，
+// 只需往 msgCollectAll() 里再 push 一组，铃铛与列表自动带上，不用改 UI。
+
+/**
+ * 取账号的中文显示名：优先用服务端随消息带下来的 displayName，
+ * 没有再回落到已加载的用户列表（刚建的账号在旧页面里也能显示）。
+ * 有显示名就写「显示名（账号）」，只有账号时才退回账号。
+ */
+function userLabel(username, displayName){
+  const acct=String(username||'');
+  const pick=dn=>{
+    const s=String(dn||'').trim();
+    if(!s)return '';
+    return s.toLowerCase()===acct.toLowerCase()?s:s+'（'+acct+'）';
+  };
+  const fromServer=pick(displayName);
+  if(fromServer)return fromServer;
+  const key=acct.toLowerCase();
+  const u=(DB.users||[]).find(x=>String(x.username||'').toLowerCase()===key);
+  const fromLocal=pick(u&&u.displayName);
+  return fromLocal||acct||'—';
+}
+
+/**
+ * 汇总所有来源的消息，统一成 {kind,id,ts,title,sub,ops,pending}。
+ * 排序按时间倒序：最新的在最上面。
+ */
+function msgCollectAll(){
+  const out=[];
+  const now=Date.now();
+  // 来源一：密码重置申请。已过期（重置码作废）的不再列出，否则列表越用越长。
+  RESET_ROWS.forEach(x=>{
+    const pending=x.status==='PENDING';
+    if(!pending&&x.expiresAt&&x.expiresAt<=now)return;
+    const st=pending
+      ?'<span class="tag warn">待审批</span>'
+      :'<span class="tag info">已发码 · 待使用</span>'+(x.expiresAt?' · '+tsLocal(x.expiresAt)+' 前有效':'');
+    out.push({
+      kind:'reset',id:x.id,ts:x.requestedAt||0,pending:pending,
+      title:'「'+esc(userLabel(x.username,x.displayName))+'」申请重置密码',
+      sub:tsLocal(x.requestedAt)+' · 来源 '+esc(x.requestIp||'—')+' · '+st,
+      ops:pending
+        ?'<button class="btn btn-sm btn-primary" onclick="approveReset('+x.id+')">批准并发码</button>'+
+         '<button class="btn btn-sm" onclick="rejectReset('+x.id+')">驳回</button>'
+        :'<span class="msg-sub">由 '+esc(x.approvedBy||'—')+' 发放</span>'
+    });
+  });
+  // 来源二（预留）：系统公告 / 账号变更 / 证书到期 —— 往 out 里 push 同结构即可
+  out.sort((a,b)=>(b.ts||0)-(a.ts||0));
+  return out;
+}
+
+function msgBadgeCount(){ return msgCollectAll().filter(x=>x.pending).length; }
+
+function renderMsgCenter(){
+  const pend=msgBadgeCount();
   const dot=$('msgDot');
   if(dot){dot.style.display=pend?'':'none';dot.textContent=pend}
   // 旧版在侧栏「用户管理」上挂角标，现在统一到铃铛，撤掉避免两处数字打架
@@ -665,31 +700,24 @@ function renderPasswordResets(){
   const host=$('msgList');
   if(host)host.innerHTML=msgRowsHtml();
 }
+// 兼容旧调用点（loadUsersData 等处还按这个名字调）
+function renderPasswordResets(){ renderMsgCenter(); }
+
 function msgRowsHtml(){
-  // 已过期的记录不再列出：重置码 30 分钟就作废，留着既点不动也用不上，
-  // 时间一长消息中心会堆成流水账，真正的待办反而被埋掉。
-  const now=Date.now();
-  const rows=RESET_ROWS.filter(x=>x.status==='PENDING'||!x.expiresAt||x.expiresAt>now);
+  const rows=msgCollectAll();
   if(!rows.length){
-    return '<div class="empty-inline">暂无待办。用户忘记密码并提交申请后，会出现在这里。</div>';
+    return '<div class="empty-inline">暂无待办。用户提交密码重置申请后会出现在这里；'+
+      '以后系统公告、账号变更等通知也集中在此，不再各页弹窗。</div>';
   }
-  return rows.map(x=>{
-    const pending=x.status==='PENDING';
-    const st=pending?'<span class="tag warn">待审批</span>':'<span class="tag info">已发码 · 待使用</span>';
-    const exp=!pending&&x.expiresAt?' · '+tsLocal(x.expiresAt)+' 前有效':'';
-    const ops=pending
-      ?'<button class="btn btn-sm btn-primary" onclick="approveReset('+x.id+')">批准并发码</button>'+
-       '<button class="btn btn-sm" onclick="rejectReset('+x.id+')">驳回</button>'
-      :'<span class="msg-sub">由 '+esc(x.approvedBy||'—')+' 发放</span>';
-    return '<div class="msg-row"><div class="msg-main">'+
-      '<div class="msg-title">「'+esc(x.username)+'」申请重置密码</div>'+
-      '<div class="msg-sub">'+tsLocal(x.requestedAt)+' · 来源 '+esc(x.requestIp||'—')+' · '+st+exp+'</div>'+
-      '</div><div class="msg-ops">'+ops+'</div></div>';
-  }).join('');
+  return rows.map(x=>'<div class="msg-row" data-kind="'+esc(x.kind)+'"><div class="msg-main">'+
+      '<div class="msg-title">'+x.title+'</div>'+
+      '<div class="msg-sub">'+x.sub+'</div>'+
+      '</div><div class="msg-ops">'+x.ops+'</div></div>').join('');
 }
 function openMsgCenter(){
   Shell.modal({title:'消息中心',okText:'关闭',cancelText:'',
-    body:'<div class="form-note">密码重置申请集中在这里审批：批准后生成一次性重置码（30 分钟有效、用一次作废）。'+
+    body:'<div class="form-note">所有待办通知都在这里：目前是密码重置申请（批准后生成一次性重置码，30 分钟有效、用一次作废），'+
+      '系统公告、账号变更等后续也统一收在这一处，不再各自弹窗。'+
       '若只是临时帮某人改密码，直接到「用户管理」点行内「重置密码」更快，不必走申请。</div>'+
       '<div id="msgList">'+msgRowsHtml()+'</div>'});
 }
@@ -698,7 +726,8 @@ async function approveReset(id){
     const j=await apiWrite('/api/admin/password-resets/'+id+'/approve',{method:'POST'});
     Shell.modal({title:'重置码已生成',okText:'知道了',cancelText:'',
       body:'<p style="margin:0 0 12px">请通过可靠渠道告知本人：<b>30 分钟内有效，用一次即作废</b>。</p>'+
-        '<div class="reset-code">'+esc(j.code)+'</div>'+
+        '<div class="reset-code-wrap"><div class="reset-code" id="resetCode">'+esc(j.code)+'</div>'+
+        '<button class="btn btn-sm copy-btn" type="button" onclick="copyResetCode(this)">复制</button></div>'+
         '<p class="hint" style="margin:12px 0 0">系统只保存重置码的哈希，关闭本弹框后无法再次查看。'+
         '若已丢失，可让用户重新提交申请，或直接在账号列表里为他重置密码。</p>',
       // 关掉码之后回到消息中心：不然批一条就得重新点一次铃铛。
@@ -709,6 +738,31 @@ async function approveReset(id){
     loadPasswordResets();
   }catch(e){appToast(e.message,'err')}
 }
+/**
+ * 复制重置码。
+ * clipboard API 要求安全上下文（https 或 localhost）；内网 http 部署时它不可用，
+ * 所以要留 execCommand 这条降级路径，否则点了没反应比没有按钮更糟。
+ */
+async function copyResetCode(btn){
+  const el=$('resetCode');
+  const code=(el?el.textContent:'').trim();
+  if(!code)return;
+  let ok=false;
+  try{ await navigator.clipboard.writeText(code); ok=true; }
+  catch(e){
+    try{
+      const ta=document.createElement('textarea');
+      ta.value=code;ta.setAttribute('readonly','');
+      ta.style.cssText='position:fixed;top:-1000px;opacity:0';
+      document.body.appendChild(ta);ta.select();
+      ok=document.execCommand('copy');
+      ta.remove();
+    }catch(e2){ok=false}
+  }
+  if(btn){btn.textContent=ok?'已复制':'复制失败';setTimeout(()=>{btn.textContent='复制'},1600)}
+  appToast(ok?'重置码已复制':'复制失败，请手动选中复制',ok?'ok':'err');
+}
+
 async function rejectReset(id){
   try{
     await apiWrite('/api/admin/password-resets/'+id+'/reject',{method:'POST'});
@@ -1018,7 +1072,7 @@ function userForm(u,presetTenant){
   const self=!!(u&&me&&String(u.username||'').toLowerCase()===me);
   // 所属组织下拉：值取组织标识（数据归属用），显示用带层级的组织名称——
   // 组织有层级后，"水利业务部 / 调度科"这种全路径才不会让两个同名科室选错。
-  const orgList=(DB.orgs&&DB.orgs.length)?DB.orgs:[{key:'default',name:'默认组织'}];
+  const orgList=(DB.orgs&&DB.orgs.length)?DB.orgs:[{key:'default',name:'顶层组织'}];
   const cur=u?(u.tenant||'default'):(presetTenant||'default');
   const tenantOpts=orgList.map(o=>'<option value="'+esc(o.key)+'"'+(o.key===cur?' selected':'')+'>'+
     esc(orgCrumbText(o.key))+'</option>').join('');
@@ -1142,7 +1196,6 @@ function renderOrgHead(){
     stats.push('直属成员 <b>'+orgDirectMembers(key)+'</b>');
     stats.push('含下级 <b>'+orgAllMembers(key)+'</b>');
     stats.push('下级组织 <b>'+orgChildren(key).length+'</b>');
-    if((orgByKey(key)||{}).builtin)stats.push('<span class="tag info">内置</span>');
   }else{
     stats.push('共 <b>'+(DB.orgs||[]).length+'</b> 个组织');
     stats.push('顶层 <b>'+orgChildren('').length+'</b> 个');
@@ -1159,8 +1212,7 @@ function renderOrgTable(){
     const ops='<button class="op-btn" onclick="orgMemberList(\''+esc(o.key)+'\')">成员</button>'+
       '<button class="op-btn" onclick="orgCreate(\''+esc(o.key)+'\')">＋子组织</button>'+
       '<button class="op-btn" onclick="orgEdit(\''+esc(o.key)+'\')">编辑</button>'+
-      (o.builtin?'<span class="op-note" title="默认组织是兜底归属，不能删除">内置</span>'
-                :'<button class="op-btn danger" onclick="orgDelete(\''+esc(o.key)+'\')">删除</button>');
+      '<button class="op-btn danger" onclick="orgDelete(\''+esc(o.key)+'\')">删除</button>';
     return '<tr><td class="row-idx">'+(i+1)+'</td>'+
       '<td class="name"><a href="javascript:void(0)" style="color:var(--primary);text-decoration:none" onclick="orgPick(\''+esc(o.key)+'\')">'+esc(o.name)+'</a></td>'+
       '<td class="mono" style="font-size:11px">'+esc(o.key)+'</td>'+
@@ -1269,33 +1321,55 @@ function orgEdit(key){
     }});
 }
 
+/** 迁移成员时的目标组织下拉：排除自己与自己的子树（子组织不能当父组织的收容所） */
+function orgMoveTargets(selfKey){
+  const skip=orgSubtree(selfKey);
+  const rows=(DB.orgs||[]).filter(o=>!skip.has(o.key));
+  if(!rows.length)return '<option value="">（没有可迁往的组织）</option>';
+  return rows.map(o=>'<option value="'+esc(o.key)+'">'+esc(orgCrumbText(o.key))+'</option>').join('');
+}
+
+/**
+ * 删除组织。
+ *
+ * <p>不再有"内置组织不能删"的特例——第一个组织只是建得早，不是系统资产。
+ * 但顺序不能乱：先处理子组织（不能连带删，否则子组织变成树上点不到的孤儿），
+ * 再处理成员（这里给一条出路：把直属成员整体迁到另一个组织后一起删，
+ * 比让人逐个去改账号快得多），最后守住"至少留一个组织"。</p>
+ */
 function orgDelete(key){
   const o=orgByKey(key);if(!o)return;
-  if(o.builtin){
+  const kids=orgChildren(key).length;
+  if(kids){
     Shell.modal({title:'不能删除',okText:'知道了',cancelText:'',
-      body:'<p style="margin:0">「默认组织」是所有新账号的兜底归属，不能删除。</p>'});
+      body:'<p style="margin:0">「'+esc(o.name)+'」下还有 <b>'+kids+'</b> 个子组织。'+
+        '子组织不会跟着一起删（删了就成树上点不到的孤儿），请先把子组织挪到别处或删掉，再删本组织。</p>'});
     return;
   }
-  const kids=orgChildren(key).length,mem=orgDirectMembers(key);
-  if(kids||mem){
-    const why=[];
-    if(kids)why.push(kids+' 个下级组织');
-    if(mem)why.push(mem+' 个直属成员');
+  if((DB.orgs||[]).length<=1){
     Shell.modal({title:'不能删除',okText:'知道了',cancelText:'',
-      body:'<p style="margin:0">「'+esc(o.name)+'」下还有 '+why.join('、')+'。'+
-        '请先把成员改到其它组织、把子组织处理掉，再删本组织。</p>'});
+      body:'<p style="margin:0">这是最后一个组织。账号必须有归属单位，至少要保留一个。</p>'});
     return;
   }
-  Shell.modal({title:'删除组织',danger:true,okText:'确认删除',
-    body:'<p style="margin:0">确定删除组织「'+esc(o.name)+'」（'+esc(key)+'）吗？该组织下没有成员，也没有下级组织。</p>',
+  const mem=orgDirectMembers(key);
+  // 一律走"迁移并删除"：即使这个组织没有成员，也可能还挂着知识库文档与会话。
+  // 只删组织不迁数据，那些文档会留在已删除的组织键上，谁都看不到也删不掉。
+  Shell.modal({title:'删除组织',danger:true,okText:'迁移并删除',
+    body:'<p style="margin:0 0 12px">删除「'+esc(o.name)+'」前，把它名下的账号、知识库文档与会话一并迁到另一个组织。'+
+      '只删组织不迁数据，文档会留在已删除的组织上成为孤儿。</p>'+
+      (mem?'<p style="margin:0 0 12px">当前直属成员 <b>'+mem+'</b> 个。</p>':'')+
+      '<div class="field"><label for="oMoveTo">把数据迁到</label><select id="oMoveTo">'+orgMoveTargets(key)+'</select></div>'+
+      '<div class="form-hint">迁完即删除「'+esc(o.name)+'」，组织标识 '+esc(key)+' 作废。</div>',
     onOk:async function(close){
+      const to=($('oMoveTo').value||'').trim();
+      if(!to){Shell.modalError('请选择数据要迁往的组织');return false}
       try{
-        await apiWrite('/api/admin/orgs/'+encodeURIComponent(key),{method:'DELETE'});
-        close();appToast('组织已删除','ok');
+        const j=await apiWrite('/api/admin/orgs/'+encodeURIComponent(key)+'?moveTo='+encodeURIComponent(to),{method:'DELETE'});
+        close();appToast((j&&j.message)||'组织已删除','ok');
         const next=String(o.parentKey||'');
-        await loadOrgs();
+        await loadUsersData();
         orgSel={key:(next&&orgByKey(next))?next:''};
-        orgPick(orgSel.key);renderUserTree();renderUserTable();
+        orgPick(orgSel.key);
       }catch(e){Shell.modalError(e.message);return false}
     }});
 }
@@ -1534,23 +1608,6 @@ function togglePermTree(expand){
   renderPermTable();
 }
 
-async function loadOverview(){
-  try{
-    const docs=await api('/api/docs/list');
-    const chunks=docs.reduce((s,d)=>s+Number(d.chunks||0),0);
-    const models=await api('/api/models');
-    const health=await api('/api/search/health');
-    const cards=$('ovStats').querySelectorAll('.stat-num');
-    cards[0].textContent=docs.length;cards[1].textContent=num(chunks);
-    cards[2].textContent=DB.users.length;cards[3].textContent=health.healthy?'正常':'异常';
-    const audit=await api('/api/audit/logs?limit=6');
-    $('ovAudit').innerHTML=(audit.logs||[]).map(l=>
-      '<tr><td>'+tsLocal(l.ts)+'</td><td>'+esc(l.user_id)+'</td><td>'+esc(actionCn(l.action))+'</td>'+
-      '<td>'+statusTag(l.status)+'</td><td>'+esc(l.duration_ms||l.duration||'—')+'</td></tr>').join('')||
-      '<tr><td colspan="5" class="empty">暂无记录</td></tr>';
-  }catch(e){console.error(e)}
-}
-
 async function loadDocs(){
   try{
     const docs=await api('/api/docs/list');
@@ -1784,7 +1841,7 @@ async function loadAudit(){
   }catch(e){console.error(e)}
 }
 
-const TITLES={overview:'概览',users:'用户管理',org:'组织架构',roles:'角色定义',perms:'菜单权限',
+const TITLES={users:'用户管理',org:'组织架构',roles:'角色定义',perms:'菜单权限',
   docs:'文档管理',models:'模型设置',usage:'用量统计',loginlogs:'登录日志',audit:'操作日志',profile:'个人中心'};
 // 切面板：优先点侧栏导航项；个人中心等无导航入口的面板直接切换并取消导航高亮
 function goPanel(key){
@@ -1852,8 +1909,7 @@ document.querySelectorAll('.admin-nav-item[data-panel]').forEach(btn=>{
     document.querySelectorAll('.admin-nav-item[data-panel]').forEach(b=>b.classList.toggle('active',b===btn));
     document.querySelectorAll('.admin-panel').forEach(p=>p.classList.toggle('active',p.dataset.panel===key));
     $('panelTitle').textContent=TITLES[key]||'管理后台';
-    if(key==='overview')loadOverview();
-    else if(key==='docs')loadDocs();
+    if(key==='docs')loadDocs();
     else if(key==='models')loadModelsInfo();
     else if(key==='usage')loadUsage();
     else if(key==='loginlogs')loadLoginLogs();
@@ -1869,7 +1925,7 @@ document.querySelectorAll('#uStats .drillable').forEach(c=>{
 });
 
 initShell('admin');
-guard().then(ok=>{if(ok)loadOverview()});
+guard();
 </script>
 </body>
 </html>

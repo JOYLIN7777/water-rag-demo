@@ -166,9 +166,10 @@ document.getElementById('loginForm').addEventListener('submit',async function(e)
       if(document.getElementById('remember').checked)localStorage.setItem(KEY_REMEMBER,u);
       else localStorage.removeItem(KEY_REMEMBER);
     }catch(e){}
-    // 跳转到来源页（若有）或首页
-    var redirect=new URLSearchParams(location.search).get('redirect')||'index.html';
-    location.href=redirect.indexOf('/')===0?redirect:'index.html';
+    // 一律回问答页，不沿用上一个账号停留的页面：
+    // 谁登录就落谁的默认视图——有历史会话定位到最新一条，没有就是新会话（由问答页自己决定）。
+    // 以前带 redirect 参数，A 账号停在检索对比、B 账号登录后直接被带进检索对比，观感像"串号"。
+    location.href='index.html';
   }catch(err){showErr('网络异常，请稍后重试：'+err.message)}
   finally{btn.disabled=false;btn.textContent='登 录'}
 });

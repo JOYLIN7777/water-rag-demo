@@ -208,6 +208,49 @@ public class EsIndexService {
         }
     }
 
+    /**
+     * 某个组织名下的切片数。
+     *
+     * <p>删除组织前必须问一句"这里还有没有东西"：只有账号、没有文档的组织可以直接删；
+     * 只要有文档，说明删掉就会有数据变成谁都看不见的孤儿。</p>
+     */
+    public long countByTenant(String tenant) {
+        if (tenant == null || tenant.isBlank()) return 0;
+        try {
+            String dsl = "{\"query\":{\"term\":{\"tenantId\":" + quote(tenant) + "}}}";
+            return postJson("/" + props.getIndex() + "/_count", dsl).path("count").asLong(0);
+        } catch (Exception e) {
+            log.warn("统计租户分片数失败 {}：{}", tenant, e.getMessage());
+            return 0;
+        }
+    }
+
+    /**
+     * 把某个组织名下的全部分片改挂到另一个组织（组织合并/删除时用）。
+     *
+     * <p>为什么必须做这一步：账号的 tenant 迁走了，文档的 tenantId 还留着旧键，
+     * 而检索和文档清单都按 tenantId 过滤——旧组织一删，这批文档就变成"系统里有
+     * 但谁都看不到、也删不掉"的孤儿数据。实测踩过一次（3724 个分片失联）。</p>
+     *
+     * @return 实际改挂的切片数
+     */
+    public long migrateTenant(String from, String to) {
+        if (from == null || from.isBlank() || to == null || to.isBlank() || from.equals(to)) return 0;
+        try {
+            String dsl = """
+                {"query":{"term":{"tenantId":%s}},
+                 "script":{"source":"ctx._source.tenantId = params.to","params":{"to":%s}}}
+                """.formatted(quote(from), quote(to));
+            JsonNode r = postJson("/" + props.getIndex() + "/_update_by_query?refresh=true&conflicts=proceed", dsl);
+            long n = r.path("updated").asLong(0);
+            log.info("ES 租户迁移 {} → {}：{} 个分片", from, to, n);
+            return n;
+        } catch (Exception e) {
+            log.warn("ES 租户迁移失败 {} → {}：{}", from, to, e.getMessage());
+            throw new IllegalStateException("文档迁移失败：" + e.getMessage(), e);
+        }
+    }
+
     /** 文档清单：按 fileName 聚合切片数与权限字段，只看当前账号可见的文档 */
     public JsonNode listDocuments() {
         String dsl = """

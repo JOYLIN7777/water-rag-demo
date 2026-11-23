@@ -54,8 +54,13 @@ public class OrgStore {
                         + "parent_key VARCHAR(64), created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)");
                 // 老库升级：上一版表里没有 parent_key，缺列时补上（历史组织全部落在顶层）
                 jdbc.execute("ALTER TABLE org_unit ADD COLUMN IF NOT EXISTS parent_key VARCHAR(64)");
-                jdbc.update("INSERT INTO org_unit(org_key,name,parent_key) VALUES(?,?,NULL) "
-                        + "ON CONFLICT (org_key) DO NOTHING", DEFAULT_KEY, "默认组织");
+                // 只在一条组织都没有时建第一个顶层组织。
+                // 不再专门造一个叫「默认组织」的内置项：组织就是组织，
+                // 第一个组织叫什么、要不要改名、最后要不要删，都由使用者决定，
+                // 系统只守住一条底线——不能删到一个都不剩（账号必须有归属）。
+                jdbc.update("INSERT INTO org_unit(org_key,name,parent_key) "
+                        + "SELECT ?,?,NULL WHERE NOT EXISTS (SELECT 1 FROM org_unit)",
+                        DEFAULT_KEY, "顶层组织");
                 // 旧数据兜底：账号里出现过但组织表没有的 tenant，按标识名补一条，
                 // 否则这些账号在"所属组织"下拉里会凭空消失。
                 jdbc.update("INSERT INTO org_unit(org_key,name,parent_key) "
@@ -78,26 +83,28 @@ public class OrgStore {
         ensure();
         List<Map<String, Object>> out = new ArrayList<>();
         try {
-            jdbc.query("SELECT org_key,name,parent_key FROM org_unit "
-                    + "ORDER BY (org_key=?) DESC, created_at", rs -> {
+            // 按创建先后排：第一个建的自然在最上面，不再把某个 key 特殊排前
+            jdbc.query("SELECT org_key,name,parent_key FROM org_unit ORDER BY created_at, org_key", rs -> {
                 Map<String, Object> m = new LinkedHashMap<>();
                 String key = rs.getString("org_key");
                 m.put("key", key);
                 m.put("name", rs.getString("name"));
                 String parent = rs.getString("parent_key");
                 m.put("parentKey", parent == null ? "" : parent);
-                m.put("builtin", DEFAULT_KEY.equals(key));
+                // builtin 字段保留但恒为 false：老前端仍在读它，留着免得 undefined 判断出岔子；
+                // 语义上已经不存在"内置不可删"的组织。
+                m.put("builtin", false);
                 out.add(m);
-            }, DEFAULT_KEY);
+            });
         } catch (Exception e) {
             log.warn("读取组织清单失败：{}", e.getMessage());
         }
         if (out.isEmpty()) {
             Map<String, Object> fallback = new LinkedHashMap<>();
             fallback.put("key", DEFAULT_KEY);
-            fallback.put("name", "默认组织");
+            fallback.put("name", "顶层组织");
             fallback.put("parentKey", "");
-            fallback.put("builtin", true);
+            fallback.put("builtin", false);
             out.add(fallback);
         }
         return out;
@@ -210,19 +217,29 @@ public class OrgStore {
         } catch (Exception e) { return 0; }
     }
 
+    /** 组织总数（用于守住"不能删到一个都不剩"） */
+    public int count() {
+        ensure();
+        try {
+            Long n = jdbc.queryForObject("SELECT COUNT(*) FROM org_unit", Long.class);
+            return n == null ? 0 : n.intValue();
+        } catch (Exception e) { return 0; }
+    }
+
     /**
      * 删除组织。
      *
-     * <p>只允许删"叶子且无人"的组织：还有成员的话那些账号会掉进一个不存在的组织，
-     * 登录后文档与历史全空；还有子组织的话子组织会变成孤儿，树上再也点不到。
-     * 默认组织是兜底归属，永不删。</p>
+     * <p>不再有"内置组织不能删"的特例——第一个组织只是创建得早，不是系统资产。
+     * 但要守住两条：有子组织不能删（子组织会变成树上点不到的孤儿），
+     * 有成员不能删（那些账号会掉进一个不存在的组织，登录后文档与历史全空）；
+     * 外加一条底线：至少留一个组织，否则所有账号都失去归属。</p>
      */
     public void delete(String key, int members) {
         ensure();
-        if (DEFAULT_KEY.equals(key)) throw new IllegalArgumentException("默认组织是兜底归属，不能删除");
         int children = childCount(key);
         if (children > 0) throw new IllegalArgumentException("该组织下还有 " + children + " 个子组织，请先处理子组织");
         if (members > 0) throw new IllegalArgumentException("该组织还有 " + members + " 个成员，请先把成员移到其它组织");
+        if (count() <= 1) throw new IllegalArgumentException("至少要保留一个组织：账号必须有归属单位，删掉最后一个组织相当于让所有人无处可去");
         try {
             jdbc.update("DELETE FROM org_unit WHERE org_key=?", key);
         } catch (Exception e) {

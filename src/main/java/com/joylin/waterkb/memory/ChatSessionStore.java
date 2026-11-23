@@ -94,9 +94,13 @@ public class ChatSessionStore {
         ensureSchema();
         if (!schemaReady) return out;
         try {
-            jdbc.query("SELECT session_id, title, "
-                            + "(EXTRACT(EPOCH FROM created_at) * 1000)::BIGINT AS created_ms, "
-                            + "(EXTRACT(EPOCH FROM updated_at) * 1000)::BIGINT AS updated_ms "
+            // 时间戳一定要走 JDBC 的 getTimestamp().getTime()，不要在 SQL 里 EXTRACT(EPOCH FROM ...)。
+            // created_at/updated_at 是「无时区 TIMESTAMP」，写入时按 JVM 时区落的是本地墙上时间；
+            // 而 EXTRACT(EPOCH FROM timestamp) 会按 PG session 时区（容器里是 Etc/UTC）去解释它，
+            // 北京时间就被当成 UTC，凭空多出 8 小时——列表里刚聊过的会话显示成明天凌晨，
+            // 排序自然全乱（"最新"被算成未来时刻排最前，真正刚聊的沉到最后）。
+            // getTimestamp 由驱动按同一个 JVM 时区解释，与写入自洽。
+            jdbc.query("SELECT session_id, title, created_at, updated_at "
                             + "FROM chat_session WHERE tenant_id=? AND user_id=? "
                             + "AND title IS NOT NULL AND title <> '' "
                             + "ORDER BY updated_at DESC",
@@ -104,14 +108,47 @@ public class ChatSessionStore {
                         Map<String, Object> m = new LinkedHashMap<>();
                         m.put("id", rs.getString("session_id"));
                         m.put("title", rs.getString("title") == null ? "" : rs.getString("title"));
-                        m.put("createdAt", rs.getLong("created_ms"));
-                        m.put("updatedAt", rs.getLong("updated_ms"));
+                        java.sql.Timestamp created = rs.getTimestamp("created_at");
+                        java.sql.Timestamp updated = rs.getTimestamp("updated_at");
+                        m.put("createdAt", created == null ? 0L : created.getTime());
+                        m.put("updatedAt", updated == null ? 0L : updated.getTime());
                         out.add(m);
                     }, tenant(), user());
         } catch (Exception e) {
             log.warn("读取会话清单失败：{}", e.getMessage());
         }
         return out;
+    }
+
+    /**
+     * 某个组织名下的会话条数（删除组织前盘家底用）。
+     */
+    public int countByTenant(String tenant) {
+        if (jdbc == null || tenant == null || tenant.isBlank()) return 0;
+        ensureSchema();
+        if (!schemaReady) return 0;
+        try {
+            Long n = jdbc.queryForObject("SELECT COUNT(*) FROM chat_session WHERE tenant_id=?", Long.class, tenant);
+            return n == null ? 0 : n.intValue();
+        } catch (Exception e) { return 0; }
+    }
+
+    /**
+     * 组织合并时把会话一并迁到新组织。
+     *
+     * <p>和文档同一个道理：会话 key 里带租户，账号迁走了会话还挂在旧租户上，
+     * 旧组织一删，这些历史问答就跟着失联。</p>
+     */
+    public int migrateTenant(String from, String to) {
+        if (jdbc == null || from == null || from.isBlank() || to == null || to.isBlank() || from.equals(to)) return 0;
+        ensureSchema();
+        if (!schemaReady) return 0;
+        try {
+            return jdbc.update("UPDATE chat_session SET tenant_id=? WHERE tenant_id=?", to, from);
+        } catch (Exception e) {
+            log.warn("会话迁移失败 {} → {}：{}", from, to, e.getMessage());
+            return 0;
+        }
     }
 
     /**

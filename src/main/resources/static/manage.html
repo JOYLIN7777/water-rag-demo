@@ -24,6 +24,9 @@
   .fmt-total{font-size:11px;color:var(--primary);font-weight:600}
   .folder-btn{border:1px solid #d6e4ff;background:var(--primary-soft);color:#25469b;border-radius:8px;padding:9px 12px;font-size:12px;font-weight:600;transition:all .15s;text-align:center}
   .folder-btn:hover{background:#dbe8ff;border-color:#b9cbff}
+  .folder-row{display:flex;gap:6px}
+  .folder-row .folder-btn{flex:1}
+  .folder-row .folder-other{flex:0 0 auto;padding:9px 11px;font-size:14px}
   .upload-msg{margin:0 0 16px;background:#f7f9fc;border:1px solid var(--line);color:var(--ink-2)}
   .toolbar{display:flex;gap:12px;margin-bottom:14px;align-items:center;flex-wrap:wrap}
   .search{max-width:320px}
@@ -59,8 +62,11 @@
       <div class="upload-side">
         <h4>支持格式 <span class="fmt-total" id="fmtTotal">加载中…</span></h4>
         <div class="fmt-groups" id="fmtGroups"></div>
-        <button class="folder-btn" onclick="Shell.pickFolder()">📁 选择文件夹批量上传</button>
-        <div class="hint" style="margin:0">单个文件最大 500MB，文件夹上传会自动遍历支持的类型。</div>
+        <div class="folder-row">
+          <button class="folder-btn" onclick="Shell.pickFolder()" title="同一页面内重复点击会直接读取上次那个文件夹，不再弹授权">📁 选择文件夹批量上传</button>
+          <button class="folder-btn folder-other" id="folderOther" style="display:none" onclick="Shell.pickFolder(true)" title="换一个文件夹（会重新弹一次读取授权）">↻</button>
+        </div>
+        <div class="hint" id="folderHint" style="margin:0">单个文件最大 500MB，文件夹上传会自动遍历支持的类型。</div>
       </div>
       <input type="file" id="fileInput" hidden>
       <input type="file" id="folderInput" webkitdirectory multiple hidden>
@@ -124,7 +130,11 @@ function fmtTime(s){
 async function loadDocs(){
   const tbody=document.getElementById('docTbody');
   try{
-    docs=await (await fetch('/api/docs/list')).json();
+    const j=await (await fetch('/api/docs/list')).json();
+    // 401/403/500 时后端返回 {code,message} 对象而不是数组，直接 filter 会抛
+    // "docs.filter is not a function"——先把类型守住，把后端的话原样亮给用户
+    if(!Array.isArray(j))throw new Error(j&&j.message?j.message:'登录状态已失效，请重新登录后再试');
+    docs=j;
     render();
     document.getElementById('statDocs').textContent=docs.length;
     document.getElementById('statChunks').textContent=docs.reduce((a,d)=>a+Number(d.chunks),0);

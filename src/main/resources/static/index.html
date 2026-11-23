@@ -120,6 +120,12 @@
   .composer-wrap{flex:0 0 auto;padding:14px 6% 16px;background:linear-gradient(transparent,var(--bg) 18%)}
   .error-bar{max-width:880px;margin:0 auto 9px;padding:9px 13px;border-radius:8px;background:#fdeef3;color:#b91c4a;font-size:12.5px;border:1px solid #f8cfdc;box-shadow:var(--shadow-sm)}
   .composer{max-width:880px;margin:0 auto;background:#fff;border:1px solid #d9e0ec;border-radius:16px;box-shadow:var(--shadow-md);transition:all .18s;padding:15px 17px 11px}
+  /* 引用条：「从这里再问」把那一轮的问题挂在这里，输入框留给新问题 */
+  .quote-bar{display:flex;align-items:center;gap:8px;background:#f2f6ff;border:1px solid #dbe5ff;border-radius:9px;padding:6px 10px;margin-bottom:9px;font-size:12px}
+  .quote-tag{flex:0 0 auto;color:var(--primary);font-weight:650}
+  .quote-text{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#41506b}
+  .quote-x{border:0;background:transparent;color:#8a97b3;font-size:15px;cursor:pointer;padding:0 2px;line-height:1}
+  .quote-x:hover{color:#e05a6d}
   .composer:focus-within{border-color:var(--primary);box-shadow:0 0 0 4px rgba(59,110,245,.1),var(--shadow-md)}
   .composer textarea{width:100%;resize:none;border:0;outline:0;font-size:15px;line-height:1.65;max-height:160px;min-height:28px;color:var(--ink);background:transparent;display:block}
   .composer-bar{display:flex;align-items:center;gap:8px;margin-top:11px;padding-top:10px;border-top:1px solid #f0f3f8}
@@ -194,6 +200,11 @@
     <div class="composer-wrap">
       <div class="error-bar" id="errorBar" style="display:none"></div>
       <div class="composer">
+        <div class="quote-bar" id="quoteBar" style="display:none">
+          <span class="quote-tag">引用</span>
+          <span class="quote-text" id="quoteText"></span>
+          <button class="quote-x" onclick="clearQuote()" title="取消引用">×</button>
+        </div>
         <textarea id="question" rows="1" placeholder="输入你的问题，Enter 发送，Shift+Enter 换行"></textarea>
         <div class="composer-bar">
           <span class="composer-tool" title="基于知识库检索作答"><span style="color:var(--primary)">◈</span> 知识库问答</span>
@@ -283,6 +294,7 @@ function switchSession(id){
   // 切到别的会话，未提问的空会话直接丢弃（它本来就没有任何内容可留）
   if(id!==pendingId)pendingId='';
   if(branchCtx&&branchCtx.sid!==id)branchCtx=null;
+  clearQuote();   // 引用条跟着会话走：切走就收起，免得挂着上一个会话的引用
   if(currentId&&currentId!==id){
     if(messages.length)cacheMessages(currentId);            // 存旧会话消息（空会话不留缓存垃圾）
     try{sessionStorage.setItem(draftKey(currentId),draftBox.value)}catch(e){} // 存旧会话草稿
@@ -398,7 +410,12 @@ function renderSessions(){
   // 例外：未提问的占位会话本来就不在清单里，不能因此把它自愈掉。
   const list=Shell.getSessions();
   if(currentId&&currentId!==pendingId&&!list.some(s=>s.id===currentId)){
-    if(list.length)switchSession(list[0].id);
+    // 兜底也要切到"最近更新的那条"，不能拿数组第一项凑数：
+    // 数组顺序取决于服务端返回与本地补登记，未必等于时间顺序。
+    if(list.length){
+      const latest=list.slice().sort((a,b)=>(b.updatedAt||0)-(a.updatedAt||0))[0];
+      switchSession(latest.id);
+    }
     else if(!sending)newSession();
   }
 }
@@ -476,7 +493,7 @@ function msgHtml(m,i){
         '<span class="ai-usage"'+(u?'':' style="display:none"')+(u?' title="'+escapeHtml(usageTip(u))+'"':'')+'>'+
           (u?usageInner(u):'')+'</span>'+
         '<button class="icon-btn ai-cite-count" title="引用片段" style="display:none">▤</button>'+
-        '<button class="icon-btn ai-rewind" onclick="rewindAsk('+i+')" title="从这一轮重新提问：问题填回输入框，新回答作为分支接在它后面，原对话一条不删">从这里再问</button>'+
+        '<button class="icon-btn ai-rewind" onclick="rewindAsk('+i+')" title="引用这一轮：输入新问题发送后，作为分支接在它后面，原对话一条不删">从这里再问</button>'+
         '<button class="icon-btn" title="复制回答到剪贴板" onclick="copyMsg('+i+')">复制</button>'+
       '</span></div>'+
     '<div class="ai-card-body">'+renderMarkdown(m.content)+(m.streaming?'<span class="cursor"></span>':'')+'</div>'+
@@ -556,13 +573,16 @@ async function syncMsgIds(sessionId){
   }catch(e){return false}
 }
 /**
- * 从这里再问：把该轮的问题填回输入框，并记下"待分叉点"。
+ * 从这里再问：把该轮的问题挂到输入框上方的「引用条」，并记下"待分叉点"。
  *
  * <p>以前的做法是先让后端把 head 回退到该轮父节点，再重拉 history 让画面收缩——
  * 结果只要点的是第一轮，history 就是空的，整段对话从屏幕上消失，用户以为记录被删了
  * （数据其实还在 Redis 树里，但问答页再也走不回去）。现在改成<b>只在发送时带上
  * parentId</b>：后端把新问答挂到该轮父节点下成为兄弟分支，旧分支一个节点都不动，
  * 屏幕上原有内容也一条不删。</p>
+ *
+ * <p>交互上不把原问题塞回输入框——原话重发一遍没有意义。引用条负责"接着哪一轮"，
+ * 输入框留给<b>新问题</b>：基于那一轮换个角度接着问，发送时 parentId 生效成为分支。</p>
  */
 async function rewindAsk(i){
   const q=messages[i-1];
@@ -581,11 +601,28 @@ async function rewindAsk(i){
   }
   branchCtx={sid:ownerId,parentId,idx:i-1};
   markBranchOrigin(i-1);
-  draftBox.value=q.content;
+  showQuote(i-1,q.content);
+  draftBox.value='';
   draftBox.focus();
-  try{draftBox.setSelectionRange(draftBox.value.length,draftBox.value.length)}catch(e){}
   hideError();
-  toast('已定位到这一轮：发送后新回答作为分支接在它后面，原对话保留','ok');
+  toast('已引用这一轮：输入你的新问题，发送后作为分支接在它后面','ok');
+}
+/* 引用条：显示被引用的那一轮提问，发送或切会话后收起 */
+function showQuote(i,text){
+  const bar=document.getElementById('quoteBar');
+  if(!bar)return;
+  const round=messages.slice(0,i).filter(m=>m.role==='user').length+1;
+  document.getElementById('quoteText').textContent='第 '+round+' 轮 · '+String(text||'');
+  bar.style.display='flex';
+}
+function clearQuote(){
+  const bar=document.getElementById('quoteBar');
+  if(bar)bar.style.display='none';
+  boxClearBranchOrigin();
+}
+function boxClearBranchOrigin(){
+  const box=document.getElementById('messages');
+  if(box)box.querySelectorAll('.branch-origin').forEach(el=>el.classList.remove('branch-origin'));
 }
 /** 高亮"待分叉"的那一轮（问 + 答），让用户知道新回答会接在哪儿 */
 function markBranchOrigin(idx){
@@ -677,6 +714,7 @@ async function send(text){
   // 「从这里再问」留下的分叉点：取一次就清掉，避免下一轮还挂在旧节点上
   const fork=branchCtx&&branchCtx.sid===ownerId?branchCtx:null;
   branchCtx=null;
+  clearQuote();
   clearDraft(ownerId);
   sending=true;document.getElementById('sendBtn').disabled=true;hideError();
   // 首问自动把问题当标题：读—改—写一次完成，别先改内存再写回（会丢标题）

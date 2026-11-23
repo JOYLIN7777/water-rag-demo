@@ -38,7 +38,8 @@
   function goLogin() {
     clearSession();
     if (location.pathname.indexOf('login.html') < 0) {
-      location.href = 'login.html?redirect=' + encodeURIComponent(location.pathname + location.search);
+      // 不带 redirect：登录成功后一律回问答页（换账号登录不该落进上一个账号停留的页面）
+      location.href = 'login.html';
     }
   }
 
