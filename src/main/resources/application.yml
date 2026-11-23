@@ -77,6 +77,13 @@ security:
     # 生产务必改密码并改用数据库用户表；默认 admin 仅用于本地/作品集演示。
     users: "${AUTH_USERS:admin|Admin@123456|admin,water-dept|default|系统管理员;analyst|Analyst@123456|water-dept,analyst|default|水利分析员}"
 
+# ============ 用量统计：百炼官方 Usage API（可选，未配置时管理后台显示引导） ============
+usage:
+  bailian:
+    # 工作空间 ID，形如 ws_xxxxxxxxxxxx，从百炼控制台右上角获取
+    workspace-id: ${BAILIAN_WORKSPACE_ID:}
+    region: ${BAILIAN_REGION:cn-beijing}
+
 # ============ Elasticsearch：混合检索底座 ============
 # 容器内用服务名 elasticsearch；本地直连用 localhost
 es:

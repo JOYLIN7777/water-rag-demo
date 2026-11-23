@@ -95,6 +95,10 @@ a{color:var(--primary);text-decoration:none}
 .status-dot{width:6px;height:6px;border-radius:50%;background:var(--ok);box-shadow:0 0 0 3px rgba(14,159,110,.15)}
 .status-pill.off{color:var(--danger);background:#fdeef3;border-color:#f8cfdc}
 .status-pill.off .status-dot{background:var(--danger);box-shadow:0 0 0 3px rgba(224,36,94,.14)}
+/* 右上角管理后台入口：仅管理员可见（权限码 admin:access），普通用户此容器为空 */
+.admin-slot{display:inline-flex;align-items:center}
+.admin-entry{border:1px solid #dcd6ff;background:#f5f2ff;color:#6244c8;font-weight:650}
+.admin-entry:hover{border-color:#bfaeff;background:#ede7ff;color:#4f34ad}
 
 /* ============ 页面容器与页头 ============ */
 .page{max-width:1160px;margin:0 auto;padding:28px 30px 60px;width:100%}

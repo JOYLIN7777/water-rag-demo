@@ -13,9 +13,12 @@
 | 模型可插拔 | 数据库配置 CHAT/EMBEDDING 模型，API Key 脱敏、连通性测试、切换即时生效；兼容公有云 API 与内网私有化模型（OpenAI 兼容协议） |
 | 会话树 | pi-mono 风格消息树：**fork**（从任意历史节点开新支）/ **rewind**（只移动当前位置不删节点）；上下文只取祖先链，兄弟分支不串 |
 | 登录与认证 | **用户名密码登录页** + JWT（HS256）双令牌：access 30 分钟 / refresh 7 天，刷新轮换、登出拉黑、refresh 令牌禁止访问业务 API；密码 PBKDF2 加盐慢哈希（零新增依赖，明文不驻留）；claims 携带 sub/groups/tenant；未登录访问 API 一律 401 |
-| 三层权限 | 功能权限（菜单按角色过滤）+ 数据权限（租户隔离 + 行级 owner/组/public）+ 工具权限（白名单默认拒绝）；`/api/auth/permissions` 聚合视图，管理菜单仅 admin 可见 |
-| 认证与治理 | 全局 Bearer 拦截 + 审计日志落 PostgreSQL（覆盖所有 API + 登录失败 + 401 + 工具越权）；个人中心支持改密；`REQUIRE_LOGIN=false` 可切回 X-User 演示头模式 |
-| Web 前端 | 零依赖静态页（手写渲染，无需 npm）：登录页、问答页、文档管理、检索实验、模型配置、会话树、企业治理中心、个人中心；**全站共用同一侧栏渲染组件**（切换零结构差异），401 自动刷新令牌 |
+| 企业级 RBAC | 权限码 + `@RequirePermission` 注解 + 服务端拦截器强制校验（默认拒绝）：admin 拥有全部权限，analyst 可问答/传文档/看用量但改不了模型、审计、后台；非管理员直接调敏感接口返回 **403**，前端藏入口只是体验层 |
+| 三层数据权限 | 功能权限按角色过滤 + 数据权限（租户隔离 + 行级 owner/组/public）+ 工具权限（白名单默认拒绝）；`/api/auth/permissions` 返回权限码、角色矩阵、菜单可见性 |
+| 独立管理后台 | `/admin.html` 仅管理员可进：概览、用户与权限、文档、模型、用量、审计六个面板；问答页右上角仅管理员显示入口，同源令牌免登录跳转；页面级校验 + 接口级 403 双保险 |
+| 用量统计 | 对接百炼官方 `/api/v1/agentstudio/usage/summary`（需 `BAILIAN_WORKSPACE_ID`），展示今日/本月请求与 Token 消耗、按模型明细；未配置时明确提示而非编造数据 |
+| 认证与治理 | 全局 Bearer 拦截 + 审计日志落 PostgreSQL（覆盖所有 API + 登录失败 + 401 + 403 + 工具越权）；个人中心支持改密；`REQUIRE_LOGIN=false` 可切回 X-User 演示头模式 |
+| Web 前端 | 零依赖静态页（手写渲染，无需 npm）：登录页、问答页、文档管理、检索对比、问答分支、模型设置、权限与日志、个人中心、管理后台；**全站共用同一侧栏渲染组件**（切换零结构差异），401 自动刷新令牌 |
 
 ## 架构图
 
@@ -86,7 +89,10 @@ docker compose up -d --build app
 - `users`：初始账号串，格式 `用户名|密码|组(逗号分隔)|租户|显示名`，多个账号用 `;` 分隔；可用环境变量 `AUTH_USERS` 整体覆盖。密码启动时经 PBKDF2 加盐哈希后只保留哈希，明文不驻留内存。
 - `access-ttl-seconds` / `refresh-ttl-seconds`：access 令牌 30 分钟，refresh 令牌 7 天；刷新时旧 refresh 立即轮换失效，登出会把 access 拉黑到自然过期。
 - 个人中心（`/profile.html`）可查看账号/令牌有效期并改密（`POST /api/auth/change-password`）。用户库是内存实现，改密在运行期生效，**容器重启后回落到配置里的初始密码**；持久化需接数据库用户表。
-- 三层权限：`/api/auth/permissions` 聚合返回功能菜单 / 数据权限 / 工具权限；侧栏管理类菜单（模型配置、企业治理）仅 admin 组可见，未登录演示模式显示全部菜单。
+- 三层权限：`/api/auth/permissions` 聚合返回权限码、角色矩阵、功能菜单 / 数据权限 / 工具权限；侧栏与设置页按权限码过滤入口。
+- RBAC 角色：`admin`（全部权限）、`analyst`（问答/文档/检索/分支/用量）、`viewer`（只读问答与查看）。权限码声明在接口上由服务端拦截校验，非管理员调用模型配置、审计等接口返回 403。
+- 管理后台：`admin` 登录后在问答页右上角点「管理后台」即可免登录跳转 `/admin.html`；非管理员进入只看到拒绝页，接口层同样拒绝。
+- 用量统计（可选）：设置 `BAILIAN_WORKSPACE_ID`（形如 `ws_xxxx`，百炼控制台右上角可见）后，管理后台「用量统计」显示百炼官方用量；未设置时给出明确提示。API Key 仍只走 `AI_API_KEY` 环境变量。
 - 生产务必替换演示密码、改用数据库用户表并开启 HTTPS；JWT 密钥用 `JWT_SECRET` 注入。
 
 容器网络说明：容器内通过服务名 `postgres` 访问数据库（compose 内置 DNS），通过
@@ -212,7 +218,7 @@ water-rag-demo
 ## 测试
 
 ```bash
-mvn test   # 43 例：切片5 + 熔断6 + 多格式9 + RRF/DSL/权限6 + 认证5 + JWT4 + 工具权限5 + 脱敏/其他3
+mvn test   # 49 例：切片5 + 熔断6 + 多格式9 + RRF/DSL/权限6 + 认证5 + JWT4 + RBAC6 + 工具权限5 + 脱敏/其他3
 mvn package -DskipTests   # 打包后 docker compose up -d --build app
 ```
 
@@ -226,14 +232,17 @@ mvn package -DskipTests   # 打包后 docker compose up -d --build app
 
 ## 企业能力演示
 
-浏览器打开 `http://localhost:8080/governance.html`（企业治理中心），可现场演示：
+浏览器打开 `http://localhost:8080/admin.html`（管理后台）或 `http://localhost:8080/governance.html`（权限与日志），可现场演示：
 
 | 演示项 | 操作 | 预期效果 |
 |---|---|---|
 | 登录认证 | 登录页用 `admin/Admin@123456` 登录，错误密码再试一次 | 正确登录跳问答页并回显用户；错误密码 401；未登录直访 API 也 401 |
 | 令牌安全 | 登录响应里的 refresh token 拿来调 `/api/docs/list`；再用它刷新后拿旧 refresh 重放 | refresh 访问业务 API 被拒（401）；旧 refresh 重放被拒；登出后 access 立即失效 |
-| 三层权限矩阵 | 治理页看「权限矩阵」：功能菜单 / 数据权限 / 工具权限；分别用 admin 与 analyst 登录对比 | admin 全部菜单可见；analyst 看不到「模型配置/企业治理」；数据权限显示租户隔离与行级范围 |
-| 个人中心 | 进「个人中心」看令牌剩余有效期，输原密码改新密码后用新密码重新登录 | 显示令牌倒计时；错误原密码 400；改密成功后再用旧密码登录失败、新密码成功 |
+| 管理后台入口 | admin 登录看问答页右上角「管理后台」，点击进入；换 analyst 登录再看 | admin 显示入口且免登录进后台；analyst 看不到入口，直访 `/admin.html` 只显示拒绝页 |
+| 企业级 RBAC | 用 analyst 的令牌直接调 `/api/models`、`/api/audit/logs`；再换 admin 调 | analyst 返回 403（服务端强制拒绝，不是前端隐藏）；admin 返回 200 |
+| 权限矩阵 | 管理后台「用户与权限」看角色矩阵与权限码；分别用 admin 与 analyst 对比 | admin 全部 13 项权限；analyst 7 项且无模型/审计/后台权限 |
+| 用量统计 | 管理后台「用量统计」点刷新 | 未配置工作空间 ID 时给出配置提示；配置后显示百炼官方请求数与 Token 消耗 |
+| 个人中心 | 进「个人中心」看登录剩余时间，输原密码改新密码后用新密码重新登录 | 显示倒计时；错误原密码 400；改密成功后再用旧密码登录失败、新密码成功 |
 | 多租户 | 用 `admin`（default 租户）登录，另配 `X-Tenant` 头或换租户账号上传同名文件 | 不同租户检索/列表互不可见；跨租户删除返回"不存在" |
 | 行级权限 | 分别以有/无 `water-dept` 组的账号查同一问题 | 组内用户可见内部文档，无组用户只见 public 文档 |
 | 工具权限 | 分别用 admin（含 water-dept）与其他组账号调 `/api/chat/tool/water` | 无权限组返回 PERMISSION_DENIED，water-dept 组返回水情数据 |

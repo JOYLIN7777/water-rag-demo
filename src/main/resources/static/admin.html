@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>管理后台 · 水利知识库</title>
+<link rel="stylesheet" href="assets/app.css">
+<style>
+  .admin-sidebar{width:250px;flex:0 0 250px;background:linear-gradient(180deg,#0d1730 0%,#16223c 100%);color:#c8d3e8;display:flex;flex-direction:column;padding:22px 14px 14px;position:sticky;top:0;height:100vh}
+  .admin-sidebar .brand{padding-bottom:20px}
+  .admin-panel{display:none}
+  .admin-panel.active{display:block}
+  .admin-nav-item{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:9px;color:#b9c6de;text-decoration:none;font-size:13px;cursor:pointer;margin-bottom:3px;transition:all .15s;border:0;background:transparent;width:100%;text-align:left}
+  .admin-nav-item:hover{background:rgba(255,255,255,.06);color:#fff}
+  .admin-nav-item.active{background:rgba(124,92,214,.3);color:#fff;font-weight:650}
+  .admin-nav-item .ic{width:18px;text-align:center;font-size:14px;opacity:.9}
+  .admin-back{margin-top:auto;border-top:1px solid rgba(255,255,255,.09);padding-top:12px}
+  .kv-table td:first-child{color:var(--muted);width:180px;white-space:nowrap}
+  .deny{background:#fff;border:1px solid var(--line);border-radius:var(--radius);padding:60px 30px;text-align:center;box-shadow:var(--shadow-sm)}
+  .deny-mark{width:56px;height:56px;border-radius:50%;background:#fdeef3;color:var(--danger);display:flex;align-items:center;justify-content:center;font-size:26px;margin:0 auto 16px}
+  .perm-grid2{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:10px}
+  .perm-pill{background:#f8fafc;border:1px solid var(--line);border-radius:8px;padding:10px 12px;font-size:12px;color:var(--ink-2)}
+  .perm-pill b{display:block;color:var(--primary);font-size:12px;margin-bottom:3px}
+  .quick-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:14px;margin-bottom:18px}
+  .quick-card{display:block;background:#fff;border:1px solid var(--line);border-radius:var(--radius);padding:18px 20px;text-decoration:none;box-shadow:var(--shadow-sm);transition:all .18s}
+  .quick-card:hover{border-color:#b9cbff;transform:translateY(-2px);box-shadow:0 8px 22px rgba(59,110,245,.12)}
+  .quick-card .qc-t{font-size:14px;font-weight:650;color:var(--ink)}
+  .quick-card .qc-d{font-size:12px;color:var(--muted);margin-top:6px;line-height:1.6}
+</style>
+</head>
+<body>
+<!-- 页面级权限校验未通过前隐藏主内容 -->
+<div class="layout" id="adminRoot" style="display:none">
+  <aside class="admin-sidebar">
+    <div class="brand"><div class="brand-mark">管</div>
+      <div><div class="brand-title">管理后台</div><div class="brand-sub">水利知识库</div></div></div>
+    <div class="section-label" style="margin-top:6px">管理功能</div>
+    <button class="admin-nav-item active" data-panel="overview"><span class="ic">▦</span>概览</button>
+    <button class="admin-nav-item" data-panel="users"><span class="ic">◈</span>用户与权限</button>
+    <button class="admin-nav-item" data-panel="docs"><span class="ic">▤</span>文档管理</button>
+    <button class="admin-nav-item" data-panel="models"><span class="ic">◇</span>模型设置</button>
+    <button class="admin-nav-item" data-panel="usage"><span class="ic">◷</span>用量统计</button>
+    <button class="admin-nav-item" data-panel="audit"><span class="ic">☷</span>审计日志</button>
+    <div class="admin-back">
+      <a class="admin-nav-item" href="index.html"><span class="ic">←</span>返回问答</a>
+      <div class="user-block" id="adminUserBlock"></div>
+    </div>
+  </aside>
+  <main class="main">
+    <header class="topbar">
+      <div class="topbar-left"><div class="topbar-title" id="panelTitle">概览</div>
+        <span class="topbar-sub">仅管理员可见</span></div>
+      <span class="status-pill" data-status-pill><span class="status-dot"></span>检测中…</span>
+    </header>
+
+    <div class="page">
+      <div id="denyBox" class="deny" style="display:none">
+        <div class="deny-mark">!</div>
+        <h2 style="margin:0 0 8px">没有访问权限</h2>
+        <p class="page-desc" style="margin:0 0 18px">当前账号不是管理员，无法进入管理后台。</p>
+        <a class="btn btn-primary" href="index.html">返回问答</a>
+      </div>
+
+      <!-- 概览 -->
+      <section class="admin-panel active" data-panel="overview">
+        <div class="page-head"><h1 class="page-title">概览</h1>
+          <p class="page-desc">知识库与系统的整体运行情况，一屏掌握。</p></div>
+        <div class="stats" id="ovStats">
+          <div class="stat-card"><div class="stat-num">—</div><div class="stat-label">知识库文档</div></div>
+          <div class="stat-card"><div class="stat-num">—</div><div class="stat-label">已入库片段</div></div>
+          <div class="stat-card"><div class="stat-num">—</div><div class="stat-label">模型配置</div></div>
+          <div class="stat-card"><div class="stat-num">—</div><div class="stat-label">系统状态</div></div>
+        </div>
+        <div class="quick-cards">
+          <a class="quick-card" href="manage.html"><div class="qc-t">文档管理 ↗</div><div class="qc-d">上传、查看与删除知识库文档</div></a>
+          <a class="quick-card" href="models.html"><div class="qc-t">模型设置 ↗</div><div class="qc-d">配置对话与文档检索模型</div></a>
+          <a class="quick-card" href="governance.html"><div class="qc-t">权限与日志 ↗</div><div class="qc-d">查看权限范围与操作记录</div></a>
+          <a class="quick-card" href="search.html"><div class="qc-t">检索对比 ↗</div><div class="qc-d">对比不同检索方式的结果</div></a>
+        </div>
+        <div class="card"><div class="card-head"><h3>最近操作</h3>
+          <button class="btn btn-sm" onclick="loadOverview()">刷新</button></div>
+          <div class="scroll"><table><thead><tr><th>时间</th><th>账号</th><th>动作</th><th>状态</th><th>耗时</th></tr></thead>
+            <tbody id="ovAudit"><tr><td colspan="5" class="empty">加载中…</td></tr></tbody></table></div>
+        </div>
+      </section>
+
+      <!-- 用户与权限 -->
+      <section class="admin-panel" data-panel="users">
+        <div class="page-head"><h1 class="page-title">用户与权限</h1>
+          <p class="page-desc">系统按角色分配权限，管理员拥有全部权限。所有接口在服务端强制校验。</p></div>
+        <div class="card"><div class="card-head"><h3>当前账号</h3></div>
+          <table class="kv-table"><tbody id="uIdentity"><tr><td colspan="2" class="empty">加载中…</td></tr></tbody></table></div>
+        <div class="card"><div class="card-head"><h3>角色权限矩阵</h3></div>
+          <div class="scroll"><table><thead><tr><th>角色</th><th>拥有的权限</th></tr></thead>
+            <tbody id="uRoles"><tr><td colspan="2" class="empty">加载中…</td></tr></tbody></table></div>
+        </div>
+        <div class="card"><div class="card-head"><h3>全部权限码</h3></div>
+          <div class="perm-grid2" id="uPerms"></div></div>
+      </section>
+
+      <!-- 文档管理 -->
+      <section class="admin-panel" data-panel="docs">
+        <div class="page-head"><h1 class="page-title">文档管理</h1>
+          <p class="page-desc">管理知识库中的文档，删除会同时移除其全部片段。</p></div>
+        <div class="card"><div class="card-head"><h3>已入库文档</h3>
+          <div style="display:flex;gap:8px"><button class="btn btn-sm" onclick="loadDocs()">刷新</button>
+            <a class="btn btn-sm btn-primary" href="manage.html">前往上传</a></div></div>
+          <div class="scroll"><table><thead><tr><th>文档名称</th><th>片段数</th><th>上传时间</th><th>操作</th></tr></thead>
+            <tbody id="dList"><tr><td colspan="4" class="empty">加载中…</td></tr></tbody></table></div>
+        </div>
+      </section>
+
+      <!-- 模型设置 -->
+      <section class="admin-panel" data-panel="models">
+        <div class="page-head"><h1 class="page-title">模型设置</h1>
+          <p class="page-desc">查看当前生效的对话与检索模型，完整配置请到模型设置页。</p></div>
+        <div class="card"><div class="card-head"><h3>当前生效配置</h3>
+          <a class="btn btn-sm btn-primary" href="models.html">前往配置</a></div>
+          <table class="kv-table"><tbody id="mInfo"><tr><td colspan="2" class="empty">加载中…</td></tr></tbody></table></div>
+      </section>
+
+      <!-- 用量统计 -->
+      <section class="admin-panel" data-panel="usage">
+        <div class="page-head"><h1 class="page-title">用量统计</h1>
+          <p class="page-desc">来自模型服务提供方的真实调用量与 Token 消耗。</p></div>
+        <div class="stats" id="uStats">
+          <div class="stat-card"><div class="stat-num">—</div><div class="stat-label">今日请求次数</div></div>
+          <div class="stat-card"><div class="stat-num">—</div><div class="stat-label">今日消耗 Token</div></div>
+          <div class="stat-card"><div class="stat-num">—</div><div class="stat-label">本月请求次数</div></div>
+          <div class="stat-card"><div class="stat-num">—</div><div class="stat-label">本月消耗 Token</div></div>
+        </div>
+        <div class="card"><div class="card-head"><h3>按模型查看</h3>
+          <button class="btn btn-sm" onclick="loadUsage()">刷新</button></div>
+          <div class="scroll"><table><thead><tr><th>模型</th><th>请求次数</th><th>输入Token</th><th>输出Token</th></tr></thead>
+            <tbody id="uUsage"><tr><td colspan="4" class="empty">加载中…</td></tr></tbody></table></div>
+          <div class="hint" id="uUsageHint"></div>
+        </div>
+      </section>
+
+      <!-- 审计日志 -->
+      <section class="admin-panel" data-panel="audit">
+        <div class="page-head"><h1 class="page-title">审计日志</h1>
+          <p class="page-desc">记录重要的登录与操作行为，仅管理员可查看。</p></div>
+        <div class="card"><div class="card-head"><h3>操作记录</h3>
+          <button class="btn btn-sm" onclick="loadAudit()">刷新</button></div>
+          <div class="scroll" style="max-height:520px"><table><thead><tr><th>时间</th><th>账号</th><th>动作</th><th>状态</th><th>耗时</th><th>结果</th></tr></thead>
+            <tbody id="aList"><tr><td colspan="6" class="empty">加载中…</td></tr></tbody></table></div>
+        </div>
+      </section>
+    </div>
+  </main>
+</div>
+
+<script src="assets/auth.js"></script>
+<script src="assets/app.js"></script>
+<script>
+const $=id=>document.getElementById(id);
+function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+const gl=g=>window.Shell?Shell.groupLabel(g):g;
+const tl=t=>window.Shell?Shell.tenantLabel(t):t;
+const num=n=>Number(n||0).toLocaleString('zh-CN');
+function statusTag(s){const n=Number(s);return '<span class="tag '+(n>=400?'no':'ok')+'">'+n+'</span>'}
+async function api(path){const r=await fetch(path);if(r.status===401){WrkAuth.goLogin();throw new Error('未登录')}if(!r.ok)throw new Error('请求失败（'+r.status+'）');return r.json()}
+
+// 页面级权限校验：非管理员直接显示拒绝页，不暴露任何管理数据
+async function guard(){
+  try{
+    const r=await fetch('/api/auth/permissions');
+    if(r.status===401){WrkAuth.goLogin();return false}
+    if(r.status===403||!r.ok){$('denyBox').style.display='block';return false}
+    const p=await r.json();
+    if(!p.admin&&!(p.permissions||[]).includes('admin:access')){$('denyBox').style.display='block';return false}
+    $('adminRoot').style.display='flex';
+    const u=WrkAuth.getUser()||{};
+    $('adminUserBlock').innerHTML=
+      '<a class="user-avatar" href="profile.html" title="个人中心">'+esc((u.displayName||u.user||'管').slice(0,1))+'</a>'+
+      '<a class="user-meta" href="profile.html"><div class="user-name">'+esc(u.displayName||u.user)+'</div>'+
+      '<div class="user-tenant">'+esc(tl(u.tenant))+'</div></a>'+
+      '<button class="user-logout" title="退出登录" onclick="WrkAuth.logout()">⏻</button>';
+    renderUsers(p);
+    return true;
+  }catch(e){$('denyBox').style.display='block';return false}
+}
+
+function renderUsers(p){
+  $('uIdentity').innerHTML=
+    '<tr><td>登录账号</td><td>'+esc(p.user)+'</td></tr>'+
+    '<tr><td>角色</td><td>'+((p.groups||[]).map(g=>esc(gl(g))).join('、')||'—')+'</td></tr>'+
+    '<tr><td>所属空间</td><td>'+esc(tl(p.tenant))+'</td></tr>'+
+    '<tr><td>管理员</td><td>'+(p.admin?'<span class="tag ok">是</span>':'<span class="tag off">否</span>')+'</td></tr>'+
+    '<tr><td>拥有权限数</td><td>'+((p.permissions||[]).length)+' 项</td></tr>';
+  const roles=p.roleMatrix||[];
+  $('uRoles').innerHTML=roles.length?roles.map(r=>
+    '<tr><td class="name">'+esc(r.role)+'</td><td>'+((r.permissions||[]).map(x=>'<span class="tag">'+esc(x)+'</span>').join(' '))+'</td></tr>'
+  ).join(''):'<tr><td colspan="2" class="empty">暂无角色数据</td></tr>';
+  const desc={
+    'admin:access':'进入管理后台','chat:use':'智能问答','doc:read':'查看文档','doc:write':'上传文档',
+    'doc:delete':'删除文档','search:use':'检索对比','tree:use':'问答分支','model:read':'查看模型设置',
+    'model:write':'修改模型设置','audit:read':'查看审计日志','usage:read':'查看用量统计',
+    'user:read':'查看用户','user:write':'管理用户'};
+  $('uPerms').innerHTML=(p.allPermissions||[]).map(code=>
+    '<div class="perm-pill"><b>'+esc(code)+'</b>'+esc(desc[code]||'')+'</div>').join('');
+}
+
+async function loadOverview(){
+  try{
+    const docs=await api('/api/docs/list');
+    const chunks=docs.reduce((s,d)=>s+Number(d.chunks||0),0);
+    const models=await api('/api/models');
+    const health=await api('/api/search/health');
+    const cards=$('ovStats').querySelectorAll('.stat-num');
+    cards[0].textContent=docs.length;cards[1].textContent=num(chunks);
+    cards[2].textContent=models.length;cards[3].textContent=health.healthy?'正常':'异常';
+    const audit=await api('/api/audit/logs?limit=6');
+    $('ovAudit').innerHTML=(audit.logs||[]).map(l=>
+      '<tr><td>'+esc(String(l.ts||'').slice(5,19))+'</td><td>'+esc(l.user_id)+'</td><td>'+esc(l.action)+'</td>'+
+      '<td>'+statusTag(l.status)+'</td><td>'+esc(l.duration_ms||l.duration||'—')+'</td></tr>').join('')||
+      '<tr><td colspan="5" class="empty">暂无记录</td></tr>';
+  }catch(e){console.error(e)}
+}
+
+async function loadDocs(){
+  try{
+    const docs=await api('/api/docs/list');
+    const list=docs.slice().sort((a,b)=>String(b.uploadedAt||'').localeCompare(String(a.uploadedAt||'')));
+    $('dList').innerHTML=list.map(d=>
+      '<tr><td class="name">'+esc(d.fileName)+'</td><td>'+num(d.chunks)+'</td><td>'+esc(String(d.uploadedAt||'').slice(0,19))+'</td>'+
+      '<td><button class="btn btn-sm btn-danger" onclick="delDoc('+JSON.stringify(d.fileName).replace(/"/g,'&quot;')+')">删除</button></td></tr>'
+    ).join('')||'<tr><td colspan="4" class="empty">知识库暂无文档</td></tr>';
+  }catch(e){console.error(e)}
+}
+async function delDoc(name){
+  if(!confirm('确定删除「'+name+'」及其全部片段吗？'))return;
+  try{
+    const r=await fetch('/api/docs?fileName='+encodeURIComponent(name),{method:'DELETE'});
+    const j=await r.json();if(!r.ok)throw new Error(j.message||'删除失败');
+    appToast('已删除文档','ok');loadDocs();
+  }catch(e){appToast('删除失败：'+e.message,'err')}
+}
+
+async function loadModelsInfo(){
+  try{
+    const m=await api('/api/models');
+    const chat=m.find(x=>x.type==='CHAT'&&x.active),emb=m.find(x=>x.type==='EMBEDDING'&&x.active);
+    $('mInfo').innerHTML=
+      '<tr><td>对话模型</td><td>'+(chat?esc(chat.name)+' <span class="tag ok">生效中</span>':'<span class="tag off">未配置</span>')+'</td></tr>'+
+      '<tr><td>接口地址</td><td class="mono">'+esc(chat?chat.baseUrl:'—')+'</td></tr>'+
+      '<tr><td>检索模型</td><td>'+(emb?esc(emb.name)+' <span class="tag ok">生效中</span>':'<span class="tag off">未配置</span>')+'</td></tr>'+
+      '<tr><td>向量维度</td><td>'+(emb?esc(emb.dimensions||'—'):'—')+'</td></tr>'+
+      '<tr><td>配置总数</td><td>'+m.length+' 项</td></tr>';
+  }catch(e){console.error(e)}
+}
+
+async function loadUsage(){
+  try{
+    const j=await api('/api/usage/summary');
+    const t=j.totals||{};
+    const cards=$('uStats').querySelectorAll('.stat-num');
+    cards[0].textContent=num(t.todayRequests);cards[1].textContent=num(t.todayTokens);
+    cards[2].textContent=num(t.monthRequests);cards[3].textContent=num(t.monthTokens);
+    $('uUsage').innerHTML=(j.models||[]).map(m=>
+      '<tr><td class="name">'+esc(m.model)+'</td><td>'+num(m.requests)+'</td><td>'+num(m.inputTokens)+'</td><td>'+num(m.outputTokens)+'</td></tr>'
+    ).join('')||'<tr><td colspan="4" class="empty">所选时间范围暂无调用记录</td></tr>';
+    $('uUsageHint').textContent=j.hint||'';
+  }catch(e){
+    $('uUsageHint').textContent='暂未获取到用量数据：'+e.message;
+  }
+}
+
+async function loadAudit(){
+  try{
+    const j=await api('/api/audit/logs?limit=200');
+    $('aList').innerHTML=(j.logs||[]).map(l=>
+      '<tr><td>'+esc(String(l.ts||'').slice(5,19))+'</td><td>'+esc(l.user_id)+'</td><td>'+esc(l.action)+'</td>'+
+      '<td>'+statusTag(l.status)+'</td><td>'+esc(l.duration_ms||l.duration||'—')+'</td><td>'+esc(l.result||'')+'</td></tr>'
+    ).join('')||'<tr><td colspan="6" class="empty">暂无记录</td></tr>';
+  }catch(e){console.error(e)}
+}
+
+const TITLES={overview:'概览',users:'用户与权限',docs:'文档管理',models:'模型设置',usage:'用量统计',audit:'审计日志'};
+document.querySelectorAll('.admin-nav-item[data-panel]').forEach(btn=>{
+  btn.onclick=()=>{
+    const key=btn.dataset.panel;
+    document.querySelectorAll('.admin-nav-item[data-panel]').forEach(b=>b.classList.toggle('active',b===btn));
+    document.querySelectorAll('.admin-panel').forEach(p=>p.classList.toggle('active',p.dataset.panel===key));
+    $('panelTitle').textContent=TITLES[key]||'管理后台';
+    if(key==='overview')loadOverview();
+    else if(key==='docs')loadDocs();
+    else if(key==='models')loadModelsInfo();
+    else if(key==='usage')loadUsage();
+    else if(key==='audit')loadAudit();
+  };
+});
+
+initShell('admin');
+guard().then(ok=>{if(ok)loadOverview()});
+</script>
+</body>
+</html>

@@ -77,7 +77,8 @@
     refreshDocs() { return loadDocs(); },
     getCurrentUser() { const a = global.WrkAuth; return a ? a.getUser() : null; },
     groupLabel: groupLabel,
-    tenantLabel: tenantLabel
+    tenantLabel: tenantLabel,
+    hasPermission: hasPermission
   };
 
   function pickSession(id, ev) {
@@ -319,6 +320,31 @@
     }).catch(() => {});
   }
 
+  // ---------- 权限码（前端只控制入口显示，真正拦截在服务端） ----------
+  let ownedPermissions = new Set();
+  function hasPermission(code) {
+    return ownedPermissions.has(code);
+  }
+  async function loadPermissions() {
+    try {
+      const r = await fetch('/api/auth/permissions');
+      if (!r.ok) return;
+      const j = await r.json();
+      ownedPermissions = new Set(j.permissions || []);
+      renderAdminEntry();
+    } catch (e) { /* 权限接口失败时保持默认不显示，默认拒绝 */ }
+  }
+  // 右上角管理后台入口：仅拥有 admin:access 才显示，免登录跳转（同源共享会话令牌）
+  function renderAdminEntry() {
+    const slot = document.getElementById('adminEntrySlot');
+    if (!slot) return;
+    const allowed = hasPermission('admin:access') ||
+      (function () { const u = global.WrkAuth && global.WrkAuth.getUser(); return !!(u && (u.groups || []).indexOf('admin') >= 0); })();
+    slot.innerHTML = allowed
+      ? '<a class="text-btn admin-entry" href="admin.html" title="进入管理后台">管理后台 ›</a>'
+      : '';
+  }
+
   // ---------- 服务探活 ----------
   async function checkHealth() {
     const pills = document.querySelectorAll('[data-status-pill]');
@@ -344,6 +370,8 @@
   global.initShell = function (active) {
     renderSidebar(active);
     checkHealth();
+    renderAdminEntry();
+    loadPermissions();
     if (global.setInterval) setInterval(checkHealth, 30000);
   };
   global.appToast = toast;
