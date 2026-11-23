@@ -85,7 +85,7 @@ async function run(){
   }catch(e){['bm25','knn','hybrid'].forEach(id=>document.getElementById(id).innerHTML='<div class="empty">失败：'+esc(e.message)+'</div>')}
 }
 document.getElementById('q').addEventListener('keydown',e=>{if(e.key==='Enter')run()});
-initShell('search');
+initShell('settings');
 </script>
 </body>
 </html>

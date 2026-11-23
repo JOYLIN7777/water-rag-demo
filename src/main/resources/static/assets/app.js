@@ -13,18 +13,26 @@
     model: '<rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/>',
     tree: '<rect x="9" y="2" width="6" height="4" rx="1"/><rect x="2" y="16" width="6" height="4" rx="1"/><rect x="16" y="16" width="6" height="4" rx="1"/><path d="M12 6v4M5 16v-3a3 3 0 0 1 3-3h8a3 3 0 0 1 3 3v3"/>',
     shield: '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="9 12 11 14 15 10"/>',
-    user: '<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>'
+    user: '<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>',
+    settings: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.87l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.7 1.7 0 0 0-1.87-.34 1.7 1.7 0 0 0-1.03 1.56V21a2 2 0 1 1-4 0v-.09A1.7 1.7 0 0 0 9 19.4a1.7 1.7 0 0 0-1.87.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-1.56-1.03H3a2 2 0 1 1 0-4h.09A1.7 1.7 0 0 0 4.6 9a1.7 1.7 0 0 0-.34-1.87l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.7 1.7 0 0 0 9 4.6a1.7 1.7 0 0 0 1.03-1.56V3a2 2 0 1 1 4 0v.09A1.7 1.7 0 0 0 15 4.6a1.7 1.7 0 0 0 1.87-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.7 1.7 0 0 0 19.4 9v0a1.7 1.7 0 0 0 1.56 1.03H21a2 2 0 1 1 0 4h-.09A1.7 1.7 0 0 0 19.4 15z"/>'
   };
-  // key / href / 标签 / 图标 / 需要的组（空=所有登录用户）
+  // 工作台主导航只保留高频两项；其余功能统一收进「设置」页，避免侧栏冗长
   const NAV = [
     { key: 'index', href: 'index.html', label: '智能问答', icon: 'chat', groups: [] },
-    { key: 'manage', href: 'manage.html', label: '知识库文档', icon: 'doc', groups: [] },
-    { key: 'search', href: 'search.html', label: '检索实验', icon: 'search', groups: [] },
-    { key: 'models', href: 'models.html', label: '模型配置', icon: 'model', groups: ['admin'] },
-    { key: 'tree', href: 'tree.html', label: '会话树', icon: 'tree', groups: [] },
-    { key: 'governance', href: 'governance.html', label: '企业治理', icon: 'shield', groups: ['admin'] },
-    { key: 'profile', href: 'profile.html', label: '个人中心', icon: 'user', groups: [] }
+    { key: 'manage', href: 'manage.html', label: '知识库文档', icon: 'doc', groups: [] }
   ];
+  // 设置页内的功能入口（含功能权限控制）
+  const SETTINGS = [
+    { key: 'search', href: 'search.html', label: '检索实验', icon: 'search',
+      desc: '并排对比 BM25 全文检索、kNN 向量检索与 RRF 融合结果', groups: [] },
+    { key: 'models', href: 'models.html', label: '模型配置', icon: 'model',
+      desc: '配置对话 / 向量模型，切换公有云 API 或内网私有化模型', groups: ['admin'] },
+    { key: 'tree', href: 'tree.html', label: '会话树', icon: 'tree',
+      desc: '查看消息分支，从任意节点 fork 开新支或 rewind 回退', groups: [] },
+    { key: 'governance', href: 'governance.html', label: '企业治理', icon: 'shield',
+      desc: '查看登录身份、三层权限矩阵与全量审计日志', groups: ['admin'] }
+  ];
+  global.ShellSettings = SETTINGS;
 
   const svg = name => '<svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">' + (ICONS[name] || '') + '</svg>';
   const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c =>
@@ -122,7 +130,7 @@
     if (!el) return;
     const area = document.getElementById('uploadArea');
     if (area) area.classList.add('open');
-    el.className = 'upload-msg' + (type ? ' ' + type : '');
+    el.className = 'upload-msg show' + (type ? ' ' + type : '');
     el.style.display = 'block';
     if (text !== undefined) el.textContent = text;
   }
@@ -309,6 +317,8 @@
             '<input type="file" id="folderInput" webkitdirectory multiple hidden>' +
           '</div>' +
         '</div>' +
+        '<a class="settings-entry' + (active === 'settings' ? ' active' : '') + '" href="settings.html" title="设置">' +
+          svg('settings') + '<span>设置</span><span class="settings-arrow">›</span></a>' +
         '<div class="user-block" id="sidebarUserBlock"></div>' +
         '<div class="sidebar-footer">Spring Boot 3.4 · Spring AI<br>Elasticsearch</div>' +
       '</aside>';
