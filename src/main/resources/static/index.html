@@ -217,6 +217,8 @@ let pendingId='';
 // 「从这里再问」的待分叉点：{sid,parentId,idx}。发送时把它作为 parentId 传给后端，
 // 新问答成为该轮的兄弟分支——全程不动历史、不清画面，原对话一直在。
 let branchCtx=null;
+// 服务端拿不到历史、画面靠本地缓存撑着的会话 id（切走再切回时用来提个醒）
+let missingHistoryId='';
 // 所有本地数据按登录账号分区：换账号登录不会看到上一个账号的会话、消息和草稿
 const SCOPE=(window.WrkAuth&&WrkAuth.scope)?WrkAuth.scope():'demo';
 function sessionKey(){return 'water-rag-sessions:'+SCOPE}
@@ -305,6 +307,14 @@ function switchSession(id){
     const fresh=list.map(m=>({role:m.role,content:m.content,sources:m.sources||[],streaming:false,
       usage:m.usage||null,nodeId:m.id||'',parentId:m.parentId||''}));
     if(sig(fresh)===sig(messages))return;                  // 内容一致就不重绘，消除二次渲染闪烁
+    // 服务端历史为空、本地却还有内容：绝不能拿空数组覆盖画面。
+    // 以前直接替换，服务端树一旦被清理（会话被删、Redis 过期、换库），用户切走再切回来
+    // 就整段消失——看起来像"问答记录不见了"，其实本地缓存还在。
+    if(!fresh.length&&messages.length){
+      missingHistoryId=id;
+      return;                                              // 保留本地内容，下面统一由提示条说明
+    }
+    missingHistoryId='';
     messages=fresh;msgStore[id]=messages;
     cacheMessages(id);renderMessages();scrollBottom(true);
   }).catch(()=>{}).then(()=>{
@@ -325,6 +335,13 @@ async function refreshBranchNote(id){
   const el=document.getElementById('branchNote');
   if(!el)return;
   el.style.display='none';el.innerHTML='';
+  // 服务端没有历史、画面显示的是本机缓存：这条提示比"另有分支"更要紧，先报它
+  if(missingHistoryId===id){
+    el.innerHTML='<span>ⓘ</span><span>服务端没有这个会话的消息记录，下面显示的是本机缓存；'+
+      '继续提问会从这一轮起重建立对话树（旧记录不会再回到服务端）</span>';
+    el.style.display='';
+    return;
+  }
   try{
     const r=await fetch('/api/chat/tree?sessionId='+encodeURIComponent(id));
     if(!r.ok)return;

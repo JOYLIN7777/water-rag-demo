@@ -57,7 +57,13 @@ public class AdminController {
 
     // ---------- 组织（界面上叫"组织"，底层仍是账号的 tenant 字段） ----------
 
-    /** 组织清单 + 成员数：组织架构页的主数据 */
+    /**
+     * 组织清单 + 成员数：组织架构页的主数据。
+     *
+     * <p>三个数字各有用途：members 是本组织直属成员（账号的 tenant 直接等于它），
+     * membersAll 含所有子组织（看"这个部门一共多少人"），children 是下级组织数
+     * （决定能不能删、树上要不要画三角）。</p>
+     */
     @GetMapping("/orgs")
     public List<Map<String, Object>> orgList() {
         Map<String, Integer> counts = new LinkedHashMap<>();
@@ -69,26 +75,37 @@ public class AdminController {
             String key = String.valueOf(m.get("key"));
             Map<String, Object> row = new LinkedHashMap<>(m);
             row.put("members", counts.getOrDefault(key, 0));
+            int all = 0;
+            for (String k : orgs.subtreeKeys(key)) all += counts.getOrDefault(k, 0);
+            row.put("membersAll", all);
+            row.put("children", orgs.childCount(key));
             out.add(row);
         }
         return out;
     }
 
-    /** 新建组织：标识留空则自动生成 */
+    /** 新建组织：标识留空则自动生成；parentKey 决定挂在哪个节点下（空=顶层） */
     @PostMapping("/orgs")
     public Map<String, Object> createOrg(@RequestBody Map<String, Object> body) {
-        String key = orgs.create(str(body.get("name")), str(body.get("key")));
+        String key = orgs.create(str(body.get("name")), str(body.get("key")), str(body.get("parentKey")));
         return Map.of("message", "组织已创建", "key", key);
     }
 
-    /** 组织改名：只改显示名，组织标识（数据隔离依据）保持不变 */
+    /**
+     * 更新组织：改名与调整上级都可选。
+     *
+     * <p>parentKey 用 {@code containsKey} 判断而不是判空——传空字符串表示"挪到顶层"，
+     * 与"不传（不改上级）"是两件事，混在一起就永远挪不回顶层了。</p>
+     */
     @PutMapping("/orgs/{key}")
-    public Map<String, Object> renameOrg(@PathVariable String key, @RequestBody Map<String, Object> body) {
-        if (!orgs.rename(key, str(body.get("name")))) throw new IllegalArgumentException("组织不存在：" + key);
+    public Map<String, Object> updateOrg(@PathVariable String key, @RequestBody Map<String, Object> body) {
+        String name = str(body.get("name"));
+        if (!name.isBlank() && !orgs.rename(key, name)) throw new IllegalArgumentException("组织不存在：" + key);
+        if (body.containsKey("parentKey")) orgs.setParent(key, str(body.get("parentKey")));
         return Map.of("message", "组织已更新", "key", key);
     }
 
-    /** 删除组织：默认组织与仍有成员的组织都拒绝 */
+    /** 删除组织：默认组织、有子组织、仍有成员的组织都拒绝 */
     @DeleteMapping("/orgs/{key}")
     public Map<String, Object> deleteOrg(@PathVariable String key) {
         long members = users.list().stream()

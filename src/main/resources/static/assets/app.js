@@ -189,6 +189,8 @@
     logout: confirmLogout,
     /** 选文件后先列清单再上传（知识库文档页也复用这套） */
     openUploadPicker: openUploadPicker,
+    /** 选文件夹批量上传：优先目录选择器，避免浏览器原生"上传到此网站"确认 */
+    pickFolder: pickFolder,
     /** 分片树状预览（后台文档管理与知识库文档页共用） */
     showChunks: showChunks,
     refreshDocs() { return loadDocs(); },
@@ -344,14 +346,19 @@
     return i < 0 ? '' : String(name).slice(i + 1).toLowerCase();
   }
 
-  /** 把 FileList 变成可展示的候选清单：分出"可上传 / 格式不支持 / 超过上限"三类 */
+  /** 把待上传文件变成可展示的候选清单：分出"可上传 / 格式不支持 / 超过上限"三类 */
   function collectCandidates(all) {
-    const files = Array.from(all || []).filter(function (f) { return !isJunkFile(f.name); });
-    return files.map(function (f) {
+    // 兼容三种入参：input 的 FileList、File 数组、目录选择器产出的 {file, rel}
+    // （File System Access API 拿到的 File 没有 webkitRelativePath，相对路径得自己带过来）
+    const raw = Array.from(all || []).map(function (x) {
+      return (x && x.file) ? x : { file: x, rel: (x && x.webkitRelativePath) || '' };
+    }).filter(function (x) { return x.file && !isJunkFile(x.file.name); });
+    return raw.map(function (x) {
+      const f = x.file;
       const ext = extOf(f.name);
       const supported = !supportedExts.size || supportedExts.has(ext);
       const oversize = !!(maxFileBytes && f.size > maxFileBytes);
-      const rel = f.webkitRelativePath || '';
+      const rel = x.rel || '';
       const cut = rel.lastIndexOf('/');
       return {
         file: f, name: f.name, size: f.size, ext: ext,
@@ -377,6 +384,52 @@
   }
 
   /**
+   * 选文件夹。
+   *
+   * <p>优先用 File System Access 的 showDirectoryPicker：webkitdirectory 的 input 会让
+   * 浏览器弹一条「将 N 个文件上传到此网站?」的原生确认，看着像浏览器在警告我们的产品，
+   * 而这句提示用 CSS/JS 消不掉。目录选择器只弹系统文件夹选择框，选完直接进我们的清单弹框。</p>
+   *
+   * <p>不支持的浏览器（Firefox/Safari、以及 http 内网地址——该 API 要求安全上下文）
+   * 自动退回原来的 webkitdirectory input，功能不丢，只是会看到那条原生确认。</p>
+   */
+  async function pickFolder() {
+    if (typeof global.showDirectoryPicker !== 'function') {
+      const inp = document.getElementById('folderInput');
+      if (inp) inp.click(); else toast('当前浏览器不支持选择文件夹', 'err');
+      return;
+    }
+    let dir = null;
+    try {
+      dir = await global.showDirectoryPicker({ mode: 'read' });
+    } catch (e) {
+      return;   // 用户取消选择，不用提示
+    }
+    const picked = [];
+    const walk = async function (handle, prefix) {
+      for await (const entry of handle.values()) {
+        if (isJunkFile(entry.name)) continue;
+        if (entry.kind === 'file') {
+          try {
+            const f = await entry.getFile();
+            picked.push({ file: f, rel: prefix + entry.name });
+          } catch (e) { /* 单个文件读不出来（被占用/无权限）跳过，不影响整批 */ }
+        } else if (entry.kind === 'directory') {
+          await walk(entry, prefix + entry.name + '/');
+        }
+      }
+    };
+    try {
+      await walk(dir, '');
+    } catch (e) {
+      toast('读取文件夹失败：' + e.message, 'err');
+      return;
+    }
+    if (!picked.length) { toast('该文件夹里没有可上传的文件', 'err'); return; }
+    openUploadPicker(picked);
+  }
+
+  /**
    * 选文件夹 / 多选文件后的第一步：列出清单让人自己挑，而不是一股脑全传。
    * 一个目录里常混着 zip、图片、临时文件，传完才发现垃圾进库，还得逐个删。
    */
@@ -391,7 +444,9 @@
     pickState = { items: items, finished: false, done: 0, fail: 0 };
     const total = items.length, bad = total - usable.length;
     openModal({
-      title: '选择要上传的文件', wide: true,
+      // 中号弹框：文件清单是"逐条核对"的活，460 装不下文件名+大小+状态三列，
+      // 680 又会在 1366 屏上贴着边；560 刚好一屏看八九条
+      title: '选择要上传的文件', size: 'md',
       okText: '上传所选（' + usable.length + '）',
       body:
         '<div class="pick-summary">' +
@@ -704,13 +759,12 @@
               '<div class="drop-text">点击或拖拽上传文档</div>' +
               '<div class="drop-formats" id="dropFormats">支持多格式</div></div>' +
             '<div class="upload-msg" id="uploadMsg" style="display:none"></div>' +
-            '<button class="folder-btn" onclick="document.getElementById(\'folderInput\').click()">📁 选择文件夹上传</button>' +
+            '<button class="folder-btn" onclick="Shell.pickFolder()">📁 选择文件夹上传</button>' +
             '<input type="file" id="fileInput" hidden>' +
             '<input type="file" id="folderInput" webkitdirectory multiple hidden>' +
           '</div>' +
         '</div>' +
         '<div class="user-block" id="sidebarUserBlock"></div>' +
-        '<div class="sidebar-health" data-status-pill><span class="status-dot"></span>检测中…</div>' +
         '<div class="sidebar-footer">水利知识库 · 让知识更好用</div>' +
       '</aside>';
     host.insertBefore(aside.firstElementChild, host.firstChild);
@@ -773,16 +827,29 @@
     });
   }
 
-  /** 管理后台是独立布局（.admin-sidebar），不走 renderSidebar，单独把状态条塞进侧栏底部 */
-  function injectAdminHealth() {
-    const back = document.querySelector('.admin-sidebar .admin-back');
-    if (!back || document.querySelector('.admin-sidebar .sidebar-health')) return;
-    const el = document.createElement('div');
-    el.className = 'sidebar-health';
-    el.setAttribute('data-status-pill', '');
-    el.innerHTML = '<span class="status-dot"></span>检测中…';
-    back.parentNode.insertBefore(el, back);
+  /**
+   * 服务探活胶囊：右下角固定悬浮，全站只此一处。
+   *
+   * <p>放侧栏底部时它等于每个页面都多一行常驻文字（用户反馈"服务正常这个还是不太对"）；
+   * 环境状态属于"想确认时才看一眼"的信息，固定右下角、不参与任何布局最省事，
+   * 也不会像顶栏胶囊那样跟页面标题抢视线。</p>
+   */
+  function ensureHealthPill() {
+    let el = document.getElementById('svcPill');
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'svcPill';
+      el.setAttribute('data-status-pill', '');
+      el.title = '知识库检索服务状态（每 30 秒自动重试）';
+      el.innerHTML = '<span class="status-dot"></span>检测中…';
+      document.body.appendChild(el);
+    }
+    // 基础类固定为 svc-pill；healthy/off 由 checkHealth 每次重算，不在这里叠加
+    if (!el.dataset.baseClass) el.dataset.baseClass = 'svc-pill';
+    return el;
   }
+  /** 老入口保留：管理后台以前单独往侧栏塞状态条，现在统一走右下角胶囊 */
+  function injectAdminHealth() { ensureHealthPill(); }
 
   function toast(msg, type) {
     let t = document.getElementById('appToast');
@@ -834,8 +901,10 @@
       mask.id = 'appModal'; mask.className = 'modal-mask';
       document.body.appendChild(mask);
     }
+    // 宽度三档：默认（460，表单/提示）、md（560，列表类）、wide（680，矩阵/树）
+    const sizeCls = opts.wide ? ' modal-wide' : (opts.size === 'md' ? ' modal-md' : '');
     mask.innerHTML =
-      '<div class="modal-box' + (opts.wide ? ' modal-wide' : '') + '" role="dialog" aria-modal="true">' +
+      '<div class="modal-box' + sizeCls + '" role="dialog" aria-modal="true">' +
         '<div class="modal-head' + (opts.danger ? ' danger' : '') + '"><div class="modal-title">' +
           (opts.danger ? '<span style="margin-right:6px">⚠</span>' : '') + esc(opts.title || '提示') + '</div>' +
           '<button class="modal-close" title="关闭">×</button></div>' +
