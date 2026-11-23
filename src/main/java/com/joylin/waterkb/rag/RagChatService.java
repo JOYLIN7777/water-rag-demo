@@ -4,13 +4,16 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.joylin.waterkb.config.RagProperties;
 import com.joylin.waterkb.memory.ConversationTreeStore;
 import com.joylin.waterkb.memory.TreeNode;
+import com.joylin.waterkb.model.ModelConfigRepository;
 import com.joylin.waterkb.model.ModelRegistry;
 import com.joylin.waterkb.resilience.LlmCircuitBreaker;
 import com.joylin.waterkb.security.UserContext;
 import com.joylin.waterkb.tool.WaterInfoTool;
+import com.joylin.waterkb.usage.UsageRecorder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.metadata.Usage;
 import org.springframework.ai.document.Document;
 import org.springframework.ai.vectorstore.SearchRequest;
 import org.springframework.ai.vectorstore.VectorStore;
@@ -23,6 +26,7 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * RAG 问答核心服务：检索 → 拼装 Prompt → 流式生成（含熔断降级）。
@@ -39,11 +43,13 @@ public class RagChatService {
 
     private final VectorStore vectorStore;
     private final ModelRegistry modelRegistry;
+    private final ModelConfigRepository modelConfigRepository;
     private final ConversationTreeStore historyStore;
     private final PromptTemplateLoader promptLoader;
     private final LlmCircuitBreaker breaker;
     private final RagProperties props;
     private final ObjectMapper objectMapper;
+    private final UsageRecorder usageRecorder;
 
     private final WaterInfoTool waterInfoTool;
 
@@ -54,15 +60,19 @@ public class RagChatService {
                           PromptTemplateLoader promptLoader,
                           LlmCircuitBreaker breaker,
                           RagProperties props,
-                          ObjectMapper objectMapper) {
+                          ObjectMapper objectMapper,
+                          ModelConfigRepository modelConfigRepository,
+                          UsageRecorder usageRecorder) {
         this.vectorStore = vectorStore;
         this.modelRegistry = modelRegistry;
+        this.modelConfigRepository = modelConfigRepository;
         this.waterInfoTool = waterInfoTool;
         this.historyStore = historyStore;
         this.promptLoader = promptLoader;
         this.breaker = breaker;
         this.props = props;
         this.objectMapper = objectMapper;
+        this.usageRecorder = usageRecorder;
         // 不在构造时固定 ChatClient：每次问答从 ModelRegistry 取当前激活模型，
         // 这样管理页切换模型后无需重启容器即可生效。
     }
@@ -80,6 +90,8 @@ public class RagChatService {
         // 那时 Filter 已 clear ThreadLocal，直接读会拿到 anonymous/default（多租户串台）。
         final String tenantAtStart = UserContext.get().tenantId();
         final String userAtStart = UserContext.get().userId();
+        final long startAt = System.currentTimeMillis();
+        final AtomicReference<Usage> usageRef = new AtomicReference<>();
 
         // ===== 阶段 1：相似度检索 =====
         // ES 混合检索内部会先把问题交给 EmbeddingModel 向量化，再跑 BM25+kNN+RRF
@@ -118,7 +130,7 @@ public class RagChatService {
             tokens = Flux.just(fallback);
         } else {
             // 每次调用动态取当前激活的 Chat 模型（含 Tool Calling 工具注册）
-            tokens = buildTokens(question, systemPrompt, answerBuf, degraded, hits);
+            tokens = buildTokens(question, systemPrompt, answerBuf, degraded, hits, usageRef);
         }
 
         // 统一收尾：先落库（同步、可观测），再发 done。所有分支（正常/熔断/降级）都经过这里。
@@ -131,6 +143,14 @@ public class RagChatService {
                 appendExchange(sessionId, tenantAtStart, userAtStart, parentId, question, answerBuf.toString(), hits);
             } catch (Exception e) {
                 log.error("对话历史落库失败（不影响本次回答）", e);
+            }
+            // 真实模型调用才算用量：熔断/降级分支没有请求模型，不记
+            if (!degraded[0]) {
+                Usage u = usageRef.get();
+                usageRecorder.record(userAtStart, activeChatModelName(),
+                        u == null || u.getPromptTokens() == null ? 0 : u.getPromptTokens(),
+                        u == null || u.getCompletionTokens() == null ? 0 : u.getCompletionTokens(),
+                        System.currentTimeMillis() - startAt);
             }
         });
 
@@ -147,12 +167,24 @@ public class RagChatService {
                 });
     }
 
+    /** 当前激活的对话模型名（用量记录用）；取不到回落 unknown */
+    private String activeChatModelName() {
+        try {
+            com.joylin.waterkb.model.ModelConfig c = modelConfigRepository.findActive("CHAT");
+            return c == null || c.getModel() == null ? "unknown" : c.getModel();
+        } catch (Exception e) {
+            return "unknown";
+        }
+    }
+
     /**
      * 构建模型输出的 token 流。模型构建失败也降级为检索原文，不让问答接口 500。
      * 独立成方法避免 try/catch 里 chatClient 的编译期确定赋值歧义。
+     * 用 chatResponse() 而非 content()：流式响应的 usage 元数据挂在最后一个
+     * ChatResponse 上，只有完整对象流才能拿到输入/输出 Token 用于用量统计。
      */
     private Flux<String> buildTokens(String question, String systemPrompt, StringBuilder answerBuf,
-                                     boolean[] degraded, List<Document> hits) {
+                                     boolean[] degraded, List<Document> hits, AtomicReference<Usage> usageRef) {
         ChatClient chatClient;
         try {
             chatClient = modelRegistry.currentChatClient(waterInfoTool);
@@ -168,9 +200,22 @@ public class RagChatService {
                 .system(systemPrompt)
                 .user(question)
                 .stream()
-                .content()
+                .chatResponse()
                 .timeout(Duration.ofSeconds(props.getStreamTimeoutSeconds()))
-                .doOnNext(answerBuf::append)
+                .doOnNext(resp -> {
+                    if (resp.getResult() != null && resp.getResult().getOutput() != null
+                            && resp.getResult().getOutput().getText() != null) {
+                        answerBuf.append(resp.getResult().getOutput().getText());
+                    }
+                    if (resp.getMetadata() != null && resp.getMetadata().getUsage() != null
+                            && resp.getMetadata().getUsage().getTotalTokens() != null
+                            && resp.getMetadata().getUsage().getTotalTokens() > 0) {
+                        usageRef.set(resp.getMetadata().getUsage());
+                    }
+                })
+                .map(resp -> (resp.getResult() != null && resp.getResult().getOutput() != null
+                        && resp.getResult().getOutput().getText() != null)
+                        ? resp.getResult().getOutput().getText() : "")
                 .onErrorResume(ex -> {
                     breaker.recordFailure();
                     degraded[0] = true;

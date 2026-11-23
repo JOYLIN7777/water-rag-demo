@@ -25,6 +25,7 @@ public class PermissionService {
 
     private final ToolPermissionRegistry toolRegistry;
     private final RolePermissions rolePermissions;
+    private final PermissionCatalog permCatalog;
 
     /** 功能菜单定义：名称 / 地址 / 需要的权限码（空=所有认证用户） */
     private static final List<Map<String, Object>> MENUS = List.of(
@@ -38,9 +39,11 @@ public class PermissionService {
             menu("个人中心", "profile.html", List.of())
     );
 
-    public PermissionService(ToolPermissionRegistry toolRegistry, RolePermissions rolePermissions) {
+    public PermissionService(ToolPermissionRegistry toolRegistry, RolePermissions rolePermissions,
+                             PermissionCatalog permCatalog) {
         this.toolRegistry = toolRegistry;
         this.rolePermissions = rolePermissions;
+        this.permCatalog = permCatalog;
     }
 
     private static Map<String, Object> menu(String name, String href, List<String> permissions) {
@@ -85,7 +88,17 @@ public class PermissionService {
         result.put("anonymous", anonymous);
         result.put("admin", admin);
         result.put("permissions", owned);          // 前端按权限码控制入口显示
-        result.put("allPermissions", Permission.ALL);
+        // 全量权限码 = 内置权限 + 权限目录中的自定义节点（供权限编辑器勾选）
+        List<String> allPerms = new ArrayList<>(Permission.ALL);
+        try {
+            for (Map<String, Object> n : permCatalog.list()) {
+                String code = String.valueOf(n.get("code"));
+                if (!allPerms.contains(code)) allPerms.add(code);
+            }
+        } catch (Exception ignored) {
+            // 目录读取失败时退化为内置权限码
+        }
+        result.put("allPermissions", allPerms);
         result.put("roleMatrix", rolePermissions.roleMatrix());
         result.put("menus", menus);
         result.put("data", data);

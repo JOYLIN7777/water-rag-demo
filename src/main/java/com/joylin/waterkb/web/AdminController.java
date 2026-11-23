@@ -1,6 +1,7 @@
 package com.joylin.waterkb.web;
 
 import com.joylin.waterkb.audit.AuditService;
+import com.joylin.waterkb.security.PermissionCatalog;
 import com.joylin.waterkb.security.Permission;
 import com.joylin.waterkb.security.RequirePermission;
 import com.joylin.waterkb.security.RolePermissions;
@@ -36,11 +37,14 @@ public class AdminController {
 
     private final UserStore users;
     private final RolePermissions rolePermissions;
+    private final PermissionCatalog permCatalog;
     private final AuditService audit;
 
-    public AdminController(UserStore users, RolePermissions rolePermissions, AuditService audit) {
+    public AdminController(UserStore users, RolePermissions rolePermissions,
+                           PermissionCatalog permCatalog, AuditService audit) {
         this.users = users;
         this.rolePermissions = rolePermissions;
+        this.permCatalog = permCatalog;
         this.audit = audit;
     }
 
@@ -155,6 +159,39 @@ public class AdminController {
     public Map<String, Object> deleteRole(@PathVariable String role) {
         boolean removed = rolePermissions.deleteRole(role);
         return Map.of("message", removed ? "角色定义已删除" : "该角色没有自定义配置", "role", role.toLowerCase());
+    }
+
+    // ==================== 权限节点目录（菜单权限页） ====================
+
+    /** 全部权限节点（内置 + 自定义） */
+    @GetMapping("/perms")
+    public List<Map<String, Object>> perms() {
+        return permCatalog.list();
+    }
+
+    /** 新增自定义权限节点 */
+    @PostMapping("/perms")
+    public Map<String, Object> createPerm(@RequestBody Map<String, Object> body) {
+        permCatalog.create(str(body.get("code")), str(body.get("name")),
+                str(body.get("type")), str(body.get("module")), str(body.get("desc")));
+        return Map.of("message", "权限节点已创建", "code", str(body.get("code")));
+    }
+
+    /** 编辑节点显示信息；内置节点不可改标识、不可删除 */
+    @PutMapping("/perms/{code}")
+    public Map<String, Object> updatePerm(@PathVariable String code, @RequestBody Map<String, Object> body) {
+        permCatalog.update(code, str(body.get("name")), str(body.get("type")),
+                str(body.get("module")), str(body.get("desc")));
+        return Map.of("message", "权限节点已更新", "code", code);
+    }
+
+    /** 删除节点：仅自定义节点可删，同时清理各角色的该权限配置 */
+    @DeleteMapping("/perms/{code}")
+    public Map<String, Object> deletePerm(@PathVariable String code) {
+        permCatalog.delete(code);
+        // 数据库里的角色配置已同步清理，重载内存角色矩阵让变更立即生效
+        rolePermissions.refresh();
+        return Map.of("message", "权限节点已删除", "code", code);
     }
 
     /** 登录日志：从审计里按登录相关动作过滤（含成功与失败） */

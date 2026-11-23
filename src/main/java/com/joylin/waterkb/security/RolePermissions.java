@@ -49,6 +49,8 @@ public class RolePermissions {
 
     /** 可为 null：单测与无数据库环境只用内置默认 */
     private final JdbcTemplate jdbc;
+    /** 权限节点目录：自定义权限码的合法性校验来源 */
+    private final PermissionCatalog catalog;
 
     /**
      * 运行期角色权限表（内置默认 + DB 覆盖 + 自定义角色合并后的最终视图）。
@@ -56,10 +58,13 @@ public class RolePermissions {
      */
     private volatile Map<String, Set<String>> effective = BUILT_IN;
 
-    public RolePermissions() { this.jdbc = null; }
+    public RolePermissions() { this.jdbc = null; this.catalog = null; }
 
     @Autowired
-    public RolePermissions(JdbcTemplate jdbc) { this.jdbc = jdbc; }
+    public RolePermissions(JdbcTemplate jdbc, PermissionCatalog catalog) {
+        this.jdbc = jdbc;
+        this.catalog = catalog;
+    }
 
     @PostConstruct
     public void init() {
@@ -75,7 +80,8 @@ public class RolePermissions {
     }
 
     /** 从数据库重建最终视图：DB 有记录的角色【整体替换】内置默认（后台勾选清单即全部权限），无记录的回落内置默认 */
-    private void refresh() {
+    /** 从数据库整体重载角色权限到内存视图（启动、保存、节点删除后调用） */
+    public void refresh() {
         Map<String, Set<String>> fromDb = new LinkedHashMap<>();
         jdbc.query("SELECT role, permission FROM role_permissions ORDER BY role, permission", rs -> {
             fromDb.computeIfAbsent(rs.getString("role").trim(), k -> new LinkedHashSet<>())
@@ -129,7 +135,8 @@ public class RolePermissions {
         String name = normalize(role);
         if (name.isEmpty()) throw new IllegalArgumentException("角色名不能为空");
         if (name.equals("admin")) throw new IllegalArgumentException("管理员角色拥有全部权限，不可修改");
-        if (permissions == null || permissions.stream().anyMatch(p -> !Permission.ALL.contains(p))) {
+        if (permissions == null || permissions.stream().anyMatch(p ->
+                !Permission.ALL.contains(p) && (catalog == null || !catalog.exists(p)))) {
             throw new IllegalArgumentException("存在不合法的权限码");
         }
         if (jdbc == null) throw new IllegalStateException("当前环境无数据库，角色权限不可配置");

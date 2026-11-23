@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.joylin.waterkb.security.Permission;
 import com.joylin.waterkb.security.RequirePermission;
+import com.joylin.waterkb.usage.UsageRecorder;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -49,35 +50,37 @@ public class UsageController {
     private final String apiKey;
     private final String workspaceId;
     private final String region;
+    private final UsageRecorder recorder;
 
     public UsageController(ObjectMapper mapper,
                            @Value("${usage.bailian.workspace-id:${BAILIAN_WORKSPACE_ID:}}") String workspaceId,
-                           @Value("${usage.bailian.region:cn-beijing}") String region) {
+                           @Value("${usage.bailian.region:cn-beijing}") String region,
+                           UsageRecorder recorder) {
         this.mapper = mapper;
         this.apiKey = System.getenv("AI_API_KEY");
         this.workspaceId = workspaceId == null ? "" : workspaceId.trim();
         this.region = region == null || region.isBlank() ? "cn-beijing" : region.trim();
+        this.recorder = recorder;
         this.http = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5)).build();
     }
 
     /** 今日 / 本月请求次数与 Token 消耗，以及按模型明细 */
     @GetMapping("/summary")
     public Map<String, Object> summary() {
+        // 未配置官方工作空间时直接用本地真实调用记录：任何部署形态下用量页都有数据
+        if (workspaceId.isBlank() || apiKey == null || apiKey.isBlank()) {
+            Map<String, Object> local = recorder.summary();
+            return local;
+        }
+
         Map<String, Object> totals = new LinkedHashMap<>();
         totals.put("todayRequests", 0);
         totals.put("todayTokens", 0);
         totals.put("monthRequests", 0);
         totals.put("monthTokens", 0);
-
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("totals", totals);
         result.put("models", List.of());
-
-        if (workspaceId.isBlank() || apiKey == null || apiKey.isBlank()) {
-            result.put("configured", false);
-            result.put("hint", "尚未配置工作空间 ID。请设置环境变量 BAILIAN_WORKSPACE_ID 后重启服务，即可查看百炼官方用量。");
-            return result;
-        }
 
         try {
             LocalDate today = LocalDate.now(ZONE);
@@ -99,9 +102,10 @@ public class UsageController {
             result.put("hint", "数据来自阿里云百炼官方用量接口，按当前工作空间统计，可能有分钟级延迟。");
             return result;
         } catch (Exception e) {
-            result.put("configured", false);
-            result.put("hint", "暂时无法获取官方用量：" + safeMessage(e) + "。请检查工作空间 ID 与 API Key 权限。");
-            return result;
+            // 官方接口异常时降级为本地记录，避免整页空白
+            Map<String, Object> local = recorder.summary();
+            local.put("hint", "官方用量暂时不可用（" + safeMessage(e) + "），已切换为本系统调用记录。");
+            return local;
         }
     }
 
