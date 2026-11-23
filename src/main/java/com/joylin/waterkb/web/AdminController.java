@@ -140,6 +140,23 @@ public class AdminController {
         return rolePermissions.roleMatrix();
     }
 
+    /** 编辑角色权限：保存后立即生效（内存缓存重建），admin 恒为全权限不可改 */
+    @PutMapping("/roles/{role}/permissions")
+    public Map<String, Object> setRolePermissions(@PathVariable String role,
+                                                  @RequestBody Map<String, Object> body) {
+        @SuppressWarnings("unchecked")
+        List<String> permissions = (List<String>) body.getOrDefault("permissions", List.of());
+        rolePermissions.setPermissions(role, permissions);
+        return Map.of("message", "角色权限已保存并实时生效", "role", role.toLowerCase());
+    }
+
+    /** 删除角色定义：删除后该角色回落内置默认（无记录的角色按无权限处理） */
+    @DeleteMapping("/roles/{role}")
+    public Map<String, Object> deleteRole(@PathVariable String role) {
+        boolean removed = rolePermissions.deleteRole(role);
+        return Map.of("message", removed ? "角色定义已删除" : "该角色没有自定义配置", "role", role.toLowerCase());
+    }
+
     /** 登录日志：从审计里按登录相关动作过滤（含成功与失败） */
     @GetMapping("/login-logs")
     public List<Map<String, Object>> loginLogs(@RequestParam(required = false, defaultValue = "100") int limit) {

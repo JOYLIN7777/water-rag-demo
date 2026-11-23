@@ -78,12 +78,12 @@
     <div class="lb-title">水利知识库</div>
     <div class="lb-sub">面向水利规程、调度文档的专业知识库智能问答系统</div>
     <div class="lb-features">
-      <div class="lb-feature"><span class="tick">✓</span>ES 混合检索 · 全文 + 向量 + RRF 融合</div>
-      <div class="lb-feature"><span class="tick">✓</span>行级权限与多租户数据隔离</div>
-      <div class="lb-feature"><span class="tick">✓</span>全量审计与工具权限治理</div>
-      <div class="lb-feature"><span class="tick">✓</span>模型可插拔 · 公有云 / 私有化部署</div>
+      <div class="lb-feature"><span class="tick">✓</span>基于规程文档的智能问答，回答标注原文出处</div>
+      <div class="lb-feature"><span class="tick">✓</span>支持规程、报告、表格等多种格式资料</div>
+      <div class="lb-feature"><span class="tick">✓</span>多轮追问与分支回溯，思路不丢失</div>
+      <div class="lb-feature"><span class="tick">✓</span>数据按账号与部门隔离，安全可控</div>
     </div>
-    <div class="lb-foot">Spring Boot 3.4 · Spring AI · Elasticsearch</div>
+    <div class="lb-foot">让知识更好用 · 水利知识库</div>
   </div>
 
   <div class="login-form">
@@ -106,7 +106,7 @@
       </div>
       <div class="row-between">
         <label class="checkbox"><input type="checkbox" id="remember">记住用户名</label>
-        <span class="link" id="forgotLink">忘记密码？</span>
+        <span class="link" id="forgotLink" title="联系管理员重置密码">忘记密码？</span>
       </div>
       <button class="login-btn" type="submit" id="loginBtn">登 录</button>
     </form>
@@ -137,7 +137,7 @@ document.getElementById('pwEye').onclick=function(){
   var show=p.type==='password';p.type=show?'text':'password';this.textContent=show?'隐藏':'显示';
 };
 document.getElementById('forgotLink').onclick=function(){
-  alert('演示环境未开放自助改密，请联系管理员重置。');
+  alert('请联系系统管理员，在管理后台的「用户管理」中为您重置密码。');
 };
 function showErr(msg){
   var b=document.getElementById('errBox');b.textContent=msg;b.classList.add('show');

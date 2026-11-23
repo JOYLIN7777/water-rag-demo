@@ -398,8 +398,9 @@
       document.body.appendChild(mask);
     }
     mask.innerHTML =
-      '<div class="modal-box" role="dialog" aria-modal="true">' +
-        '<div class="modal-head"><div class="modal-title">' + esc(opts.title || '提示') + '</div>' +
+      '<div class="modal-box' + (opts.wide ? ' modal-wide' : '') + '" role="dialog" aria-modal="true">' +
+        '<div class="modal-head' + (opts.danger ? ' danger' : '') + '"><div class="modal-title">' +
+          (opts.danger ? '<span style="margin-right:6px">⚠</span>' : '') + esc(opts.title || '提示') + '</div>' +
           '<button class="modal-close" title="关闭">×</button></div>' +
         '<div class="modal-body">' + (opts.body || '') + '</div>' +
         '<div class="modal-foot">' +
