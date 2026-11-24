@@ -460,14 +460,12 @@
               <div class="field"><label>访问密钥（内网可留空）</label><input id="fKey" type="password" autocomplete="new-password" name="apiKeyInput" data-no-autofill="1" placeholder="留空表示保持原值"></div>
             </div>
             <div class="field" id="dimField" style="display:none"><label>向量维度（EMBEDDING 必填）</label><input id="fDim" type="number" placeholder="1024"></div>
-            <button class="primary-btn" data-perm="model:write" onclick="createModel()">＋ 添加配置</button>
-            <div class="msg" id="createMsg"></div>
+        <button class="primary-btn" data-perm="model:write" onclick="createModel()">＋ 添加配置</button>
             <div class="hint">提示：切换文档检索模型前，建议先点「测试」确认服务可用；不同维度的模型不能共用同一个知识库。</div>
           </div>
           <div class="card">
             <div class="card-head"><h3>当前生效配置</h3></div>
             <div id="activeBox"><div class="empty">加载中…</div></div>
-            <div class="msg" id="activeMsg"></div>
           </div>
         </div>
         <div class="table-card">
@@ -2207,11 +2205,6 @@ function resultCn(r,status){
 
 // ===== 模型设置（新版，原 models.html 脚本） =====
 let models=[];
-function modelMsg(id,text,ok){
-  const el=$(id);if(!el)return;
-  el.className='msg '+(ok?'ok':'err');
-  el.innerHTML='<span>'+esc(text)+'</span><button type="button" class="msg-close" title="关闭提示" onclick="this.parentNode.className=\'msg\'">×</button>';
-}
 async function loadModels(){
   try{
     models=await api('/api/models');
@@ -2249,15 +2242,15 @@ async function createModel(){
   const body={name:$('fName').value.trim(),type,baseUrl:$('fUrl').value.trim(),model:$('fModel').value.trim(),
     apiKey:$('fKey').value.trim(),dimensions:type==='EMBEDDING'?Number($('fDim').value):null,enabled:true,active:false};
   try{
-    const r=await apiWrite('/api/models',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
-    modelMsg('createMsg','✓ '+r.message,true);
+    await apiWrite('/api/models',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
     ['fName','fUrl','fModel','fKey','fDim'].forEach(id=>{const el=$(id);if(el)el.value=''});
-    appToast('配置已添加','ok');loadModels();
-  }catch(e){modelMsg('createMsg','✗ '+e.message,false)}
+    appToast(r.message||'配置已添加','ok');loadModels();
+  }catch(e){appToast('添加失败：'+e.message,'err')}
 }
 async function activateModelNew(id){
-  try{const j=await apiWrite('/api/models/'+id+'/activate',{method:'POST'});modelMsg('activeMsg','✓ '+j.message+'（已即时生效，无需重启）',true);appToast('模型已切换','ok');loadModels()}
-  catch(e){modelMsg('activeMsg','✗ '+e.message,false)}
+  try{const j=await apiWrite('/api/models/'+id+'/activate',{method:'POST'});
+    appToast(j.message+'（已即时生效，无需重启）','ok');loadModels()}
+  catch(e){appToast('激活失败：'+e.message,'err')}
 }
 async function testModelNew(id,btn){
   btn.disabled=true;btn.textContent='测试中…';
@@ -2272,7 +2265,7 @@ async function delModelNew(id){
   const m=models.find(x=>x.id===id);
   if(!confirm('确定删除模型配置「'+(m?m.name:id)+'」吗？'))return;
   try{await apiWrite('/api/models/'+id,{method:'DELETE'});appToast('配置已删除','ok');loadModels()}
-  catch(e){modelMsg('activeMsg','✗ '+e.message,false)}
+  catch(e){appToast('删除失败：'+e.message,'err')}
 }
 
 async function loadUsage(){
