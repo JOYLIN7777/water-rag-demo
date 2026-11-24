@@ -72,8 +72,16 @@
   .branch-note{max-width:880px;margin:0 auto 16px;padding:9px 14px;border:1px solid #dbe6fb;background:#f6f9ff;border-radius:9px;
     font-size:12px;color:#4b5c78;line-height:1.6;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
   .branch-note b{color:#2f5fe0}
-  .branch-note a{margin-left:auto;color:#3b6ef5;text-decoration:none;white-space:nowrap;font-size:11.5px}
+  .branch-note a{margin-left:auto;color:#3b6ef5;text-decoration:none;white-space:nowrap;font-size:11.5px;cursor:pointer}
   .branch-note a:hover{text-decoration:underline}
+  /* 提示条展开后的其它分支清单：问题+回答预览都在当前页可见，一键切回该分支 */
+  .branch-list{display:none;flex:0 0 100%;margin-top:12px;border-top:1px solid #dbe6fb;padding-top:10px}
+  .branch-list.open{display:block}
+  .branch-item{border:1px solid #dbe6fb;border-radius:8px;background:#fff;padding:10px 12px;margin-bottom:8px}
+  .branch-item .bi-q{font-size:12px;color:var(--ink);font-weight:600;line-height:1.6}
+  .branch-item .bi-a{font-size:11.5px;color:var(--ink-2);line-height:1.6;margin-top:4px;max-height:42px;overflow:hidden}
+  .branch-item button{margin-top:8px;border:1px solid #c9d9ff;background:#f2f6ff;color:#315ec9;border-radius:6px;padding:3px 10px;font-size:11px;cursor:pointer}
+  .branch-item button:hover{background:#e3ecff}
   /* 用户气泡：宽度有上限，超宽屏不拉成横幅，保持对话气泡形态 */
   .user-bubble{max-width:min(78%,760px);background:var(--primary-soft);color:#1e3a8a;border:1px solid #d6e4ff;border-radius:14px 14px 4px 14px;padding:12px 18px;font-size:14px;line-height:1.7;white-space:pre-wrap;box-shadow:var(--shadow-sm)}
   /* 回答卡片：占满主区，内部三层（标题栏/正文/引用）用底色与分隔线分层；
@@ -389,13 +397,45 @@ async function refreshBranchNote(id){
     if(!r.ok)return;
     const j=await r.json();
     if(currentId!==id)return;
-    const inTree=(j.nodes||[]).filter(n=>n&&n.role==='user').length;
-    const shown=messages.filter(m=>m.role==='user').length;
-    if(inTree<=shown)return;
-    el.innerHTML='<span>⑃</span><span>本会话另有 <b>'+(inTree-shown)+'</b> 轮提问保存在其它分支，当前只显示最近一次提问所在的分支</span>'+
-      '<a href="tree.html?sid='+encodeURIComponent(id)+'" target="_blank" rel="noopener">查看会话结构 →</a>';
+    const nodes=j.nodes||[];
+    const byId={};nodes.forEach(n=>{if(n&&n.id)byId[n.id]=n});
+    // 当前链：从 head 沿 parentId 回溯到根；其余 user 节点就是"藏在其它分支里的提问"
+    const chain=new Set();let cur=j.head||'';
+    while(cur&&byId[cur]&&!chain.has(cur)){chain.add(cur);cur=byId[cur].parentId}
+    const others=nodes.filter(n=>n&&n.role==='user'&&!chain.has(n.id));
+    if(!others.length)return;
+    const items=others.map(u=>({q:u,a:nodes.find(n=>n&&n.role==='assistant'&&n.parentId===u.id)}));
+    el.innerHTML='<span>⑃</span><span>本会话另有 <b>'+items.length+'</b> 轮提问保存在其它分支，点开可查看原回答或切回该分支</span>'+
+      '<a id="branchToggle">展开查看 →</a>'+
+      '<div class="branch-list" id="branchList">'+items.map(it=>
+        '<div class="branch-item"><div class="bi-q">问：'+escapeHtml(String(it.q.content||'').slice(0,160))+'</div>'+
+        '<div class="bi-a">'+(it.a?'答：'+escapeHtml(String(it.a.content||'').slice(0,120)):'（该轮暂无回答）')+'</div>'+
+        '<button onclick="switchBranch(\''+escapeHtml((it.a&&it.a.id)||it.q.id)+'\')">切换到这个分支 →</button></div>').join('')+'</div>';
     el.style.display='';
+    const list=document.getElementById('branchList');
+    document.getElementById('branchToggle').onclick=function(){
+      const open=list.classList.toggle('open');
+      this.textContent=open?'收起 ↑':'展开查看 →';
+    };
   }catch(e){}
+}
+/**
+ * 切到另一分支：服务端 rewind 只移动 head，不删任何节点；随后重拉该分支的完整问答。
+ * 切过去后原分支照样能从提示条切回来——"原来的提问回答"始终可见。
+ */
+async function switchBranch(nodeId){
+  const id=currentId;
+  try{
+    const r=await fetch('/api/chat/rewind?sessionId='+encodeURIComponent(id)+'&nodeId='+encodeURIComponent(nodeId),{method:'POST'});
+    const j=await r.json().catch(()=>({}));
+    if(!r.ok)throw new Error(j.error||'切换失败');
+    const list=await fetch('/api/chat/history?sessionId='+encodeURIComponent(id)).then(r=>r.json());
+    if(!Array.isArray(list)||currentId!==id)return;
+    messages=list.map(m=>({role:m.role,content:m.content,sources:m.sources||[],streaming:false,
+      usage:m.usage||null,nodeId:m.id||'',parentId:m.parentId||''}));
+    msgStore[id]=messages;renderMessages();scrollBottom(true);refreshBranchNote(id);
+    toast('已切到该分支，原分支的对话随时可以再切回来','ok');
+  }catch(e){showError('切换分支失败：'+e.message)}
 }
 // 注意：这里原来有个本地版 removeSession（只删内存+localStorage），侧栏 DOM 早已由
 // app.js 统一渲染并绑定它自己的删除逻辑（含后端历史清理），本地这份是死代码且逻辑过时，已删除。
@@ -574,7 +614,6 @@ function msgHtml(m,i){
         '<span class="ai-usage"'+(u?'':' style="display:none"')+(u?' title="'+escapeHtml(usageTip(u))+'"':'')+'>'+
           (u?usageInner(u):'')+'</span>'+
         '<button class="icon-btn ai-cite-count" title="引用片段" style="display:none">▤</button>'+
-        '<button class="icon-btn ai-rewind" onclick="rewindAsk('+i+')" title="接着这一轮换个问法：输入新问题发送后，新回答接在它后面成为分支，原对话一条不动">接着问</button>'+
         '<button class="icon-btn" title="复制回答到剪贴板" onclick="copyMsg('+i+')">复制</button>'+
       '</span></div>'+
     '<div class="ai-card-body">'+renderMarkdown(m.content)+(m.streaming?'<span class="cursor"></span>':'')+'</div>'+
