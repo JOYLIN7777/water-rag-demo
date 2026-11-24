@@ -12,8 +12,10 @@
   .admin-sidebar .brand{padding-bottom:16px}
   .admin-panel[data-panel="org"] .tree-pane{display:none}
   .org-page-head{display:flex;justify-content:space-between;align-items:flex-start;gap:18px;margin-bottom:16px}
-  .org-tools{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
-  .org-search{max-width:240px;padding:7px 10px;border:1px solid var(--line);border-radius:7px;font-size:12px}
+  .org-tools{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-left:auto}
+  .org-search{width:210px;padding:7px 10px;border:1px solid var(--line);border-radius:7px;font-size:12px;background:#fff}
+  .org-tools .btn-sm{white-space:nowrap}
+  .org-tools .org-search{margin:0 4px}
   .org-table-card{padding:0;overflow:hidden}
   .org-tree-table th:first-child{width:44%}
   .org-tree-table td:nth-child(2){color:#3b6ef5;font-family:ui-monospace,monospace;font-size:11.5px}
@@ -322,10 +324,12 @@
 <script>
 // 独立路由首屏防闪：在任何内容绘制前先按路径锁定目标面板，等权限接口回来再交给 goPanel()
 (function(){
-  const m={users:'users',org:'org',roles:'roles',perms:'perms',docs:'docs',
-    usage:'usage',loginlogs:'loginlogs',audit:'audit'};
+  const FILE_PANEL={users:'users','users.html':'users',org:'org','org.html':'org',
+    roles:'roles','roles.html':'roles',perms:'perms','perms.html':'perms',docs:'docs','docs.html':'docs',
+    usage:'usage','usage.html':'usage',loginlogs:'loginlogs','loginlogs.html':'loginlogs',
+    audit:'audit','audit.html':'audit'};
   const f=location.pathname.split('/').pop()||'';
-  const p=m[f]||new URLSearchParams(location.search).get('panel')||'users';
+  const p=FILE_PANEL[f]||new URLSearchParams(location.search).get('panel')||'users';
   if(f==='admin.html'&&new URLSearchParams(location.search).get('panel')==='models'){
     location.replace('models.html');return;
   }
@@ -367,7 +371,7 @@
             <button class="btn btn-sm btn-search" data-perm="user:read" onclick="renderUserTable(1)">搜索</button>
             <button class="btn btn-sm" data-perm="user:read" onclick="resetUserFilter()">重置</button>
             <button class="btn btn-sm btn-green" data-perm="user:read" onclick="exportUsers()">导出用户</button>
-            <button class="btn btn-sm btn-amber" data-perm="user:write" onclick="createUser()">＋ 新增账号</button>
+            <button class="btn btn-sm btn-amber" data-perm="user:write" onclick="createUser(userFilter.type==='org'?userFilter.value:'')">＋ 新增账号</button>
           </div>
         </div>
         <div class="workbench" style="min-height:auto">
@@ -393,12 +397,12 @@
       <section class="admin-panel" data-panel="org">
         <div class="org-page-head">
           <div><h1 class="page-title">组织架构管理中心</h1>
-            <p class="page-desc">维护系统组织机构层级，严格反映「政务云业务处室」与「平台系统组织」双轨结构。</p></div>
+            <p class="page-desc">以树形结构维护部门层级；可直接编辑任意层级，支持调整上级、排序与子部门。</p></div>
           <div class="org-tools">
-            <input class="org-search" id="orgKeyword" placeholder="搜索部门名称 / 编码" oninput="renderOrgTable()">
-            <button class="btn btn-sm" onclick="toggleOrgTree()">折叠全部</button>
+            <button class="btn btn-sm" onclick="toggleOrgTree()" title="展开或收起全部层级">展开/收起</button>
             <button class="btn btn-sm" onclick="loadOrgData()">刷新</button>
-            <button class="btn btn-sm btn-primary" data-perm="user:write" onclick="orgCreate('')">＋ 新建系统部门</button>
+            <input class="org-search" id="orgKeyword" placeholder="搜索部门名称 / 编码" oninput="renderOrgTable()">
+            <button class="btn btn-sm btn-primary" data-perm="user:write" onclick="orgCreate('')">＋ 新建部门</button>
           </div>
         </div>
         <div class="card org-table-card">
@@ -575,6 +579,7 @@
 </div>
 
 <script src="assets/auth.js"></script>
+<script src="assets/perm-manifest.js"></script>
 <script src="assets/app.js"></script>
 <script src="assets/crypto.js"></script>
 <script>
@@ -1341,21 +1346,17 @@ function renderOrgTable(){
   };
   walk('',0,0);
   const list=kw?rows.filter(r=>r.o.name.toLowerCase().includes(kw)||String(r.o.key).toLowerCase().includes(kw)):rows;
-  const ops=o=>{
-    const protectedOrg=/^org-mw/.test(String(o.key));
-    return protectedOrg?'<span class="org-protected">政务云操作已保护</span>':
-      '<button class="op-btn" data-perm="user:write" onclick="orgCreate(\''+esc(o.key)+'\')">＋子组织</button>'+
-      '<button class="op-btn" data-perm="user:write" onclick="orgEdit(\''+esc(o.key)+'\')">编辑</button>'+
-      '<button class="op-btn danger" data-perm="user:write" onclick="orgDelete(\''+esc(o.key)+'\')">删除</button>';
-  };
+  const ops=o=>
+    '<button class="op-btn" data-perm="user:write" onclick="orgCreate(\''+esc(o.key)+'\')">＋子部门</button>'+
+    '<button class="op-btn" data-perm="user:write" onclick="orgEdit(\''+esc(o.key)+'\')">编辑</button>'+
+    '<button class="op-btn danger" data-perm="user:write" onclick="orgDelete(\''+esc(o.key)+'\')">删除</button>';
   const host=document.getElementById('oTable');
   if(!host)return;
   host.innerHTML=list.length?list.map((r,i)=>{
-    const o=r.o, protectedOrg=/^org-mw/.test(String(o.key));
+    const o=r.o;
     return '<tr><td><span class="org-node" style="padding-left:'+(r.d*22)+'px">'+
       '<span class="org-caret'+(r.kids?'':' leaf')+'" data-toggle="'+esc(o.key)+'">'+(r.kids?(orgFolded[o.key]?'▸':'▾'):'▸')+'</span>'+
-      '<span class="org-ic">🏢</span><span>'+esc(o.name)+'</span>'+
-      '<span class="org-badge">'+(protectedOrg?'政务云只读':'平台可维护')+'</span></span></td>'+
+      '<span class="org-ic">⌘</span><span>'+esc(o.name)+'</span></span></td>'+
       '<td>'+esc(o.key)+'</td><td>'+r.idx+'</td><td><span class="tag ok">正常</span></td>'+
       '<td>'+ops(o)+'</td></tr>';
   }).join(''):'<tr><td colspan="5" class="empty-inline">没有匹配的组织</td></tr>';
@@ -2287,9 +2288,12 @@ document.querySelectorAll('#uStats .drillable').forEach(c=>{
 });
 
 (function(){
-  const m={users:'users',org:'org',roles:'roles',perms:'perms',docs:'docs',usage:'usage',loginlogs:'loginlogs',audit:'audit'};
+  const FILE_PANEL={users:'users','users.html':'users',org:'org','org.html':'org',
+    roles:'roles','roles.html':'roles',perms:'perms','perms.html':'perms',docs:'docs','docs.html':'docs',
+    usage:'usage','usage.html':'usage',loginlogs:'loginlogs','loginlogs.html':'loginlogs',
+    audit:'audit','audit.html':'audit'};
   const f=location.pathname.split('/').pop()||'';
-  const p=m[f]||new URLSearchParams(location.search).get('panel')||'users';
+  const p=FILE_PANEL[f]||new URLSearchParams(location.search).get('panel')||'users';
   document.documentElement.setAttribute('data-early-panel',p);
   initShell(p,{adminSidebar:true});
 })();

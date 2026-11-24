@@ -1303,20 +1303,19 @@
     });
     return out;
   }
-  /** 自动发现：仅管理员上报；未知权限码入库，已存在只刷新最近出现时间 */
+  /** 声明式清单对账：权限树以 perm-manifest.js 为准，自定义节点服务端不碰 */
   async function discoverPermissions(force) {
     if ((!force && permissionDiscoveryDone) || !hasPermission('admin:access')) return;
+    if (!global.PermManifest) return;
     permissionDiscoveryDone = true;
     try {
-      const items = collectPermDeclarations();
-      if (!items.length) return;
-      const r = await fetch('/api/admin/perms/discover', {
+      const r = await fetch('/api/admin/perms/sync', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(items)
+        body: JSON.stringify(global.PermManifest.flatten())
       });
       if (r.ok) {
         const j = await r.json();
-        if ((j.added || []).length) console.info('权限树自动发现新节点：', j.added.join(', '));
+        if ((j.added || []).length || (j.retired || []).length) console.info('权限清单已同步：', j);
       }
     } catch (e) { /* 自动发现失败不影响页面功能 */ }
   }

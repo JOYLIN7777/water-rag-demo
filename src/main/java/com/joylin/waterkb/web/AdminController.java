@@ -366,6 +366,12 @@ public class AdminController {
         return permCatalog.discover(body);
     }
 
+    /** 声明式清单对账：新增/改名/改路由/改层级，清单里消失的内置节点标记下线 */
+    @PostMapping("/perms/sync")
+    public Map<String, Object> syncPerms(@RequestBody List<Map<String, Object>> body) {
+        return permCatalog.sync(body);
+    }
+
     /** 编辑节点显示信息；内置节点不可改标识、不可删除 */
     @PutMapping("/perms/{code}")
     public Map<String, Object> updatePerm(@PathVariable String code, @RequestBody Map<String, Object> body) {

@@ -1,11 +1,15 @@
 package com.joylin.waterkb.security;
 
 import jakarta.annotation.PostConstruct;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -25,6 +29,8 @@ import java.util.Map;
  */
 @Service
 public class PermissionCatalog {
+
+    private static final Logger log = LoggerFactory.getLogger(PermissionCatalog.class);
 
     /**
      * 内置节点按真实导航排列，权限树即页面地图：
@@ -83,6 +89,7 @@ public class PermissionCatalog {
         jdbc.execute("ALTER TABLE perm_node ADD COLUMN IF NOT EXISTS route_path VARCHAR(128) DEFAULT ''");
         jdbc.execute("ALTER TABLE perm_node ADD COLUMN IF NOT EXISTS order_num INT DEFAULT 0");
         jdbc.execute("ALTER TABLE perm_node ADD COLUMN IF NOT EXISTS last_seen_at TIMESTAMP");
+        jdbc.execute("ALTER TABLE perm_node ADD COLUMN IF NOT EXISTS retired BOOLEAN DEFAULT FALSE");
         // 内置节点首次初始化写入，之后以库为准（用户改过的显示信息不会被启动覆盖）
         for (String[] n : BUILT_IN) {
             jdbc.update("INSERT INTO perm_node(code,name,node_type,module,description,builtin,parent_code,route_path,order_num) "
@@ -105,7 +112,7 @@ public class PermissionCatalog {
     public List<Map<String, Object>> list() {
         List<Map<String, Object>> out = new ArrayList<>();
         jdbc.query("SELECT code,name,node_type,module,description,builtin,parent_code,route_path,order_num "
-                + "FROM perm_node ORDER BY builtin DESC, order_num, code", rs -> {
+                + "FROM perm_node WHERE COALESCE(retired,FALSE)=FALSE ORDER BY builtin DESC, order_num, code", rs -> {
             Map<String, Object> m = new LinkedHashMap<>();
             m.put("code", rs.getString("code"));
             m.put("name", rs.getString("name"));
@@ -173,6 +180,63 @@ public class PermissionCatalog {
             }
         }
         return Map.of("added", added, "updated", updated);
+    }
+
+    /**
+     * 声明式清单对账：以前端 perm-manifest.js 为准同步内置节点。
+     * - 清单里的节点：新增或按清单修正 name/层级/路由/排序/类型；
+     * - 清单里消失的内置节点：标记"已下线"并从权限树隐藏（不硬删，角色授权不瞬间丢失）；
+     * - 用户手工创建的自定义节点：完全不碰。
+     */
+    public Map<String, Object> sync(List<Map<String, Object>> items) {
+        List<String> added = new ArrayList<>(), updated = new ArrayList<>(), retired = new ArrayList<>();
+        List<Map<String, Object>> safe = items == null ? List.of() : items;
+        Set<String> codes = new HashSet<>();
+        for (Map<String, Object> item : safe) {
+            String code = s(item.get("code"));
+            if (!code.matches("^[a-z][a-z0-9_.-]*:[a-z][a-z0-9_.-]*$")) continue;
+            String name = s(item.get("name"));
+            if (name.isEmpty()) name = code;
+            String type = normalizeType(s(item.get("type")));
+            String parent = s(item.get("parentCode"));
+            if (!parent.isEmpty() && !exists(parent)) parent = "";
+            String route = s(item.get("routePath"));
+            String module = s(item.get("module"));
+            int order = 0;
+            try { order = Integer.parseInt(String.valueOf(item.getOrDefault("orderNum", 0))); } catch (Exception ignored) { }
+            codes.add(code);
+            try {
+                if (exists(code)) {
+                    // 只同步内置节点；同名自定义节点保留管理员的手工配置
+                    jdbc.update("UPDATE perm_node SET name=?,node_type=?,parent_code=?,route_path=?,order_num=?,"
+                                    + "module=CASE WHEN ?='' THEN module ELSE ? END,retired=FALSE,last_seen_at=CURRENT_TIMESTAMP "
+                                    + "WHERE code=? AND builtin=TRUE",
+                            name, type, parent, route, order, module, module, code);
+                    updated.add(code);
+                } else {
+                    jdbc.update("INSERT INTO perm_node(code,name,node_type,module,description,builtin,"
+                                    + "parent_code,route_path,order_num,last_seen_at) "
+                                    + "VALUES(?,?,?,?,'页面清单定义',TRUE,?,?,?,CURRENT_TIMESTAMP)",
+                            code, name, type, module.isEmpty() ? "自定义" : module, parent, route, order);
+                    added.add(code);
+                }
+            } catch (org.springframework.dao.DuplicateKeyException e) {
+                updated.add(code);
+            }
+        }
+        // 清单中消失的内置节点：标记下线，不删除
+        try {
+            List<String> builtins = jdbc.queryForList(
+                    "SELECT code FROM perm_node WHERE builtin=TRUE AND retired=FALSE", String.class);
+            for (String code : builtins) {
+                if (codes.contains(code)) continue;
+                jdbc.update("UPDATE perm_node SET retired=TRUE WHERE code=?", code);
+                retired.add(code);
+            }
+        } catch (Exception e) {
+            log.warn("权限清单下线扫描失败：{}", e.getMessage());
+        }
+        return Map.of("added", added, "updated", updated, "retired", retired);
     }
 
     private static String s(Object v) { return v == null ? "" : String.valueOf(v).trim(); }
