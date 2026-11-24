@@ -334,6 +334,18 @@
 </style>
 </head>
 <script>
+// 从别的页面带遮罩跳转过来时，body 还没解析就先盖住白屏；页面渲染完在底部脚本撤掉
+(function(){
+  try{
+    if(sessionStorage.getItem('consoleNavPending')){
+      var m=document.createElement('div');m.id='consoleNavMask';m.className='console-nav-mask';
+      m.innerHTML='<div class="console-nav-spinner"></div><span>正在打开页面…</span>';
+      (document.body||document.documentElement).appendChild(m);
+      // 兜底：任何异常都不能让用户永远卡在遮罩上
+      setTimeout(function(){var x=document.getElementById('consoleNavMask');if(x)x.remove()},3000);
+    }
+  }catch(e){}
+})();
 // 独立路由首屏防闪：在任何内容绘制前先按路径锁定目标面板，等权限接口回来再交给 goPanel()
 (function(){
   const FILE_PANEL={users:'users','users.html':'users',org:'org','org.html':'org',
@@ -2377,7 +2389,13 @@ document.querySelectorAll('#uStats .drillable').forEach(c=>{
   document.documentElement.setAttribute('data-early-panel',p);
   initShell(p,{adminSidebar:true});
 })();
-guard();
+guard().finally(function(){
+  try{sessionStorage.removeItem('consoleNavPending')}catch(e){}
+  // 内容还在渲染，稍等再撤，避免最后一下跳动露出来；不用 rAF，后台标签页会被节流
+  setTimeout(function(){
+    var mask=document.getElementById('consoleNavMask');if(mask)mask.remove();
+  },120);
+});
 </script>
 </body>
 </html>

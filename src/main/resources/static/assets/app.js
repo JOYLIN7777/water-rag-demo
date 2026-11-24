@@ -232,6 +232,8 @@
   /** 整页跳转统一遮罩：盖住旧页面再跳，避免旧页面留屏被看成"闪一下" */
   function navWithMask(href) {
     if (!href || document.getElementById('consoleNavMask')) return;
+    // 标记带到新文档：旧页面的遮罩会随文档销毁，新页面必须在 head 第一帧自己盖住白屏
+    try { sessionStorage.setItem('consoleNavPending', href); } catch (e) { }
     const mask = document.createElement('div');
     mask.id = 'consoleNavMask';
     mask.className = 'console-nav-mask';
@@ -1114,7 +1116,7 @@
     const slot = document.getElementById('adminEntrySlot');
     if (slot) {
       slot.innerHTML = (target && !inAdmin)
-        ? '<a class="admin-entry-btn" href="' + target + '" title="进入管理后台" onclick="Shell.navWithMask(this)">⚙ 管理后台</a>' : '';
+        ? '<a class="admin-entry-btn" href="' + target + '" title="进入管理后台" onclick="Shell.navWithMask(\'' + target + '\')">⚙ 管理后台</a>' : '';
     }
   }
 
