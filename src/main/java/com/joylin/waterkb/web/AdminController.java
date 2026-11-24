@@ -44,13 +44,15 @@ public class AdminController {
     private final com.joylin.waterkb.security.OrgStore orgs;
     private final com.joylin.waterkb.search.EsIndexService es;
     private final com.joylin.waterkb.memory.ChatSessionStore chatSessions;
+    private final com.joylin.waterkb.security.LoginCryptoService crypto;
 
     public AdminController(UserStore users, RolePermissions rolePermissions,
                            PermissionCatalog permCatalog, AuditService audit,
                            PasswordResetService passwordReset,
                            com.joylin.waterkb.security.OrgStore orgs,
                            com.joylin.waterkb.search.EsIndexService es,
-                           com.joylin.waterkb.memory.ChatSessionStore chatSessions) {
+                           com.joylin.waterkb.memory.ChatSessionStore chatSessions,
+                           com.joylin.waterkb.security.LoginCryptoService crypto) {
         this.users = users;
         this.rolePermissions = rolePermissions;
         this.permCatalog = permCatalog;
@@ -59,6 +61,7 @@ public class AdminController {
         this.orgs = orgs;
         this.es = es;
         this.chatSessions = chatSessions;
+        this.crypto = crypto;
     }
 
     // ---------- 组织（界面上叫"组织"，底层仍是账号的 tenant 字段） ----------
@@ -184,10 +187,17 @@ public class AdminController {
     }
 
     /** 新增账号 */
+    /** 管理端设置密码：页面传 encrypted=true 时先解密，兼容内部脚本的明文调用 */
+    private String passwordOf(Map<String, Object> body) {
+        if (body == null) return null;
+        return Boolean.parseBoolean(String.valueOf(body.get("encrypted")))
+                ? crypto.decrypt(str(body.get("password"))) : str(body.get("password"));
+    }
+
     @PostMapping("/users")
     public Map<String, Object> createUser(@RequestBody Map<String, Object> body) {
         String username = str(body.get("username"));
-        if (!users.create(username, str(body.get("password")), strList(body.get("groups")),
+        if (!users.create(username, passwordOf(body), strList(body.get("groups")),
                 str(body.get("tenant")), str(body.get("displayName")))) {
             throw new IllegalArgumentException("账号已存在，或初始密码不足 8 位");
         }
@@ -241,7 +251,7 @@ public class AdminController {
         if (target != null && target.groups().contains("admin")) {
             throw new IllegalArgumentException("系统管理员账号的密码不可在用户管理中重置");
         }
-        if (!users.resetPassword(name, str(body.get("password")))) {
+        if (!users.resetPassword(name, passwordOf(body))) {
             throw new IllegalArgumentException("账号不存在，或新密码不足 8 位");
         }
         return Map.of("message", "密码已重置", "username", name);

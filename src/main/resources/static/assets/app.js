@@ -44,15 +44,14 @@
     { key: 'docs', label: '文档管理', icon: '▤', href: 'admin.html?panel=docs', perm: 'admin:docs' },
     { key: 'models', label: '模型设置', icon: '◇', href: 'admin.html?panel=models', perm: 'model:read' },
     { key: 'usage', label: '用量统计', icon: '◷', href: 'admin.html?panel=usage', perm: 'usage:read' },
-    { key: 'governance', label: '权限与日志', icon: '◈', href: 'governance.html', perm: 'audit:read' },
-    // 日志类入口落在治理页自身：审计员只有 audit:read，进 admin.html 会被 admin:access 守卫拦住
+    // 日志页入口只有登录日志/操作日志（同一页面按锚点切换筛选）
     { key: 'loginlogs', label: '登录日志', icon: '⎗', href: 'governance.html#loginlogs', perm: 'loginlog:read' },
     { key: 'audit', label: '操作日志', icon: '≡', href: 'governance.html#audit', perm: 'audit:read' }
   ];
   const ADMIN_GROUPS = [
     { label: '权限配置目录', keys: ['users', 'org', 'roles', 'perms'] },
     { label: '业务管理', keys: ['docs', 'models', 'usage'] },
-    { label: '日志审计', keys: ['governance', 'loginlogs', 'audit'] }
+    { label: '日志审计', keys: ['loginlogs', 'audit'] }
   ];
 
   // 内部标识转中文显示名，避免把 admin / water-dept / default 直接暴露给用户
@@ -887,10 +886,15 @@
 
   /** 退出登录：一步点了就走太容易误触（这个按钮紧挨着设置），必须二次确认 */
   function confirmLogout() {
+    // 只说用户会关心的事；没有问答权限的人不该看到草稿、历史对话这些无关说明
+    const chatUser = hasPermission('chat:use');
+    const detail = chatUser
+      ? '还没发出的提问会留在这台设备上，下次用同一账号登录还能接着写；之前的对话记录不受影响。'
+      : '下次用同一账号登录，会回到你上次使用的页面。';
     openModal({
-      title: '退出登录', danger: true, okText: '确认退出', cancelText: '取消',
-      body: '<p style="margin:0 0 8px">退出后需要重新输入账号密码才能继续使用。</p>' +
-        '<p style="margin:0;color:var(--muted);font-size:12px">未发送的草稿保存在当前浏览器，下次用同一账号登录仍可找回；会话记录已存到服务端，不会丢。</p>',
+      title: '确认退出登录？', okText: '退出登录', cancelText: '继续留在当前页面',
+      body: '<p style="margin:0 0 8px">退出后需要重新登录才能继续使用，确定现在退出吗？</p>' +
+        '<p style="margin:0;color:var(--muted);font-size:12px">' + detail + '</p>',
       onOk: function () { if (global.WrkAuth) global.WrkAuth.logout(); }
     });
   }

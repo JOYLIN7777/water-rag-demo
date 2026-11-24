@@ -3,6 +3,7 @@ package com.joylin.waterkb.web;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.joylin.waterkb.audit.AuditService;
 import com.joylin.waterkb.security.JwtService;
+import com.joylin.waterkb.security.LoginCryptoService;
 import com.joylin.waterkb.security.PasswordResetService;
 import com.joylin.waterkb.security.PermissionService;
 import com.joylin.waterkb.security.RefreshTokenStore;
@@ -39,12 +40,14 @@ public class AuthController {
     private final AuditService audit;
     private final PermissionService permissions;
     private final PasswordResetService passwordReset;
+    private final LoginCryptoService crypto;
     private final long accessTtl;
     private final long refreshTtl;
     private final boolean issueEndpoint;
 
     public AuthController(JwtService jwt, UserStore users, RefreshTokenStore store, AuditService audit,
                           PermissionService permissions, PasswordResetService passwordReset,
+                          LoginCryptoService crypto,
                           @Value("${security.auth.access-ttl-seconds:1800}") long accessTtl,
                           @Value("${security.auth.refresh-ttl-seconds:604800}") long refreshTtl,
                           @Value("${security.auth.issue-endpoint:false}") boolean issueEndpoint) {
@@ -54,9 +57,23 @@ public class AuthController {
         this.audit = audit;
         this.permissions = permissions;
         this.passwordReset = passwordReset;
+        this.crypto = crypto;
         this.accessTtl = accessTtl;
         this.refreshTtl = refreshTtl;
         this.issueEndpoint = issueEndpoint;
+    }
+
+    /** 前端取公钥加密密码（RSA-OAEP/SHA-256），无需登录 */
+    @GetMapping("/public-key")
+    public Map<String, String> publicKey() {
+        return Map.of("publicKey", crypto.publicKey(), "algorithm", "RSA-OAEP-SHA256");
+    }
+
+    /** 页面传 encrypted=true 时，密码字段是前端用公钥加密后的 Base64 密文 */
+    private String passwordOf(Map<String, String> body, String field) {
+        if (body == null) return null;
+        String value = body.get(field);
+        return Boolean.parseBoolean(String.valueOf(body.get("encrypted"))) ? crypto.decrypt(value) : value;
     }
 
     /** 登录：校验用户名密码，签发 access + refresh。密码错误与用户不存在返回同样错误，防用户枚举。 */
@@ -64,7 +81,7 @@ public class AuthController {
     public ResponseEntity<?> login(@RequestBody Map<String, String> body,
                                    jakarta.servlet.http.HttpServletRequest req) {
         String username = body == null ? null : body.get("username");
-        String password = body == null ? null : body.get("password");
+        String password = passwordOf(body, "password");
         UserAccount u = users.authenticate(username, password);
         if (u == null) {
             audit.record(AuditService.of("default", username == null ? "anonymous" : username, "",
@@ -165,8 +182,8 @@ public class AuthController {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                     .body(Map.of("code", 401, "message", "请先登录"));
         }
-        String oldPwd = body == null ? null : body.get("oldPassword");
-        String newPwd = body == null ? null : body.get("newPassword");
+        String oldPwd = passwordOf(body, "oldPassword");
+        String newPwd = passwordOf(body, "newPassword");
         boolean ok = users.changePassword(u.userId(), oldPwd, newPwd);
         audit.record(AuditService.of(u.tenantId(), u.userId(), String.join(",", u.groups()),
                 "POST /api/auth/change-password", "/api/auth/change-password",
@@ -206,7 +223,7 @@ public class AuthController {
                                                   jakarta.servlet.http.HttpServletRequest req) {
         String username = body == null ? null : body.get("username");
         String code = body == null ? null : body.get("code");
-        String newPassword = body == null ? null : body.get("newPassword");
+        String newPassword = passwordOf(body, "newPassword");
         String err = passwordReset.confirm(username, code, newPassword);
         String who = username == null || username.isBlank() ? "anonymous" : username.trim().toLowerCase();
         audit.record(AuditService.of("default", who, "", "POST /api/auth/password-reset/confirm",

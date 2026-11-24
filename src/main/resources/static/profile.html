@@ -63,6 +63,7 @@
 
 <script src="assets/auth.js"></script>
 <script src="assets/app.js"></script>
+<script src="assets/crypto.js"></script>
 <script>
 function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 const tag=(t,c)=>'<span class="tag '+c+'">'+esc(t)+'</span>';
@@ -132,7 +133,8 @@ function openPwdModal(){
       try{
         const r=await fetch('/api/auth/change-password',{
           method:'POST',headers:{'Content-Type':'application/json'},
-          body:JSON.stringify({oldPassword:oldPwd,newPassword:newPwd})
+          body:JSON.stringify({oldPassword:await PwdCrypto.encrypt(oldPwd),
+            newPassword:await PwdCrypto.encrypt(newPwd),encrypted:true})
         });
         const j=await r.json();
         if(!r.ok){msg.className='err';msg.textContent=j.message||('修改失败（HTTP '+r.status+'）');return false}

@@ -581,6 +581,7 @@
 
 <script src="assets/auth.js"></script>
 <script src="assets/app.js"></script>
+<script src="assets/crypto.js"></script>
 <script>
 const $=id=>document.getElementById(id);
 function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
@@ -1204,6 +1205,7 @@ function createUser(orgKey){
     if(!f.username){Shell.modalError('请填写登录账号');return false}
     if(!/^[a-zA-Z0-9_-]{2,32}$/.test(f.username)){Shell.modalError('登录账号只能用 2-32 位英文字母、数字、下划线或短横线');return false}
     if(!f.password||f.password.length<8){Shell.modalError('初始密码至少 8 位');return false}
+    f.password=await PwdCrypto.encrypt(f.password);f.encrypted=true;
     try{
       await apiWrite('/api/admin/users',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(f)});
       close();appToast('账号已创建','ok');
@@ -1237,7 +1239,8 @@ function resetPwdBy(u){
       if(pwd.length<8){Shell.modalError('新密码至少 8 位');return false}
       try{
         await apiWrite('/api/admin/users/'+encodeURIComponent(u.username)+'/reset-password',
-          {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({password:pwd})});
+          {method:'POST',headers:{'Content-Type':'application/json'},
+           body:JSON.stringify({password:await PwdCrypto.encrypt(pwd),encrypted:true})});
         close();appToast('密码已重置','ok');
       }catch(e){Shell.modalError(e.message);return false}
     }});

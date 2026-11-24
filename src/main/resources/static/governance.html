@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>企业治理中心 · 水利知识库</title>
+<title>日志审计 · 水利知识库</title>
 <link rel="icon" type="image/svg+xml" href="assets/logo.svg">
 <link rel="stylesheet" href="assets/app.css">
 <style>
@@ -45,41 +45,18 @@
 <div class="layout" id="sidebarHost">
 <main class="main">
   <header class="topbar">
-    <div class="topbar-left"><div class="topbar-title">权限与日志</div><span class="topbar-sub">账号权限与操作记录</span></div>
+    <div class="topbar-left"><div class="topbar-title">日志审计</div><span class="topbar-sub">登录日志与操作记录</span></div>
     <span id="adminEntrySlot" class="admin-slot"></span>
   </header>
 
   <div class="page">
     <div class="page-head">
-      <h1 class="page-title">权限与日志</h1>
-      <p class="page-desc">查看当前账号可以访问的功能与数据范围，以及最近的操作记录。</p>
+      <h1 class="page-title">日志审计</h1>
+      <p class="page-desc">查看登录与操作记录，支持按类型筛选和导出。</p>
     </div>
 
-    <div class="notice">这里显示的是你当前能使用的功能和可查看的数据范围。</div>
-
-    <div class="card">
-      <div class="card-head"><h3>① 当前登录身份</h3><a class="btn btn-sm" href="profile.html">个人中心</a></div>
-      <div class="sub">你的账号信息</div>
-      <div class="identity-grid" id="identity">加载中…</div>
-    </div>
-
-    <div class="card">
-      <div class="card-head"><h3>② 我能使用的功能</h3>
-        <button class="btn btn-sm" data-perm="audit:read" onclick="loadPermissions()">刷新</button></div>
-      <div class="sub">标着「可用」的就是你当前能用的功能。</div>
-
-      <div class="layer">可用功能</div>
-      <div class="perm-grid" id="menuPerms">加载中…</div>
-
-      <div class="layer">可查看的数据</div>
-      <div id="dataPerms">加载中…</div>
-
-      <div class="layer">可用工具</div>
-      <div id="toolPerms">加载中…</div>
-    </div>
-
-    <div class="card" data-perm="audit:read">
-      <div class="card-head"><h3>③ 操作记录</h3>
+                <div class="card" data-perm="audit:read">
+      <div class="card-head"><h3>日志记录</h3>
         <span class="log-actions">
           <button class="btn btn-sm" data-perm="loginlog:read" data-filter="login" onclick="setLogFilter('login')">登录日志</button>
           <button class="btn btn-sm" data-perm="audit:read" data-filter="operation" onclick="setLogFilter('operation')">操作日志</button>
@@ -148,13 +125,24 @@ let logFilter = location.hash === '#loginlogs' ? 'login'
   : (location.hash === '#audit' ? 'operation' : 'all');
 const AUDIT_PAGE={page:1,size:15};
 function isLoginLog(l){return /\/api\/auth\/(login|logout|refresh)/.test(l.action||'')}
-function setLogFilter(t){
-  logFilter=t;
-  history.replaceState(null,'',location.pathname+(t==='login'?'#loginlogs':t==='operation'?'#audit':''));
+function syncFilterUi(){
+  const activeHash=logFilter==='login'?'#loginlogs':(logFilter==='operation'?'#audit':'');
+  document.querySelectorAll('.admin-nav-item').forEach(a=>
+    a.classList.toggle('active',(a.getAttribute('href')||'').endsWith(activeHash)));
   document.querySelectorAll('.log-actions button[data-filter]').forEach(b=>
-    b.classList.toggle('on',b.getAttribute('data-filter')===t));
-  renderAuditPage(1);
+    b.classList.toggle('on',b.getAttribute('data-filter')===logFilter));
 }
+function setLogFilter(t){
+  logFilter=t;AUDIT_PAGE.page=1;
+  history.replaceState(null,'',location.pathname+(t==='login'?'#loginlogs':t==='operation'?'#audit':''));
+  syncFilterUi();renderAuditPage(1);
+}
+// 侧栏两个入口只切锚点，靠这里真正切换日志类型——之前点了没反应
+window.addEventListener('hashchange',function(){
+  const t=location.hash==='#loginlogs'?'login':(location.hash==='#audit'?'operation':'all');
+  if(t!==logFilter){logFilter=t;AUDIT_PAGE.page=1;renderAuditPage(AUDIT_PAGE.page)}
+  syncFilterUi();
+});
 async function exportLogs(type){
   try{
     const r=await fetch('/api/audit/logs/export?type='+type);
@@ -219,8 +207,7 @@ async function loadAudit(){
       '<span>异常 <b style="color:var(--danger)">'+s.errors+'</b></span><span>范围 <b>'+esc(scopeLabel)+'</b></span>';
     const j2=await (await fetch('/api/audit/logs?limit=500')).json();
     auditRows=j2.logs||[];
-    document.querySelectorAll('.log-actions button[data-filter]').forEach(b=>
-      b.classList.toggle('on',b.getAttribute('data-filter')===logFilter));
+    syncFilterUi();
     renderAuditPage(1);
   }catch(e){document.getElementById('auditBody').innerHTML='<tr><td colspan="8" class="empty">记录加载失败</td></tr>'}
 }
@@ -236,18 +223,14 @@ function exportAuditCsv(){
   setTimeout(()=>URL.revokeObjectURL(url),2000);
 }
 
-initShell('governance',{adminSidebar:true});
-loadIdentity();
-loadPermissions();
+initShell(location.hash === '#loginlogs' ? 'loginlogs' : 'audit',{adminSidebar:true});
 loadAudit();
-if(location.hash==='#audit')setTimeout(()=>{
-  const cards=document.querySelectorAll('.page > .card');
-  if(cards.length>2)cards[2].scrollIntoView({behavior:'smooth',block:'start'});
-},400);
-// 页面级权限守卫：菜单权限页没勾「权限与日志」的账号，直接敲 URL 也进不来
+// 页面级权限守卫：没有两类日志任一权限的账号，直接敲 URL 也进不来
 (async function guardPerm(){
   if(window.Shell&&Shell.permsReady)await Shell.permsReady();
-  if(!(window.Shell&&Shell.hasPermission&&Shell.hasPermission('audit:read'))){
+  const allowed=window.Shell&&Shell.hasPermission&&
+    (Shell.hasPermission('audit:read')||Shell.hasPermission('loginlog:read'));
+  if(!allowed){
     const main=document.querySelector('main')||document.body;
     Array.from(main.children).forEach(el=>{if(!el.classList.contains('topbar'))el.style.display='none'});
     // 顶栏面包屑由公共组件注入在 topbar 内部，不属于 main 直属子元素——这里单独摘掉，

@@ -122,6 +122,7 @@
   </div>
 </div>
 
+<script src="assets/crypto.js"></script>
 <script>
 var KEY_REMEMBER='wrk_remember_user', KEY_ACCESS='wrk_access_token',
     KEY_REFRESH='wrk_refresh_token', KEY_USER='wrk_user_info';
@@ -180,7 +181,7 @@ document.getElementById('loginForm').addEventListener('submit',async function(e)
   try{
     var r=await fetch('/api/auth/login',{
       method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({username:u,password:p})
+      body:JSON.stringify({username:u,password:await PwdCrypto.encrypt(p),encrypted:true})
     });
     var j=await r.json();
     if(!r.ok){showErr(j.message||('登录失败（HTTP '+r.status+'）'));return}
