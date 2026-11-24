@@ -81,6 +81,20 @@ public class AuditService {
                 resource, detail, ip, status, durationMs, result);
     }
 
+    /** 登录日志：直接在 SQL 层按登录/刷新动作过滤，避免高频业务日志把登录记录挤出最近 N 条 */
+    public List<Map<String, Object>> loginLogs(String tenant, int limit) {
+        try {
+            return jdbc.queryForList("""
+                SELECT ts,tenant_id,user_id,groups,action,resource,detail,ip,status,duration_ms,result
+                FROM audit_log WHERE tenant_id=? AND (action LIKE '%/api/auth/login%' OR action LIKE '%/api/auth/refresh%')
+                ORDER BY ts DESC LIMIT ?
+                """, tenant, Math.min(Math.max(limit, 1), 500));
+        } catch (Exception e) {
+            log.warn("登录日志查询失败：{}", e.getMessage());
+            return new ArrayList<>();
+        }
+    }
+
     /** 查询审计日志：按当前租户强制过滤，只返回最近 limit 条 */
     public List<Map<String, Object>> recent(String tenant, int limit) {
         try {

@@ -388,21 +388,7 @@ public class AdminController {
     @GetMapping("/login-logs")
     public List<Map<String, Object>> loginLogs(@RequestParam(required = false, defaultValue = "100") int limit) {
         String tenant = UserContext.get().tenantId();
-        List<Map<String, Object>> all = audit.recent(tenant, Math.min(Math.max(limit, 1), 500));
-        List<Map<String, Object>> out = new ArrayList<>();
-        for (Map<String, Object> row : all) {
-            String action = String.valueOf(row.getOrDefault("action", ""));
-            // 只认真正的登录/刷新端点；不能用 contains("login")，否则查询本接口自身也会被算进去
-            if (action.endsWith("/api/auth/login") || action.endsWith("/api/auth/refresh")) {
-                // 审计表只记 HTTP 状态，没有 result 字段；补一个供界面显示"结果"列
-                int code = 0;
-                try { code = Integer.parseInt(String.valueOf(row.getOrDefault("status", "0"))); }
-                catch (Exception ignored) { }
-                Map<String, Object> enriched = new LinkedHashMap<>(row);
-                enriched.put("result", code >= 200 && code < 400 ? "SUCCESS" : "FAIL");
-                out.add(enriched);
-            }
-        }
+        List<Map<String, Object>> out = new ArrayList<>(audit.loginLogs(tenant, Math.min(Math.max(limit, 1), 500)));
         return out;
     }
 }
