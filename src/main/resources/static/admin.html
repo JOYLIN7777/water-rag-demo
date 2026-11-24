@@ -7,6 +7,7 @@
 <link rel="icon" type="image/svg+xml" href="assets/logo.svg">
 <link rel="stylesheet" href="assets/app.css">
 <style>
+  #sidebarHost{display:contents}
   .admin-sidebar{width:232px;flex:0 0 232px;background:linear-gradient(180deg,#0d1730 0%,#16223c 100%);color:#c8d3e8;display:flex;flex-direction:column;padding:20px 12px 12px;position:sticky;top:0;height:100vh;overflow-y:auto}
   .admin-sidebar .brand{padding-bottom:16px}
   .admin-panel[data-panel="org"] .tree-pane{display:none}
@@ -328,38 +329,13 @@
   if(f==='admin.html'&&new URLSearchParams(location.search).get('panel')==='models'){
     location.replace('models.html');return;
   }
+  window.__consolePanel=p;
   document.documentElement.setAttribute('data-early-panel',p);
 })();
 </script>
 <body>
 <div class="layout" id="adminRoot" style="display:none">
-  <aside class="admin-sidebar">
-    <div class="brand"><div class="brand-mark has-logo"><img class="brand-logo" src="assets/logo.svg" alt=""></div>
-      <div><div class="brand-title">管理后台</div><div class="brand-sub">水利知识库</div></div></div>
-    <!-- 概览页已去掉：后台进来直接是用户管理，管理动作都在下面这几组里 -->
-    <div class="admin-nav-group">
-      <div class="section-label" style="margin-top:6px">权限配置目录</div>
-      <a class="admin-nav-item active" data-panel="users" href="users.html" data-perm="user:read"><span class="ic">◈</span>用户管理</a>
-      <a class="admin-nav-item" data-panel="org" href="org.html" data-perm="org:read"><span class="ic">⌘</span>组织架构</a>
-      <a class="admin-nav-item" data-panel="roles" href="roles.html" data-perm="role:read"><span class="ic">❖</span>角色定义</a>
-      <a class="admin-nav-item" data-panel="perms" href="perms.html" data-perm="perm:read"><span class="ic">☷</span>菜单权限</a>
-    </div>
-    <div class="admin-nav-group">
-      <div class="section-label" style="margin:14px 0 6px">业务管理</div>
-      <a class="admin-nav-item" data-panel="docs" href="docs.html" data-perm="admin:docs"><span class="ic">▤</span>文档管理</a>
-      <a class="admin-nav-item" data-panel="models" href="models.html" data-perm="model:read"><span class="ic">◇</span>模型设置</a>
-      <a class="admin-nav-item" data-panel="usage" href="usage.html" data-perm="usage:read"><span class="ic">◷</span>用量统计</a>
-    </div>
-    <div class="admin-nav-group">
-      <div class="section-label" style="margin:14px 0 6px">日志审计</div>
-      <a class="admin-nav-item" data-panel="loginlogs" href="loginlogs.html" data-perm="loginlog:read"><span class="ic">⎗</span>登录日志</a>
-      <a class="admin-nav-item" data-panel="audit" href="audit.html" data-perm="audit:read"><span class="ic">≡</span>操作日志</a>
-    </div>
-    <div class="admin-back">
-      <a class="admin-nav-item" href="index.html"><span class="ic">⌂</span>返回问答</a>
-      <div class="user-block" id="adminUserBlock"></div>
-    </div>
-  </aside>
+  <div id="sidebarHost"></div>
   <main class="main">
     <header class="topbar">
       <div class="topbar-left"><div class="brand-crumb"><span>管理后台</span><span class="sep">/</span><span id="panelTitle">概览</span></div>
@@ -2310,7 +2286,7 @@ document.querySelectorAll('#uStats .drillable').forEach(c=>{
   c.onkeydown=e=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); go(); } };
 });
 
-initShell('admin');
+initShell(window.__consolePanel||'users',{adminSidebar:true});
 guard();
 </script>
 </body>
