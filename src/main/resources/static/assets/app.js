@@ -1079,15 +1079,21 @@
   // 管理后台入口：管理员是高频用户，顶栏保留醒目的文字按钮（问页/文档页等都能一键进入）；
   // 左下角用户卡同时保留快捷入口。权限不足时两处都不显示。
   function renderAdminEntry() {
-    const allowed = hasPermission('admin:access') ||
-      (function () { const u = global.WrkAuth && global.WrkAuth.getUser(); return !!(u && (u.groups || []).indexOf('admin') >= 0); })();
-    const file = location.pathname.split('/').pop();
-    const inAdmin = file === 'admin.html';
+    // 同时拥有问答权限和任一后台权限才给入口；只进后台页不做问答的账号不需要这个按钮
+    const pages = [
+      ['admin:access', 'users.html'], ['user:read', 'users.html'], ['org:read', 'org.html'],
+      ['role:read', 'roles.html'], ['perm:read', 'perms.html'], ['admin:docs', 'docs.html'],
+      ['model:read', 'models.html'], ['usage:read', 'usage.html'],
+      ['loginlog:read', 'loginlogs.html'], ['audit:read', 'audit.html']
+    ];
+    const canChat = hasPermission('chat:use');
+    const target = canChat ? (pages.find(p => hasPermission(p[0])) || [])[1] : null;
+    const inAdmin = /admin\.html|users\.html|org\.html|roles\.html|perms\.html|docs\.html|usage\.html|loginlogs\.html|audit\.html/
+      .test(location.pathname);
     const slot = document.getElementById('adminEntrySlot');
     if (slot) {
-      // 已经在后台里就不再显示指向自己的按钮；用户卡里不再放第二个入口
-      slot.innerHTML = (allowed && !inAdmin)
-        ? '<a class="admin-entry-btn" href="admin.html" title="进入管理后台">⚙ 管理后台</a>' : '';
+      slot.innerHTML = (target && !inAdmin)
+        ? '<a class="admin-entry-btn" href="' + target + '" title="进入管理后台">⚙ 管理后台</a>' : '';
     }
   }
 
