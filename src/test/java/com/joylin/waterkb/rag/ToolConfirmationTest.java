@@ -23,7 +23,7 @@ class ToolConfirmationTest {
     private static RagChatService service(WaterInfoTool tool, ToolPermissionRegistry reg) {
         // 只用到工具与权限依赖，其余构造参数传 null
         return new RagChatService(null, null, tool, reg, null, null, null, null,
-                new ObjectMapper(), null, null);
+                new ObjectMapper(), null, null, null);
     }
 
     @Test

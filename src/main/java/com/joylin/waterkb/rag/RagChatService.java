@@ -53,6 +53,7 @@ public class RagChatService {
     private final RagProperties props;
     private final ObjectMapper objectMapper;
     private final UsageRecorder usageRecorder;
+    private final VectorStoreAdminRepository adminRepository;
 
     private final WaterInfoTool waterInfoTool;
     private final ToolPermissionRegistry toolPermissions;
@@ -67,7 +68,8 @@ public class RagChatService {
                           RagProperties props,
                           ObjectMapper objectMapper,
                           ModelConfigRepository modelConfigRepository,
-                          UsageRecorder usageRecorder) {
+                          UsageRecorder usageRecorder,
+                          VectorStoreAdminRepository adminRepository) {
         this.vectorStore = vectorStore;
         this.modelRegistry = modelRegistry;
         this.modelConfigRepository = modelConfigRepository;
@@ -79,6 +81,7 @@ public class RagChatService {
         this.props = props;
         this.objectMapper = objectMapper;
         this.usageRecorder = usageRecorder;
+        this.adminRepository = adminRepository;
         // 不在构造时固定 ChatClient：每次问答从 ModelRegistry 取当前激活模型，
         // 这样管理页切换模型后无需重启容器即可生效。
     }
@@ -107,7 +110,14 @@ public class RagChatService {
         final List<Document> hits = retrieve(question);
 
         // ===== 阶段 2：拼装知识库上下文 =====
-        String context = hits.isEmpty() ? "（知识库中未检索到相关内容）" : formatContext(hits);
+        // "有哪些文档"是元问题：语义检索只会命中少数最相关切片，回答会漏掉大部分文件。
+        // 这类问题改注入当前权限可见的完整文档清单，让模型按真实清单作答。
+        String context;
+        if (isDocumentListQuestion(question)) {
+            context = documentListContext();
+        } else {
+            context = hits.isEmpty() ? "（知识库中未检索到相关内容）" : formatContext(hits);
+        }
 
         // ===== 阶段 3：取指定分支的祖先链作为上下文 =====
         // parentId=null 走当前 head；传历史节点则从该点分叉，只带它的祖先链，
@@ -456,6 +466,35 @@ public class RagChatService {
         } catch (Exception e) {
             log.error("向量检索失败，本次回答将不带知识库上下文", e);
             return List.of();
+        }
+    }
+
+    /** "有哪些文档"这类元问题：走真实文档清单，不走语义检索 */
+    private boolean isDocumentListQuestion(String question) {
+        String q = String.valueOf(question == null ? "" : question).replaceAll("\\s", "");
+        return q.matches(".*(哪些文档|什么文档|文档有哪些|文档清单|可检索.{0,6}文档|能检索.{0,6}文档|知识库.{0,6}文档).*");
+    }
+
+    /** 当前账号可见的全部文档名，按文档清单接口的同一份权限口径生成 */
+    private String documentListContext() {
+        try {
+            List<Map<String, Object>> docs = adminRepository.listDocuments();
+            List<String> names = new ArrayList<>();
+            if (docs != null) {
+                for (Map<String, Object> d : docs) {
+                    String name = String.valueOf(d.getOrDefault("fileName", ""));
+                    if (!name.isEmpty() && !"null".equals(name)) names.add(name);
+                }
+            }
+            if (names.isEmpty()) return "【知识库文档清单】当前没有可见文档。";
+            StringBuilder sb = new StringBuilder("【知识库文档清单（共 ").append(names.size()).append(" 份，按文件名列出）】\n");
+            for (int i = 0; i < names.size(); i++) {
+                sb.append(i + 1).append(". ").append(names.get(i)).append('\n');
+            }
+            return sb.toString();
+        } catch (Exception e) {
+            log.warn("文档清单上下文生成失败：{}", e.getMessage());
+            return "（知识库文档清单暂时无法获取）";
         }
     }
 
