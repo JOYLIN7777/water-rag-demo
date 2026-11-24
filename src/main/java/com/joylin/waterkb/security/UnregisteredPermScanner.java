@@ -45,6 +45,17 @@ public class UnregisteredPermScanner {
         this.mapping = mapping;
     }
 
+    /** 代码里所有在用的权限码（含已注册），用于校验手工填写的码是否真的会生效 */
+    public Set<String> allUsedCodes() {
+        Map<String, List<String>> sources = new LinkedHashMap<>();
+        scanResources("classpath*:static/**/*.html", HTML_PERM, sources);
+        scanResources("classpath*:static/assets/*.js", JS_PERM, sources);
+        scanAnnotations(sources);
+        Set<String> out = new TreeSet<>();
+        sources.keySet().forEach(code -> { if (CODE.matcher(code).matches()) out.add(code); });
+        return out;
+    }
+
     /** code → 来源描述（多个来源合并） */
     public List<Map<String, Object>> scan() {
         Map<String, List<String>> sources = new LinkedHashMap<>();

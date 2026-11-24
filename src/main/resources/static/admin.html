@@ -11,11 +11,10 @@
   .admin-sidebar{width:232px;flex:0 0 232px;background:linear-gradient(180deg,#0d1730 0%,#16223c 100%);color:#c8d3e8;display:flex;flex-direction:column;padding:20px 12px 12px;position:sticky;top:0;height:100vh;overflow-y:auto}
   .admin-sidebar .brand{padding-bottom:16px}
   .admin-panel[data-panel="org"] .tree-pane{display:none}
-  .org-page-head{display:flex;justify-content:space-between;align-items:flex-start;gap:18px;margin-bottom:16px}
-  .org-tools{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-left:auto}
-  .org-search{width:210px;padding:7px 10px;border:1px solid var(--line);border-radius:7px;font-size:12px;background:#fff}
-  .org-tools .btn-sm{white-space:nowrap}
-  .org-tools .org-search{margin:0 4px}
+  .org-page-head{display:block;margin-bottom:12px}
+  .org-toolbar{display:flex;justify-content:flex-end;align-items:center;gap:8px;flex-wrap:nowrap;margin-bottom:14px}
+  .org-search{width:230px;padding:7px 10px;border:1px solid var(--line);border-radius:7px;font-size:12px;background:#fff}
+  .org-toolbar .btn-sm{white-space:nowrap}
   .org-table-card{padding:0;overflow:hidden}
   .org-tree-table th:first-child{width:44%}
   .org-tree-table td:nth-child(2){color:#3b6ef5;font-family:ui-monospace,monospace;font-size:11.5px}
@@ -419,12 +418,12 @@
         <div class="org-page-head">
           <div><h1 class="page-title">组织架构管理中心</h1>
             <p class="page-desc">以树形结构维护部门层级；可直接编辑任意层级，支持调整上级、排序与子部门。</p></div>
-          <div class="org-tools">
-            <button class="btn btn-sm" onclick="toggleOrgTree()" title="展开或收起全部层级">展开/收起</button>
-            <button class="btn btn-sm" onclick="loadOrgData()">刷新</button>
-            <input class="org-search" id="orgKeyword" placeholder="搜索部门名称 / 编码" oninput="renderOrgTable()">
-            <button class="btn btn-sm btn-primary" data-perm="user:write" onclick="orgCreate('')">＋ 新建部门</button>
-          </div>
+        </div>
+        <div class="org-toolbar">
+          <input class="org-search" id="orgKeyword" placeholder="搜索部门名称 / 编码" oninput="renderOrgTable()">
+          <button class="btn btn-sm" onclick="toggleOrgTree()" title="展开或收起全部层级">展开/收起</button>
+          <button class="btn btn-sm" onclick="loadOrgData()">刷新</button>
+          <button class="btn btn-sm btn-primary" data-perm="user:write" onclick="orgCreate('')">＋ 新建部门</button>
         </div>
         <div class="card org-table-card">
           <table class="data-table org-tree-table">
@@ -1864,14 +1863,17 @@ function parentPermOptions(sel){
 // 快捷选项来自后端扫描：代码里已在用（前端 data-perm / 后端 @RequirePermission）但权限树还没建的码。
 // 这些码选了就能真正控制功能，不是随便拼出来的字符串。
 let UNUSED_PERM_CODES=[];
+let USED_PERM_CODES=new Set();
 async function loadUnusedPermCodes(){
   try{const list=await api('/api/admin/perms/unused-codes');UNUSED_PERM_CODES=Array.isArray(list)?list:[]}
   catch(e){UNUSED_PERM_CODES=[]}
+  try{const used=await api('/api/admin/perms/used-codes');USED_PERM_CODES=new Set(Array.isArray(used)?used:[])}
+  catch(e){USED_PERM_CODES=new Set()}
   return UNUSED_PERM_CODES;
 }
 function permQuickBtns(){
   if(!UNUSED_PERM_CODES.length)
-    return '<div class="form-hint">当前所有在用的权限码都已注册，没有需要补建的节点。如需新增业务权限，请先在前台按钮或后端接口上声明权限码。</div>';
+    return '<div class="form-hint">当前所有在用的权限码都已注册。如需新增业务权限，请先在前台按钮写 data-perm 或后端接口加 @RequirePermission，再回来新增；也可以直接在下方手工填写权限码（会提示是否真能生效）。</div>';
   const items=UNUSED_PERM_CODES.map(x=>{
     const src=(x.sources||[]).join('、').replace(/"/g,'&quot;').replace(/</g,'&lt;');
     const name=esc(x.name||x.code),code=esc(x.code);
@@ -1898,9 +1900,13 @@ function checkPermCode(){
   if(hit){
     hint.className='form-hint err';
     hint.textContent='⚠ 该权限码已存在（'+(hit.builtin?'系统清单节点':'自定义节点')+'：'+hit.name+'），请换一个动作词';
+  }else if(USED_PERM_CODES.size && !USED_PERM_CODES.has(code)){
+    // 没撞码但代码里没人用：允许建（前端可能还没写完），但必须让用户知道建了暂时不生效
+    hint.className='form-hint err';
+    hint.textContent='⚠ 此权限码当前没有任何按钮或接口使用，建了暂时不会控制任何功能；请先在前台按钮写 data-perm 或后端接口加 @RequirePermission';
   }else{
     hint.className='form-hint ok';
-    hint.textContent='✓ 该权限码可用';
+    hint.textContent='✓ 该权限码已在代码中使用，创建后立即生效';
   }
   return hit||null;
 }

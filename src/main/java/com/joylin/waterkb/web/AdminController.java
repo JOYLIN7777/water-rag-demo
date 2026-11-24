@@ -375,6 +375,12 @@ public class AdminController {
         return permCatalog.sync(body);
     }
 
+    /** 代码里所有在用的权限码（含已注册），供新增弹窗校验手填码是否真能生效 */
+    @GetMapping("/perms/used-codes")
+    public java.util.Set<String> usedPermCodes() {
+        return unregisteredPermScanner.allUsedCodes();
+    }
+
     /** 代码里在用、但权限树还没建的权限码（供新增权限弹窗快捷选择，选了就能控制真实功能） */
     @GetMapping("/perms/unused-codes")
     public List<Map<String, Object>> unusedPermCodes() {
