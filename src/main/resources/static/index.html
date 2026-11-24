@@ -147,9 +147,10 @@
   .composer-tool:hover{background:var(--primary-soft);color:var(--primary);border-color:#dbe5ff}
   .send-btn{border:0;background:linear-gradient(135deg,var(--primary-hi),var(--primary));color:#fff;padding:8px 18px;border-radius:10px;font-size:12.5px;font-weight:600;transition:all .18s;box-shadow:0 3px 10px rgba(59,110,245,.28);display:flex;align-items:center;gap:6px;margin-left:auto}
   .send-btn:hover:not(:disabled){transform:translateY(-1px);box-shadow:0 5px 16px rgba(59,110,245,.36)}
-  /* 生成中的「停止生成」态：红色系，与发送按钮一眼区分开 */
-  .send-btn.stop{background:linear-gradient(135deg,#e05a6d,#c74457);box-shadow:0 3px 10px rgba(224,90,109,.28)}
-  .send-btn.stop:hover{transform:translateY(-1px);box-shadow:0 5px 16px rgba(224,90,109,.36)}
+  /* 生成中的停止态：白底细边 + 实心方块图标（WorkBuddy 同款克制风格），不再是一整块刺眼红 */
+  .send-btn.stop{background:#fff;border:1px solid #edc3cb;color:#b93c50;box-shadow:none;padding:7px 14px}
+  .send-btn.stop:hover{background:#fff5f6;border-color:#e69caa;transform:none;box-shadow:0 2px 8px rgba(224,90,109,.12)}
+  .send-btn.stop .stop-ico{display:inline-block;width:9px;height:9px;border-radius:2px;background:#c74457;flex:0 0 9px}
   .composer-tip{text-align:center;font-size:10.5px;color:var(--muted);margin-top:9px;letter-spacing:.2px}
 
   /* ============ Markdown 正文 ============ */
@@ -257,7 +258,7 @@ function syncSendBtn(){
   const busy=isBusy(currentId);
   btn.dataset.busy=busy?'1':'';
   btn.classList.toggle('stop',busy);
-  btn.innerHTML=busy?'■ 停止生成':'发送 <span style="opacity:.75">↵</span>';
+  btn.innerHTML=busy?'<span class="stop-ico"></span>停止生成':'发送 <span style="opacity:.75">↵</span>';
 }
 function sendOrStop(){if(isBusy(currentId))stopGenerate();else send()}
 function stopGenerate(){

@@ -115,8 +115,12 @@
   .tag-role.analyst{background:var(--primary-soft);color:#25469b}
   .empty-inline{padding:36px;text-align:center;color:var(--muted);font-size:13px}
   .node-type{display:inline-block;font-size:10px;padding:2px 7px;border-radius:5px;background:#eef2f8;color:var(--ink-2)}
+  .node-type.directory{background:#e8f7f1;color:#0d8f62}
   .node-type.menu{background:var(--primary-soft);color:#25469b}
   .node-type.btn{background:#fef4e6;color:var(--warn)}
+  .type-quick{display:flex;flex-wrap:wrap;gap:5px;margin-top:5px}
+  .type-quick button{border:1px solid var(--line);background:#fff;color:var(--ink-2);font-size:10.5px;padding:3px 8px;border-radius:5px}
+  .type-quick button:hover{border-color:var(--primary);color:var(--primary)}
   /* 权限模块分组行：整行可点击折叠，箭头单独给反馈 */
   tr.perm-group{cursor:pointer;user-select:none}
   tr.perm-group>td{background:#f7f9fc;font-weight:650;color:var(--ink)}
@@ -165,6 +169,13 @@
   .data-table th{padding:9px 12px;font-size:11.5px;background:#f8fafc}
   .data-table td{padding:9px 12px;font-size:12.5px}
   .data-table .name{font-size:12.5px}
+  /* 用量明细：固定列宽 + 长文本单行截断，避免时间/数字被提问列挤成多行 */
+  .usage-detail{table-layout:fixed;width:100%}
+  .usage-detail th,.usage-detail td{padding:8px 10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .usage-detail .mono{font-variant-numeric:tabular-nums;font-feature-settings:"tnum"}
+  .usage-detail td.q{max-width:0;color:var(--ink-2)}
+  .usage-detail td:nth-child(4),.usage-detail td:nth-child(5){text-align:right;font-variant-numeric:tabular-nums}
+  .usage-detail .dim{color:var(--muted)}
   /* 操作列：彩色文字链接 */
   .op-btn{font-size:12px;padding:2px 5px}
   .op-btn.warn{color:var(--warn)}
@@ -292,8 +303,7 @@
       <!-- 用户管理 -->
       <section class="admin-panel active" data-panel="users">
         <div class="page-head"><h1 class="page-title">用户管理</h1>
-          <p class="page-desc">左侧按组织架构筛选账号，右侧维护账号。组织节点上点「＋」可直接把新账号挂到该组织下；
-            密码重置申请已移到右上角「消息中心」，不再占用本页版面。</p></div>
+          <p class="page-desc">按组织筛选和管理账号，在组织节点上点「＋」即可新增账号。</p></div>
         <div class="filter-bar">
           <div class="filter-item"><label for="uKw">关键字</label>
             <input id="uKw" type="text" name="uKwFilter" autocomplete="off" autocorrect="off"
@@ -333,9 +343,7 @@
       <!-- 组织架构 -->
       <section class="admin-panel" data-panel="org">
         <div class="page-head"><h1 class="page-title">组织机构</h1>
-          <p class="page-desc">按层级维护组织：在任意节点上都能新建子组织，企业有几级就建几级。
-            组织是账号的归属单位，也是数据隔离的边界：文档、会话历史与用量都按组织分家，
-            跨组织互相看不到。组织标识创建后不再变动（它是数据的归属键），改名与调整上级都不影响已有数据。</p></div>
+          <p class="page-desc">按层级管理部门：可在任意部门下新建子部门。不同部门的文档、会话和数据互相不可见。</p></div>
         <div class="workbench">
           <div class="tree-pane">
             <div class="tree-head">组织架构
@@ -370,7 +378,7 @@
       <!-- 角色定义 -->
       <section class="admin-panel" data-panel="roles">
         <div class="page-head"><h1 class="page-title">角色定义</h1>
-          <p class="page-desc">系统内置角色与权限范围。角色权限在服务端强制校验，非管理员无法调用管理接口。</p></div>
+          <p class="page-desc">为不同岗位分配角色，角色决定可以使用哪些功能。</p></div>
         <div class="card" style="padding:0;border:0;box-shadow:none">
           <div class="toolbar" style="background:#fff;border:1px solid var(--line);border-bottom:0;border-radius:var(--radius) var(--radius) 0 0">
             <input class="kw" id="rKw" type="text" placeholder="搜索角色名称 / 标识…">
@@ -400,7 +408,7 @@
           </div>
           <div class="table-wrap" style="border:1px solid var(--line);border-radius:0 0 var(--radius) var(--radius);background:#fff">
             <table class="data-table">
-              <thead><tr><th>权限名称</th><th>节点类型</th><th>权限标识</th><th>所属模块</th><th>说明</th><th>操作</th></tr></thead>
+              <thead><tr><th>菜单 / 权限名称</th><th>节点类型</th><th>权限标识</th><th>路由路径</th><th>排序</th><th>操作</th></tr></thead>
               <tbody id="pTable"><tr><td colspan="6" class="empty">加载中…</td></tr></tbody></table>
           </div>
         </div>
@@ -450,8 +458,7 @@
       <!-- 用量统计 -->
       <section class="admin-panel" data-panel="usage">
         <div class="page-head"><h1 class="page-title">用量统计</h1>
-          <p class="page-desc">来自模型服务提供方的真实调用量与 Token 消耗。点「今日/本月消耗 Token」可以看到每一次调用花了多少、
-            对应哪句提问——排查"今天为什么用了这么多"靠的就是这张逐次明细。</p></div>
+          <p class="page-desc">查看模型调用次数与用量；点消耗数字可查看每次调用对应的提问。</p></div>
         <div class="stats" id="uStats">
           <div class="stat-card"><div class="stat-num">—</div><div class="stat-label">今日请求次数</div></div>
           <div class="stat-card drillable" data-scope="today" role="button" tabindex="0" title="点击查看今日每一次消耗">
@@ -482,7 +489,7 @@
       <!-- 操作日志 -->
       <section class="admin-panel" data-panel="audit">
         <div class="page-head"><h1 class="page-title">操作日志</h1>
-          <p class="page-desc">记录所有接口调用行为，仅管理员可查看。</p></div>
+          <p class="page-desc">查看账号在系统中的操作记录。</p></div>
         <div class="card"><div class="card-head"><h3>操作记录</h3>
           <button class="btn btn-sm" onclick="loadAudit()">刷新</button></div>
           <div class="scroll" style="max-height:520px"><table class="data-table"><thead><tr><th>时间</th><th>账号</th><th>动作</th><th>状态</th><th>耗时</th><th>结果</th></tr></thead>
@@ -1084,8 +1091,8 @@ function groupChecks(selected,lockAdmin){
   }).join('');
   // 历史遗留角色（角色定义里已删掉）不显示为勾选项，但要在保存时原样带回，
   // 否则管理员一编辑账号就静默清掉了这个用户的角色。
-  const legacyTip=legacy.length?'<div class="form-hint">⚠ 该账号带有未在角色定义中的角色：'+
-    legacy.map(x=>esc(gl(x))+'（'+esc(x)+'）').join('、')+'，保存时原样保留。</div>':'';
+  const legacyTip=legacy.length?'<div class="form-hint">该账号仍保留已停用的角色：'+
+    legacy.map(x=>esc(gl(x))).join('、')+'，如需移除请先到「角色定义」处理。</div>':'';
   return '<div class="check-grid">'+checks+'</div>'+legacyTip;
 }
 /**
@@ -1602,98 +1609,151 @@ function permDesc(code){
 // 模块折叠状态：收起后必须还能点开——原来只做了"隐藏子行 + 改箭头"，
 // 分组行上没有任何点击事件，一旦点了"收起全部"就再也展不开，只能刷新页面。
 const PERM_FOLDED=new Set();
+const TYPE_CN={directory:'目录',menu:'菜单',btn:'按钮'};
 function renderPermTable(){
   const kw=($('pKw').value||'').trim().toLowerCase();
-  // 按模块分组（保持接口返回顺序）
-  const groups={};
-  DB.perms.forEach(x=>{(groups[x.module||'其他']=groups[x.module||'其他']||[]).push(x)});
+  const match=x=>!kw||((x.name||'')+' '+x.code+' '+(x.description||'')+' '+(x.routePath||'')).toLowerCase().includes(kw);
+  // 若依风格三级树：以 parentCode 组树；无上级的节点按 module 归到根列表。
+  const byParent={};
+  DB.perms.forEach(x=>{const p=x.parentCode||'';(byParent[p]=byParent[p]||[]).push(x)});
+  Object.keys(byParent).forEach(p=>byParent[p].sort((a,b)=>(a.orderNum||0)-(b.orderNum||0)));
+  const roots=[];
+  DB.perms.filter(x=>!x.parentCode).forEach(x=>{if(!roots.includes(x))roots.push(x)});
+  // 挂不到任何根上的（父节点不存在）也提到根层，避免节点看不见
+  DB.perms.forEach(x=>{if(x.parentCode&&!byParent[x.parentCode]&&!roots.includes(x))roots.push(x)});
   let html='',total=0;
-  Object.keys(groups).forEach(m=>{
-    const items=groups[m].filter(x=>!kw||((x.name||'')+' '+x.code+' '+(x.description||'')).toLowerCase().includes(kw));
-    if(!items.length)return;
-    const folded=PERM_FOLDED.has(m);
-    html+='<tr class="perm-group" data-module="'+esc(m)+'" title="'+(folded?'点击展开':'点击收起')+'"><td colspan="6">'+
-      '<span class="pg-caret">'+(folded?'▸':'▾')+'</span>'+esc(m)+
-      ' <span class="tag">'+items.length+'</span></td></tr>';
-    items.forEach(x=>{
-      total++;
-      const roles=DB.roles.filter(r=>(r.permissions||[]).includes(x.code)).map(r=>gl(r.role));
-      const ops='<button class="op-btn" onclick="showPermRoles(\''+esc(x.code)+'\')">查看角色</button>'+
-        '<button class="op-btn" onclick="editPerm(\''+esc(x.code)+'\')">编辑</button>'+
-        (x.builtin?'':'<button class="op-btn" style="color:#c0392b" onclick="delPerm(\''+esc(x.code)+'\')">删除</button>');
-      html+='<tr data-module="'+esc(m)+'"'+(folded?' style="display:none"':'')+'><td style="padding-left:28px" class="name">'+esc(x.name)+
-        (x.builtin?'':' <span class="tag">自定义</span>')+'</td>'+
-        '<td><span class="node-type '+esc(x.nodeType||'menu')+'">'+(x.nodeType==='btn'?'操作按钮':'功能菜单')+'</span></td>'+
-        '<td class="mono" style="font-size:11px">'+esc(x.code)+'</td><td>'+esc(x.module||m)+'</td>'+
-        '<td style="color:var(--muted)">'+esc(x.description||'')+'</td>'+
-        '<td>'+ops+'</td></tr>';
-    });
-  });
+  const nodeRow=(x,depth)=>{
+    total++;
+    const folded=PERM_FOLDED.has(x.code);
+    const kids=(byParent[x.code]||[]).filter(match);
+    const indent=16+depth*20;
+    const caret=kids.length?'<span class="pg-caret" data-fold="'+esc(x.code)+'" style="cursor:pointer">'+(folded?'▸':'▾')+'</span>':'<span class="pg-caret"></span>';
+    const ops='<button class="op-btn" onclick="showPermRoles(\''+esc(x.code)+'\')">查看角色</button>'+
+      '<button class="op-btn" onclick="editPerm(\''+esc(x.code)+'\')">编辑</button>'+
+      (x.builtin?'':'<button class="op-btn" style="color:#c0392b" onclick="delPerm(\''+esc(x.code)+'\')">删除</button>');
+    html+='<tr data-code="'+esc(x.code)+'"><td style="padding-left:'+indent+'px" class="name">'+caret+esc(x.name)+
+      (x.builtin?'':' <span class="tag">自定义</span>')+'</td>'+
+      '<td><span class="node-type '+esc(x.nodeType||'menu')+'">'+(TYPE_CN[x.nodeType]||'功能菜单')+'</span></td>'+
+      '<td class="mono" style="font-size:11px">'+esc(x.code)+'</td>'+
+      '<td class="mono" style="font-size:11px;color:var(--muted)">'+esc(x.routePath||'—')+'</td>'+
+      '<td>'+esc(x.orderNum||0)+'</td>'+
+      '<td>'+ops+'</td></tr>';
+    if(!folded)kids.forEach(k=>nodeRow(k,depth+1));
+  };
+  roots.filter(match).forEach(r=>nodeRow(r,0));
   $('pTable').innerHTML=html||'<tr><td colspan="6" class="empty-inline">'+(DB.perms.length?'没有匹配的权限节点':'暂无权限节点')+'</td></tr>';
   $('pTable')._total=total;
-  // 分组行：点击整行折叠/展开该模块
-  $('pTable').querySelectorAll('.perm-group').forEach(tr=>{
-    tr.onclick=()=>{
-      const m=tr.dataset.module;
-      if(PERM_FOLDED.has(m))PERM_FOLDED.delete(m);else PERM_FOLDED.add(m);
+  $('pTable').querySelectorAll('[data-fold]').forEach(el=>{
+    el.onclick=()=>{
+      const c=el.getAttribute('data-fold');
+      if(PERM_FOLDED.has(c))PERM_FOLDED.delete(c);else PERM_FOLDED.add(c);
       renderPermTable();
     };
   });
 }
 $('pKw')&&($('pKw').oninput=renderPermTable);
 
-// 新增自定义权限节点（持久化到 perm_node 表，可立即分配给角色）
+// 上级节点下拉：目录和菜单都能当上级，按钮不能挂子节点
+function parentPermOptions(sel){
+  const cands=DB.perms.filter(x=>x.nodeType!=='btn');
+  return '<option value="">（顶级）</option>'+cands.map(x=>
+    '<option value="'+esc(x.code)+'"'+(x.code===sel?' selected':'')+'>'+esc(x.name)+'（'+esc(x.code)+'）</option>').join('');
+}
+// 若依快捷按钮：点一下按「模块前缀:动作」填好权限标识
+const PERM_ACTIONS=[['select','查询'],['create','新增'],['edit','编辑'],['delete','删除'],
+  ['export','导出'],['import','导入'],['audit','审核'],['config','配置']];
+function permQuickBtns(){
+  return '<div class="type-quick">'+PERM_ACTIONS.map(([code,label])=>
+    '<button type="button" onclick="fillPermAction(\''+code+'\',\''+label+'\')">'+label+'</button>').join('')+'</div>';
+}
+function fillPermAction(action,label){
+  const mod=($('fPModule').value||'').trim();
+  if(!mod){Shell.modalError('请先填所属模块，再选快捷动作');return}
+  const slug=mod.toLowerCase().replace(/[^a-z0-9]/g,'');
+  const code=($('fPCode')||{});
+  if(code){code.value=(slug||'custom')+':'+action;code.disabled=false}
+  if($('fPName'))$('fPName').value=mod+label;
+}
+
+// 新增权限节点（若依风格三级树）
 function createPerm(){
-  Shell.modal({title:'新增权限节点',okText:'创建',body:
-    '<div class="field"><label for="fPCode">权限标识（模块:动作，如 report:export）</label>'+
-    '<input id="fPCode" placeholder="例如：report:export"></div>'+
-    '<div class="field"><label for="fPName">权限名称</label>'+
-    '<input id="fPName" placeholder="例如：导出报表"></div>'+
+  Shell.modal({title:'新增菜单 / 权限',okText:'创建',body:
+    '<div class="field"><label for="fPParent">上级节点</label><select id="fPParent">'+parentPermOptions('')+'</select></div>'+
     '<div class="field"><label for="fPType">节点类型</label>'+
-    '<select id="fPType"><option value="menu">功能菜单</option><option value="btn">操作按钮</option></select></div>'+
+    '<select id="fPType" onchange="permTypeChanged()"><option value="directory">目录</option>'+
+    '<option value="menu" selected>菜单</option><option value="btn">按钮</option></select></div>'+
+    '<div class="field"><label for="fPName">节点名称</label>'+
+    '<input id="fPName" placeholder="例如：导出报表"></div>'+
     '<div class="field"><label for="fPModule">所属模块</label>'+
-    '<input id="fPModule" placeholder="例如：报表中心"></div>'+
-    '<div class="field"><label for="fPDesc">说明</label>'+
-    '<input id="fPDesc" placeholder="一句话描述该权限的用途"></div>',
+    '<input id="fPModule" placeholder="例如：报表中心"><div class="form-hint">用于生成权限标识前缀，如「报表中心」→ report。</div></div>'+
+    '<div class="field"><label>权限标识（快捷生成）</label>'+permQuickBtns()+
+    '<input id="fPCode" placeholder="例如：report:export" style="margin-top:6px"></div>'+
+    '<div class="field" id="fPRouteField"><label for="fPRoute">路由路径</label>'+
+    '<input id="fPRoute" placeholder="例如：/admin/reports"></div>'+
+    '<div class="field"><label for="fPOrder">显示顺序</label>'+
+    '<input id="fPOrder" type="number" value="0"></div>'+
+    '<div class="field"><label for="fPDesc">备注说明</label>'+
+    '<input id="fPDesc" placeholder="一句话描述用途"></div>',
     onOk:async function(close){
       const code=($('fPCode').value||'').trim();
       const name=($('fPName').value||'').trim();
-      if(!/^[a-z][a-z0-9_-]*:[a-z][a-z0-9_-]*$/.test(code)){Shell.modalError('权限标识需为小写「模块:动作」格式，例如 report:export');return false}
-      if(!name){Shell.modalError('请填写权限名称');return false}
+      const type=$('fPType').value;
+      // 目录仅作分组，不绑定接口权限码，允许用 目录:root 形式
+      if(type!=='directory'&&!/^[a-z][a-z0-9_-]*:[a-z][a-z0-9_-]*$/.test(code)){
+        Shell.modalError('权限标识需为小写「模块:动作」格式，例如 report:export');return false}
+      if(type==='directory'&&!/^[a-z][a-z0-9_-]*:(root|dir)$/.test(code)){
+        Shell.modalError('目录标识格式为「模块:root」，例如 system:root');return false}
+      if(!name){Shell.modalError('请填写节点名称');return false}
       try{
-        const j=await apiWrite('/api/admin/perms',{method:'POST',headers:{'Content-Type':'application/json'},
-          body:JSON.stringify({code:code,name:name,type:$('fPType').value,module:($('fPModule').value||'').trim(),desc:($('fPDesc').value||'').trim()})});
-        close();appToast(j.message||'权限节点已创建','ok');loadPerms();
+        await apiWrite('/api/admin/perms',{method:'POST',headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({code:code,name:name,type:type,module:($('fPModule').value||'').trim(),
+            desc:($('fPDesc').value||'').trim(),parentCode:($('fPParent').value||'').trim(),
+            routePath:($('fPRoute').value||'').trim(),orderNum:Number($('fPOrder').value||0)})});
+        close();appToast('节点已创建','ok');loadPerms();
       }catch(e){Shell.modalError(e.message);return false}
     }});
 }
+function permTypeChanged(){
+  const t=$('fPType').value;
+  if($('fPRouteField'))$('fPRouteField').style.display=t==='btn'?'none':'';
+}
 
-// 编辑权限节点：权限标识是服务端拦截的绑定契约，一律不可改；内置节点不可删除
+// 编辑权限节点：权限标识是接口绑定契约，一律不可改；内置节点不可删除
 function editPerm(code){
   const x=DB.perms.find(p=>p.code===code);if(!x)return;
-  Shell.modal({title:'编辑权限 · '+esc(x.name),okText:'保存',body:
-    '<p style="margin:0 0 4px;color:var(--muted);font-size:12.5px">'+(x.builtin?'内置节点：权限标识不可修改，可调整名称、类型、模块与说明。':'自定义节点：保存后已分配给角色的权限立即跟随更新。')+'</p>'+
+  Shell.modal({title:'编辑 · '+esc(x.name),okText:'保存',body:
+    '<p style="margin:0 0 4px;color:var(--muted);font-size:12.5px">'+
+    (x.builtin?'内置节点的权限标识不可修改。':'保存后，已分配该权限的角色立即跟随更新。')+'</p>'+
     permFormBody(x),
     onOk:async function(close){
       try{
-        const j=await apiWrite('/api/admin/perms/'+encodeURIComponent(x.code),{method:'PUT',headers:{'Content-Type':'application/json'},
-          body:JSON.stringify({name:($('fPName').value||'').trim(),type:$('fPType').value,module:($('fPModule').value||'').trim(),desc:($('fPDesc').value||'').trim()})});
-        close();appToast(j.message||'已保存','ok');loadPerms();
+        await apiWrite('/api/admin/perms/'+encodeURIComponent(x.code),{method:'PUT',headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({name:($('fPName').value||'').trim(),type:$('fPType').value,
+            module:($('fPModule').value||'').trim(),desc:($('fPDesc').value||'').trim(),
+            parentCode:($('fPParent').value||'').trim(),routePath:($('fPRoute').value||'').trim(),
+            orderNum:Number($('fPOrder').value||0)})});
+        close();appToast('已保存','ok');loadPerms();
       }catch(e){Shell.modalError(e.message);return false}
     }});
 }
 
 function permFormBody(x){
-  return '<div class="field"><label for="fPCode">权限标识（模块:动作，保存后不可修改）</label>'+
-    '<input id="fPCode" value="'+esc(x.code)+'" disabled></div>'+
-    '<div class="field"><label for="fPName">权限名称</label>'+
-    '<input id="fPName" value="'+esc(x.name||'')+'"></div>'+
+  return '<div class="field"><label>权限标识（不可修改）</label>'+
+    '<input value="'+esc(x.code)+'" disabled></div>'+
+    '<div class="field"><label for="fPParent">上级节点</label><select id="fPParent">'+parentPermOptions(x.parentCode||'')+'</select></div>'+
     '<div class="field"><label for="fPType">节点类型</label>'+
-    '<select id="fPType"><option value="menu"'+(x.nodeType!=='btn'?' selected':'')+'>功能菜单</option>'+
-    '<option value="btn"'+(x.nodeType==='btn'?' selected':'')+'>操作按钮</option></select></div>'+
+    '<select id="fPType" onchange="permTypeChanged()"><option value="directory"'+(x.nodeType==='directory'?' selected':'')+'>目录</option>'+
+    '<option value="menu"'+(x.nodeType==='menu'||!x.nodeType?' selected':'')+'>菜单</option>'+
+    '<option value="btn"'+(x.nodeType==='btn'?' selected':'')+'>按钮</option></select></div>'+
+    '<div class="field"><label for="fPName">节点名称</label>'+
+    '<input id="fPName" value="'+esc(x.name||'')+'"></div>'+
     '<div class="field"><label for="fPModule">所属模块</label>'+
     '<input id="fPModule" value="'+esc(x.module||'')+'"></div>'+
-    '<div class="field"><label for="fPDesc">说明</label>'+
+    '<div class="field" id="fPRouteField"'+(x.nodeType==='btn'?' style="display:none"':'')+'><label for="fPRoute">路由路径</label>'+
+    '<input id="fPRoute" value="'+esc(x.routePath||'')+'" placeholder="例如：/admin/reports"></div>'+
+    '<div class="field"><label for="fPOrder">显示顺序</label>'+
+    '<input id="fPOrder" type="number" value="'+esc(x.orderNum||0)+'"></div>'+
+    '<div class="field"><label for="fPDesc">备注说明</label>'+
     '<input id="fPDesc" value="'+esc(x.description||'')+'"></div>';
 }
 
@@ -1720,11 +1780,9 @@ function showPermRoles(code){
     '<div class="perm-grid2">'+roles.map(r=>'<div class="perm-pill"><b>'+esc(r)+'</b>拥有此权限</div>').join('')+'</div>'});
 }
 function togglePermTree(expand){
-  // 直接改折叠状态再整体重绘：只有一处真源，箭头/行显示/提示文字不会互相打架
-  DB.perms.forEach(x=>{
-    const m=x.module||'其他';
-    if(expand)PERM_FOLDED.delete(m); else PERM_FOLDED.add(m);
-  });
+  // 按节点折叠：有子节点的才需要记录状态，展开全部即清空折叠集
+  if(expand){PERM_FOLDED.clear()}
+  else{DB.perms.filter(x=>DB.perms.some(c=>c.parentCode===x.code)).forEach(x=>PERM_FOLDED.add(x.code))}
   renderPermTable();
 }
 

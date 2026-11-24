@@ -293,6 +293,10 @@ public class AdminController {
     }
 
     private static String str(Object v) { return v == null ? "" : String.valueOf(v).trim(); }
+    private static int intOf(Object v) {
+        if (v == null) return 0;
+        try { return Integer.parseInt(String.valueOf(v).trim()); } catch (Exception e) { return 0; }
+    }
 
     @SuppressWarnings("unchecked")
     private static List<String> strList(Object v) {
@@ -341,7 +345,8 @@ public class AdminController {
     @PostMapping("/perms")
     public Map<String, Object> createPerm(@RequestBody Map<String, Object> body) {
         permCatalog.create(str(body.get("code")), str(body.get("name")),
-                str(body.get("type")), str(body.get("module")), str(body.get("desc")));
+                str(body.get("type")), str(body.get("module")), str(body.get("desc")),
+                str(body.get("parentCode")), str(body.get("routePath")), intOf(body.get("orderNum")));
         return Map.of("message", "权限节点已创建", "code", str(body.get("code")));
     }
 
@@ -349,7 +354,8 @@ public class AdminController {
     @PutMapping("/perms/{code}")
     public Map<String, Object> updatePerm(@PathVariable String code, @RequestBody Map<String, Object> body) {
         permCatalog.update(code, str(body.get("name")), str(body.get("type")),
-                str(body.get("module")), str(body.get("desc")));
+                str(body.get("module")), str(body.get("desc")),
+                str(body.get("parentCode")), str(body.get("routePath")), intOf(body.get("orderNum")));
         return Map.of("message", "权限节点已更新", "code", code);
     }
 

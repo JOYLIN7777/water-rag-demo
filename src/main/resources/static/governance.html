@@ -44,36 +44,37 @@
       <p class="page-desc">查看当前账号可以访问的功能与数据范围，以及最近的操作记录。</p>
     </div>
 
-    <div class="notice">以下信息均根据当前登录账号由服务端实时计算，前端无法修改。</div>
+    <div class="notice">这里显示的是你当前能使用的功能和可查看的数据范围。</div>
 
     <div class="card">
       <div class="card-head"><h3>① 当前登录身份</h3><a class="btn btn-sm" href="profile.html">个人中心</a></div>
-      <div class="sub">身份由登录信息自动识别，无需手动切换。</div>
+      <div class="sub">你的账号信息</div>
       <div class="identity-grid" id="identity">加载中…</div>
     </div>
 
     <div class="card">
-      <div class="card-head"><h3>② 权限矩阵（三层权限）</h3>
-        <button class="btn btn-sm" onclick="loadPermissions()">刷新权限</button></div>
-      <div class="sub">功能权限决定可以使用哪些功能，数据权限决定可以看到哪些文档，工具权限决定能否调用系统工具。全部按当前账号实时计算。</div>
+      <div class="card-head"><h3>② 我能使用的功能</h3>
+        <button class="btn btn-sm" onclick="loadPermissions()">刷新</button></div>
+      <div class="sub">标着「可用」的就是你当前能用的功能。</div>
 
-      <div class="layer">功能权限 · 菜单访问</div>
+      <div class="layer">可用功能</div>
       <div class="perm-grid" id="menuPerms">加载中…</div>
 
-      <div class="layer">数据权限 · 租户隔离与行级可见范围</div>
+      <div class="layer">可查看的数据</div>
       <div id="dataPerms">加载中…</div>
 
-      <div class="layer">工具权限 · Tool Calling 白名单</div>
+      <div class="layer">可用工具</div>
       <div id="toolPerms">加载中…</div>
     </div>
 
     <div class="card">
-      <div class="card-head"><h3>③ 审计日志</h3>
-        <button class="btn btn-sm" onclick="loadAudit()">刷新审计</button></div>
-      <div class="sub">记录重要的登录与操作行为（含账号、时间、动作、结果与耗时），仅能看到当前组织内的记录。</div>
+      <div class="card-head"><h3>③ 操作记录</h3>
+        <span><button class="btn btn-sm" onclick="loadAudit()">刷新</button>
+        <button class="btn btn-sm btn-primary" style="margin-left:6px" onclick="exportAuditCsv()">导出记录</button></span></div>
+      <div class="sub">最近的登录与操作情况，方便你核对是谁在什么时候做了什么。</div>
       <div class="kv" id="auditStats"></div>
       <div class="scroll" style="margin-top:14px;max-height:420px">
-        <table><thead><tr><th>时间</th><th>租户</th><th>用户</th><th>动作</th><th>状态</th><th>耗时</th><th>结果</th><th>细节</th></tr></thead><tbody id="auditBody"></tbody></table>
+        <table><thead><tr><th>时间</th><th>部门</th><th>账号</th><th>动作</th><th>状态</th><th>耗时</th><th>结果</th><th>详情</th></tr></thead><tbody id="auditBody"></tbody></table>
       </div>
     </div>
   </div>
@@ -95,10 +96,10 @@ async function loadIdentity(){
     const j=await r.json();
     document.getElementById('identity').innerHTML=
       '<div class="id-cell"><div class="k">用户</div><div class="v">'+esc(j.user)+'</div></div>'+
-      '<div class="id-cell"><div class="k">用户组</div><div class="v">'+(j.groups&&j.groups.length?j.groups.map(esc).join('、'):'—')+'</div></div>'+
+      '<div class="id-cell"><div class="k">角色</div><div class="v">'+(j.groups&&j.groups.length?j.groups.map(g=>esc(window.Shell&&Shell.roleLabel?Shell.roleLabel(g):g)).join('、'):'—')+'</div></div>'+
       '<div class="id-cell"><div class="k">所属组织</div><div class="v">'+esc(window.Shell?Shell.tenantLabel(j.tenant):j.tenant)+'</div></div>'+
       '<div class="id-cell"><div class="k">登录方式</div><div class="v">'+tag('账号密码','info')+'</div></div>';
-  }catch(e){document.getElementById('identity').innerHTML='<div class="empty">加载失败</div>'}
+  }catch(e){document.getElementById('identity').innerHTML='<div class="empty">账号信息暂时加载不出来</div>'}
 }
 
 async function loadPermissions(){
@@ -111,39 +112,58 @@ async function loadPermissions(){
       (m.allowed?tag('可访问','ok'):tag('受限','no'))+'</div>').join('');
     const d=p.data||{};
     document.getElementById('dataPerms').innerHTML=
-      '<div class="kv"><span>当前租户 <b>'+esc(d.tenant)+'</b></span>'+
-      '<span>租户隔离 <b>'+(d.tenantIsolated?'已启用':'未启用')+'</b></span>'+
-      '<span>管理员绕过 <b>'+(d.adminBypass?'是':'否')+'</b></span></div>'+
-      '<div class="data-scope">'+(d.rowLevelScopes||[]).map(s=>'<span>'+esc(s)+'</span>').join('')+'</div>';
+      '<div class="kv"><span>所属部门 <b>'+esc(window.Shell?Shell.tenantLabel(d.tenant):d.tenant)+'</b></span>'+
+      '<span>可查看范围 <b>'+esc((d.rowLevelScopes||[]).join('、')||'本部门')+'</b></span></div>';
     document.getElementById('toolPerms').innerHTML=(p.tools||[]).length
-      ? p.tools.map(t=>'<div class="tool-line"><div><div class="tn">'+esc(t.tool)+'</div>'+
-          '<div class="td">'+esc(t.description)+' · 允许用户 '+esc((t.allowUsers||[]).join(',')||'无')+
-          ' / 允许组 '+esc((t.allowGroups||[]).join(',')||'无')+'</div></div>'+
-          '<div class="tr">'+(t.allowed?tag('有权','ok'):tag('无权','no'))+'</div></div>').join('')
-      : '<div class="empty">当前账号未配置工具权限</div>';
+      ? p.tools.map(t=>'<div class="tool-line"><div><div class="tn">'+esc(t.name||t.tool)+'</div>'+
+          '<div class="td">'+esc(t.description||'')+'</div></div>'+
+          '<div class="tr">'+(t.allowed?tag('可用','ok'):tag('不可用','no'))+'</div></div>').join('')
+      : '<div class="empty">当前没有可使用的工具</div>';
   }catch(e){
-    document.getElementById('menuPerms').innerHTML='<div class="empty">加载失败：'+esc(e.message)+'</div>';
+    document.getElementById('menuPerms').innerHTML='<div class="empty">暂时没能加载，请点「刷新」重试</div>';
   }
 }
 
+let auditRows=[];
 async function loadAudit(){
   try{
     const s=await (await fetch('/api/audit/stats')).json();
     document.getElementById('auditStats').innerHTML=
-      '<span>总记录 <b>'+s.total+'</b></span><span>拒绝 <b style="color:var(--danger)">'+s.denied+'</b></span>'+
-      '<span>错误 <b style="color:var(--danger)">'+s.errors+'</b></span><span>租户 <b>'+esc(s.tenant)+'</b></span>';
-    const j2=await (await fetch('/api/audit/logs?limit=100')).json();
-    document.getElementById('auditBody').innerHTML=(j2.logs||[]).map(l=>
-      '<tr><td>'+esc(String(l.ts).slice(11,19))+'</td><td>'+esc(l.tenant_id)+'</td><td>'+esc(l.user_id)+'</td>'+
-      '<td>'+esc(l.action)+'</td><td>'+esc(l.status)+'</td><td>'+esc(l.duration_ms)+'ms</td>'+
-      '<td class="res-'+esc(l.result)+'">'+esc(l.result)+'</td><td class="detail">'+esc(l.detail)+'</td></tr>').join('');
-  }catch(e){document.getElementById('auditBody').innerHTML='<tr><td colspan="8" class="empty">审计加载失败</td></tr>'}
+      '<span>共 <b>'+s.total+'</b> 条</span><span>未通过 <b style="color:var(--danger)">'+s.denied+'</b></span>'+
+      '<span>异常 <b style="color:var(--danger)">'+s.errors+'</b></span><span>部门 <b>'+esc(window.Shell?Shell.tenantLabel(s.tenant):s.tenant)+'</b></span>';
+    const j2=await (await fetch('/api/audit/logs?limit=200')).json();
+    auditRows=j2.logs||[];
+    const d=new Date();
+    document.getElementById('auditBody').innerHTML=auditRows.map(l=>{
+      const t=new Date(l.ts);
+      const hh=isNaN(t.getTime())?String(l.ts||'').slice(11,19):
+        [t.getHours(),t.getMinutes(),t.getSeconds()].map(n=>String(n).padStart(2,'0')).join(':');
+      return '<tr><td>'+esc(hh)+'</td><td>'+esc(Shell.tenantLabel(l.tenant_id))+'</td><td>'+esc(l.user_id)+'</td>'+
+      '<td>'+esc(l.action)+'</td><td>'+esc(l.status)+'</td><td>'+esc(l.duration_ms||0)+'ms</td>'+
+      '<td class="res-'+esc(l.result)+'">'+esc(resultCn(l.result,l.status))+'</td><td class="detail">'+esc(l.detail)+'</td></tr>';
+    }).join('')||'<tr><td colspan="8" class="empty">暂无记录</td></tr>';
+  }catch(e){document.getElementById('auditBody').innerHTML='<tr><td colspan="8" class="empty">记录加载失败</td></tr>'}
+}
+function resultCn(r,status){return r==='SUCCESS'?'成功':r==='DENIED'?'未通过':r==='ERROR'?'异常':(Number(status)>=400?'失败':r||'—')}
+function exportAuditCsv(){
+  if(!auditRows.length){if(window.appToast)appToast('暂无可导出的记录','info');return}
+  const q=v=>'"'+String(v==null?'':v).replace(/"/g,'""')+'"';
+  const head=['时间','部门','账号','动作','状态','耗时(ms)','结果','详情'];
+  const rows=auditRows.map(l=>[l.ts,Shell.tenantLabel(l.tenant_id),l.user_id,l.action,l.status,l.duration_ms,resultCn(l.result,l.status),l.detail]);
+  const csv='\ufeff'+[head].concat(rows).map(r=>r.map(q).join(',')).join('\r\n');
+  const url=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));
+  const a=document.createElement('a');a.href=url;a.download='操作记录-'+new Date().toISOString().slice(0,10)+'.csv';a.click();
+  setTimeout(()=>URL.revokeObjectURL(url),2000);
 }
 
-initShell('settings');
+initShell('governance',{adminSidebar:true});
 loadIdentity();
 loadPermissions();
 loadAudit();
+if(location.hash==='#audit')setTimeout(()=>{
+  const cards=document.querySelectorAll('.page > .card');
+  if(cards.length>2)cards[2].scrollIntoView({behavior:'smooth',block:'start'});
+},400);
 // 页面级权限守卫：菜单权限页没勾「权限与日志」的账号，直接敲 URL 也进不来
 (async function guardPerm(){
   if(window.Shell&&Shell.permsReady)await Shell.permsReady();
@@ -159,7 +179,7 @@ loadAudit();
     bar.className='card';bar.style.cssText='margin:auto;max-width:520px;padding:36px;text-align:center';
     bar.innerHTML='<div style="font-size:34px;margin-bottom:12px">🔒</div>'+
       '<div style="font-size:15px;font-weight:650;margin-bottom:8px">没有使用权限</div>'+
-      '<div style="font-size:13px;color:#6b7a99;line-height:1.7">当前账号未被授予「权限与日志」的使用权限。<br>如需使用，请联系管理员为你的角色勾选该功能。</div>'+
+      '<div style="font-size:13px;color:#6b7a99;line-height:1.7">你暂时不能使用这个功能。<br>需要的话，请联系管理员开通。</div>'+
       '<a href="index.html" style="display:inline-block;margin-top:18px;color:var(--primary,#3b6ef5);text-decoration:none;font-size:13px">← 返回智能问答</a>';
     main.insertBefore(bar,main.firstChild);
   }

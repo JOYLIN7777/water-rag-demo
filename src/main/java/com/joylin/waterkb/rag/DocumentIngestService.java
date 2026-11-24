@@ -29,7 +29,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashSet;
@@ -133,7 +133,9 @@ public class DocumentIngestService {
             meta.put("fileName", fileName);
             meta.put("chunkIndex", i);
             meta.put("totalChunks", chunks.size());
-            meta.put("uploadedAt", LocalDateTime.now().toString());
+            // 写入带 Z 的 UTC 绝对时间：ES 的 date 字段按 UTC 解释，
+            // 若写无时区的本地时间会被当成 UTC，前端再转本地就多出 8 小时（实测踩坑）。
+            meta.put("uploadedAt", Instant.now().toString());
             // 行级权限：上传者为 owner；可见性由部门规则（tenantId + visibleSubtree）决定
             // allowedGroups 仅作元数据留存，检索过滤不再消费它（功能角色组不是数据可见组）
             com.joylin.waterkb.security.UserContext.CurrentUser user = com.joylin.waterkb.security.UserContext.get();

@@ -33,6 +33,28 @@
   ];
   global.ShellSettings = SETTINGS;
 
+  // 后台侧栏：治理/审计类页面虽不在 admin.html 内，但属于管理域，
+  // 统一显示后台导航而不是问答侧栏（审计员登录后看到的应该是后台的一套入口）。
+  // href 指向 admin.html 的对应面板；带 panel 参数由后台页面自己激活。
+  const ADMIN_NAV = [
+    { key: 'users', label: '用户管理', icon: '◈', href: 'admin.html?panel=users', perm: 'user:read' },
+    { key: 'org', label: '组织架构', icon: '⌘', href: 'admin.html?panel=org', perm: 'user:read' },
+    { key: 'roles', label: '角色定义', icon: '❖', href: 'admin.html?panel=roles', perm: 'user:read' },
+    { key: 'perms', label: '菜单权限', icon: '☷', href: 'admin.html?panel=perms', perm: 'user:read' },
+    { key: 'docs', label: '文档管理', icon: '▤', href: 'admin.html?panel=docs', perm: 'doc:read' },
+    { key: 'models', label: '模型设置', icon: '◇', href: 'admin.html?panel=models', perm: 'model:read' },
+    { key: 'usage', label: '用量统计', icon: '◷', href: 'admin.html?panel=usage', perm: 'usage:read' },
+    { key: 'governance', label: '权限与日志', icon: '◈', href: 'governance.html', perm: 'audit:read' },
+    // 日志类入口落在治理页自身：审计员只有 audit:read，进 admin.html 会被 admin:access 守卫拦住
+    { key: 'loginlogs', label: '登录日志', icon: '⎗', href: 'governance.html#audit', perm: 'audit:read' },
+    { key: 'audit', label: '操作日志', icon: '≡', href: 'governance.html#audit', perm: 'audit:read' }
+  ];
+  const ADMIN_GROUPS = [
+    { label: '权限配置目录', keys: ['users', 'org', 'roles', 'perms'] },
+    { label: '业务管理', keys: ['docs', 'models', 'usage'] },
+    { label: '日志审计', keys: ['governance', 'loginlogs', 'audit'] }
+  ];
+
   // 内部标识转中文显示名，避免把 admin / water-dept / default 直接暴露给用户
   const GROUP_LABELS = {
     admin: '系统管理员', 'water-dept': '水利业务组', analyst: '水利分析员',
@@ -220,6 +242,7 @@
     saveSessions,
     /** 相对时间格式化（今天 HH:MM / 昨天 / N天前 / M/D）：个人中心等处复用 */
     fmtTime: fmtTime,
+    roleLabel: groupLabel,
     avatar: avatar,
     logout: confirmLogout,
     /** 选文件后先列清单再上传（知识库文档页也复用这套） */
@@ -855,6 +878,8 @@
         '<div class="user-name">' + esc(name) + '</div>' +
         '<div class="user-tenant">' + esc(tenantLabel(tenant)) + '</div></a>' +
       '<a class="user-icon-btn" href="settings.html" title="设置">' + svg('settings') + '</a>' +
+      // 管理后台是低频入口，跟「设置/退出」一起收在左下角用户区，不占顶栏主位置
+      '<a class="user-icon-btn admin-shortcut" href="admin.html" title="进入管理后台" style="display:none">◈</a>' +
       '<button class="user-logout" title="退出登录" onclick="Shell.logout()">⏻</button>';
   }
 
@@ -907,6 +932,7 @@
     global.Shell.newSession = newSession;
     renderSessions();
     renderUser();
+    renderAdminEntry();   // 用户卡刚渲染完就定位管理后台入口，别等权限请求回来才显示
     bindSidebarEvents();
     loadDocs();
     fetch('/api/docs/formats').then(r => r.json()).then(d => {
@@ -916,6 +942,37 @@
       const f = document.getElementById('dropFormats');
       if (f) { f.textContent = exts.slice(0, 10).join(' / ') + (exts.length > 10 ? ' 等 ' + exts.length + ' 种格式' : ''); f.title = exts.join(' / '); }
     }).catch(() => {});
+  }
+
+  /** 管理域页面侧栏：与 admin.html 同一套导航，按权限过滤，避免审计员看到问答侧栏 */
+  function renderAdminSidebar(active) {
+    const host = document.getElementById('sidebarHost');
+    if (!host) return;
+    const old = host.querySelector('.sidebar');
+    if (old) old.remove();
+    const navHtml = ADMIN_GROUPS.map(g =>
+      '<div class="section-label">' + g.label + '</div>' +
+      g.keys.map(k => {
+        const n = ADMIN_NAV.find(x => x.key === k);
+        return '<a class="nav-item admin-nav-item' + (n.key === active ? ' active' : '') + '"' +
+          ' href="' + n.href + '" data-perm="' + n.perm + '" title="' + n.label + '">' +
+          '<span class="nav-ic">' + n.icon + '</span><span>' + n.label + '</span></a>';
+      }).join('')
+    ).join('');
+    const aside = document.createElement('div');
+    aside.innerHTML =
+      '<aside class="sidebar admin-sidebar">' +
+        '<div class="brand"><div class="brand-mark has-logo"><img class="brand-logo" src="assets/logo.svg" alt="水利知识库"></div>' +
+          '<div><div class="brand-title">管理后台</div><div class="brand-sub">水利知识库</div></div></div>' +
+        '<nav class="nav-list">' + navHtml + '</nav>' +
+        '<div class="admin-back"><a class="nav-item" href="index.html"><span class="nav-ic">⌂</span>返回问答</a></div>' +
+        '<div class="user-block" id="sidebarUserBlock"></div>' +
+        '<div class="sidebar-footer">水利知识库 · 让知识更好用</div>' +
+      '</aside>';
+    host.insertBefore(aside.firstElementChild, host.firstChild);
+    renderUser();
+    renderAdminEntry();
+    bindSidebarEvents();
   }
 
   // ---------- 权限码（前端只控制入口显示，真正拦截在服务端） ----------
@@ -961,16 +1018,20 @@
       const el = host.querySelector('.nav-item[href="' + n.href + '"]');
       if (el) el.remove();
     });
+    // 后台侧栏导航项统一带 data-perm，按权限码摘除（审计员只看得到日志审计组）
+    host.querySelectorAll('.admin-nav-item[data-perm]').forEach(el => {
+      if (!hasPermission(el.getAttribute('data-perm'))) el.remove();
+    });
   }
-  // 右上角管理后台入口：仅拥有 admin:access 才显示，免登录跳转（同源共享会话令牌）
+  // 管理后台入口：低频管理动作收进左下角用户卡（与设置/退出同组），仅 admin:access 可见。
+  // 顶栏不再挂文字按钮——那是高频问答区，管理员也不该被管理入口反复打断。
   function renderAdminEntry() {
     const slot = document.getElementById('adminEntrySlot');
-    if (!slot) return;
+    if (slot) slot.innerHTML = '';
     const allowed = hasPermission('admin:access') ||
       (function () { const u = global.WrkAuth && global.WrkAuth.getUser(); return !!(u && (u.groups || []).indexOf('admin') >= 0); })();
-    slot.innerHTML = allowed
-      ? '<a class="text-btn admin-entry" href="admin.html" title="进入管理后台">管理后台 ›</a>'
-      : '';
+    const btn = document.querySelector('.admin-shortcut');
+    if (btn) btn.style.display = allowed ? '' : 'none';
   }
 
   // ---------- 服务探活 ----------
@@ -1118,7 +1179,8 @@
     'search.html': { label: '检索对比', parent: 'settings.html', parentLabel: '设置' },
     'tree.html': { label: '会话结构', parent: 'settings.html', parentLabel: '设置' },
     'models.html': { label: '模型配置', parent: 'settings.html', parentLabel: '设置' },
-    'governance.html': { label: '权限与日志', parent: 'settings.html', parentLabel: '设置' },
+    // 权限与日志属于管理域，左侧已有完整后台导航，顶栏不再重复塞"返回设置/设置/…"
+    'governance.html': { label: '权限与日志', noNav: true },
     'profile.html': { label: '个人中心', back: 'index.html', backText: '返回问答' },
     'manage.html': { label: '知识库文档', back: 'index.html', backText: '返回问答' }
   };
@@ -1126,7 +1188,7 @@
     const file = location.pathname.split('/').pop() || 'index.html';
     const meta = PAGE_NAV[file];
     const host = document.querySelector('.topbar-left');
-    if (!meta || !host || host.querySelector('.topbar-nav-left')) return;
+    if (!meta || meta.noNav || !host || host.querySelector('.topbar-nav-left')) return;
     const backHref = meta.parent || meta.back || 'index.html';
     const backText = meta.parent ? '返回设置' : (meta.backText || '返回');
     const crumb = meta.parent
@@ -1143,10 +1205,12 @@
     if (sub) sub.style.display = 'none';
   }
 
-  global.initShell = function (active) {
+  global.initShell = function (active, opts) {
     // 未登录直接敲静态页地址也要弹回登录页（静态资源是后端白名单，前端必须自查）
     if (global.WrkAuth && !global.WrkAuth.guardPage()) return;
-    renderSidebar(active);
+    opts = opts || {};
+    // 管理域页面（如权限与日志）用后台侧栏；问答域保持原侧栏
+    if (opts.adminSidebar) renderAdminSidebar(active); else renderSidebar(active);
     renderTopbarNav();
     injectAdminHealth();
     checkHealth();
@@ -1154,8 +1218,8 @@
     loadPermissions();
     // 组织名先按内置兜底渲染，拿到服务端字典后重绘侧栏用户块（组织名可能已被管理员改过）
     loadOrgLabels().then(ok => { if (ok) renderUser(); });
-    // 会话清单与权限并行拉取：先渲染本地缓存，网络回来后再合并
-    syncSessions();
+    // 管理域页面不碰问答会话清单，避免审计员登录后被塞进"新建会话"那套状态
+    if (!opts.adminSidebar) syncSessions();
     if (global.setInterval) setInterval(checkHealth, 30000);
   };
   global.appToast = toast;

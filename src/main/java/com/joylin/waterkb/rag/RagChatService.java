@@ -113,6 +113,10 @@ public class RagChatService {
         // ===== 阶段 4：渲染外置 Prompt 模板 =====
         String systemPrompt = promptLoader.render(props.getRagSystemPrompt(),
                 Map.of("context", context, "history", history));
+        // 用户答「需要」确认上一轮的工具提议：模型不会自动把这种短句关联到工具调用，
+        // 这里显式注入一条强指令，避免又答一句"知识库中未找到相关内容"就完事。
+        String toolDirective = toolConfirmDirective(question, history);
+        if (toolDirective != null) systemPrompt = systemPrompt + "\n\n" + toolDirective;
 
         // 前置 sources 事件：前端可展示"本次回答引用了哪些片段"
         String sourcesJson = toSourcesJson(hits);
@@ -295,6 +299,29 @@ public class RagChatService {
      * 取祖先链文本：parentId 为空走当前 head，否则从指定节点回溯到根。
      * 只保留最近 maxTurns 轮，防止长会话撑爆 token 预算。
      */
+    /**
+     * 识别「上一轮模型问要不要调用工具，用户答需要」这种追问。
+     * 单纯把「需要」塞进 history 模型会当成新问题重新走 RAG，结果答非所问；
+     * 这里补一条明确指令，让模型接着上一轮的提议直接调工具。
+     */
+    private String toolConfirmDirective(String question, String history) {
+        if (question == null || history == null || history.isBlank()) return null;
+        String q = question.trim().replaceAll("[。！!？?，,、~\\s]", "");
+        if (!q.matches("需要|要|好的|好|可以|是的|嗯|查吧|查一下|帮我查|请查|调用吧|请调用|确认")) return null;
+        String h = history.toLowerCase();
+        if (!h.contains("是否需要") && !h.contains("要不要") && !h.contains("需要我")) return null;
+        if (!h.contains("工具") && !h.contains("水情")) return null;
+        String station = null;
+        for (String s : new String[]{"云溪水库", "东风水库", "红旗闸站", "东溪闸", "西溪闸"}) {
+            if (history.contains(s)) { station = s; break; }
+        }
+        return "【用户已确认】用户刚刚明确表示需要调用实时水情查询工具。" +
+                (station == null
+                        ? "请立即调用 queryRealtimeWater 工具；若上文没有明确站点，请先问用户要查哪个站点。"
+                        : "请立即调用 queryRealtimeWater 工具，站点参数使用「" + station + "」。") +
+                "不要再说「知识库中未找到相关内容」，不要重复询问是否需要。";
+    }
+
     private String historyChainText(String sessionId, String parentId) {
         try {
             List<TreeNode> nodes = parentId == null || parentId.isBlank()
