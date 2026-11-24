@@ -23,11 +23,11 @@ public class ConsolePageController {
 
     private static final String[] PAGES = {
             "/users.html", "/org.html", "/roles.html", "/perms.html",
-            "/docs.html", "/usage.html", "/loginlogs.html", "/audit.html"
+            "/docs.html", "/models.html", "/usage.html", "/loginlogs.html", "/audit.html"
     };
 
     @RequestMapping(value = {"/users.html", "/org.html", "/roles.html", "/perms.html",
-            "/docs.html", "/usage.html", "/loginlogs.html", "/audit.html"}, method = RequestMethod.GET)
+            "/docs.html", "/models.html", "/usage.html", "/loginlogs.html", "/audit.html"}, method = RequestMethod.GET)
     public ResponseEntity<byte[]> consolePage() throws IOException {
         ClassPathResource resource = new ClassPathResource("static/admin.html");
         return ResponseEntity.ok()

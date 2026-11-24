@@ -42,7 +42,7 @@
     { key: 'roles', label: '角色定义', icon: '❖', href: 'roles.html', perm: 'role:read' },
     { key: 'perms', label: '菜单权限', icon: '☷', href: 'perms.html', perm: 'perm:read' },
     { key: 'docs', label: '文档管理', icon: '▤', href: 'docs.html', perm: 'admin:docs' },
-    { key: 'models', label: '模型设置', icon: '◇', href: 'admin.html?panel=models', perm: 'model:read' },
+    { key: 'models', label: '模型设置', icon: '◇', href: 'models.html', perm: 'model:read' },
     { key: 'usage', label: '用量统计', icon: '◷', href: 'usage.html', perm: 'usage:read' },
     // 日志类入口直接按菜单权限目录的路由进入各自页面（管理员与审计员看到同一页面）
     { key: 'loginlogs', label: '登录日志', icon: '⎗', href: 'loginlogs.html', perm: 'loginlog:read' },
@@ -229,6 +229,20 @@
   let sessionChangeHandler = null;
   let sessionsSyncedHandler = null;
   let currentSessionId = '';
+  /** 整页跳转统一遮罩：盖住旧页面再跳，避免旧页面留屏被看成"闪一下" */
+  function navWithMask(href) {
+    if (!href || document.getElementById('consoleNavMask')) return;
+    const mask = document.createElement('div');
+    mask.id = 'consoleNavMask';
+    mask.className = 'console-nav-mask';
+    mask.innerHTML = '<div class="console-nav-spinner"></div><span>正在打开页面…</span>';
+    document.body.appendChild(mask);
+    requestAnimationFrame(function () {
+      setTimeout(function () { location.href = href; }, 90);
+    });
+  }
+
+
   global.Shell = {
     setSession(id) { currentSessionId = id; renderSessions(); },
     onSessionChange(fn) { sessionChangeHandler = fn; },
@@ -271,6 +285,8 @@
     applyPermControls: applyPermControls,
     /** 手动触发一次页面权限发现（调试/新按钮上线后可用） */
     discoverPermissions: discoverPermissions,
+    /** 整页跳转前盖遮罩，避免旧页面留屏 */
+    navWithMask: navWithMask,
     /** 等权限清单就绪：功能页守卫用它保证判定时权限已加载 */
     permsReady: function () { return loadPermissions(); },
     /** 后台改完角色权限后调用，强制重拉（返回 Promise） */
@@ -1088,7 +1104,7 @@
     const pages = [
       ['admin:access', 'users.html'], ['user:read', 'users.html'], ['org:read', 'org.html'],
       ['role:read', 'roles.html'], ['perm:read', 'perms.html'], ['admin:docs', 'docs.html'],
-      ['model:read', 'admin.html?panel=models'], ['usage:read', 'usage.html'],
+      ['model:read', 'models.html'], ['usage:read', 'usage.html'],
       ['loginlog:read', 'loginlogs.html'], ['audit:read', 'audit.html']
     ];
     const canChat = hasPermission('chat:use');
@@ -1098,7 +1114,7 @@
     const slot = document.getElementById('adminEntrySlot');
     if (slot) {
       slot.innerHTML = (target && !inAdmin)
-        ? '<a class="admin-entry-btn" href="' + target + '" title="进入管理后台">⚙ 管理后台</a>' : '';
+        ? '<a class="admin-entry-btn" href="' + target + '" title="进入管理后台" onclick="Shell.navWithMask(this)">⚙ 管理后台</a>' : '';
     }
   }
 
@@ -1331,7 +1347,7 @@
     'manage.html': 'doc:read',
     'search.html': 'search:use',
     'tree.html': 'tree:use',
-    'admin.html?panel=models': 'model:read',
+    'models.html': 'model:read',
     'users.html': 'user:read',
     'org.html': 'org:read',
     'roles.html': 'role:read',
@@ -1406,16 +1422,7 @@
       // 先盖一层遮罩再跳，避免旧页面在新文档加载完成前一直留在屏幕上（用户看到的就是"闪一下"）。
       if (!panel || typeof window.goPanel !== 'function') {
         e.preventDefault();
-        const href = a.getAttribute('href');
-        if (document.getElementById('consoleNavMask')) return;
-        const mask = document.createElement('div');
-        mask.id = 'consoleNavMask';
-        mask.className = 'console-nav-mask';
-        mask.innerHTML = '<div class="console-nav-spinner"></div><span>正在打开页面…</span>';
-        document.body.appendChild(mask);
-        requestAnimationFrame(function () {
-          setTimeout(function () { location.href = href; }, 90);
-        });
+        navWithMask(a.getAttribute('href'));
         return;
       }
       e.preventDefault();
