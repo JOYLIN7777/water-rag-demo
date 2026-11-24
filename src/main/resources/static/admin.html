@@ -11,6 +11,11 @@
   .admin-sidebar .brand{padding-bottom:16px}
   .admin-panel{display:none}
   .admin-panel.active{display:block}
+  /* 后台内容区占满视口高度：main→page→panel→工作台逐层拉伸，
+     避免表格在一个屏幕中段就结束、下面露出一大片页面底色 */
+  main.main > .page{flex:1;display:flex;flex-direction:column;padding-bottom:20px}
+  .admin-panel.active{flex:1;display:flex;flex-direction:column}
+  .admin-panel.active > .workbench,.admin-panel.active > .card{flex:1}
   .admin-nav-item{display:flex;align-items:center;gap:10px;padding:8px 11px;border-radius:8px;color:#b9c6de;text-decoration:none;font-size:12.5px;cursor:pointer;margin-bottom:2px;transition:all .15s;border:0;background:transparent;width:100%;text-align:left}
   .admin-nav-item:hover{background:rgba(255,255,255,.06);color:#fff}
   .admin-nav-item.active{background:rgba(124,92,214,.3);color:#fff;font-weight:650}
@@ -396,14 +401,17 @@
           <div class="toolbar" style="background:#fff;border:1px solid var(--line);border-bottom:0;border-radius:var(--radius) var(--radius) 0 0">
             <input type="file" id="adminDocFiles" multiple hidden onchange="adminUploadDocs()">
             <button class="btn btn-sm btn-primary" onclick="document.getElementById('adminDocFiles').click()">＋ 选择文件</button>
+            <label style="display:inline-flex;align-items:center;gap:5px;font-size:12px;color:var(--ink-2);cursor:pointer">
+              <input type="checkbox" id="adminIncludeSubtree"> 含下级部门可见
+            </label>
             <span id="adminUploadMsg" style="font-size:12px;color:var(--muted)">可多选文件，也可直接拖到下方列表</span>
             <span class="grow"></span>
             <button class="btn btn-sm" onclick="loadDocs()">刷新</button>
           </div>
           <div class="table-wrap" style="border:1px solid var(--line);border-radius:0 0 var(--radius) var(--radius);background:#fff"
                ondragover="event.preventDefault()" ondrop="adminDropDocs(event)">
-            <table class="data-table"><thead><tr><th>文档名称</th><th>片段数</th><th>上传人</th><th>上传时间</th><th>操作</th></tr></thead>
-              <tbody id="dList"><tr><td colspan="5" class="empty">加载中…</td></tr></tbody></table>
+            <table class="data-table"><thead><tr><th>文档名称</th><th>所属部门 / 可见范围</th><th>片段数</th><th>上传人</th><th>上传时间</th><th>操作</th></tr></thead>
+              <tbody id="dList"><tr><td colspan="6" class="empty">加载中…</td></tr></tbody></table>
           </div>
         </div>
       </section>
@@ -1613,12 +1621,17 @@ async function loadDocs(){
     const docs=await api('/api/docs/list');
     const list=docs.slice().sort((a,b)=>String(b.uploadedAt||'').localeCompare(String(a.uploadedAt||'')));
     $('dList')._rows=list;
-    $('dList').innerHTML=list.map((d,i)=>
-      '<tr><td class="name">'+esc(d.fileName)+'</td><td>'+num(d.chunks)+'</td><td>'+esc(d.ownerUser||'—')+'</td>'+
-      '<td>'+esc(String(d.uploadedAt||'').slice(0,19))+'</td>'+
-      '<td><button class="op-btn" onclick="showChunks('+i+')">查看分片</button>'+
-      '<button class="btn btn-sm btn-danger" style="margin-left:8px" onclick="delDocAt('+i+')">删除</button></td></tr>'
-    ).join('')||'<tr><td colspan="5" class="empty">知识库暂无文档</td></tr>';
+    $('dList').innerHTML=list.map((d,i)=>{
+      // 与「知识库文档」页同步：显示归属部门 + 可见范围（下发/仅本部门）
+      const org=esc(window.Shell?Shell.tenantLabel(d.tenantId||'default'):(d.tenantId||'default'));
+      const scope=d.visibleSubtree?org+' · 含下级':org+' · 仅本部门+上级';
+      return '<tr><td class="name">'+esc(d.fileName)+'</td>'+
+        '<td><span class="tag" title="文档归属部门与可见范围">'+scope+'</span></td>'+
+        '<td>'+num(d.chunks)+'</td><td>'+esc(d.ownerUser||'—')+'</td>'+
+        '<td>'+esc(String(d.uploadedAt||'').slice(0,19))+'</td>'+
+        '<td><button class="op-btn" onclick="showChunks('+i+')">查看分片</button>'+
+        '<button class="btn btn-sm btn-danger" style="margin-left:8px" onclick="delDocAt('+i+')">删除</button></td></tr>';
+    }).join('')||'<tr><td colspan="6" class="empty">知识库暂无文档</td></tr>';
   }catch(e){console.error(e)}
 }
 
@@ -1638,6 +1651,8 @@ async function adminUploadDocs(picked){
   let ok=0,fail=0;
   for(let i=0;i<files.length;i++){
     const fd=new FormData();fd.append('file',files[i]);
+    const sub=document.getElementById('adminIncludeSubtree');
+    if(sub&&sub.checked)fd.append('includeSubtree','true');
     $('adminUploadMsg').textContent='正在入库 '+files[i].name+'（'+(i+1)+'/'+files.length+'）…';
     try{
       const r=await fetch('/api/docs/upload',{method:'POST',body:fd});
@@ -1651,14 +1666,16 @@ async function adminUploadDocs(picked){
   appToast('文档入库完成','ok');loadDocs();
 }
 function delDocAt(i){
-  const d=($('dList')._rows||[])[i];if(d)delDoc(d.fileName);
+  const d=($('dList')._rows||[])[i];if(d)delDoc(d.fileName,d.tenantId);
 }
-function delDoc(name){
+function delDoc(name,tenantId){
   Shell.modal({title:'删除文档',danger:true,okText:'确认删除',body:
-    '<p style="margin:0">确定删除「'+esc(name)+'」及其全部片段吗？删除后无法恢复。</p>',
+    '<p style="margin:0">确定删除「'+esc(name)+'」及其全部片段吗？删除后无法恢复。</p>'+
+    (tenantId?'<p style="margin:6px 0 0;color:var(--muted);font-size:12px">仅删除「'+esc(window.Shell?Shell.tenantLabel(tenantId):tenantId)+'」部门下的同名文档，不影响其他部门。</p>':''),
     onOk:async function(close){
       try{
-        const r=await fetch('/api/docs?fileName='+encodeURIComponent(name),{method:'DELETE'});
+        const q='?fileName='+encodeURIComponent(name)+(tenantId?'&tenantId='+encodeURIComponent(tenantId):'');
+        const r=await fetch('/api/docs'+q,{method:'DELETE'});
         const j=await r.json();if(!r.ok)throw new Error(j.message||'删除失败');
         close();appToast('已删除文档','ok');loadDocs();
       }catch(e){Shell.modalError('删除失败：'+e.message);return false}

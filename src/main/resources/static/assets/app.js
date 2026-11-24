@@ -792,7 +792,10 @@
   }
 
   function bindSidebarEvents() {
-    const dz = document.getElementById('dropzone');
+    // 侧栏已移除快速上传区；上传统一走「知识库文档」页的上传卡。
+    // 查询必须限定在侧栏内——否则会绑到 manage.html 自己的 #dropzone 并覆盖页面内的处理函数
+    const host = document.getElementById('sidebarHost');
+    const dz = host && host.querySelector('#dropzone');
     if (dz) {
       dz.onclick = () => document.getElementById('fileInput') && document.getElementById('fileInput').click();
       dz.ondragover = e => { e.preventDefault(); dz.classList.add('dragging'); };
@@ -817,10 +820,10 @@
         }
       };
     }
-    const fi = document.getElementById('fileInput');
+    const fi = host && host.querySelector('#fileInput');
     if (fi) fi.onchange = e => { uploadFiles(e.target.files); e.target.value = ''; };
     // 选文件夹：先列清单，用户勾掉不要的再传
-    const folder = document.getElementById('folderInput');
+    const folder = host && host.querySelector('#folderInput');
     if (folder) folder.onchange = e => { openUploadPicker(e.target.files); e.target.value = ''; };
   }
 
@@ -881,18 +884,6 @@
         '<button class="new-chat" onclick="Shell.newSession()">＋ 新建会话</button>' +
         '<div class="section-label">历史会话</div>' +
         '<div class="session-list" id="sessionList"></div>' +
-        '<div class="upload-area open" id="uploadArea">' +
-          '<div class="upload-title"><span class="t">快速上传</span><span class="upload-hint">拖入即可入库</span></div>' +
-          '<div class="upload-body">' +
-            '<div class="dropzone" id="dropzone"><div class="drop-icon">⇪</div>' +
-              '<div class="drop-text">点击或拖拽上传文档</div>' +
-              '<div class="drop-formats" id="dropFormats">支持多格式</div></div>' +
-            '<div class="upload-msg" id="uploadMsg" style="display:none"></div>' +
-            '<button class="folder-btn" onclick="Shell.pickFolder()">📁 选择文件夹上传</button>' +
-            '<input type="file" id="fileInput" hidden>' +
-            '<input type="file" id="folderInput" webkitdirectory multiple hidden>' +
-          '</div>' +
-        '</div>' +
         '<div class="user-block" id="sidebarUserBlock"></div>' +
         '<div class="sidebar-footer">水利知识库 · 让知识更好用</div>' +
       '</aside>';
@@ -935,8 +926,7 @@
     return permsReady;
   }
   // 权限清单回来后二次收敛侧栏：renderSidebar 是同步渲染（当时权限多半还没回来），
-  // 这里把无权限的导航项与上传区从 DOM 摘掉——菜单隐藏只是第一道门，页面内还有守卫。
-  // 注意空权限集也是"加载完成"：没有任何权限的账号同样要摘（size 只是防"还没加载就误摘"）
+  // 这里把无权限的导航项从 DOM 摘掉——菜单隐藏只是第一道门，页面内还有守卫
   function applySidebarPerms() {
     const host = document.getElementById('sidebarHost');
     if (!host) return;
@@ -944,9 +934,6 @@
       const el = host.querySelector('.nav-item[href="' + n.href + '"]');
       if (el) el.remove();
     });
-    // 快速上传区需要 doc:write；只读用户（没勾上传文档）不显示，点了也只会 403
-    const up = host.querySelector('.upload-area');
-    if (up && !hasPermission('doc:write')) up.remove();
   }
   // 右上角管理后台入口：仅拥有 admin:access 才显示，免登录跳转（同源共享会话令牌）
   function renderAdminEntry() {

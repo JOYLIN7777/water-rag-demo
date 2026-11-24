@@ -149,7 +149,8 @@ async function loadDocs(){
     // 401/403/500 时后端返回 {code,message} 对象而不是数组，直接 filter 会抛
     // "docs.filter is not a function"——先把类型守住，把后端的话原样亮给用户
     if(!Array.isArray(j))throw new Error(j&&j.message?j.message:'登录状态已失效，请重新登录后再试');
-    docs=j;
+    // ES composite 聚合按（部门,文件名）字典序返回，这里按上传时间倒序（最新在前）再分页
+    docs=j.slice().sort((a,b)=>String(b.uploadedAt||'').localeCompare(String(a.uploadedAt||'')));
     try{await Shell.loadOrgLabels()}catch(e){} // 部门徽标要显示组织名而不是 org-key
     render();
     document.getElementById('statDocs').textContent=docs.length;
@@ -227,7 +228,8 @@ async function delDoc(d){
   if(!confirm('确定从知识库删除「'+d.fileName+'」（'+d.chunks+' 个切片）吗？\n删除后相关内容将无法再被问答引用。'))return;
   showMsg('','正在删除 '+d.fileName+' ...');
   try{
-    const r=await fetch('/api/docs?fileName='+encodeURIComponent(d.fileName),{method:'DELETE'});
+    const q='?fileName='+encodeURIComponent(d.fileName)+(d.tenantId?'&tenantId='+encodeURIComponent(d.tenantId):'');
+    const r=await fetch('/api/docs'+q,{method:'DELETE'});
     const j=await r.json();
     if(!r.ok||j.deletedChunks===undefined)throw new Error(j.message||('删除失败（HTTP '+r.status+'）'));
     showMsg('ok','✓ 已删除「'+d.fileName+'」（'+j.deletedChunks+' 个切片）');

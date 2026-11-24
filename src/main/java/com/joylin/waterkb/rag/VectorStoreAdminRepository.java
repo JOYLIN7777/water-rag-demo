@@ -59,8 +59,8 @@ public class VectorStoreAdminRepository {
         return out;
     }
 
-    public int deleteByFileName(String fileName) {
-        return es.deleteByFileName(fileName);
+    public int deleteByFileName(String fileName, String tenantId) {
+        return es.deleteByFileName(fileName, tenantId);
     }
 
     /** 可见范围内查文件归属部门（删除失败时区分"不存在"与"归属别部门"） */

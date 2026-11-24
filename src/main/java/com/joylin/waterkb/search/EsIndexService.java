@@ -233,11 +233,19 @@ public class EsIndexService {
      * 按文件名删除（先 _delete_by_query，再 refresh）。
      * 范围由 {@link DocVisibilityService#deleteScopeFilter()} 决定：非 admin 只删本部门的同名文档，
      * 祖先下发的、兄弟部门的同名文档不会被误删（同名跨部门在列表里是独立条目）。
+     *
+     * @param tenantId 可选：管理员在后台按列表行精确删除某部门的同名文档；
+     *                 非管理员忽略此参数（服务端强制本部门，防越权删别人部门）
      */
-    public int deleteByFileName(String fileName) {
+    public int deleteByFileName(String fileName, String tenantId) {
         // fileName 本身就是 keyword 类型，没有 .keyword 子字段
+        String scope = visibility.deleteScopeFilter();
+        if (tenantId != null && !tenantId.isBlank()
+                && com.joylin.waterkb.security.UserContext.get().hasGroup("admin")) {
+            scope = "{\"term\":{\"tenantId\":" + quote(tenantId) + "}}";
+        }
         String dsl = "{\"query\":{\"bool\":{\"must\":["
-                + "{\"term\":{\"fileName\":" + quote(fileName) + "}}," + visibility.deleteScopeFilter() + "]}}}";
+                + "{\"term\":{\"fileName\":" + quote(fileName) + "}}," + scope + "]}}}";
         try {
             return postJson("/" + props.getIndex() + "/_delete_by_query?refresh=true", dsl).path("deleted").asInt();
         } catch (Exception e) {

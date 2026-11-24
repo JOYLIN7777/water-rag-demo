@@ -103,8 +103,9 @@ public class DocumentController {
      */
     @DeleteMapping
     @RequirePermission(Permission.DOC_DELETE)
-    public Map<String, Object> delete(@RequestParam String fileName) {
-        int deleted = adminRepository.deleteByFileName(fileName);
+    public Map<String, Object> delete(@RequestParam String fileName,
+            @RequestParam(value = "tenantId", required = false) String tenantId) {
+        int deleted = adminRepository.deleteByFileName(fileName, tenantId);
         if (deleted == 0) {
             String tenant = adminRepository.findDocTenant(fileName);
             if (tenant != null && !tenant.isBlank()) {
