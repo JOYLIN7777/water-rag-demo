@@ -71,7 +71,7 @@ class RolePermissionsTest {
     @Test
     void 角色矩阵带中文显示名且内置角色回落正确() {
         var matrix = service.roleMatrix();
-        assertEquals(3, matrix.size(), "无数据库时只应有三个内置角色，不能冒出运维人员等历史硬编码");
+        assertEquals(4, matrix.size(), "无数据库时只应有四个内置角色（admin/analyst/viewer/water-dept）");
         assertTrue(matrix.stream().anyMatch(m -> "admin".equals(m.get("role"))
                 && "系统管理员".equals(m.get("name"))));
         assertTrue(matrix.stream().anyMatch(m -> "analyst".equals(m.get("role"))

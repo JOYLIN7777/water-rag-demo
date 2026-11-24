@@ -75,7 +75,7 @@
           <textarea id="q" placeholder="输入问题，将从树下选中的节点分叉…"></textarea>
           <div class="row">
             <span class="hint" id="selHint">当前位置：尚未加载</span>
-            <button class="btn btn-primary" onclick="ask()">发送并分叉</button>
+            <button class="btn btn-primary" data-perm="chat:use" onclick="ask()">发送并分叉</button>
           </div>
         </div>
         <div class="legend">点击树中节点可选中它；再点「发送并分叉」，新回答会挂在该节点下，原分支不受影响。若只想切换当前位置而不发消息，点节点上的「回到这里」。</div>
@@ -83,7 +83,7 @@
           <div class="card-head"><h3 style="font-size:13px">命名分支</h3></div>
           <div style="display:flex;gap:8px;margin-bottom:8px">
             <input type="text" id="branchName" placeholder="分支名，如：换一种方案" style="flex:1">
-            <button class="btn" onclick="forkBranch()">标记</button>
+            <button class="btn" data-perm="tree:use" onclick="forkBranch()">标记</button>
           </div>
           <div id="branchList" class="hint"></div>
         </div>

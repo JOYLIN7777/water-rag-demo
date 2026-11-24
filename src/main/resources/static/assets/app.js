@@ -266,6 +266,8 @@
     /** 组织改名后重绘侧栏用户块（显示的是"账号 · 组织名"） */
     renderUser: renderUser,
     hasPermission: hasPermission,
+    /** 页面内动态加按钮后主动收敛（MutationObserver 通常已自动处理） */
+    applyPermControls: applyPermControls,
     /** 等权限清单就绪：功能页守卫用它保证判定时权限已加载 */
     permsReady: function () { return loadPermissions(); },
     /** 后台改完角色权限后调用，强制重拉（返回 Promise） */
@@ -977,6 +979,7 @@
 
   // ---------- 权限码（前端只控制入口显示，真正拦截在服务端） ----------
   let ownedPermissions = new Set();
+  let permsLoaded = false;
   function hasPermission(code) {
     return ownedPermissions.has(code);
   }
@@ -990,16 +993,21 @@
         if (!r.ok) {
           // 权限接口非 2xx：清空权限集并收敛菜单，不能让"权限加载失败"变成"全都可见"
           ownedPermissions = new Set();
-          applySidebarPerms(); renderAdminEntry();
-          return;
+          permsLoaded = false;
+          applySidebarPerms(); applyPermControls(); renderAdminEntry();
+          return false;
         }
         const j = await r.json();
         ownedPermissions = new Set(j.permissions || []);
+        permsLoaded = true;
         renderAdminEntry();
-        applySidebarPerms();
+        applySidebarPerms(); applyPermControls();
+        return true;
       } catch (e) {
         ownedPermissions = new Set();
-        applySidebarPerms(); renderAdminEntry();   // 网络失败同样按无权限收敛
+        permsLoaded = false;
+        applySidebarPerms(); applyPermControls(); renderAdminEntry();   // 网络失败同样按无权限收敛
+        return false;
       }
     })();
     return permsReady;
@@ -1023,13 +1031,45 @@
       if (!hasPermission(el.getAttribute('data-perm'))) el.remove();
     });
   }
-  // 管理后台入口：低频管理动作收进左下角用户卡（与设置/退出同组），仅 admin:access 可见。
-  // 顶栏不再挂文字按钮——那是高频问答区，管理员也不该被管理入口反复打断。
+  /**
+   * 全局按钮级权限：页面上任何元素都可以用 data-perm="权限码" 声明入口门槛。
+   * 侧栏导航由 applySidebarPerms 负责摘除，这里处理页面内的按钮/工具条/面板。
+   * 动态渲染的按钮由 MutationObserver 自动补挂，不必每个页面自己记得调用。
+   */
+  function applyPermControls(root) {
+    const scope = root && root.querySelectorAll ? root : document;
+    const nodes = scope.querySelectorAll ? scope.querySelectorAll('[data-perm]') : [];
+    nodes.forEach(el => {
+      const code = el.getAttribute('data-perm');
+      if (!code) return;
+      // 权限还没回来时先隐藏，拿到权限再放行——和侧栏一样采用默认拒绝
+      if (permsLoaded && hasPermission(code)) {
+        if (el.dataset.permHidden === '1') {
+          el.style.display = el.dataset.permPrevDisplay || '';
+          delete el.dataset.permHidden;
+        }
+      } else {
+        if (el.dataset.permHidden !== '1') {
+          el.dataset.permPrevDisplay = el.style.display || '';
+          el.dataset.permHidden = '1';
+        }
+        el.style.display = 'none';
+      }
+    });
+  }
+  // 管理后台入口：管理员是高频用户，顶栏保留醒目的文字按钮（问页/文档页等都能一键进入）；
+  // 左下角用户卡同时保留快捷入口。权限不足时两处都不显示。
   function renderAdminEntry() {
-    const slot = document.getElementById('adminEntrySlot');
-    if (slot) slot.innerHTML = '';
     const allowed = hasPermission('admin:access') ||
       (function () { const u = global.WrkAuth && global.WrkAuth.getUser(); return !!(u && (u.groups || []).indexOf('admin') >= 0); })();
+    const file = location.pathname.split('/').pop();
+    const inAdmin = file === 'admin.html' || file === 'governance.html';
+    const slot = document.getElementById('adminEntrySlot');
+    if (slot) {
+      // 已经在后台里就不再显示指向自己的按钮
+      slot.innerHTML = (allowed && !inAdmin)
+        ? '<a class="admin-entry-btn" href="admin.html" title="进入管理后台">⚙ 管理后台</a>' : '';
+    }
     const btn = document.querySelector('.admin-shortcut');
     if (btn) btn.style.display = allowed ? '' : 'none';
   }
@@ -1205,17 +1245,65 @@
     if (sub) sub.style.display = 'none';
   }
 
+  // 页面级权限：静态页是白名单资源，服务端拦不到 HTML 本身，进入页面要靠前端守卫。
+  // 权限码与权限目录（菜单权限页）的 routePath 一一对应，后台改角色权限后刷新即生效。
+  const PAGE_PERMS = {
+    'index.html': 'chat:use',
+    'manage.html': 'doc:read',
+    'search.html': 'search:use',
+    'tree.html': 'tree:use',
+    'models.html': 'model:read',
+    'admin.html': 'admin:access',
+    'governance.html': 'audit:read'
+  };
+  const PAGE_PERM_NAMES = {
+    'chat:use': '智能问答', 'doc:read': '知识库文档', 'search:use': '检索对比',
+    'tree:use': '会话分支', 'model:read': '模型设置', 'admin:access': '管理后台',
+    'audit:read': '审计日志'
+  };
+  function enforcePagePermission(file) {
+    // 权限接口失败时不误拦页面（服务端接口仍有权限校验），只做入口收敛
+    if (!permsLoaded) return;
+    const code = PAGE_PERMS[file];
+    if (!code || hasPermission(code) || document.getElementById('permDeniedScreen')) return;
+    const name = PAGE_PERM_NAMES[code] || code;
+    document.body.insertAdjacentHTML('beforeend',
+      '<div class="perm-denied-screen" id="permDeniedScreen">' +
+        '<div class="perm-denied-card">' +
+          '<div class="perm-denied-mark">⊘</div>' +
+          '<h2>没有访问权限</h2>' +
+          '<p>当前账号没有「' + esc(name) + '」权限，无法打开此页面。如需使用，请联系管理员开通。</p>' +
+          '<div class="perm-denied-actions">' +
+            '<a class="perm-denied-primary" href="index.html">返回问答首页</a>' +
+            '<button class="perm-denied-secondary" onclick="window.WrkAuth&&WrkAuth.logout&&WrkAuth.logout()">退出并换账号</button>' +
+          '</div>' +
+        '</div>' +
+      '</div>');
+  }
+
   global.initShell = function (active, opts) {
     // 未登录直接敲静态页地址也要弹回登录页（静态资源是后端白名单，前端必须自查）
     if (global.WrkAuth && !global.WrkAuth.guardPage()) return;
     opts = opts || {};
+    const file = location.pathname.split('/').pop() || 'index.html';
+    // 动态渲染出来的按钮（表格行、弹窗等）自动挂上权限收敛
+    if (global.MutationObserver && !document.body.dataset.permObserverReady) {
+      document.body.dataset.permObserverReady = '1';
+      new MutationObserver(muts => muts.forEach(m => m.addedNodes.forEach(n => {
+        if (n.nodeType === 1) applyPermControls(n);
+      }))).observe(document.body, { childList: true, subtree: true });
+    }
     // 管理域页面（如权限与日志）用后台侧栏；问答域保持原侧栏
     if (opts.adminSidebar) renderAdminSidebar(active); else renderSidebar(active);
     renderTopbarNav();
     injectAdminHealth();
     checkHealth();
     renderAdminEntry();
-    loadPermissions();
+    loadPermissions().then(ok => {
+      if (!ok) return;                 // 加载失败不误拦，接口侧仍受服务端保护
+      enforcePagePermission(file);
+      applyPermControls();
+    });
     // 组织名先按内置兜底渲染，拿到服务端字典后重绘侧栏用户块（组织名可能已被管理员改过）
     loadOrgLabels().then(ok => { if (ok) renderUser(); });
     // 管理域页面不碰问答会话清单，避免审计员登录后被塞进"新建会话"那套状态

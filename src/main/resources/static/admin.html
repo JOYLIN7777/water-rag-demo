@@ -287,17 +287,17 @@
       <div><div class="brand-title">管理后台</div><div class="brand-sub">水利知识库</div></div></div>
     <!-- 概览页已去掉：后台进来直接是用户管理，管理动作都在下面这几组里 -->
     <div class="section-label" style="margin-top:6px">权限配置目录</div>
-    <button class="admin-nav-item active" data-panel="users"><span class="ic">◈</span>用户管理</button>
-    <button class="admin-nav-item" data-panel="org"><span class="ic">⌘</span>组织架构</button>
-    <button class="admin-nav-item" data-panel="roles"><span class="ic">❖</span>角色定义</button>
-    <button class="admin-nav-item" data-panel="perms"><span class="ic">☷</span>菜单权限</button>
+    <button class="admin-nav-item active" data-panel="users" data-perm="user:read"><span class="ic">◈</span>用户管理</button>
+    <button class="admin-nav-item" data-panel="org" data-perm="user:read"><span class="ic">⌘</span>组织架构</button>
+    <button class="admin-nav-item" data-panel="roles" data-perm="admin:access"><span class="ic">❖</span>角色定义</button>
+    <button class="admin-nav-item" data-panel="perms" data-perm="admin:access"><span class="ic">☷</span>菜单权限</button>
     <div class="section-label" style="margin:14px 0 6px">业务管理</div>
-    <button class="admin-nav-item" data-panel="docs"><span class="ic">▤</span>文档管理</button>
-    <button class="admin-nav-item" data-panel="models"><span class="ic">◇</span>模型设置</button>
-    <button class="admin-nav-item" data-panel="usage"><span class="ic">◷</span>用量统计</button>
+    <button class="admin-nav-item" data-panel="docs" data-perm="doc:read"><span class="ic">▤</span>文档管理</button>
+    <button class="admin-nav-item" data-panel="models" data-perm="model:read"><span class="ic">◇</span>模型设置</button>
+    <button class="admin-nav-item" data-panel="usage" data-perm="usage:read"><span class="ic">◷</span>用量统计</button>
     <div class="section-label" style="margin:14px 0 6px">日志审计</div>
-    <button class="admin-nav-item" data-panel="loginlogs"><span class="ic">⎗</span>登录日志</button>
-    <button class="admin-nav-item" data-panel="audit"><span class="ic">≡</span>操作日志</button>
+    <button class="admin-nav-item" data-panel="loginlogs" data-perm="audit:read"><span class="ic">⎗</span>登录日志</button>
+    <button class="admin-nav-item" data-panel="audit" data-perm="audit:read"><span class="ic">≡</span>操作日志</button>
     <div class="admin-back">
       <a class="admin-nav-item" href="index.html"><span class="ic">⌂</span>返回问答</a>
       <div class="user-block" id="adminUserBlock"></div>
@@ -310,7 +310,7 @@
       <div class="topbar-right">
         <!-- 消息中心：密码重置申请挂在这里。放在业务页里会一直占版面，
              而它本质是"待办通知"，跟通知一起收进铃铛才符合管理员的使用顺序 -->
-        <button class="msg-bell" id="msgBell" onclick="openMsgCenter()" title="消息中心">
+        <button class="msg-bell" id="msgBell" data-perm="admin:access" onclick="openMsgCenter()" title="消息中心">
           <span>✉</span><span>消息</span><span class="dot" id="msgDot" style="display:none">0</span>
         </button>
       </div>
@@ -331,16 +331,16 @@
           <div class="filter-item"><label for="uRole">所属角色</label>
             <select id="uRole"><option value="">全部角色</option></select></div>
           <div class="filter-actions">
-            <button class="btn btn-sm btn-search" onclick="renderUserTable(1)">搜索</button>
-            <button class="btn btn-sm" onclick="resetUserFilter()">重置</button>
-            <button class="btn btn-sm btn-green" onclick="exportUsers()">导出用户</button>
-            <button class="btn btn-sm btn-amber" onclick="createUser()">＋ 新增账号</button>
+            <button class="btn btn-sm btn-search" data-perm="user:read" onclick="renderUserTable(1)">搜索</button>
+            <button class="btn btn-sm" data-perm="user:read" onclick="resetUserFilter()">重置</button>
+            <button class="btn btn-sm btn-green" data-perm="user:read" onclick="exportUsers()">导出用户</button>
+            <button class="btn btn-sm btn-amber" data-perm="user:write" onclick="createUser()">＋ 新增账号</button>
           </div>
         </div>
         <div class="workbench" style="min-height:auto">
           <div class="tree-pane">
             <div class="tree-head">组织架构
-              <button class="tree-add" onclick="orgCreate('')" title="在顶层新建组织">＋</button>
+              <button class="tree-add" data-perm="user:write" onclick="orgCreate('')" title="在顶层新建组织">＋</button>
             </div>
             <div id="uTree"></div>
           </div>
@@ -348,7 +348,7 @@
             <div class="toolbar">
               <span id="uFilterHint" style="font-size:12px;color:var(--muted)">全部用户</span>
               <span class="grow"></span>
-              <button class="btn btn-sm" onclick="loadUsersData()">刷新</button>
+              <button class="btn btn-sm" data-perm="user:read" onclick="loadUsersData()">刷新</button>
             </div>
             <div class="table-wrap"><table class="data-table">
               <thead><tr><th class="row-idx">序号</th><th>账号</th><th>显示名</th><th>所属角色</th><th>所属组织</th><th>账号状态</th><th>操作</th></tr></thead>
@@ -365,7 +365,7 @@
         <div class="workbench">
           <div class="tree-pane">
             <div class="tree-head">组织架构
-              <button class="tree-add" onclick="orgCreate('')" title="在顶层新建组织">＋</button>
+              <button class="tree-add" data-perm="user:write" onclick="orgCreate('')" title="在顶层新建组织">＋</button>
             </div>
             <div id="oTtree"></div>
           </div>
@@ -374,10 +374,10 @@
               <div class="org-crumb" id="oPath">全部组织</div>
               <div class="org-summary" id="oStats"></div>
               <div class="org-actions">
-                <button class="btn btn-sm btn-primary" onclick="orgCreate(orgSel.key)">＋ 新建子组织</button>
-                <button class="btn btn-sm" id="oEditBtn" onclick="orgEdit(orgSel.key)">编辑</button>
-                <button class="btn btn-sm btn-amber" onclick="createUser(orgSel.key)">＋ 新增用户</button>
-                <button class="btn btn-sm" onclick="toggleOrgTree()">展开/收起</button>
+                <button class="btn btn-sm btn-primary" data-perm="user:write" onclick="orgCreate(orgSel.key)">＋ 新建子组织</button>
+                <button class="btn btn-sm" id="oEditBtn" data-perm="user:write" onclick="orgEdit(orgSel.key)">编辑</button>
+                <button class="btn btn-sm btn-amber" data-perm="user:write" onclick="createUser(orgSel.key)">＋ 新增用户</button>
+                <button class="btn btn-sm" data-perm="user:read" onclick="toggleOrgTree()">展开/收起</button>
               </div>
             </div>
             <div class="org-section">下级组织</div>
@@ -385,7 +385,7 @@
               <thead><tr><th class="row-idx">序号</th><th>组织名称</th><th>标识</th><th>上级组织</th><th>直属成员</th><th>含下级成员</th><th>操作</th></tr></thead>
               <tbody id="oTable"><tr><td colspan="7" class="empty">加载中…</td></tr></tbody></table></div>
             <div class="v-resizer" id="orgSplitter" title="按住上下拖动，调整两个表格的高度"></div>
-            <div class="org-section">直属成员<button class="btn btn-sm" style="margin-left:10px" onclick="createUser(orgSel.key)">＋ 添加</button></div>
+            <div class="org-section">直属成员<button class="btn btn-sm" data-perm="user:write" style="margin-left:10px" onclick="createUser(orgSel.key)">＋ 添加</button></div>
             <div class="table-wrap" id="orgMemberTableWrap"><table class="data-table">
               <thead><tr><th class="row-idx">序号</th><th>账号</th><th>显示名</th><th>所属角色</th><th>账号状态</th><th>操作</th></tr></thead>
               <tbody id="oMemberTable"><tr><td colspan="6" class="empty">请选择左侧组织</td></tr></tbody></table></div>
@@ -401,8 +401,8 @@
           <div class="toolbar" style="background:#fff;border:1px solid var(--line);border-bottom:0;border-radius:var(--radius) var(--radius) 0 0">
             <input class="kw" id="rKw" type="text" placeholder="搜索角色名称 / 标识…">
             <span class="grow"></span>
-            <button class="btn btn-sm" onclick="refreshRoles()">刷新</button>
-            <button class="btn btn-sm btn-primary" onclick="createRole()">＋ 新增角色</button>
+            <button class="btn btn-sm" data-perm="admin:access" onclick="refreshRoles()">刷新</button>
+            <button class="btn btn-sm btn-primary" data-perm="admin:access" onclick="createRole()">＋ 新增角色</button>
           </div>
           <div class="table-wrap" style="border:1px solid var(--line);border-radius:0 0 var(--radius) var(--radius);background:#fff">
             <table class="data-table">
@@ -420,9 +420,9 @@
           <div class="toolbar" style="background:#fff;border:1px solid var(--line);border-bottom:0;border-radius:var(--radius) var(--radius) 0 0">
             <input class="kw" id="pKw" type="text" placeholder="查询菜单 / 按钮 / 权限标识…">
             <span class="grow"></span>
-            <button class="btn btn-sm" onclick="togglePermTree(true)">展开全部</button>
-            <button class="btn btn-sm" onclick="togglePermTree(false)">收起全部</button>
-            <button class="btn btn-sm btn-primary" onclick="createPerm()">＋ 新增权限</button>
+            <button class="btn btn-sm" data-perm="admin:access" onclick="togglePermTree(true)">展开全部</button>
+            <button class="btn btn-sm" data-perm="admin:access" onclick="togglePermTree(false)">收起全部</button>
+            <button class="btn btn-sm btn-primary" data-perm="admin:access" onclick="createPerm()">＋ 新增权限</button>
           </div>
           <div class="table-wrap" style="border:1px solid var(--line);border-radius:0 0 var(--radius) var(--radius);background:#fff">
             <table class="data-table">
@@ -439,13 +439,13 @@
         <div class="card" style="padding:0">
           <div class="toolbar" style="background:#fff;border:1px solid var(--line);border-bottom:0;border-radius:var(--radius) var(--radius) 0 0">
             <input type="file" id="adminDocFiles" multiple hidden onchange="adminUploadDocs()">
-            <button class="btn btn-sm btn-primary" onclick="document.getElementById('adminDocFiles').click()">＋ 选择文件</button>
+            <button class="btn btn-sm btn-primary" data-perm="doc:write" onclick="document.getElementById('adminDocFiles').click()">＋ 选择文件</button>
             <label style="display:inline-flex;align-items:center;gap:5px;font-size:12px;color:var(--ink-2);cursor:pointer">
               <input type="checkbox" id="adminIncludeSubtree"> 含下级部门可见
             </label>
             <span id="adminUploadMsg" style="font-size:12px;color:var(--muted)">可多选文件，也可直接拖到下方列表</span>
             <span class="grow"></span>
-            <button class="btn btn-sm" onclick="loadDocs()">刷新</button>
+            <button class="btn btn-sm" data-perm="doc:read" onclick="loadDocs()">刷新</button>
           </div>
           <div class="table-wrap" style="border:1px solid var(--line);border-radius:0 0 var(--radius) var(--radius);background:#fff"
                ondragover="event.preventDefault()" ondrop="adminDropDocs(event)">
@@ -464,8 +464,8 @@
           <div class="toolbar" style="background:#fff;border:1px solid var(--line);border-bottom:0;border-radius:var(--radius) var(--radius) 0 0">
             <span style="font-size:12.5px;color:var(--ink)">模型配置（带「生效中」的为当前使用配置）</span>
             <span class="grow"></span>
-            <button class="btn btn-sm" onclick="loadModelsInfo()">刷新</button>
-            <button class="btn btn-sm btn-primary" onclick="editModel(null)">＋ 新增模型</button>
+            <button class="btn btn-sm" data-perm="model:read" onclick="loadModelsInfo()">刷新</button>
+            <button class="btn btn-sm btn-primary" data-perm="model:write" onclick="editModel(null)">＋ 新增模型</button>
           </div>
           <div class="table-wrap" style="border:1px solid var(--line);border-radius:0 0 var(--radius) var(--radius);background:#fff">
             <table class="data-table"><thead><tr><th>名称</th><th>类型</th><th>模型标识</th><th>接口地址</th><th>状态</th><th>操作</th></tr></thead>
@@ -487,7 +487,7 @@
             <div class="stat-num">—</div><div class="stat-label">本月消耗 Token<span class="drill-tip">查看明细 ›</span></div></div>
         </div>
         <div class="card"><div class="card-head"><h3>按模型查看</h3>
-          <button class="btn btn-sm" onclick="loadUsage()">刷新</button></div>
+          <button class="btn btn-sm" data-perm="usage:read" onclick="loadUsage()">刷新</button></div>
           <div class="scroll"><table class="data-table"><thead><tr><th>模型</th><th>请求次数</th><th>输入Token</th><th>输出Token</th></tr></thead>
             <tbody id="uUsage"><tr><td colspan="4" class="empty">加载中…</td></tr></tbody></table></div>
           <div class="hint" id="uUsageHint"></div>
@@ -499,7 +499,7 @@
         <div class="page-head"><h1 class="page-title">登录日志</h1>
           <p class="page-desc">登录成功与失败的尝试都留有记录，失败原因可追溯。</p></div>
         <div class="card"><div class="card-head"><h3>登录记录</h3>
-          <button class="btn btn-sm" onclick="loadLoginLogs()">刷新</button></div>
+          <button class="btn btn-sm" data-perm="audit:read" onclick="loadLoginLogs()">刷新</button></div>
           <div class="table-wrap"><table class="data-table"><thead><tr><th>时间</th><th>账号</th><th>操作</th><th>状态</th><th>结果</th><th>耗时</th><th>来源 IP</th></tr></thead>
             <tbody id="lList"><tr><td colspan="7" class="empty">加载中…</td></tr></tbody></table></div>
           <div class="pager" id="lPager"></div>
@@ -511,7 +511,7 @@
         <div class="page-head"><h1 class="page-title">操作日志</h1>
           <p class="page-desc">查看账号在系统中的操作记录。</p></div>
         <div class="card"><div class="card-head"><h3>操作记录</h3>
-          <button class="btn btn-sm" onclick="loadAudit()">刷新</button></div>
+          <button class="btn btn-sm" data-perm="audit:read" onclick="loadAudit()">刷新</button></div>
           <div class="table-wrap"><table class="data-table"><thead><tr><th>时间</th><th>账号</th><th>动作</th><th>状态</th><th>耗时</th><th>结果</th></tr></thead>
             <tbody id="aList"><tr><td colspan="6" class="empty">加载中…</td></tr></tbody></table></div>
           <div class="pager" id="aPager"></div>
@@ -731,8 +731,8 @@ function msgCollectAll(){
       title:'「'+esc(userLabel(x.username,x.displayName))+'」申请重置密码',
       sub:tsLocal(x.requestedAt)+' · 来源 '+esc(x.requestIp||'—')+' · '+st,
       ops:pending
-        ?'<button class="btn btn-sm btn-primary" onclick="approveReset('+x.id+')">批准并发码</button>'+
-         '<button class="btn btn-sm" onclick="rejectReset('+x.id+')">驳回</button>'
+        ?'<button class="btn btn-sm btn-primary" data-perm="user:write" onclick="approveReset('+x.id+')">批准并发码</button>'+
+         '<button class="btn btn-sm" data-perm="user:write" onclick="rejectReset('+x.id+')">驳回</button>'
         :'<span class="msg-sub">由 '+esc(x.approvedBy||'—')+' 发放</span>'
     });
   });
@@ -914,10 +914,10 @@ function renderOrgTreeInto(hostId,activeKey,onPick,addMode){
         '<span class="cnt" title="含下级成员">'+orgAllMembers(o.key)+'</span>'+
         '<span class="tree-acts">'+
           (isUser
-            ?'<button data-act="add" data-k="'+esc(o.key)+'" title="在此组织下新增账号">＋</button>'
-            :'<button data-act="add" data-k="'+esc(o.key)+'" title="在此组织下新建子组织">＋</button>')+
-          '<button data-act="edit" data-k="'+esc(o.key)+'" title="编辑：改名 / 调整上级">✎</button>'+
-          '<button data-act="del" data-k="'+esc(o.key)+'" title="删除组织">×</button>'+
+            ?'<button data-perm="user:write" data-act="add" data-k="'+esc(o.key)+'" title="在此组织下新增账号">＋</button>'
+            :'<button data-perm="user:write" data-act="add" data-k="'+esc(o.key)+'" title="在此组织下新建子组织">＋</button>')+
+          '<button data-perm="user:write" data-act="edit" data-k="'+esc(o.key)+'" title="编辑：改名 / 调整上级">✎</button>'+
+          '<button data-perm="user:write" data-act="del" data-k="'+esc(o.key)+'" title="删除组织">×</button>'+
         '</span></div>';
       if(kids.length&&!folded)walk(o.key,depth+1);
     });
@@ -989,9 +989,9 @@ function renderUserTable(page){
         '<span style="margin-left:8px;font-size:11.5px;color:'+(u.enabled?'var(--ok)':'var(--muted)')+'">'+(u.enabled?'正常':'停用')+'</span>';
     const ops=isAdmin
       ? '<span style="color:var(--muted);font-size:11.5px" title="系统管理员账号受保护，不能编辑/重置/删除">不可编辑</span>'
-      : '<button class="op-btn" onclick="editUser('+gi+')">编辑</button>'+
-        '<button class="op-btn warn" onclick="resetUserPwd('+gi+')">重置密码</button>'+
-        '<button class="op-btn danger" onclick="delUser('+gi+')">删除</button>';
+      : '<button class="op-btn" data-perm="user:write" onclick="editUser('+gi+')">编辑</button>'+
+        '<button class="op-btn warn" data-perm="user:write" onclick="resetUserPwd('+gi+')">重置密码</button>'+
+        '<button class="op-btn danger" data-perm="user:write" onclick="delUser('+gi+')">删除</button>';
     return '<tr><td class="row-idx">'+(gi+1)+'</td>'+
       '<td><span style="display:inline-flex;align-items:center;gap:8px">'+
         (window.Shell?Shell.avatar(u.displayName||u.username,'sm'):'')+
@@ -1300,10 +1300,10 @@ function renderOrgHead(){
 function renderOrgTable(){
   const rows=orgChildren(orgSel.key);
   $('oTable').innerHTML=rows.length?rows.map((o,i)=>{
-    const ops='<button class="op-btn" onclick="orgMemberList(\''+esc(o.key)+'\')">成员</button>'+
-      '<button class="op-btn" onclick="orgCreate(\''+esc(o.key)+'\')">＋子组织</button>'+
-      '<button class="op-btn" onclick="orgEdit(\''+esc(o.key)+'\')">编辑</button>'+
-      '<button class="op-btn danger" onclick="orgDelete(\''+esc(o.key)+'\')">删除</button>';
+    const ops='<button class="op-btn" data-perm="user:read" onclick="orgMemberList(\''+esc(o.key)+'\')">成员</button>'+
+      '<button class="op-btn" data-perm="user:write" onclick="orgCreate(\''+esc(o.key)+'\')">＋子组织</button>'+
+      '<button class="op-btn" data-perm="user:write" onclick="orgEdit(\''+esc(o.key)+'\')">编辑</button>'+
+      '<button class="op-btn danger" data-perm="user:write" onclick="orgDelete(\''+esc(o.key)+'\')">删除</button>';
     return '<tr><td class="row-idx">'+(i+1)+'</td>'+
       '<td class="name"><a href="javascript:void(0)" style="color:var(--primary);text-decoration:none" onclick="orgPick(\''+esc(o.key)+'\')">'+esc(o.name)+'</a></td>'+
       '<td class="mono" style="font-size:11px">'+esc(o.key)+'</td>'+
@@ -1326,8 +1326,8 @@ function renderOrgMembers(){
       '<a class="name" href="javascript:void(0)" style="color:var(--primary);text-decoration:none" onclick="editUserByName(\''+esc(u.username)+'\')">'+esc(u.username)+'</a></span></td>'+
     '<td>'+esc(u.displayName)+'</td><td>'+roleTags(u.groups)+'</td>'+
     '<td>'+(u.enabled?'<span class="tag ok">正常</span>':'<span class="tag off">停用</span>')+'</td>'+
-    '<td><button class="op-btn" onclick="editUserByName(\''+esc(u.username)+'\')">编辑</button>'+
-    '<button class="op-btn warn" onclick="resetPwdByName(\''+esc(u.username)+'\')">重置密码</button></td></tr>').join('')
+    '<td><button class="op-btn" data-perm="user:write" onclick="editUserByName(\''+esc(u.username)+'\')">编辑</button>'+
+    '<button class="op-btn warn" data-perm="user:write" onclick="resetPwdByName(\''+esc(u.username)+'\')">重置密码</button></td></tr>').join('')
     :'<tr><td colspan="6" class="empty-inline">'+(key?'该组织还没有直属成员':'还没有账号')+'</td></tr>';
 }
 
@@ -1545,9 +1545,9 @@ function renderRoleTable(){
     return '<tr><td class="row-idx">'+(i+1)+'</td><td class="name">'+esc(gl(r.role))+'</td>'+
       '<td class="mono" style="font-size:11px">'+esc(r.role)+'</td><td>'+esc(scope)+'</td>'+
       '<td>'+perms.length+'</td><td>'+perms.slice(0,3).map(p=>'<span class="tag">'+esc(p)+'</span>').join(' ')+(perms.length>3?' <span class="tag off">+'+(perms.length-3)+'</span>':'')+'</td>'+
-      '<td><button class="op-btn" onclick="showRolePerms('+i+')">查看</button>'+
-      (r.role==='admin'?'':'<button class="op-btn" onclick="editRolePerms('+i+')">编辑权限</button>'+
-      '<button class="op-btn danger" onclick="delRole('+i+')">删除</button>')+'</td></tr>';
+      '<td><button class="op-btn" data-perm="admin:access" onclick="showRolePerms('+i+')">查看</button>'+
+      (r.role==='admin'?'':'<button class="op-btn" data-perm="admin:access" onclick="editRolePerms('+i+')">编辑权限</button>'+
+      '<button class="op-btn danger" data-perm="admin:access" onclick="delRole('+i+')">删除</button>')+'</td></tr>';
   }).join(''):'<tr><td colspan="7" class="empty-inline">没有匹配的角色</td></tr>';
   $('rTable')._rows=list;
 }
@@ -1713,9 +1713,9 @@ function renderPermTable(){
     const kids=(byParent[x.code]||[]).filter(match);
     const indent=16+depth*20;
     const caret=kids.length?'<span class="pg-caret" data-fold="'+esc(x.code)+'" style="cursor:pointer">'+(folded?'▸':'▾')+'</span>':'<span class="pg-caret"></span>';
-    const ops='<button class="op-btn" onclick="showPermRoles(\''+esc(x.code)+'\')">查看角色</button>'+
-      '<button class="op-btn" onclick="editPerm(\''+esc(x.code)+'\')">编辑</button>'+
-      (x.builtin?'':'<button class="op-btn" style="color:#c0392b" onclick="delPerm(\''+esc(x.code)+'\')">删除</button>');
+    const ops='<button class="op-btn" data-perm="admin:access" onclick="showPermRoles(\''+esc(x.code)+'\')">查看角色</button>'+
+      '<button class="op-btn" data-perm="admin:access" onclick="editPerm(\''+esc(x.code)+'\')">编辑</button>'+
+      (x.builtin?'':'<button class="op-btn" style="color:#c0392b" data-perm="admin:access" onclick="delPerm(\''+esc(x.code)+'\')">删除</button>');
     html+='<tr data-code="'+esc(x.code)+'"><td style="padding-left:'+indent+'px" class="name">'+caret+esc(x.name)+
       (x.builtin?'':' <span class="tag">自定义</span>')+'</td>'+
       '<td><span class="node-type '+esc(x.nodeType||'menu')+'">'+(TYPE_CN[x.nodeType]||'功能菜单')+'</span></td>'+
@@ -1749,7 +1749,7 @@ const PERM_ACTIONS=[['select','查询'],['create','新增'],['edit','编辑'],['
   ['export','导出'],['import','导入'],['audit','审核'],['config','配置']];
 function permQuickBtns(){
   return '<div class="type-quick">'+PERM_ACTIONS.map(([code,label])=>
-    '<button type="button" onclick="fillPermAction(\''+code+'\',\''+label+'\')">'+label+'</button>').join('')+'</div>';
+    '<button type="button" data-perm="admin:access" onclick="fillPermAction(\''+code+'\',\''+label+'\')">'+label+'</button>').join('')+'</div>';
 }
 function fillPermAction(action,label){
   const mod=($('fPModule').value||'').trim();
@@ -1891,8 +1891,8 @@ async function loadDocs(page){
         '<td><span class="tag" title="文档归属部门与可见范围">'+scope+'</span></td>'+
         '<td>'+num(d.chunks)+'</td><td>'+esc(d.ownerUser||'—')+'</td>'+
         '<td>'+esc(String(d.uploadedAt||'').slice(0,19))+'</td>'+
-        '<td><button class="op-btn" onclick="showChunks('+gi+')">查看分片</button>'+
-        '<button class="btn btn-sm btn-danger" style="margin-left:8px" onclick="delDocAt('+gi+')">删除</button></td></tr>';
+        '<td><button class="op-btn" data-perm="doc:read" onclick="showChunks('+gi+')">查看分片</button>'+
+        '<button class="btn btn-sm btn-danger" data-perm="doc:delete" style="margin-left:8px" onclick="delDocAt('+gi+')">删除</button></td></tr>';
     }).join('')||'<tr><td colspan="6" class="empty">知识库暂无文档</td></tr>';
     renderPager('dPager',total,DOC_PAGE.page,DOC_PAGE.size,'loadDocs');
   }catch(e){console.error(e)}
@@ -2000,10 +2000,10 @@ async function loadModelsInfo(){
       '<td class="mono" style="font-size:11px">'+esc(x.model)+'</td>'+
       '<td class="mono" style="font-size:11px;max-width:210px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(x.baseUrl||'')+'</td>'+
       '<td>'+(x.active?'<span class="tag ok">生效中</span>':x.enabled?'<span class="tag">已启用</span>':'<span class="tag off">已停用</span>')+'</td>'+
-      '<td><button class="op-btn" onclick="editModel('+i+')">编辑</button>'+
-        (x.active?'':'<button class="op-btn" onclick="activateModel('+x.id+')">启用</button>')+
-        '<button class="op-btn" onclick="testModel('+x.id+')">测试</button>'+
-        (x.active?'':'<button class="op-btn danger" onclick="delModel('+x.id+')">删除</button>')+'</td></tr>').join('')
+      '<td><button class="op-btn" data-perm="model:write" onclick="editModel('+i+')">编辑</button>'+
+        (x.active?'':'<button class="op-btn" data-perm="model:write" onclick="activateModel('+x.id+')">启用</button>')+
+        '<button class="op-btn" data-perm="model:write" onclick="testModel('+x.id+')">测试</button>'+
+        (x.active?'':'<button class="op-btn danger" data-perm="model:write" onclick="delModel('+x.id+')">删除</button>')+'</td></tr>').join('')
       :'<tr><td colspan="6" class="empty">暂无模型配置</td></tr>';
   }catch(e){$('mTable').innerHTML='<tr><td colspan="6" class="empty">加载失败：'+esc(e.message)+'</td></tr>'}
 }

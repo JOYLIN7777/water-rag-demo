@@ -80,7 +80,7 @@ mvn -DskipTests package
 #    JWT 密钥可用环境变量 JWT_SECRET 覆盖（不设则用内置 Demo 密钥）
 docker compose up -d --build app
 
-# 4. 浏览器访问 http://localhost:8080（容器 8080 已映射到宿主机）
+# 4. 浏览器访问 http://localhost:18080（容器 8080 已映射到宿主机）
 #    首次会跳转登录页，演示账号：admin / Admin@123456（管理员）、analyst / Analyst@123456（分析员）
 ```
 
@@ -113,7 +113,7 @@ docker compose up -d postgres
 # 启动应用（不设 DB_HOST/REDIS_HOST 时自动用 localhost）
 mvn spring-boot:run
 
-# 浏览器直接访问 http://localhost:8080（零依赖静态页，应用自身托管）
+# 浏览器直接访问 http://localhost:18080（零依赖静态页，应用自身托管）
 # 页面入口：问答 / 会话树 / 检索实验 / 模型配置 / 文档管理 / 企业治理 / 个人中心
 ```
 
@@ -131,23 +131,23 @@ docker compose up -d --build app  # 代码改动后：重新 package + 重建镜
 > `npm install` 若报 `EPERM`（全局 npm 缓存目录无写权限，常见于公司机器），改用工作区缓存：
 > `npm install --cache ./.npm-cache`（`.npm-cache` 已加入 .gitignore）。
 >
-> **零依赖方案**：`src/main/resources/static/index.html` 已内置一份**功能完整的专业问答页**（会话管理 / 拖拽上传 / SSE 打字机 / 引用卡片，纯静态无构建）。只启动后端后直接访问 `http://localhost:8080` 即可使用，不需要 Node 和 npm。`frontend/` 的 Vue 工程是组件化增强版，供定制开发。
+> **零依赖方案**：`src/main/resources/static/index.html` 已内置一份**功能完整的专业问答页**（会话管理 / 拖拽上传 / SSE 打字机 / 引用卡片，纯静态无构建）。只启动后端后直接访问 `http://localhost:18080` 即可使用，不需要 Node 和 npm。`frontend/` 的 Vue 工程是组件化增强版，供定制开发。
 >
 > 打包部署 Vue 版：`cd frontend && npm run build`，把 `frontend/dist/` 下的内容拷到
-> `src/main/resources/static/` 覆盖 index.html 后重新启动后端，访问 `http://localhost:8080`。
+> `src/main/resources/static/` 覆盖 index.html 后重新启动后端，访问 `http://localhost:18080`。
 
 ### 接口示例
 
 ```bash
 # 查询支持格式（30+ 种）
-curl http://localhost:8080/api/docs/formats
+curl http://localhost:18080/api/docs/formats
 
 # 上传示例文档（项目自带 sample-docs/云溪水库调度规程节选.md；也可换 docx/xlsx/pdf 等）
-curl -F "file=@src/main/resources/sample-docs/云溪水库调度规程节选.md" http://localhost:8080/api/docs/upload
+curl -F "file=@src/main/resources/sample-docs/云溪水库调度规程节选.md" http://localhost:18080/api/docs/upload
 # => {"fileName":"...","chunks":3,"chars":1200}
 
 # RAG 问答（SSE 流式，-N 关闭缓冲逐条看事件）
-curl -N -X POST http://localhost:8080/api/chat/stream \
+curl -N -X POST http://localhost:18080/api/chat/stream \
   -H "Content-Type: application/json" \
   -d "{\"sessionId\":\"demo-001\",\"question\":\"云溪水库的汛限水位是多少？汛期怎么控制下泄流量？\"}"
 # 事件流示例：
@@ -157,16 +157,16 @@ curl -N -X POST http://localhost:8080/api/chat/stream \
 # event: done      data: [DONE]
 
 # 问答历史（Redis）
-curl "http://localhost:8080/api/chat/history?sessionId=demo-001"
-curl -X DELETE "http://localhost:8080/api/chat/history?sessionId=demo-001"
+curl "http://localhost:18080/api/chat/history?sessionId=demo-001"
+curl -X DELETE "http://localhost:18080/api/chat/history?sessionId=demo-001"
 
 # Tool Calling：问"实时水位"会触发模型调用工具
-curl -N -X POST http://localhost:8080/api/chat/stream \
+curl -N -X POST http://localhost:18080/api/chat/stream \
   -H "Content-Type: application/json" \
   -d "{\"sessionId\":\"demo-001\",\"question\":\"云溪水库现在的实时水位是多少？\"}"
 
 # 工具直调（不经过大模型，验证工具本身）
-curl -X POST "http://localhost:8080/api/chat/tool/water?station=云溪水库"
+curl -X POST "http://localhost:18080/api/chat/tool/water?station=云溪水库"
 ```
 
 > 没装 Docker 的替代方案：本机安装 PostgreSQL 16 + 手动执行 `CREATE EXTENSION vector;`（需先装 pgvector 扩展），Redis 用 Memurai 或 WSL 里的 redis-server。
@@ -194,7 +194,7 @@ water-rag-demo
 ├── docker-compose.yml                  # pgvector + app 编排（Redis 为可选 profile）
 ├── init/init.sql                       # 启用 vector 扩展
 ├── frontend/                           # Vue 3 + Vite 问答页面
-│   ├── vite.config.js                  # 开发代理 /api → localhost:8080
+│   ├── vite.config.js                  # 开发代理 /api → localhost:18080
 │   └── src/
 │       ├── App.vue                     # 主页面：会话/消息问答逻辑
 │       ├── api.js                      # fetch + ReadableStream 解析 SSE
@@ -227,12 +227,12 @@ mvn package -DskipTests   # 打包后 docker compose up -d --build app
 - `EsHybridSearchServiceTest`：RRF 跨路去重/Top-K 截断、BM25 与 kNN DSL 结构、权限 filter 强制注入租户与用户组；
 - `AuthServiceTest`：PBKDF2 加盐不可逆、正确/错误密码校验、损坏哈希不抛异常、用户库加载认证、access/refresh 令牌类型区分；
 - `JwtServiceTest`：合法 token、篡改签名、过期、格式错误四类路径；
-- `ToolPermissionRegistryTest`：默认拒绝、组命中放行、管理员放行、未注册工具拒绝；
+- `ToolPermissionRegistryTest`：默认拒绝、问答角色放行、管理员放行、未注册工具拒绝；
 - `ParagraphSplitterTest` / `LlmCircuitBreakerTest` / `ModelConfigTest`：切片边界、熔断状态机、API Key 脱敏。
 
 ## 企业能力演示
 
-浏览器打开 `http://localhost:8080/admin.html`（管理后台）或 `http://localhost:8080/governance.html`（权限与日志），可现场演示：
+浏览器打开 `http://localhost:18080/admin.html`（管理后台）或 `http://localhost:18080/governance.html`（权限与日志），可现场演示：
 
 | 演示项 | 操作 | 预期效果 |
 |---|---|---|
@@ -241,11 +241,12 @@ mvn package -DskipTests   # 打包后 docker compose up -d --build app
 | 管理后台入口 | admin 登录看问答页右上角「管理后台」，点击进入；换 analyst 登录再看 | admin 显示入口且免登录进后台；analyst 看不到入口，直访 `/admin.html` 只显示拒绝页 |
 | 企业级 RBAC | 用 analyst 的令牌直接调 `/api/models`、`/api/audit/logs`；再换 admin 调 | analyst 返回 403（服务端强制拒绝，不是前端隐藏）；admin 返回 200 |
 | 权限矩阵 | 管理后台「用户与权限」看角色矩阵与权限码；分别用 admin 与 analyst 对比 | admin 全部 13 项权限；analyst 7 项且无模型/审计/后台权限 |
+| 页面与按钮权限 | 用 viewer 登录直访 `/models.html`、`/admin.html`；再看问答页上传按钮 | 无权限页面显示拒绝页；无 doc:write 的账号看不到上传入口；按钮权限按目录/菜单/按钮三级树分配，全站统一生效 |
 | 用量统计 | 管理后台「用量统计」点刷新 | 未配置工作空间 ID 时给出配置提示；配置后显示百炼官方请求数与 Token 消耗 |
 | 个人中心 | 进「个人中心」看登录剩余时间，输原密码改新密码后用新密码重新登录 | 显示倒计时；错误原密码 400；改密成功后再用旧密码登录失败、新密码成功 |
 | 多租户 | 用 `admin`（default 租户）登录，另配 `X-Tenant` 头或换租户账号上传同名文件 | 不同租户检索/列表互不可见；跨租户删除返回"不存在" |
 | 行级权限 | 分别以有/无 `water-dept` 组的账号查同一问题 | 组内用户可见内部文档，无组用户只见 public 文档 |
-| 工具权限 | 分别用 admin（含 water-dept）与其他组账号调 `/api/chat/tool/water` | 无权限组返回 PERMISSION_DENIED，water-dept 组返回水情数据 |
+| 工具权限 | 分别用 admin/viewer 与撤销了 chat:use 的角色调 `/api/chat/tool/water` | 有问答权限的角色返回水情数据；无 chat:use 的角色返回 PERMISSION_DENIED；问答中答「需要」会由后端确定性执行工具 |
 | 会话树 | 问答页顶栏进「会话树」，从历史节点 fork 或 rewind | 新分支保留旧分支；切回旧分支上下文不串 |
 | 审计 | 治理页查看审计日志 | 每次 API 调用、401、工具越权均有记录，按租户隔离 |
 

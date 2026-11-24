@@ -34,6 +34,13 @@ class ToolPermissionRegistryTest {
     }
 
     @Test
+    void viewer问答角色放行() {
+        // 只读用户有 chat:use，能问答就能查实时水情；组白名单也随之放开
+        UserContext.CURRENT_TEST(new UserContext.CurrentUser("test", List.of("viewer")));
+        assertNull(registry.denyReason(ToolPermissionRegistry.TOOL_WATER_QUERY));
+    }
+
+    @Test
     void 管理员全局放行() {
         UserContext.CURRENT_TEST(new UserContext.CurrentUser("someone", List.of("admin")));
         assertNull(registry.denyReason(ToolPermissionRegistry.TOOL_WATER_QUERY));

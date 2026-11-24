@@ -66,7 +66,9 @@ public class WaterInfoTool {
             audit.record(AuditService.of(u.tenantId(), u.userId(), String.join(",", u.groups()),
                     "TOOL_DENIED " + ToolPermissionRegistry.TOOL_WATER_QUERY,
                     station, denied, "", 403, 0, "DENIED"));
-            return "{\"error\":\"PERMISSION_DENIED\",\"message\":\"" + denied + "\"}";
+            // 给模型的是用户视角提示，不再把权限码、白名单等技术细节带到回答里；
+            // 详细原因只进审计日志，排障时查审计即可。
+            return "{\"error\":\"PERMISSION_DENIED\",\"message\":\"当前账号未开通实时水情查询权限，请联系管理员开通\"}";
         }
 
         // 未收录站点给一组中性默认值，避免模型拿到 null 后胡编

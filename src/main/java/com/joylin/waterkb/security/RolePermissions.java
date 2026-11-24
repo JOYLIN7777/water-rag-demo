@@ -45,7 +45,9 @@ public class RolePermissions {
     private static final Map<String, Set<String>> BUILT_IN = Map.of(
             "admin", ADMIN,
             "analyst", ANALYST,
-            "viewer", VIEWER);
+            "viewer", VIEWER,
+            // 水利业务组同样要能问答和调用水情工具，否则白名单命中也过不了功能权限门槛
+            "water-dept", ANALYST);
 
     /** 内置角色的中文显示名；DB 没配名称时回落，用户管理不再露英文键 */
     private static final Map<String, String> BUILT_IN_NAMES = Map.of(

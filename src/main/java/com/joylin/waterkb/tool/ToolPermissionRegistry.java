@@ -1,5 +1,7 @@
 package com.joylin.waterkb.tool;
 
+import com.joylin.waterkb.security.Permission;
+import com.joylin.waterkb.security.RolePermissions;
 import com.joylin.waterkb.security.UserContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -21,6 +23,9 @@ import java.util.Set;
  *   <li>每个工具配 allowUsers / allowGroups / allowTenants 三组白名单；</li>
  *   <li>命中任一组即放行；三组都空=仅管理员可用（默认拒绝）；</li>
  *   <li>带 "admin" 组的用户绕过白名单（平台管理员）；</li>
+ *   <li><b>还必须有对应的功能权限码</b>（实时水情查询要求 chat:use）——
+ *       工具是问答能力的延伸，后台撤掉某角色的问答权限后，工具同步失效，
+ *       不必再维护第二套用户组白名单；</li>
  *   <li>匿名一律拒绝。</li>
  * </ul></p>
  */
@@ -30,13 +35,24 @@ public class ToolPermissionRegistry {
     private static final Logger log = LoggerFactory.getLogger(ToolPermissionRegistry.class);
     public static final String TOOL_WATER_QUERY = "queryRealtimeWater";
 
-    /** 演示规则：水情查询仅 water-dept 组、hydro-admin 用户可用（可按租户细化） */
+    /** 允许使用工具的问答角色；最终还要过功能权限码校验（见 denyReason） */
     private final Map<String, Rule> rules = Map.of(
             TOOL_WATER_QUERY, new Rule(
                     Set.of("hydro-admin"),
-                    Set.of("water-dept"),
+                    Set.of("water-dept", "analyst", "viewer"),
                     Set.of(), // 不限租户
-                    "查询实时水情（含水位/流量，属敏感运行数据）"));
+                    "查询实时水情（含水位/流量，属敏感运行数据）",
+                    Permission.CHAT_USE));
+
+    private final RolePermissions rolePermissions;
+
+    /** 单测用：不接数据库，只按内置角色默认权限判定 */
+    public ToolPermissionRegistry() { this(new RolePermissions()); }
+
+    @org.springframework.beans.factory.annotation.Autowired
+    public ToolPermissionRegistry(RolePermissions rolePermissions) {
+        this.rolePermissions = rolePermissions;
+    }
 
     /** 校验当前用户是否有权调用工具；拒绝返回可读原因，放行返回 null。 */
     public String denyReason(String tool) {
@@ -45,16 +61,22 @@ public class ToolPermissionRegistry {
 
         Rule rule = rules.get(tool);
         if (rule == null) return "工具未注册或已禁用：" + tool;
+        // 功能权限是硬门槛：能在后台问答，才有资格让工具代查实时数据。
+        // 角色权限改了立即生效（RolePermissions 内存缓存写时失效重建）。
+        if (!rolePermissions.permissionsOf(user).contains(rule.requiredPermission)) {
+            String reason = "当前账号未开通实时水情查询权限，请联系管理员开通（功能权限：" + rule.requiredPermission + "）";
+            log.warn("工具权限拒绝：用户 {} 缺少 {}", user.userId(), rule.requiredPermission);
+            return reason;
+        }
         if (user.hasGroup("admin")) return null; // 平台管理员对已注册工具全局放行
 
         boolean ok = rule.allowUsers.contains(user.userId())
                 || rule.allowGroups.stream().anyMatch(user::hasGroup)
                 || (!rule.allowTenants.isEmpty() && rule.allowTenants.contains(user.tenantId()));
         if (!ok) {
-            String reason = "无权调用工具 " + tool + "（需要用户 " + rule.allowUsers
-                    + " 或组 " + rule.allowGroups + "，当前用户 " + user.userId()
-                    + " 组 " + user.groups() + "）";
-            log.warn("工具权限拒绝：{}", reason);
+            // 对外只说"未开通"，不泄露内部白名单（组名、用户标识属于实现细节）
+            String reason = "当前账号未开通实时水情查询权限，请联系管理员开通";
+            log.warn("工具权限拒绝：工具 {} 白名单未命中，用户 {} 组 {}", tool, user.userId(), user.groups());
             return reason;
         }
         return null;
@@ -72,5 +94,6 @@ public class ToolPermissionRegistry {
     }
 
     private record Rule(Set<String> allowUsers, Set<String> allowGroups,
-                        Set<String> allowTenants, String description) {}
+                        Set<String> allowTenants, String description,
+                        String requiredPermission) {}
 }

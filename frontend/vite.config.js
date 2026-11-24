@@ -8,7 +8,7 @@ export default defineConfig({
     // 开发时代理后端接口，避免跨域；生产构建后把 dist 内容拷到 src/main/resources/static 即可
     proxy: {
       '/api': {
-        target: 'http://localhost:8080',
+        target: 'http://localhost:18080',
         changeOrigin: true
       }
     }

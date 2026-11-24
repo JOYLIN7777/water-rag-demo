@@ -8,6 +8,7 @@ import com.joylin.waterkb.model.ModelConfigRepository;
 import com.joylin.waterkb.model.ModelRegistry;
 import com.joylin.waterkb.resilience.LlmCircuitBreaker;
 import com.joylin.waterkb.security.UserContext;
+import com.joylin.waterkb.tool.ToolPermissionRegistry;
 import com.joylin.waterkb.tool.WaterInfoTool;
 import com.joylin.waterkb.usage.UsageRecorder;
 import org.slf4j.Logger;
@@ -54,10 +55,12 @@ public class RagChatService {
     private final UsageRecorder usageRecorder;
 
     private final WaterInfoTool waterInfoTool;
+    private final ToolPermissionRegistry toolPermissions;
 
     public RagChatService(VectorStore vectorStore,
                           ModelRegistry modelRegistry,
                           WaterInfoTool waterInfoTool,
+                          ToolPermissionRegistry toolPermissions,
                           ConversationTreeStore historyStore,
                           PromptTemplateLoader promptLoader,
                           LlmCircuitBreaker breaker,
@@ -69,6 +72,7 @@ public class RagChatService {
         this.modelRegistry = modelRegistry;
         this.modelConfigRepository = modelConfigRepository;
         this.waterInfoTool = waterInfoTool;
+        this.toolPermissions = toolPermissions;
         this.historyStore = historyStore;
         this.promptLoader = promptLoader;
         this.breaker = breaker;
@@ -114,9 +118,8 @@ public class RagChatService {
         String systemPrompt = promptLoader.render(props.getRagSystemPrompt(),
                 Map.of("context", context, "history", history));
         // 用户答「需要」确认上一轮的工具提议：模型不会自动把这种短句关联到工具调用，
-        // 这里显式注入一条强指令，避免又答一句"知识库中未找到相关内容"就完事。
-        String toolDirective = toolConfirmDirective(question, history);
-        if (toolDirective != null) systemPrompt = systemPrompt + "\n\n" + toolDirective;
+        // 这里显式注入一条强指令，并在后端确定性执行工具——模型是否"听话"不再影响查询结果。
+        systemPrompt = applyToolConfirmation(systemPrompt, question, history);
 
         // 前置 sources 事件：前端可展示"本次回答引用了哪些片段"
         String sourcesJson = toSourcesJson(hits);
@@ -300,6 +303,63 @@ public class RagChatService {
      * 只保留最近 maxTurns 轮，防止长会话撑爆 token 预算。
      */
     /**
+     * 用户确认查询后，由后端直接执行工具并把真实结果塞进 Prompt。
+     *
+     * <p>为什么不由模型自己调：工具调用是可选项，模型常把「需要」当成新问题重新做 RAG，
+     * 或者在工具返回权限错误后复述技术细节给用户。执行层做确定性兜底，
+     * 权限校验仍然走 ToolPermissionRegistry——提示词永远绕不过权限闸门。</p>
+     */
+    private String applyToolConfirmation(String systemPrompt, String question, String history) {
+        String directive = toolConfirmDirective(question, history);
+        boolean directQuery = isDirectWaterQuery(question);
+        if (directive == null && !directQuery) return systemPrompt;
+        // 站点优先取当前问题，再看历史（确认场景只在历史里提到站点）
+        String station = extractStation(question);
+        if (station == null) station = extractStation(history);
+        String denied = toolPermissions.denyReason(ToolPermissionRegistry.TOOL_WATER_QUERY);
+        if (denied != null) {
+            log.info("用户确认查询但工具权限不足：{}", denied);
+            return systemPrompt + "\n\n【工具权限提示】当前账号没有实时水情查询权限。" +
+                    "请用用户视角简明告知对方，并建议联系管理员开通；" +
+                    "不要暴露工具名、权限码等技术细节，不要声称已经查到数据。";
+        }
+        if (station == null) return directive == null ? systemPrompt : systemPrompt + "\n\n" + directive;
+        try {
+            String data = waterInfoTool.queryRealtimeWater(station);
+            if (data != null && data.contains("PERMISSION_DENIED")) {
+                return systemPrompt + "\n\n【工具权限提示】当前账号没有实时水情查询权限，" +
+                        "请用用户视角告知并建议联系管理员开通，不要暴露技术细节。";
+            }
+            log.info("确定性执行水情查询，站点={}，触发方式={}", station, directQuery ? "直接提问" : "确认追问");
+            return systemPrompt + "\n\n【实时水情工具已执行，以下是真实结果】\n" + data +
+                    "\n工具结果就是真实数据。请直接基于上述数据回答水位、流量与数据时间，" +
+                    "不得再说权限不足、知识库未找到，也不要重复询问是否需要。";
+        } catch (Exception e) {
+            log.warn("确定性工具执行失败，回退给模型自行调用工具", e);
+            return directive == null ? systemPrompt : systemPrompt + "\n\n" + directive;
+        }
+    }
+
+    /** 直接问"当前/实时水位、流量"且提到已收录站点时，也走确定性工具执行 */
+    private static boolean isDirectWaterQuery(String question) {
+        if (question == null || extractStation(question) == null) return false;
+        boolean timeWord = question.contains("实时") || question.contains("当前") || question.contains("现在")
+                || question.contains("此刻") || question.contains("最新");
+        boolean waterWord = question.contains("水位") || question.contains("流量") || question.contains("水情")
+                || question.contains("汛情");
+        return timeWord && waterWord;
+    }
+
+    /** 从问题或历史里提取已收录的站点名（与 WaterInfoTool 的演示站点保持一致） */
+    private static String extractStation(String text) {
+        if (text == null) return null;
+        for (String s : new String[]{"云溪水库", "东风水库", "红旗闸站", "东溪闸", "西溪闸"}) {
+            if (text.contains(s)) return s;
+        }
+        return null;
+    }
+
+    /**
      * 识别「上一轮模型问要不要调用工具，用户答需要」这种追问。
      * 单纯把「需要」塞进 history 模型会当成新问题重新走 RAG，结果答非所问；
      * 这里补一条明确指令，让模型接着上一轮的提议直接调工具。
@@ -310,11 +370,12 @@ public class RagChatService {
         if (!q.matches("需要|要|好的|好|可以|是的|嗯|查吧|查一下|帮我查|请查|调用吧|请调用|确认")) return null;
         String h = history.toLowerCase();
         if (!h.contains("是否需要") && !h.contains("要不要") && !h.contains("需要我")) return null;
-        if (!h.contains("工具") && !h.contains("水情")) return null;
-        String station = null;
-        for (String s : new String[]{"云溪水库", "东风水库", "红旗闸站", "东溪闸", "西溪闸"}) {
-            if (history.contains(s)) { station = s; break; }
-        }
+        // 模型提议的措辞不固定：可能说"查询东溪闸的设计特征值"，并未出现"工具/水情"字样。
+        // 只要上下文里有已收录的站点名，就按水情查询确认处理；没有站点又没提水情则不误触发。
+        String station = extractStation(history + "\n" + question);
+        boolean waterContext = h.contains("工具") || h.contains("水情") || h.contains("水位")
+                || h.contains("流量") || h.contains("闸") || h.contains("水库");
+        if (station == null && !waterContext) return null;
         return "【用户已确认】用户刚刚明确表示需要调用实时水情查询工具。" +
                 (station == null
                         ? "请立即调用 queryRealtimeWater 工具；若上文没有明确站点，请先问用户要查哪个站点。"

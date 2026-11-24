@@ -61,7 +61,7 @@
 
     <div class="card">
       <div class="card-head"><h3>② 我能使用的功能</h3>
-        <button class="btn btn-sm" onclick="loadPermissions()">刷新</button></div>
+        <button class="btn btn-sm" data-perm="audit:read" onclick="loadPermissions()">刷新</button></div>
       <div class="sub">标着「可用」的就是你当前能用的功能。</div>
 
       <div class="layer">可用功能</div>
@@ -76,8 +76,8 @@
 
     <div class="card">
       <div class="card-head"><h3>③ 操作记录</h3>
-        <span><button class="btn btn-sm" onclick="loadAudit()">刷新</button>
-        <button class="btn btn-sm btn-primary" style="margin-left:6px" onclick="exportAuditCsv()">导出记录</button></span></div>
+        <span><button class="btn btn-sm" data-perm="audit:read" onclick="loadAudit()">刷新</button>
+        <button class="btn btn-sm btn-primary" data-perm="audit:read" style="margin-left:6px" onclick="exportAuditCsv()">导出记录</button></span></div>
       <div class="sub">最近的登录与操作情况，方便你核对是谁在什么时候做了什么。</div>
       <div class="kv" id="auditStats"></div>
       <div style="margin-top:14px">

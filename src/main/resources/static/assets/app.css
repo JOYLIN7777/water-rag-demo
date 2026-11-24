@@ -146,6 +146,11 @@ a{color:var(--primary);text-decoration:none}
 .status-pill.off .status-dot{background:var(--danger);box-shadow:0 0 0 3px rgba(224,36,94,.14)}
 /* 右上角管理后台入口：仅管理员可见（权限码 admin:access），普通用户此容器为空 */
 .admin-slot{display:inline-flex;align-items:center}
+/* 顶栏管理后台入口：管理员高频使用，做成明显但不喧宾夺主的次级主按钮 */
+.admin-entry-btn{display:inline-flex;align-items:center;gap:6px;padding:7px 14px;border-radius:9px;
+  border:1px solid #c3d4f6;background:#eef4ff;color:#2457b8;font-size:12.5px;font-weight:600;
+  text-decoration:none;white-space:nowrap;box-shadow:0 1px 2px rgba(36,87,184,.08);transition:background .15s,border-color .15s}
+.admin-entry-btn:hover{background:#e0ebff;border-color:#9fbaf0}
 .admin-entry{border:1px solid #dcd6ff;background:#f5f2ff;color:#6244c8;font-weight:650}
 .admin-entry:hover{border-color:#bfaeff;background:#ede7ff;color:#4f34ad}
 /* 设置类页面的返回键与层级面包屑：任意一级都可点击回跳 */
@@ -420,3 +425,18 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,te
   .grid{grid-template-columns:1fr}
   .topbar{padding:0 18px}
 }
+
+/* 页面级无权限提示：静态页本身无法被服务端拦截，前端给出明确的用户视角说明 */
+.perm-denied-screen{position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;
+  background:rgba(244,247,252,.96);padding:24px}
+.perm-denied-card{max-width:420px;background:#fff;border:1px solid var(--line,#e4e9f2);border-radius:16px;
+  padding:32px 34px;text-align:center;box-shadow:0 12px 40px rgba(30,50,90,.10)}
+.perm-denied-mark{width:52px;height:52px;line-height:52px;margin:0 auto 12px;border-radius:50%;
+  background:#fff2f0;color:#d9483c;font-size:26px}
+.perm-denied-card h2{margin:0 0 10px;font-size:18px;color:var(--ink,#1d2939)}
+.perm-denied-card p{margin:0 0 22px;font-size:13px;line-height:1.8;color:var(--muted,#667085)}
+.perm-denied-actions{display:flex;gap:10px;justify-content:center}
+.perm-denied-primary,.perm-denied-secondary{padding:9px 16px;border-radius:8px;font-size:13px;cursor:pointer;
+  text-decoration:none;border:1px solid transparent}
+.perm-denied-primary{background:var(--primary,#2f6bff);color:#fff}
+.perm-denied-secondary{background:#fff;border-color:var(--line,#e4e9f2);color:var(--ink-2,#475467)}

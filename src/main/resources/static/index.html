@@ -231,7 +231,7 @@
         <textarea id="question" rows="1" placeholder="输入你的问题，Enter 发送，Shift+Enter 换行"></textarea>
         <div class="composer-bar">
           <span class="composer-tool" title="基于知识库检索作答"><span style="color:var(--primary)">◈</span> 知识库问答</span>
-          <button class="composer-tool" onclick="document.getElementById('fileInput').click()" title="上传文档到知识库">⇪ 上传文档</button>
+          <button class="composer-tool" data-perm="doc:write" onclick="document.getElementById('fileInput').click()" title="上传文档到知识库">⇪ 上传文档</button>
           <button class="send-btn" id="sendBtn" onclick="sendOrStop()">发送 <span style="opacity:.75">↵</span></button>
         </div>
       </div>

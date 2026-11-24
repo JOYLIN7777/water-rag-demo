@@ -69,8 +69,8 @@ services:
       elasticsearch:
         condition: service_started
     ports:
-      # 宿主机 8080 → 容器 8080；本地浏览器访问 localhost:8080 即容器内的应用
-      - "8080:8080"
+      # 宿主机 18080 → 容器 8080；本地浏览器访问 localhost:18080 即容器内的应用
+      - "18080:8080"
     environment:
       # 容器内用服务名 postgres 访问数据库（Docker DNS 解析）
       DB_HOST: postgres
@@ -86,6 +86,8 @@ services:
       AI_BASE_URL: ${AI_BASE_URL:-https://dashscope.aliyuncs.com/compatible-mode}
       AI_CHAT_MODEL: ${AI_CHAT_MODEL:-qwen-plus}
       AI_EMBEDDING_MODEL: ${AI_EMBEDDING_MODEL:-text-embedding-v3}
+      # 引用片段上限（默认 20，可按机器/模型性能调整）
+      RAG_TOP_K: ${RAG_TOP_K:-20}
       # 百炼业务空间 ID：配置后用量统计优先走官方接口，未配置/接口异常自动回退本地调用记录
       BAILIAN_WORKSPACE_ID: ${BAILIAN_WORKSPACE_ID:-}
       # 容器内用服务名 elasticsearch 访问 ES
