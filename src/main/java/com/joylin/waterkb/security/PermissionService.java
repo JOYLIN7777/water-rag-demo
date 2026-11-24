@@ -89,16 +89,18 @@ public class PermissionService {
         result.put("anonymous", anonymous);
         result.put("admin", admin);
         result.put("permissions", owned);          // 前端按权限码控制入口显示
-        // 全量权限码 = 内置权限 + 权限目录中的自定义节点（供权限编辑器勾选）
-        List<String> allPerms = new ArrayList<>(Permission.ALL);
+        // 全量权限码 = 权限目录（数据库，含清单自动生成与自定义节点）为准，注解码兜底，
+        // 这样后台新增节点后无需改 Java 常量就能下发到前端编辑器
+        List<String> allPerms = new ArrayList<>();
         try {
             for (Map<String, Object> n : permCatalog.list()) {
-                String code = String.valueOf(n.get("code"));
-                if (!allPerms.contains(code)) allPerms.add(code);
+                String code = String.valueOf(n.getOrDefault("code", ""));
+                if (!code.isEmpty() && !"null".equals(code) && !allPerms.contains(code)) allPerms.add(code);
             }
         } catch (Exception ignored) {
             // 目录读取失败时退化为内置权限码
         }
+        for (String code : Permission.ALL) if (!allPerms.contains(code)) allPerms.add(code);
         result.put("allPermissions", allPerms);
         result.put("roleMatrix", rolePermissions.roleMatrix());
         result.put("menus", menus);

@@ -3,6 +3,7 @@ package com.joylin.waterkb.security;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -31,6 +32,20 @@ class RolePermissionsTest {
         }
         assertTrue(service.allows(admin, new String[]{Permission.MODEL_WRITE, Permission.AUDIT_READ,
                 Permission.ADMIN_ACCESS, Permission.USER_WRITE}, true));
+    }
+
+    @Test
+    void admin自动拥有目录里新增的权限码无需改Java常量() {
+        PermissionCatalog catalog = org.mockito.Mockito.mock(PermissionCatalog.class);
+        org.mockito.Mockito.when(catalog.list()).thenReturn(List.of(
+                Map.of("code", "custom:newfeature"), Map.of("code", "doc:chunks")));
+        RolePermissions rp = new RolePermissions(null, catalog);
+        UserContext.CurrentUser admin =
+                new UserContext.CurrentUser("admin", List.of("admin"), "default", "jwt");
+        Set<String> owned = rp.permissionsOf(admin);
+        assertTrue(owned.contains("custom:newfeature"), "目录新增的自定义码 admin 应自动拥有");
+        assertTrue(owned.contains("doc:chunks"), "清单新增的细粒度码 admin 应自动拥有");
+        assertTrue(owned.containsAll(Permission.ALL), "注解层权限码仍需保留");
     }
 
     @Test

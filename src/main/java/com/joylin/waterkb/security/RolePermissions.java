@@ -113,10 +113,31 @@ public class RolePermissions {
         roleNames = Map.copyOf(names);
     }
 
+    /**
+     * admin 拥有的全部权限码：以权限目录（数据库）为准，而不是写死的 Permission.ALL。
+     * 这样后台/清单里新增节点后，admin 自动拥有，不用改 Java 常量。
+     * 无 catalog 的单测环境回落到内置常量集。
+     */
+    private Set<String> adminPermissions() {
+        if (catalog == null) return ADMIN;
+        try {
+            Set<String> fromDb = new LinkedHashSet<>();
+            for (Map<String, Object> row : catalog.list()) {
+                String code = String.valueOf(row.getOrDefault("code", ""));
+                if (!code.isEmpty() && !"null".equals(code)) fromDb.add(code);
+            }
+            // 注解层的接口权限码必须一并给 admin，哪怕目录暂时没同步到
+            fromDb.addAll(Permission.ALL);
+            return Set.copyOf(fromDb);
+        } catch (Exception e) {
+            return ADMIN;
+        }
+    }
+
     /** 获取某用户拥有的全部权限码（只读视图） */
     public Set<String> permissionsOf(UserContext.CurrentUser user) {
         if (user == null || user.isAnonymous()) return Set.of();
-        if (user.hasGroup("admin")) return ADMIN;
+        if (user.hasGroup("admin")) return adminPermissions();
         Set<String> result = new LinkedHashSet<>();
         for (Map.Entry<String, Set<String>> e : effective.entrySet()) {
             if (user.hasGroup(e.getKey())) result.addAll(e.getValue());
@@ -143,7 +164,8 @@ public class RolePermissions {
             Map<String, Object> m = new LinkedHashMap<>();
             m.put("role", role);
             m.put("name", roleNames.getOrDefault(role, BUILT_IN_NAMES.getOrDefault(role, role)));
-            m.put("permissions", role.equals("admin") ? Permission.ALL : List.copyOf(effective.getOrDefault(role, Set.of())));
+            m.put("permissions", role.equals("admin")
+                    ? List.copyOf(adminPermissions()) : List.copyOf(effective.getOrDefault(role, Set.of())));
             m.put("builtin", BUILT_IN.containsKey(role));
             out.add(m);
         });
