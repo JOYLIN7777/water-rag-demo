@@ -133,6 +133,10 @@
   .op-note{display:inline-block;padding:2px 6px;font-size:11.5px;color:var(--muted)}
   /* 字段下方的补充说明（比 .form-note 轻，不占整块底色） */
   .form-hint{font-size:11.5px;color:var(--muted);line-height:1.6;margin-top:5px}
+  .form-hint.err{color:#c0392b}
+  .form-hint.ok{color:#0d8f62}
+  .perm-quick-row{margin-top:6px}
+  .perm-quick-label{font-size:10.5px;color:var(--muted);letter-spacing:.3px}
   .table-wrap{flex:1;overflow:auto}
   /* 上下两个表格区之间的拖拽手柄：按住上下拖，调整各自高度（记忆到本机） */
   .v-resizer{flex:0 0 9px;height:9px;cursor:row-resize;display:flex;align-items:center;justify-content:center;
@@ -1844,20 +1848,44 @@ function parentPermOptions(sel){
   return '<option value="">（顶级）</option>'+cands.map(x=>
     '<option value="'+esc(x.code)+'"'+(x.code===sel?' selected':'')+'>'+esc(x.name)+'（'+esc(x.code)+'）</option>').join('');
 }
-// 若依快捷按钮：点一下按「模块前缀:动作」填好权限标识
+// 通用动作：平台页面/按钮常用；业务动作：前端可绑 data-perm 控制，但不进自动清单，只能手工新增
 const PERM_ACTIONS=[['select','查询'],['create','新增'],['edit','编辑'],['delete','删除'],
   ['export','导出'],['import','导入'],['audit','审核'],['config','配置']];
+const PERM_BIZ_ACTIONS=[['approve','审批'],['review','复核'],['report','上报'],['issue','下达'],
+  ['archive','归档'],['stats','统计'],['print','打印'],['download','下载'],
+  ['reset','重置'],['sync','同步'],['watercheck','水情确认'],['dispatch','调度下发']];
 function permQuickBtns(){
-  return '<div class="type-quick">'+PERM_ACTIONS.map(([code,label])=>
-    '<button type="button" data-perm="perm:read" onclick="fillPermAction(\''+code+'\',\''+label+'\')">'+label+'</button>').join('')+'</div>';
+  const row=(title,list)=>'<div class="perm-quick-row"><span class="perm-quick-label">'+title+'</span>'+
+    '<div class="type-quick">'+list.map(([code,label])=>
+      '<button type="button" data-perm="perm:read" onclick="fillPermAction(\''+code+'\',\''+label+'\')">'+label+'</button>').join('')+'</div></div>';
+  return row('通用动作',PERM_ACTIONS)+row('业务动作（手工新增）',PERM_BIZ_ACTIONS);
 }
 function fillPermAction(action,label){
   const mod=($('fPModule').value||'').trim();
   if(!mod){Shell.modalError('请先填所属模块，再选快捷动作');return}
-  const slug=mod.toLowerCase().replace(/[^a-z0-9]/g,'');
+  // 中文模块名没有拼音库，统一用 biz 前缀；权限码框可直接手改成英文缩写
+  const ascii=mod.toLowerCase().replace(/[^a-z0-9]/g,'');
+  const slug=ascii||'biz';
   const code=($('fPCode')||{});
-  if(code){code.value=(slug||'custom')+':'+action;code.disabled=false}
+  if(code){code.value=(slug||'biz')+':'+action;code.disabled=false}
   if($('fPName'))$('fPName').value=mod+label;
+  checkPermCode();
+}
+/** 权限码实时校验：撞到清单/已有节点就不让继续，避免自定义节点与自动生成冲突 */
+function checkPermCode(){
+  const el=$('fPCode'),hint=$('fPCodeHint');
+  if(!el||!hint)return null;
+  const code=(el.value||'').trim();
+  if(!code){hint.className='form-hint';hint.textContent='格式：小写模块:动作，例如 report:export';return null}
+  const hit=(DB.perms||[]).find(x=>x.code===code);
+  if(hit){
+    hint.className='form-hint err';
+    hint.textContent='⚠ 该权限码已存在（'+(hit.builtin?'系统清单节点':'自定义节点')+'：'+hit.name+'），请换一个动作词';
+  }else{
+    hint.className='form-hint ok';
+    hint.textContent='✓ 该权限码可用';
+  }
+  return hit||null;
 }
 
 // 新增权限节点（若依风格三级树）
@@ -1870,9 +1898,10 @@ function createPerm(){
     '<div class="field"><label for="fPName">节点名称</label>'+
     '<input id="fPName" placeholder="例如：导出报表"></div>'+
     '<div class="field"><label for="fPModule">所属模块</label>'+
-    '<input id="fPModule" placeholder="例如：报表中心"><div class="form-hint">用于生成权限标识前缀，如「报表中心」→ report。</div></div>'+
+    '<input id="fPModule" placeholder="例如：报表中心 / report"><div class="form-hint">用于生成权限标识前缀；中文模块名会用 biz 前缀，可在下方权限码框手改成英文缩写。</div></div>'+
     '<div class="field"><label>权限标识（快捷生成）</label>'+permQuickBtns()+
-    '<input id="fPCode" placeholder="例如：report:export" style="margin-top:6px"></div>'+
+    '<input id="fPCode" placeholder="例如：report:export" style="margin-top:6px" oninput="checkPermCode()">'+
+    '<div class="form-hint" id="fPCodeHint">格式：小写模块:动作，例如 report:export</div></div>'+
     '<div class="field" id="fPRouteField"><label for="fPRoute">路由路径</label>'+
     '<input id="fPRoute" placeholder="例如：/admin/reports"></div>'+
     '<div class="field"><label for="fPOrder">显示顺序</label>'+
@@ -1889,6 +1918,8 @@ function createPerm(){
       if(type==='directory'&&!/^[a-z][a-z0-9_-]*:(root|dir)$/.test(code)){
         Shell.modalError('目录标识格式为「模块:root」，例如 system:root');return false}
       if(!name){Shell.modalError('请填写节点名称');return false}
+      const clash=checkPermCode();
+      if(clash){Shell.modalError('权限码「'+code+'」已被占用（'+(clash.builtin?'系统清单节点':'自定义节点')+'），请换一个动作词');return false}
       try{
         await apiWrite('/api/admin/perms',{method:'POST',headers:{'Content-Type':'application/json'},
           body:JSON.stringify({code:code,name:name,type:type,module:($('fPModule').value||'').trim(),
