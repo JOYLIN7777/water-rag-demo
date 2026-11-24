@@ -163,6 +163,7 @@
   .type-quick{display:flex;flex-wrap:wrap;gap:5px;margin-top:5px}
   .type-quick button{border:1px solid var(--line);background:#fff;color:var(--ink-2);font-size:10.5px;padding:3px 8px;border-radius:5px}
   .type-quick button:hover{border-color:var(--primary);color:var(--primary)}
+  .unused-code-btn .mono{font-size:10px;color:var(--muted);margin-left:4px}
   /* 角色权限树：若依风格的目录/菜单/按钮三级勾选，带折叠与父子联动 */
   .perm-tree{border:1px solid var(--line);border-radius:9px;max-height:360px;overflow:auto;padding:8px 10px;background:#fff}
   .pt-row{display:flex;align-items:center;gap:7px;padding:5px 4px;border-radius:6px;font-size:12.5px}
@@ -1848,27 +1849,31 @@ function parentPermOptions(sel){
   return '<option value="">（顶级）</option>'+cands.map(x=>
     '<option value="'+esc(x.code)+'"'+(x.code===sel?' selected':'')+'>'+esc(x.name)+'（'+esc(x.code)+'）</option>').join('');
 }
-// 通用动作：平台页面/按钮常用；业务动作：前端可绑 data-perm 控制，但不进自动清单，只能手工新增
-const PERM_ACTIONS=[['select','查询'],['create','新增'],['edit','编辑'],['delete','删除'],
-  ['export','导出'],['import','导入'],['audit','审核'],['config','配置']];
-const PERM_BIZ_ACTIONS=[['approve','审批'],['review','复核'],['report','上报'],['issue','下达'],
-  ['archive','归档'],['stats','统计'],['print','打印'],['download','下载'],
-  ['reset','重置'],['sync','同步'],['watercheck','水情确认'],['dispatch','调度下发']];
-function permQuickBtns(){
-  const row=(title,list)=>'<div class="perm-quick-row"><span class="perm-quick-label">'+title+'</span>'+
-    '<div class="type-quick">'+list.map(([code,label])=>
-      '<button type="button" data-perm="perm:read" onclick="fillPermAction(\''+code+'\',\''+label+'\')">'+label+'</button>').join('')+'</div></div>';
-  return row('通用动作',PERM_ACTIONS)+row('业务动作（手工新增）',PERM_BIZ_ACTIONS);
+// 快捷选项来自后端扫描：代码里已在用（前端 data-perm / 后端 @RequirePermission）但权限树还没建的码。
+// 这些码选了就能真正控制功能，不是随便拼出来的字符串。
+let UNUSED_PERM_CODES=[];
+async function loadUnusedPermCodes(){
+  try{const list=await api('/api/admin/perms/unused-codes');UNUSED_PERM_CODES=Array.isArray(list)?list:[]}
+  catch(e){UNUSED_PERM_CODES=[]}
+  return UNUSED_PERM_CODES;
 }
-function fillPermAction(action,label){
-  const mod=($('fPModule').value||'').trim();
-  if(!mod){Shell.modalError('请先填所属模块，再选快捷动作');return}
-  // 中文模块名没有拼音库，统一用 biz 前缀；权限码框可直接手改成英文缩写
-  const ascii=mod.toLowerCase().replace(/[^a-z0-9]/g,'');
-  const slug=ascii||'biz';
-  const code=($('fPCode')||{});
-  if(code){code.value=(slug||'biz')+':'+action;code.disabled=false}
-  if($('fPName'))$('fPName').value=mod+label;
+function permQuickBtns(){
+  if(!UNUSED_PERM_CODES.length)
+    return '<div class="form-hint">当前所有在用的权限码都已注册，没有需要补建的节点。如需新增业务权限，请先在前台按钮或后端接口上声明权限码。</div>';
+  const items=UNUSED_PERM_CODES.map(x=>{
+    const src=(x.sources||[]).join('、').replace(/"/g,'&quot;').replace(/</g,'&lt;');
+    const name=esc(x.name||x.code),code=esc(x.code);
+    return '<button type="button" class="unused-code-btn" data-code="'+code+'" data-name="'+name+'" title="来源：'+src+'" '+
+      'onclick="fillPermCode(this.dataset.code,this.dataset.name)">'+name+' <span class="mono">'+code+'</span></button>';
+  }).join('');
+  return '<div class="perm-quick-row"><span class="perm-quick-label">代码中在用、尚未注册（点击填入，立即生效）</span>'+
+    '<div class="type-quick">'+items+'</div></div>';
+}
+function fillPermCode(code,name){
+  const el=$('fPCode');if(el){el.value=code;el.disabled=false}
+  if($('fPName'))$('fPName').value=name;
+  const mod=code.split(':')[0];
+  if($('fPModule'))$('fPModule').value=mod;
   checkPermCode();
 }
 /** 权限码实时校验：撞到清单/已有节点就不让继续，避免自定义节点与自动生成冲突 */
@@ -1888,8 +1893,9 @@ function checkPermCode(){
   return hit||null;
 }
 
-// 新增权限节点（若依风格三级树）
-function createPerm(){
+// 新增权限节点：快捷选项必须来自"代码在用但未注册"的真实权限码
+async function createPerm(){
+  await loadUnusedPermCodes();
   Shell.modal({title:'新增菜单 / 权限',okText:'创建',body:
     '<div class="field"><label for="fPParent">上级节点</label><select id="fPParent">'+parentPermOptions('')+'</select></div>'+
     '<div class="field"><label for="fPType">节点类型</label>'+
@@ -1898,7 +1904,7 @@ function createPerm(){
     '<div class="field"><label for="fPName">节点名称</label>'+
     '<input id="fPName" placeholder="例如：导出报表"></div>'+
     '<div class="field"><label for="fPModule">所属模块</label>'+
-    '<input id="fPModule" placeholder="例如：报表中心 / report"><div class="form-hint">用于生成权限标识前缀；中文模块名会用 biz 前缀，可在下方权限码框手改成英文缩写。</div></div>'+
+    '<input id="fPModule" placeholder="例如：报表中心 / report"><div class="form-hint">建议从上方快捷项选一个代码里已使用的权限码；自由填写时请确认前端按钮或后端接口真的会用它。</div></div>'+
     '<div class="field"><label>权限标识（快捷生成）</label>'+permQuickBtns()+
     '<input id="fPCode" placeholder="例如：report:export" style="margin-top:6px" oninput="checkPermCode()">'+
     '<div class="form-hint" id="fPCodeHint">格式：小写模块:动作，例如 report:export</div></div>'+

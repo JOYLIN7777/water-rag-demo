@@ -45,6 +45,7 @@ public class AdminController {
     private final com.joylin.waterkb.search.EsIndexService es;
     private final com.joylin.waterkb.memory.ChatSessionStore chatSessions;
     private final com.joylin.waterkb.security.LoginCryptoService crypto;
+    private final com.joylin.waterkb.security.UnregisteredPermScanner unregisteredPermScanner;
 
     public AdminController(UserStore users, RolePermissions rolePermissions,
                            PermissionCatalog permCatalog, AuditService audit,
@@ -52,7 +53,8 @@ public class AdminController {
                            com.joylin.waterkb.security.OrgStore orgs,
                            com.joylin.waterkb.search.EsIndexService es,
                            com.joylin.waterkb.memory.ChatSessionStore chatSessions,
-                           com.joylin.waterkb.security.LoginCryptoService crypto) {
+                           com.joylin.waterkb.security.LoginCryptoService crypto,
+                           com.joylin.waterkb.security.UnregisteredPermScanner unregisteredPermScanner) {
         this.users = users;
         this.rolePermissions = rolePermissions;
         this.permCatalog = permCatalog;
@@ -62,6 +64,7 @@ public class AdminController {
         this.es = es;
         this.chatSessions = chatSessions;
         this.crypto = crypto;
+        this.unregisteredPermScanner = unregisteredPermScanner;
     }
 
     // ---------- 组织（界面上叫"组织"，底层仍是账号的 tenant 字段） ----------
@@ -370,6 +373,12 @@ public class AdminController {
     @PostMapping("/perms/sync")
     public Map<String, Object> syncPerms(@RequestBody List<Map<String, Object>> body) {
         return permCatalog.sync(body);
+    }
+
+    /** 代码里在用、但权限树还没建的权限码（供新增权限弹窗快捷选择，选了就能控制真实功能） */
+    @GetMapping("/perms/unused-codes")
+    public List<Map<String, Object>> unusedPermCodes() {
+        return unregisteredPermScanner.scan();
     }
 
     /** 编辑节点显示信息；内置节点不可改标识、不可删除 */
