@@ -330,6 +330,10 @@
   #activeBox .active-label{font-size:11.5px;color:var(--muted);margin-bottom:4px}
   #activeBox .active-name{font-size:15px;font-weight:650;color:var(--ink)}
   #activeBox .active-divider{border-top:1px solid var(--line);margin:16px 0}
+  .msg.ok,.msg.err{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
+  .msg-close{flex:0 0 16px;width:16px;height:16px;line-height:14px;text-align:center;border:0;
+    border-radius:4px;background:transparent;color:inherit;font-size:14px;cursor:pointer;padding:0;opacity:.75}
+  .msg-close:hover{opacity:1;background:rgba(0,0,0,.06)}
 </style>
 </head>
 <script>
@@ -1827,10 +1831,11 @@ function renderPermTable(){
     const kids=(byParent[x.code]||[]).filter(match);
     const indent=16+depth*20;
     const caret=kids.length?'<span class="pg-caret" data-fold="'+esc(x.code)+'" style="cursor:pointer">'+(folded?'▸':'▾')+'</span>':'<span class="pg-caret"></span>';
-    const ops='<button class="op-btn" data-perm="perm:read" onclick="showPermRoles(\''+esc(x.code)+'\')">查看角色</button>'+
+    const typ=x.nodeType||'menu';
+    const ops=(typ==='btn'?'':'<button class="op-btn" data-perm="perm:read" onclick="createPerm(\''+esc(x.code)+'\')" title="在此层级下新增子项">＋子项</button>')+
+      '<button class="op-btn" data-perm="perm:read" onclick="showPermRoles(\''+esc(x.code)+'\')">查看角色</button>'+
       '<button class="op-btn" data-perm="perm:read" onclick="editPerm(\''+esc(x.code)+'\')">编辑</button>'+
       (x.builtin?'':'<button class="op-btn" style="color:#c0392b" data-perm="perm:read" onclick="delPerm(\''+esc(x.code)+'\')">删除</button>');
-    const typ=x.nodeType||'menu';
     html+='<tr data-code="'+esc(x.code)+'"><td style="padding-left:'+indent+'px" class="name perm-name '+LV(typ)+'">'+
       caret+'<span class="pn-ico">'+(TYPE_ICON[typ]||'▤')+'</span>'+esc(x.name)+
       (x.builtin?'':' <span class="tag">自定义</span>')+'</td>'+
@@ -1871,17 +1876,64 @@ async function loadUnusedPermCodes(){
   catch(e){USED_PERM_CODES=new Set()}
   return UNUSED_PERM_CODES;
 }
+// 常用业务动作：不在代码清单里、但企业后台普遍需要；点一下按当前上级前缀生成新码
+const COMMON_ACTIONS=[['select','查询'],['create','新增'],['edit','编辑'],['delete','删除'],
+  ['export','导出'],['import','导入'],['approve','审批'],['review','复核'],['report','上报'],
+  ['issue','下达'],['archive','归档'],['stats','统计'],['print','打印'],['download','下载'],
+  ['config','配置'],['audit','审核'],['reset','重置'],['sync','同步']];
 function permQuickBtns(){
-  if(!UNUSED_PERM_CODES.length)
-    return '<div class="form-hint">当前所有在用的权限码都已注册。如需新增业务权限，请先在前台按钮写 data-perm 或后端接口加 @RequirePermission，再回来新增；也可以直接在下方手工填写权限码（会提示是否真能生效）。</div>';
-  const items=UNUSED_PERM_CODES.map(x=>{
-    const src=(x.sources||[]).join('、').replace(/"/g,'&quot;').replace(/</g,'&lt;');
-    const name=esc(x.name||x.code),code=esc(x.code);
-    return '<button type="button" class="unused-code-btn" data-code="'+code+'" data-name="'+name+'" title="来源：'+src+'" '+
-      'onclick="fillPermCode(this.dataset.code,this.dataset.name)">'+name+' <span class="mono">'+code+'</span></button>';
-  }).join('');
-  return '<div class="perm-quick-row"><span class="perm-quick-label">代码中在用、尚未注册（点击填入，立即生效）</span>'+
-    '<div class="type-quick">'+items+'</div></div>';
+  return '<div id="permQuickHost"></div>';
+}
+/** 按当前上级重绘快捷区：优先"代码在用但未注册"，再给常用动作自选 */
+function renderPermQuick(){
+  const host=$('permQuickHost');if(!host)return;
+  const parent=$('fPParent')?$('fPParent').value:'';
+  const prefix=permPrefix(parent);
+  let html='';
+  const used=UNUSED_PERM_CODES.filter(x=>!prefix||String(x.code).startsWith(prefix));
+  if(used.length){
+    const items=used.map(x=>{
+      const src=(x.sources||[]).join('、').replace(/"/g,'&quot;').replace(/</g,'&lt;');
+      return '<button type="button" class="unused-code-btn" data-code="'+esc(x.code)+'" data-name="'+esc(x.name||x.code)+'" '+
+        'title="来源：'+src+'" onclick="fillPermCode(this.dataset.code,this.dataset.name)">'+
+        esc(x.name||x.code)+' <span class="mono">'+esc(x.code)+'</span></button>';
+    }).join('');
+    html+='<div class="perm-quick-row"><span class="perm-quick-label">代码在用、尚未注册（点击立即生效）</span><div class="type-quick">'+items+'</div></div>';
+  }
+  if(prefix){
+    const acts=COMMON_ACTIONS.filter(([a])=>!USED_PERM_CODES.has(prefix+a)&&!DB.perms.some(x=>x.code===prefix+a));
+    const btns=acts.map(([a,label])=>'<button type="button" onclick="fillPermAction(\''+a+'\',\''+label+'\')">'+label+'</button>').join('');
+    html+='<div class="perm-quick-row"><span class="perm-quick-label">常用动作（按 '+esc(prefix)+' 自动生成新码）</span><div class="type-quick">'+btns+'</div></div>';
+  }
+  html+='<div class="form-hint">也可直接在下方自己写权限码；若代码里尚未使用，会提示暂时不生效。</div>';
+  host.innerHTML=html;
+}
+function fillPermAction(action,label){
+  const parent=$('fPParent')?$('fPParent').value:'';
+  const prefix=permPrefix(parent);
+  if(!prefix){Shell.modalError('请先选上级节点，才能自动生成权限码前缀');return}
+  const code=prefix+action;
+  if($('fPCode'))$('fPCode').value=code;
+  if($('fPName'))$('fPName').value=label;
+  if($('fPModule')&&!$('fPModule').value)$('fPModule').value=prefix.slice(0,-1);
+  checkPermCode();
+}
+/** 从上级节点 code 取权限码前缀：user:read → user:；system:root → system: */
+function permPrefix(parentCode){
+  const p=String(parentCode||'');
+  const i=p.indexOf(':');
+  return i>0?p.slice(0,i+1):'';
+}
+/** 上级变了：自动带出权限码前缀与模块名 */
+function permParentChanged(){
+  const parent=$('fPParent')?$('fPParent').value:'';
+  const prefix=permPrefix(parent);
+  if(prefix&&$('fPModule')&&!$('fPModule').value)$('fPModule').value=prefix.slice(0,-1);
+  if(prefix&&$('fPCode')&&!$('fPCode').value){
+    $('fPCode').value=prefix;
+    checkPermCode();
+  }
+  renderPermQuick();
 }
 function fillPermCode(code,name){
   const el=$('fPCode');if(el){el.value=code;el.disabled=false}
@@ -1912,10 +1964,12 @@ function checkPermCode(){
 }
 
 // 新增权限节点：快捷选项必须来自"代码在用但未注册"的真实权限码
-async function createPerm(){
+// presetParent：从权限树某行点"＋子项"带进来的上级 code，自动带出权限码前缀
+async function createPerm(presetParent){
   await loadUnusedPermCodes();
-  Shell.modal({title:'新增菜单 / 权限',okText:'创建',body:
-    '<div class="field"><label for="fPParent">上级节点</label><select id="fPParent">'+parentPermOptions('')+'</select></div>'+
+  const parent=presetParent||'';
+  Shell.modal({title:parent?('新增子项 · '+(DB.perms.find(x=>x.code===parent)?.name||parent)):'新增菜单 / 权限',okText:'创建',body:
+    '<div class="field"><label for="fPParent">上级节点</label><select id="fPParent" onchange="permParentChanged()">'+parentPermOptions(parent)+'</select></div>'+
     '<div class="field"><label for="fPType">节点类型</label>'+
     '<select id="fPType" onchange="permTypeChanged()"><option value="directory">目录</option>'+
     '<option value="menu" selected>菜单</option><option value="btn">按钮</option></select></div>'+
@@ -1952,6 +2006,9 @@ async function createPerm(){
         close();appToast('节点已创建','ok');loadPerms();
       }catch(e){Shell.modalError(e.message);return false}
     }});
+  // 弹窗 DOM 已生成，初始化快捷区与预设上级的前缀
+  renderPermQuick();
+  if(parent)permParentChanged();
 }
 function permTypeChanged(){
   const t=$('fPType').value;
@@ -2148,7 +2205,11 @@ function resultCn(r,status){
 
 // ===== 模型设置（新版，原 models.html 脚本） =====
 let models=[];
-function modelMsg(id,text,ok){const el=$(id);if(!el)return;el.className='msg '+(ok?'ok':'err');el.textContent=text}
+function modelMsg(id,text,ok){
+  const el=$(id);if(!el)return;
+  el.className='msg '+(ok?'ok':'err');
+  el.innerHTML='<span>'+esc(text)+'</span><button type="button" class="msg-close" title="关闭提示" onclick="this.parentNode.className=\'msg\'">×</button>';
+}
 async function loadModels(){
   try{
     models=await api('/api/models');
