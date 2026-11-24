@@ -1000,6 +1000,22 @@ function onSessionDeleted(id){
   }else renderSessions();
 }
 initShell('index');       // 渲染全站统一侧栏 + 服务探活 + 触发一次会话清单同步
+// 页面级权限守卫：没勾「智能问答」的账号，直接敲 URL 也进不来。
+// 与其它功能页共用三道门——侧栏隐藏、这里拦页面、后端 @RequirePermission 拦接口。
+(async function guardPerm(){
+  if(window.Shell&&Shell.permsReady)await Shell.permsReady();
+  if(window.Shell&&Shell.hasPermission&&Shell.hasPermission('chat:use'))return;
+  const main=document.querySelector('main');if(!main)return;
+  const nav=main.querySelector('.topbar-nav');if(nav)nav.style.display='none';
+  const scroll=main.querySelector('.scroll-area');if(scroll)scroll.style.display='none';
+  const composer=main.querySelector('.composer-wrap');if(composer)composer.style.display='none';
+  const bar=document.createElement('div');
+  bar.className='card';bar.style.cssText='margin:auto;max-width:520px;padding:36px;text-align:center';
+  bar.innerHTML='<div style="font-size:34px;margin-bottom:12px">🔒</div>'+
+    '<div style="font-size:15px;font-weight:650;margin-bottom:8px">没有使用权限</div>'+
+    '<div style="font-size:13px;color:#6b7a99;line-height:1.7">当前账号未被授予「智能问答」的使用权限。<br>如需使用，请联系管理员为你的角色勾选该功能。</div>';
+  main.appendChild(bar);
+})();
 // 先等清单（最多 1.5 秒），再初始化会话；网络慢就直接用本地缓存往下走
 (async function boot(){
   try{

@@ -141,6 +141,36 @@ function showErr(msg){
   var b=document.getElementById('errBox');b.textContent=msg;b.classList.add('show');
 }
 
+// 登录落地页按权限决定，不再一律写死问答页。
+// 之前审计员账号（没有 chat:use）登录后被硬塞进问答页，侧栏和输入框全都露出来，
+// 观感像"权限没生效"。现在先读一次权限清单，落到这个账号真正能用的第一个页面。
+// 优先级：问答 > 后台 > 审计 > 模型 > 文档 > 检索 > 会话结构；全都没有就落个人中心。
+async function pickLandingPage(){
+  var perms=new Set();
+  try{
+    // login.html 不引入 auth.js（没有全局 fetch 自动补 Bearer 的补丁），必须显式带 token
+    var r=await fetch('/api/auth/permissions',{
+      headers:{Authorization:'Bearer '+(sessionStorage.getItem(KEY_ACCESS)||'')}
+    });
+    if(r.ok){var j=await r.json();perms=new Set(j.permissions||[])}
+  }catch(e){}
+  var groups=[];
+  try{groups=(JSON.parse(sessionStorage.getItem(KEY_USER)||'{}').groups)||[]}catch(e){}
+  var isAdmin=groups.indexOf('admin')>=0;
+  // 权限接口暂时不可用时，管理员仍可进后台，普通账号落个人中心而不是白屏
+  if(!perms.size)return isAdmin?'admin.html':'profile.html';
+  var routes=[
+    ['chat:use','index.html'], ['admin:access','admin.html'],
+    ['audit:read','governance.html'], ['model:read','models.html'],
+    ['doc:read','manage.html'], ['search:use','search.html'],
+    ['tree:use','tree.html']
+  ];
+  for(var i=0;i<routes.length;i++){
+    if(perms.has(routes[i][0]))return routes[i][1];
+  }
+  return 'profile.html';
+}
+
 document.getElementById('loginForm').addEventListener('submit',async function(e){
   e.preventDefault();
   var btn=document.getElementById('loginBtn');
@@ -166,10 +196,9 @@ document.getElementById('loginForm').addEventListener('submit',async function(e)
       if(document.getElementById('remember').checked)localStorage.setItem(KEY_REMEMBER,u);
       else localStorage.removeItem(KEY_REMEMBER);
     }catch(e){}
-    // 一律回问答页，不沿用上一个账号停留的页面：
-    // 谁登录就落谁的默认视图——有历史会话定位到最新一条，没有就是新会话（由问答页自己决定）。
-    // 以前带 redirect 参数，A 账号停在检索对比、B 账号登录后直接被带进检索对比，观感像"串号"。
-    location.href='index.html';
+    // 按本次登录账号的权限落地，不沿用上一个账号停留的页面（避免"串号"），
+    // 也不把没问答权限的账号硬塞进问答页。
+    location.href=await pickLandingPage();
   }catch(err){showErr('网络异常，请稍后重试：'+err.message)}
   finally{btn.disabled=false;btn.textContent='登 录'}
 });

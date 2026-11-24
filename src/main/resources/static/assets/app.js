@@ -19,7 +19,7 @@
   // 工作台主导航只保留高频两项；其余功能统一收进「设置」页，避免侧栏冗长
   // perm = 菜单权限码：权限页没勾的账号，侧栏不渲染该项（页面内还有第二道守卫）
   const NAV = [
-    { key: 'index', href: 'index.html', label: '智能问答', icon: 'chat', groups: [] },
+    { key: 'index', href: 'index.html', label: '智能问答', icon: 'chat', perm: 'chat:use', groups: [] },
     { key: 'manage', href: 'manage.html', label: '知识库文档', icon: 'doc', perm: 'doc:read', groups: [] }
   ];
   // 设置页内的功能入口（含功能权限控制）

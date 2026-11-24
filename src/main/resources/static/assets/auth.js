@@ -38,7 +38,8 @@
   function goLogin() {
     clearSession();
     if (location.pathname.indexOf('login.html') < 0) {
-      // 不带 redirect：登录成功后一律回问答页（换账号登录不该落进上一个账号停留的页面）
+      // 不带 redirect：落地页由 login.html 按本次登录账号的权限决定，
+      // 不沿用上一个账号停留的页面（换账号不该"串号"）
       location.href = 'login.html';
     }
   }
