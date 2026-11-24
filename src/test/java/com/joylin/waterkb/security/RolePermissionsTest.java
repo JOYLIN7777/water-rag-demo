@@ -69,6 +69,21 @@ class RolePermissionsTest {
     }
 
     @Test
+    void 角色矩阵带中文显示名且内置角色回落正确() {
+        var matrix = service.roleMatrix();
+        assertEquals(3, matrix.size(), "无数据库时只应有三个内置角色，不能冒出运维人员等历史硬编码");
+        assertTrue(matrix.stream().anyMatch(m -> "admin".equals(m.get("role"))
+                && "系统管理员".equals(m.get("name"))));
+        assertTrue(matrix.stream().anyMatch(m -> "analyst".equals(m.get("role"))
+                && "水利分析员".equals(m.get("name"))));
+        assertTrue(matrix.stream().anyMatch(m -> "viewer".equals(m.get("role"))
+                && "只读用户".equals(m.get("name"))));
+        assertEquals("系统管理员", service.roleName("admin"));
+        // 历史账号里可能残留 ops 组，显示名仍要正确，但它不该出现在角色定义清单里
+        assertEquals("运维人员", service.roleName("ops"));
+    }
+
+    @Test
     void all模式要求全部权限都满足() {
         UserContext.CurrentUser analyst =
                 new UserContext.CurrentUser("analyst", List.of("analyst"), "default", "jwt");

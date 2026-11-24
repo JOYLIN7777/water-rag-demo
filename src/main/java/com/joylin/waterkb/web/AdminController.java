@@ -306,8 +306,10 @@ public class AdminController {
                                                   @RequestBody Map<String, Object> body) {
         @SuppressWarnings("unchecked")
         List<String> permissions = (List<String>) body.getOrDefault("permissions", List.of());
-        rolePermissions.setPermissions(role, permissions);
-        return Map.of("message", "角色权限已保存并实时生效", "role", role.toLowerCase());
+        String roleName = str(body.get("roleName"));
+        rolePermissions.setPermissions(role, permissions, roleName);
+        return Map.of("message", "角色已保存并实时生效", "role", role.toLowerCase(),
+                "name", rolePermissions.roleName(role));
     }
 
     /** 删除角色定义：删除后该角色回落内置默认（无记录的角色按无权限处理） */

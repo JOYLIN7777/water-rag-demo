@@ -179,6 +179,9 @@
   .check-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(132px,1fr));gap:9px 12px;padding-top:4px}
   .check-grid label{display:inline-flex;align-items:center;gap:7px;font-size:12.5px;white-space:nowrap;margin:0;color:var(--ink-2);cursor:pointer}
   .check-grid input[type=checkbox]{width:15px;height:15px;min-width:15px;padding:0;margin:0;flex:0 0 15px;accent-color:var(--primary);cursor:pointer}
+  /* 账号状态与「角色 / 用户组」分块：虚线分隔，避免状态勾选被看成第五个角色 */
+  .status-field{border-top:1px dashed var(--line);padding-top:12px;margin-top:12px}
+  .status-field .field-check{font-size:12.5px;color:var(--ink-2);display:inline-flex;align-items:center;gap:7px;cursor:pointer}
   /* 重置码是一次性凭证：字号要大到能当着用户面核对/口述，等宽字体防 0/O、1/l 混淆 */
   .reset-code{font-family:ui-monospace,Consolas,monospace;font-size:26px;font-weight:700;letter-spacing:6px;
     text-align:center;color:#25469b;background:#f4f8ff;border:1px dashed #b9cbff;border-radius:10px;padding:16px 10px}
@@ -541,7 +544,12 @@
 <script>
 const $=id=>document.getElementById(id);
 function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
-const gl=g=>window.Shell?Shell.groupLabel(g):g;
+// 角色显示名以角色定义（后端下发的 name）为准，内置回落 Shell 映射，
+// 避免用户管理里冒出角色定义页根本没有的「运维人员」等历史硬编码
+const gl=g=>{
+  const r=(DB.roles||[]).find(x=>x&&x.role===g);
+  return (r&&r.name)||(window.Shell?Shell.groupLabel(g):g)||g;
+};
 const tl=t=>window.Shell?Shell.tenantLabel(t):t;
 const num=n=>Number(n||0).toLocaleString('zh-CN');
 function statusTag(s){const n=Number(s);return '<span class="tag '+(n>=400?'no':'ok')+'">'+n+'</span>'}
@@ -1053,14 +1061,23 @@ async function apiWrite(path,opts){
   if(!r.ok)throw new Error(j.message||('请求失败（'+r.status+'）'));
   return j;
 }
+// 角色勾选清单只认角色定义（DB.roles 来自服务端），不再硬编码 5 个历史角色——
+// 原来用户管理里能勾到「运维人员/水利业务组」，角色定义页却查无此角色，两处对不上。
 function groupChecks(selected,lockAdmin){
-  const opts=[['admin','系统管理员'],['analyst','水利分析员'],['viewer','只读用户'],['water-dept','水利业务组'],['ops','运维人员']];
-  return '<div class="check-grid">'+opts.map(([v,l])=>{
+  const opts=(DB.roles||[]).map(r=>[r.role,r.name||gl(r.role)]);
+  if(!opts.length)return '<div class="form-hint">角色定义暂时无法加载，请刷新页面后重试。</div>';
+  const legacy=(selected||[]).filter(g=>!opts.some(([v])=>v===g));
+  const checks=opts.map(([v,l])=>{
     const lock=lockAdmin&&v==='admin';
     return '<label'+(lock?' title="不能移除当前登录账号自己的管理员角色"':'')+'>'+
-      '<input type="checkbox" name="ug" value="'+v+'"'+((selected||[]).includes(v)?' checked':'')+(lock?' disabled':'')+'>'+
-      '<span>'+l+'</span></label>';
-  }).join('')+'</div>';
+      '<input type="checkbox" name="ug" value="'+esc(v)+'"'+((selected||[]).includes(v)?' checked':'')+(lock?' disabled':'')+'>'+
+      '<span>'+esc(l)+'</span></label>';
+  }).join('');
+  // 历史遗留角色（角色定义里已删掉）不显示为勾选项，但要在保存时原样带回，
+  // 否则管理员一编辑账号就静默清掉了这个用户的角色。
+  const legacyTip=legacy.length?'<div class="form-hint">⚠ 该账号带有未在角色定义中的角色：'+
+    legacy.map(x=>esc(gl(x))+'（'+esc(x)+'）').join('、')+'，保存时原样保留。</div>':'';
+  return '<div class="check-grid">'+checks+'</div>'+legacyTip;
 }
 /**
  * 账号表单（新增 / 编辑共用）。
@@ -1100,8 +1117,10 @@ function userForm(u,presetTenant){
     (u?'':'<div class="field"><label for="fPwd">初始密码</label>'+
       '<input id="fPwd" type="password" autocomplete="new-password" placeholder="至少 8 位，请自行设定"></div>')+
     '<div class="field"><label>角色 / 用户组</label>'+groupChecks(u?u.groups:['viewer'],self)+'</div>'+
-    (u?'<div class="field"><label class="field-check"><input id="fEnabled" type="checkbox"'+(u.enabled?' checked':'')+(self?' disabled':'')+'>账号正常'
-      +(self?'<span class="form-inline-note">（当前登录账号不可停用）</span>':'')+'</label></div>':'');
+    (u?'<div class="field status-field"><label>账号状态</label>'+
+      '<label class="field-check"><input id="fEnabled" type="checkbox"'+(u.enabled?' checked':'')+(self?' disabled':'')+'>账号正常'
+      +(self?'<span class="form-inline-note">（当前登录账号不可停用）</span>':'')+'</label>'+
+      '<div class="form-hint">停用后该账号无法登录。</div></div>':'');
 }
 function readUserForm(u){
   return {
@@ -1109,7 +1128,11 @@ function readUserForm(u){
     displayName:($('fDisplay').value||'').trim(),
     tenant:($('fTenant').value||'').trim(),
     password:u?undefined:($('fPwd').value||''),
-    groups:Array.prototype.slice.call(document.querySelectorAll('input[name=ug]:checked')).map(x=>x.value),
+    groups:(function(){
+      const on=Array.prototype.slice.call(document.querySelectorAll('input[name=ug]:checked')).map(x=>x.value);
+      const legacy=(u&&u.groups||[]).filter(g=>!(DB.roles||[]).some(r=>r.role===g));
+      return Array.from(new Set(on.concat(legacy)));
+    })(),
     enabled:u?$('fEnabled').checked:true
   };
 }
@@ -1439,10 +1462,14 @@ function createRole(){
     '<div class="form-note">角色标识是权限系统的内部键，只能用<strong>英文小写字母</strong>开头，'
     +'可含数字、下划线、短横线（例：<code>operator</code>、<code>flood_viewer</code>）。'
     +'新建后在用户管理的「角色 / 用户组」里分配。</div>'+
+    '<div class="field"><label for="fRoleName">角色名称（中文，显示在角色列表与用户管理）</label>'+
+    '<input id="fRoleName" autocomplete="off" placeholder="例如：防汛值班员" maxlength="32"></div>'+
     '<div class="field"><label for="fRole">角色标识（英文，赋给用户后生效）</label>'+
     '<input id="fRole" autocomplete="off" placeholder="例如：operator" maxlength="32"></div>'+
     '<div class="field"><label>默认权限</label><div style="padding-top:4px">'+permEditor([])+'</div></div>',
     onOk:async function(close){
+      const label=($('fRoleName').value||'').trim();
+      if(!label){Shell.modalError('请填写角色名称（中文显示名）');return false}
       const name=($('fRole').value||'').trim().toLowerCase();
       if(!name){Shell.modalError('请填写角色标识（英文，例如 operator）');return false}
       if(!/^[a-z][a-z0-9_-]{1,31}$/.test(name)){
@@ -1453,8 +1480,11 @@ function createRole(){
       if(!perms.length){Shell.modalError('请至少勾选一项权限，否则该角色登录后什么都做不了');return false}
       try{
         await apiWrite('/api/admin/roles/'+encodeURIComponent(name)+'/permissions',
-          {method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({permissions:perms})});
-        close();appToast('角色已创建，可在用户管理中分配','ok');refreshRoles();
+          {method:'PUT',headers:{'Content-Type':'application/json'},
+           body:JSON.stringify({permissions:perms,roleName:label})});
+        close();appToast('角色已创建，可在用户管理中分配','ok');
+        await refreshRoles();          // 同步 DB.roles，用户管理下拉立刻能看到新角色
+        renderUserTable(1);            // 已有账号的角色标签也跟着刷新显示名
       }catch(e){Shell.modalError(e.message);return false}
     }});
 }

@@ -47,6 +47,11 @@ public class RolePermissions {
             "analyst", ANALYST,
             "viewer", VIEWER);
 
+    /** 内置角色的中文显示名；DB 没配名称时回落，用户管理不再露英文键 */
+    private static final Map<String, String> BUILT_IN_NAMES = Map.of(
+            "admin", "系统管理员", "analyst", "水利分析员", "viewer", "只读用户",
+            "user", "普通用户", "ops", "运维人员", "water-dept", "水利业务组");
+
     /** 可为 null：单测与无数据库环境只用内置默认 */
     private final JdbcTemplate jdbc;
     /** 权限节点目录：自定义权限码的合法性校验来源 */
@@ -57,6 +62,9 @@ public class RolePermissions {
      * volatile 保证拦截线程读到最新快照；写操作在事务提交后整体替换。
      */
     private volatile Map<String, Set<String>> effective = BUILT_IN;
+
+    /** 角色中文显示名（role_definitions 表），与权限矩阵一起下发给后台页面 */
+    private volatile Map<String, String> roleNames = Map.of();
 
     public RolePermissions() { this.jdbc = null; this.catalog = null; }
 
@@ -73,6 +81,10 @@ public class RolePermissions {
             jdbc.execute("CREATE TABLE IF NOT EXISTS role_permissions ("
                     + "role VARCHAR(64) NOT NULL, permission VARCHAR(64) NOT NULL, "
                     + "PRIMARY KEY (role, permission))");
+            // 角色名称单独一张表：权限表是 (role,permission) 多行结构，名称放这里会在
+            // 每个权限行重复一遍，改个显示名要更新所有行。
+            jdbc.execute("CREATE TABLE IF NOT EXISTS role_definitions ("
+                    + "role VARCHAR(64) NOT NULL PRIMARY KEY, role_name VARCHAR(128) NOT NULL)");
             refresh();
         } catch (Exception e) {
             // 持久化表不可用时退化为纯内置默认，权限校验照常工作
@@ -82,6 +94,7 @@ public class RolePermissions {
     /** 从数据库重建最终视图：DB 有记录的角色【整体替换】内置默认（后台勾选清单即全部权限），无记录的回落内置默认 */
     /** 从数据库整体重载角色权限到内存视图（启动、保存、节点删除后调用） */
     public void refresh() {
+        if (jdbc == null) { effective = Map.copyOf(BUILT_IN); roleNames = Map.of(); return; }
         Map<String, Set<String>> fromDb = new LinkedHashMap<>();
         jdbc.query("SELECT role, permission FROM role_permissions ORDER BY role, permission", rs -> {
             fromDb.computeIfAbsent(rs.getString("role").trim(), k -> new LinkedHashSet<>())
@@ -91,6 +104,11 @@ public class RolePermissions {
         BUILT_IN.forEach((k, v) -> merged.put(k, new LinkedHashSet<>(v)));
         fromDb.forEach(merged::put);
         effective = Map.copyOf(merged);
+        Map<String, String> names = new LinkedHashMap<>();
+        jdbc.query("SELECT role, role_name FROM role_definitions", rs -> {
+            names.put(rs.getString("role").trim(), rs.getString("role_name").trim());
+        });
+        roleNames = Map.copyOf(names);
     }
 
     /** 获取某用户拥有的全部权限码（只读视图） */
@@ -114,17 +132,26 @@ public class RolePermissions {
         return List.of(needed).stream().anyMatch(owned::contains);
     }
 
-    /** 供前端展示：系统中所有角色及其权限 */
+    /** 供前端展示：系统中所有角色及其权限（带中文显示名） */
     public List<Map<String, Object>> roleMatrix() {
         List<Map<String, Object>> out = new ArrayList<>();
-        effective.forEach((role, perms) -> {
+        Set<String> roles = new LinkedHashSet<>(effective.keySet());
+        roles.addAll(roleNames.keySet());   // 只建了名称还没配权限的角色也要能看到
+        roles.forEach(role -> {
             Map<String, Object> m = new LinkedHashMap<>();
             m.put("role", role);
-            m.put("permissions", role.equals("admin") ? Permission.ALL : List.copyOf(perms));
+            m.put("name", roleNames.getOrDefault(role, BUILT_IN_NAMES.getOrDefault(role, role)));
+            m.put("permissions", role.equals("admin") ? Permission.ALL : List.copyOf(effective.getOrDefault(role, Set.of())));
             m.put("builtin", BUILT_IN.containsKey(role));
             out.add(m);
         });
         return out;
+    }
+
+    /** 角色中文显示名：DB 自定义名称优先，内置回落，未知角色原样返回 */
+    public String roleName(String role) {
+        String key = normalize(role);
+        return roleNames.getOrDefault(key, BUILT_IN_NAMES.getOrDefault(key, key));
     }
 
     /**
@@ -132,6 +159,11 @@ public class RolePermissions {
      * 写库成功后重建内存视图，下一次接口调用立即生效，无需重启。
      */
     public void setPermissions(String role, List<String> permissions) {
+        setPermissions(role, permissions, null);
+    }
+
+    /** displayName 非空时同时落角色名称，供后台列表/用户管理下拉统一显示 */
+    public void setPermissions(String role, List<String> permissions, String displayName) {
         String name = normalize(role);
         if (name.isEmpty()) throw new IllegalArgumentException("角色名不能为空");
         if (name.equals("admin")) throw new IllegalArgumentException("管理员角色拥有全部权限，不可修改");
@@ -144,6 +176,11 @@ public class RolePermissions {
         for (String p : new LinkedHashSet<>(permissions)) {
             jdbc.update("INSERT INTO role_permissions(role,permission) VALUES(?,?)", name, p);
         }
+        String label = displayName == null ? "" : displayName.trim();
+        if (!label.isEmpty()) {
+            jdbc.update("INSERT INTO role_definitions(role,role_name) VALUES(?,?) "
+                    + "ON CONFLICT(role) DO UPDATE SET role_name=excluded.role_name", name, label);
+        }
         refresh();
     }
 
@@ -153,6 +190,7 @@ public class RolePermissions {
         if (name.equals("admin")) throw new IllegalArgumentException("管理员角色不可删除");
         if (jdbc == null) throw new IllegalStateException("当前环境无数据库，角色权限不可配置");
         int rows = jdbc.update("DELETE FROM role_permissions WHERE role=?", name);
+        jdbc.update("DELETE FROM role_definitions WHERE role=?", name);
         refresh();
         return rows > 0;
     }

@@ -378,7 +378,14 @@
     const fd = new FormData(); fd.append('file', file);
     appendVisibility(fd);
     const started = Date.now();
-    const r = await fetch('/api/docs/upload', { method: 'POST', body: fd });
+    let r;
+    try {
+      r = await fetch('/api/docs/upload', { method: 'POST', body: fd });
+    } catch (e) {
+      // 浏览器网络层失败只会抛英文 "Failed to fetch"，直接贴给用户看不懂，
+      // 转成能指导下一步动作的中文原因（HTTP 层失败仍走下面的 j.message）
+      throw new Error('网络连接失败，请检查网络或稍后重试');
+    }
     const j = await r.json().catch(function () { return {}; });
     if (!r.ok || j.chunks === undefined) throw new Error(j.message || ('上传失败（HTTP ' + r.status + '）'));
     return { chunks: j.chunks, chars: j.chars, secs: ((Date.now() - started) / 1000).toFixed(1) };
@@ -607,9 +614,11 @@
     const cancelBtn = document.querySelector('#appModal .btn-cancel');
     if (okBtn) { okBtn.disabled = true; okBtn.textContent = '上传中…'; }
     if (cancelBtn) cancelBtn.disabled = true;
-    // 标题上先说清楚，免得有人盯着进度不敢关
+    // 标题只写状态；「可关闭窗口」是小字副提示，不能和标题同级抢视觉
     const titleEl = document.querySelector('#appModal .modal-title');
-    if (titleEl) titleEl.textContent = '上传中（可关闭窗口，后台会继续）';
+    if (titleEl) titleEl.textContent = '上传中';
+    const subEl = document.getElementById('modalSubtitle');
+    if (subEl) subEl.textContent = '可关闭窗口，后台会继续';
     list.querySelectorAll('.pick-cb').forEach(function (cb) { cb.disabled = true; });
     const bar = document.getElementById('pickBar');
     if (bar) bar.classList.add('show');
@@ -653,12 +662,15 @@
     const dt = document.getElementById('pickDone');
     if (dt && job.token === pickState) {
       dt.className = 'pick-done-tip show';
-      dt.innerHTML = '✓ 完成：成功 <b>' + done + '</b> 个' + (fail ? '，失败 <b style="color:var(--danger)">' + fail + '</b> 个（鼠标悬停可看原因）' : '') +
-        '。文档已入库，现在可以提问了。';
+      dt.innerHTML = (done ? '✓ ' : '') + '完成：成功 <b>' + done + '</b> 个' +
+        (fail ? '，失败 <b style="color:var(--danger)">' + fail + '</b> 个（鼠标悬停可看原因）' : '') +
+        (done ? '。文档已入库，现在可以提问了。' : '。没有文档入库，请按失败原因处理后重试。');
       if (okBtn) { okBtn.disabled = false; okBtn.textContent = '完成'; }
       if (cancelBtn) cancelBtn.disabled = false;
       const t2 = document.querySelector('#appModal .modal-title');
       if (t2) t2.textContent = '选择要上传的文件';
+      const s2 = document.getElementById('modalSubtitle');
+      if (s2) s2.textContent = '';
     }
     toast('文档已入库 ' + done + ' 个' + (fail ? '（' + fail + ' 个失败）' : ''), fail ? 'err' : 'ok');
     loadDocs();
@@ -1046,9 +1058,12 @@
     const sizeCls = opts.wide ? ' modal-wide' : (opts.size === 'md' ? ' modal-md' : '');
     mask.innerHTML =
       '<div class="modal-box' + sizeCls + '" role="dialog" aria-modal="true">' +
-        '<div class="modal-head' + (opts.danger ? ' danger' : '') + '"><div class="modal-title">' +
-          (opts.danger ? '<span style="margin-right:6px">⚠</span>' : '') + esc(opts.title || '提示') + '</div>' +
-          '<button class="modal-close" title="关闭">×</button></div>' +
+        '<div class="modal-head' + (opts.danger ? ' danger' : '') + '"><div class="modal-title-wrap">' +
+          '<div class="modal-title">' + (opts.danger ? '<span style="margin-right:6px">⚠</span>' : '') +
+            esc(opts.title || '提示') + '</div>' +
+          '<div class="modal-subtitle" id="modalSubtitle"></div>' +
+        '</div>' +
+        '<button class="modal-close" title="关闭">×</button></div>' +
         '<div class="modal-alert" id="modalAlert" role="alert"></div>' +
         '<div class="modal-body">' + (opts.body || '') + '</div>' +
         '<div class="modal-foot">' +
