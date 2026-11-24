@@ -82,6 +82,7 @@ public class PermissionCatalog {
         jdbc.execute("ALTER TABLE perm_node ADD COLUMN IF NOT EXISTS parent_code VARCHAR(64) DEFAULT ''");
         jdbc.execute("ALTER TABLE perm_node ADD COLUMN IF NOT EXISTS route_path VARCHAR(128) DEFAULT ''");
         jdbc.execute("ALTER TABLE perm_node ADD COLUMN IF NOT EXISTS order_num INT DEFAULT 0");
+        jdbc.execute("ALTER TABLE perm_node ADD COLUMN IF NOT EXISTS last_seen_at TIMESTAMP");
         // 内置节点首次初始化写入，之后以库为准（用户改过的显示信息不会被启动覆盖）
         for (String[] n : BUILT_IN) {
             jdbc.update("INSERT INTO perm_node(code,name,node_type,module,description,builtin,parent_code,route_path,order_num) "
@@ -126,6 +127,55 @@ public class PermissionCatalog {
                 "SELECT COUNT(*) > 0 FROM perm_node WHERE code=?", Boolean.class, code);
         return Boolean.TRUE.equals(hit);
     }
+
+    /**
+     * 页面自动发现：前端上报本页出现的 data-perm 节点，未知权限码自动建目录项。
+     * 只补新增、不改名不删节点——管理员改过的显示名与手动加的节点始终保留。
+     */
+    public Map<String, Object> discover(List<Map<String, Object>> items) {
+        List<String> added = new ArrayList<>();
+        int updated = 0;
+        List<Map<String, Object>> safeItems = items == null ? List.of() : items;
+        for (Map<String, Object> item : safeItems) {
+            String code = s(item.get("code"));
+            // 目录节点（含点号）由内置目录维护，不接受页面上报，避免自动生成野目录
+            if (!code.matches("^[a-z][a-z0-9_-]*:[a-z][a-z0-9_-]*$")) continue;
+            String type = s(item.get("type"));
+            if (!"menu".equals(type) && !"btn".equals(type)) continue;
+            String name = s(item.get("name"));
+            if (name.length() > 32) name = name.substring(0, 32);
+            if (name.isEmpty()) name = code;
+            String parent = s(item.get("parentCode"));
+            if (!parent.isEmpty() && !exists(parent)) parent = "";
+            String route = s(item.get("routePath"));
+            String module = s(item.get("module"));
+            if (module.isEmpty()) module = "自定义";
+            try {
+                if (exists(code)) {
+                    // 内置节点的规范路由由目录定义，页面出现在哪里都不覆盖；
+                    // 自定义节点才按页面声明补齐路由
+                    jdbc.update("UPDATE perm_node SET route_path=CASE "
+                                    + "WHEN ?='' OR (builtin=TRUE AND route_path<>'') THEN route_path ELSE ? END, "
+                                    + "last_seen_at=CURRENT_TIMESTAMP WHERE code=?",
+                            route, route, code);
+                    updated++;
+                } else {
+                    jdbc.update("INSERT INTO perm_node(code,name,node_type,module,description,builtin,"
+                                    + "parent_code,route_path,order_num,last_seen_at) "
+                                    + "VALUES(?,?,?,?,?,FALSE,?,?,0,CURRENT_TIMESTAMP)",
+                            code, name, type, module, "页面自动发现", parent, route);
+                    added.add(code);
+                }
+            } catch (org.springframework.dao.DuplicateKeyException e) {
+                // 并发上报：另一请求已建好，视为更新即可
+                jdbc.update("UPDATE perm_node SET last_seen_at=CURRENT_TIMESTAMP WHERE code=?", code);
+                updated++;
+            }
+        }
+        return Map.of("added", added, "updated", updated);
+    }
+
+    private static String s(Object v) { return v == null ? "" : String.valueOf(v).trim(); }
 
     /** 新增自定义节点：标识格式 xxx:yyy 且不与现有节点冲突（兼容旧 5 参调用） */
     public void create(String code, String name, String type, String module, String desc) {

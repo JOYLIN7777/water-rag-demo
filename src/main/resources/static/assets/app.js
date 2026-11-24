@@ -268,6 +268,8 @@
     hasPermission: hasPermission,
     /** 页面内动态加按钮后主动收敛（MutationObserver 通常已自动处理） */
     applyPermControls: applyPermControls,
+    /** 手动触发一次页面权限发现（调试/新按钮上线后可用） */
+    discoverPermissions: discoverPermissions,
     /** 等权限清单就绪：功能页守卫用它保证判定时权限已加载 */
     permsReady: function () { return loadPermissions(); },
     /** 后台改完角色权限后调用，强制重拉（返回 Promise） */
@@ -1001,6 +1003,8 @@
         permsLoaded = true;
         renderAdminEntry();
         applySidebarPerms(); applyPermControls();
+        // 页面新增/调整 data-perm 后，管理员访问一次就自动补进权限树，无需手改目录
+        if (hasPermission('admin:access')) setTimeout(discoverPermissions, 1200);
         return true;
       } catch (e) {
         ownedPermissions = new Set();
@@ -1244,6 +1248,56 @@
     const sub = host.querySelector('.topbar-sub');
     if (title) title.style.display = 'none';
     if (sub) sub.style.display = 'none';
+  }
+
+  // 页面声明的权限码 → 父节点。只用于自动发现新节点；已存在的节点以库里的层级为准。
+  const PERM_PARENT = {
+    'chat:use': 'workbench:root', 'doc:read': 'workbench:root', 'search:use': 'workbench:root',
+    'tree:use': 'workbench:root', 'doc:write': 'doc:read', 'doc:delete': 'doc:read',
+    'admin:access': 'system:root', 'user:read': 'console.config:root', 'user:write': 'user:read',
+    'org:read': 'console.config:root', 'role:read': 'console.config:root', 'perm:read': 'console.config:root',
+    'admin:docs': 'console.biz:root', 'model:read': 'console.biz:root', 'model:write': 'model:read',
+    'usage:read': 'console.biz:root', 'loginlog:read': 'console.log:root', 'audit:read': 'console.log:root'
+  };
+  let permissionDiscoveryDone = false;
+  /** 收集本页声明式权限：按钮/链接上的 data-perm，名称直接取可见文案 */
+  function collectPermDeclarations() {
+    const seen = new Set(), out = [];
+    const isAdminPage = /admin\.html|governance\.html/.test(location.pathname);
+    document.querySelectorAll('button[data-perm],a[data-perm],[data-perm-kind]').forEach(el => {
+      const code = el.getAttribute('data-perm');
+      if (!code || seen.has(code)) return;
+      seen.add(code);
+      const declared = el.getAttribute('data-perm-kind');
+      if (declared === 'directory') return;
+      const type = declared || (el.tagName === 'A' || el.classList.contains('admin-nav-item') ? 'menu' : 'btn');
+      const label = el.getAttribute('data-perm-name') ||
+        (el.innerText || el.getAttribute('title') || code).trim().replace(/\s+/g, ' ').slice(0, 32);
+      out.push({
+        code: code, name: label || code, type: type,
+        parentCode: el.getAttribute('data-perm-parent') || PERM_PARENT[code] || '',
+        routePath: '/' + (location.pathname.split('/').pop() || 'index.html'),
+        module: isAdminPage ? '系统管理' : '工作台'
+      });
+    });
+    return out;
+  }
+  /** 自动发现：仅管理员上报；未知权限码入库，已存在只刷新最近出现时间 */
+  async function discoverPermissions(force) {
+    if ((!force && permissionDiscoveryDone) || !hasPermission('admin:access')) return;
+    permissionDiscoveryDone = true;
+    try {
+      const items = collectPermDeclarations();
+      if (!items.length) return;
+      const r = await fetch('/api/admin/perms/discover', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(items)
+      });
+      if (r.ok) {
+        const j = await r.json();
+        if ((j.added || []).length) console.info('权限树自动发现新节点：', j.added.join(', '));
+      }
+    } catch (e) { /* 自动发现失败不影响页面功能 */ }
   }
 
   // 页面级权限：静态页是白名单资源，服务端拦不到 HTML 本身，进入页面要靠前端守卫。

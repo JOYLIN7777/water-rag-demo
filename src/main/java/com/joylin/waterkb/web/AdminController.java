@@ -350,6 +350,12 @@ public class AdminController {
         return Map.of("message", "权限节点已创建", "code", str(body.get("code")));
     }
 
+    /** 页面自动发现：把本页声明的 data-perm 节点补进权限树，返回新增项 */
+    @PostMapping("/perms/discover")
+    public Map<String, Object> discoverPerms(@RequestBody List<Map<String, Object>> body) {
+        return permCatalog.discover(body);
+    }
+
     /** 编辑节点显示信息；内置节点不可改标识、不可删除 */
     @PutMapping("/perms/{code}")
     public Map<String, Object> updatePerm(@PathVariable String code, @RequestBody Map<String, Object> body) {

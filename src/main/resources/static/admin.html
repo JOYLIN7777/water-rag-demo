@@ -388,20 +388,14 @@
               <div class="org-actions">
                 <button class="btn btn-sm btn-primary" data-perm="user:write" onclick="orgCreate(orgSel.key)">＋ 新建子组织</button>
                 <button class="btn btn-sm" id="oEditBtn" data-perm="user:write" onclick="orgEdit(orgSel.key)">编辑</button>
-                <button class="btn btn-sm btn-amber" data-perm="user:write" onclick="createUser(orgSel.key)">＋ 新增用户</button>
                 <button class="btn btn-sm" data-perm="user:read" onclick="toggleOrgTree()">展开/收起</button>
               </div>
             </div>
             <div class="org-section">下级组织</div>
             <div class="table-wrap" id="orgChildTableWrap"><table class="data-table">
-              <thead><tr><th class="row-idx">序号</th><th>组织名称</th><th>标识</th><th>上级组织</th><th>直属成员</th><th>含下级成员</th><th>操作</th></tr></thead>
-              <tbody id="oTable"><tr><td colspan="7" class="empty">加载中…</td></tr></tbody></table></div>
-            <div class="v-resizer" id="orgSplitter" title="按住上下拖动，调整两个表格的高度"></div>
-            <div class="org-section">直属成员<button class="btn btn-sm" data-perm="user:write" style="margin-left:10px" onclick="createUser(orgSel.key)">＋ 添加</button></div>
-            <div class="table-wrap" id="orgMemberTableWrap"><table class="data-table">
-              <thead><tr><th class="row-idx">序号</th><th>账号</th><th>显示名</th><th>所属角色</th><th>账号状态</th><th>操作</th></tr></thead>
-              <tbody id="oMemberTable"><tr><td colspan="6" class="empty">请选择左侧组织</td></tr></tbody></table></div>
-          </div>
+              <thead><tr><th class="row-idx">序号</th><th>组织名称</th><th>标识</th><th>上级组织</th><th>操作</th></tr></thead>
+              <tbody id="oTable"><tr><td colspan="5" class="empty">加载中…</td></tr></tbody></table></div>
+                      </div>
         </div>
       </section>
 
@@ -923,7 +917,6 @@ function renderOrgTreeInto(hostId,activeKey,onPick,addMode){
         '<span class="caret'+(kids.length?'':' ghost')+'" data-toggle="'+(kids.length?esc(o.key):'')+'">'+
           (kids.length?(folded?'▸':'▾'):'')+'</span>'+
         '<span class="tn" title="'+esc(o.key)+'">'+esc(o.name)+'</span>'+
-        '<span class="cnt" title="含下级成员">'+orgAllMembers(o.key)+'</span>'+
         '<span class="tree-acts">'+
           (isUser
             ?'<button data-perm="user:write" data-act="add" data-k="'+esc(o.key)+'" title="在此组织下新增账号">＋</button>'
@@ -1296,13 +1289,10 @@ function renderOrgHead(){
   const stats=[];
   if(key){
     stats.push('标识 <b>'+esc(key)+'</b>');
-    stats.push('直属成员 <b>'+orgDirectMembers(key)+'</b>');
-    stats.push('含下级 <b>'+orgAllMembers(key)+'</b>');
     stats.push('下级组织 <b>'+orgChildren(key).length+'</b>');
   }else{
     stats.push('共 <b>'+(DB.orgs||[]).length+'</b> 个组织');
     stats.push('顶层 <b>'+orgChildren('').length+'</b> 个');
-    stats.push('账号 <b>'+(DB.users||[]).length+'</b> 个');
   }
   $('oStats').innerHTML=stats.join('　·　');
   const eb=$('oEditBtn');if(eb)eb.disabled=!key;
@@ -1312,17 +1302,15 @@ function renderOrgHead(){
 function renderOrgTable(){
   const rows=orgChildren(orgSel.key);
   $('oTable').innerHTML=rows.length?rows.map((o,i)=>{
-    const ops='<button class="op-btn" data-perm="user:read" onclick="orgMemberList(\''+esc(o.key)+'\')">成员</button>'+
-      '<button class="op-btn" data-perm="user:write" onclick="orgCreate(\''+esc(o.key)+'\')">＋子组织</button>'+
+    const ops='<button class="op-btn" data-perm="user:write" onclick="orgCreate(\''+esc(o.key)+'\')">＋子组织</button>'+
       '<button class="op-btn" data-perm="user:write" onclick="orgEdit(\''+esc(o.key)+'\')">编辑</button>'+
       '<button class="op-btn danger" data-perm="user:write" onclick="orgDelete(\''+esc(o.key)+'\')">删除</button>';
     return '<tr><td class="row-idx">'+(i+1)+'</td>'+
       '<td class="name"><a href="javascript:void(0)" style="color:var(--primary);text-decoration:none" onclick="orgPick(\''+esc(o.key)+'\')">'+esc(o.name)+'</a></td>'+
       '<td class="mono" style="font-size:11px">'+esc(o.key)+'</td>'+
       '<td>'+esc(o.parentKey?orgLabel(o.parentKey):'（顶层）')+'</td>'+
-      '<td>'+orgDirectMembers(o.key)+'</td><td>'+orgAllMembers(o.key)+'</td>'+
       '<td>'+ops+'</td></tr>';
-  }).join(''):'<tr><td colspan="7" class="empty-inline">'+(orgSel.key?'该组织下还没有子组织':'还没有任何组织')+'</td></tr>';
+  }).join(''):'<tr><td colspan="5" class="empty-inline">'+(orgSel.key?'该组织下还没有子组织':'还没有任何组织')+'</td></tr>';
   $('oTable')._rows=rows;
 }
 
