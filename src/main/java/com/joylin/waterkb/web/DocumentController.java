@@ -2,6 +2,7 @@ package com.joylin.waterkb.web;
 
 import com.joylin.waterkb.rag.DocumentIngestService;
 import com.joylin.waterkb.rag.VectorStoreAdminRepository;
+import com.joylin.waterkb.security.OrgStore;
 import com.joylin.waterkb.security.Permission;
 import com.joylin.waterkb.security.RequirePermission;
 import com.joylin.waterkb.web.dto.UploadResult;
@@ -31,28 +32,34 @@ public class DocumentController {
     private final DocumentIngestService ingestService;
     private final VectorStoreAdminRepository adminRepository;
     private final MultipartProperties multipartProperties;
+    private final OrgStore orgStore;
 
     public DocumentController(DocumentIngestService ingestService,
-                              VectorStoreAdminRepository adminRepository,
-                              MultipartProperties multipartProperties) {
+            VectorStoreAdminRepository adminRepository,
+            MultipartProperties multipartProperties,
+            OrgStore orgStore) {
         this.ingestService = ingestService;
         this.adminRepository = adminRepository;
         this.multipartProperties = multipartProperties;
+        this.orgStore = orgStore;
     }
 
     /**
      * 上传文档：解析 → 切片 → 向量化入库。
      * 支持的格式与解析服务共用同一份定义（避免两处硬编码不一致）。
+     *
+     * @param includeSubtree 可见范围勾选「含下级部门」；不传=仅本部门+上级可见
      */
     @PostMapping("/upload")
     @RequirePermission(Permission.DOC_WRITE)
-    public UploadResult upload(@RequestParam("file") MultipartFile file) throws IOException {
+    public UploadResult upload(@RequestParam("file") MultipartFile file,
+            @RequestParam(value = "includeSubtree", defaultValue = "false") boolean includeSubtree) throws IOException {
         String name = file.getOriginalFilename();
         Set<String> allowed = DocumentIngestService.getSupportedExtensions();
         if (name == null || !allowed.contains(extension(name))) {
             throw new IllegalArgumentException("不支持的文件格式，当前支持：" + String.join(" / ", allowed));
         }
-        return ingestService.ingest(name, file.getBytes());
+        return ingestService.ingest(name, file.getBytes(), includeSubtree);
     }
 
     /**
@@ -92,15 +99,27 @@ public class DocumentController {
 
     /**
      * 删除单个知识文档（按文件名删除其全部切片）。
+     * 非 admin 只能删本部门的：别的部门的同名文档即使可见（上级看下级/下发）也删不掉。
      */
     @DeleteMapping
     @RequirePermission(Permission.DOC_DELETE)
     public Map<String, Object> delete(@RequestParam String fileName) {
         int deleted = adminRepository.deleteByFileName(fileName);
         if (deleted == 0) {
+            String tenant = adminRepository.findDocTenant(fileName);
+            if (tenant != null && !tenant.isBlank()) {
+                throw new IllegalArgumentException("「" + fileName + "」归属其他部门（"
+                        + orgName(tenant) + "），只能删除本部门的文档");
+            }
             throw new IllegalArgumentException("知识库中不存在文档：" + fileName);
         }
         return Map.of("fileName", fileName, "deletedChunks", deleted);
+    }
+
+    /** 部门键 → 名称（组织已删时回键本身） */
+    private String orgName(String key) {
+        String name = orgStore.nameMap().getOrDefault(key, key);
+        return name.equals(key) ? key : name;
     }
 
     private String extension(String name) {

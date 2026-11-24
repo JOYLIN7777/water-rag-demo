@@ -188,6 +188,32 @@ public class OrgStore {
                 parent.isEmpty() ? null : parent, key);
     }
 
+    /**
+     * 祖先链（从直接上级一路到根，不含自己）。
+     *
+     * <p>部门知识库层级可见模型用：子部门的文档默认对上级可见（上级看下级是管理常态），
+     * 检索过滤时用本方法取"我能以上级身份看到的部门键集合"。
+     * 防环由 setParent 保证，这里不怕死循环。</p>
+     */
+    public List<String> ancestorKeys(String key) {
+        ensure();
+        List<String> out = new ArrayList<>();
+        if (key == null || key.isBlank()) return out;
+        Map<String, String> parentOf = new LinkedHashMap<>();
+        for (Map<String, Object> m : list()) {
+            parentOf.put(String.valueOf(m.get("key")), String.valueOf(m.getOrDefault("parentKey", "")));
+        }
+        Set<String> seen = new LinkedHashSet<>();
+        String cur = key;
+        while (true) {
+            String parent = parentOf.get(cur);
+            if (parent == null || parent.isEmpty() || !seen.add(parent)) break;
+            out.add(parent);
+            cur = parent;
+        }
+        return out;
+    }
+
     /** key 自身 + 所有子孙的键（BFS；一次读全表，组织规模在几十上百，没必要递归查库） */
     public Set<String> subtreeKeys(String key) {
         ensure();

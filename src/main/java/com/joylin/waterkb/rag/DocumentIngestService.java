@@ -105,14 +105,21 @@ public class DocumentIngestService {
         return all;
     }
 
+    /** 兼容旧调用（单测/演示脚本）：默认可见范围=本部门+上级，不下发子树 */
+    public UploadResult ingest(String fileName, byte[] bytes) throws IOException {
+        return ingest(fileName, bytes, false);
+    }
+
     /**
      * 解析文档并写入向量库。
      *
-     * @param fileName 原始文件名（决定解析方式）
-     * @param bytes    文件字节内容
+     * @param fileName       原始文件名（决定解析方式）
+     * @param bytes          文件字节内容
+     * @param includeSubtree 可见范围是否含下级部门：false=本部门+上级可见；
+     *                       true=再向下下发到整个子树（兄弟部门依然不可见）
      * @return 入库结果（文件名、切片数、字符数）
      */
-    public UploadResult ingest(String fileName, byte[] bytes) throws IOException {
+    public UploadResult ingest(String fileName, byte[] bytes, boolean includeSubtree) throws IOException {
         String text = extractText(fileName, bytes);
         if (text == null || text.isBlank()) {
             throw new IllegalArgumentException("文件解析结果为空：可能是扫描版 PDF/图片（需 OCR），或文件内容本身为空");
@@ -127,12 +134,14 @@ public class DocumentIngestService {
             meta.put("chunkIndex", i);
             meta.put("totalChunks", chunks.size());
             meta.put("uploadedAt", LocalDateTime.now().toString());
-            // 行级权限：上传者为 owner；可见组来自请求头 X-Groups（缺省 public）
-            // 由 UserContext 从 Filter 注入，检索层用同一份规则强制过滤
+            // 行级权限：上传者为 owner；可见性由部门规则（tenantId + visibleSubtree）决定
+            // allowedGroups 仅作元数据留存，检索过滤不再消费它（功能角色组不是数据可见组）
             com.joylin.waterkb.security.UserContext.CurrentUser user = com.joylin.waterkb.security.UserContext.get();
             meta.put("ownerUser", user.userId());
-            // 多租户隔离：文档归属当前租户，检索/列表/删除都按此字段强制过滤
+            // 部门知识库隔离：文档归属上传者的部门（org_key），
+            // 可见性 = 本部门 ∪ 上级部门（默认） ∪ 下级子树（勾选下发），见 EsHybridSearchService
             meta.put("tenantId", user.tenantId());
+            meta.put("visibleSubtree", includeSubtree);
             java.util.List<String> groups = new java.util.ArrayList<>(user.groups());
             if (groups.isEmpty()) groups.add("public");
             meta.put("allowedGroups", groups);

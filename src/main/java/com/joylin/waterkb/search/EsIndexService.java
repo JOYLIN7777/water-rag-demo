@@ -43,27 +43,31 @@ public class EsIndexService {
     private final EsProperties props;
     private final ObjectMapper mapper;
     private final RestClient client;
+    private final DocVisibilityService visibility;
 
-    public EsIndexService(EsProperties props, ObjectMapper mapper) {
+    public EsIndexService(EsProperties props, ObjectMapper mapper, DocVisibilityService visibility) {
         this.props = props;
         this.mapper = mapper;
+        this.visibility = visibility;
         this.client = RestClient.builder()
                 .baseUrl(props.getUrl())
                 .defaultHeader(HttpHeaders.CONTENT_TYPE, JSON_UTF8.toString())
                 .build();
     }
 
-    /** 启动时确保索引存在且含 tenantId 字段（幂等，兼容老索引平滑升级） */
+    /** 启动时确保索引存在且含租户/可见范围字段（幂等，兼容老索引平滑升级） */
     @PostConstruct
     public void init() {
         try {
             if (!exists(props.getIndex())) {
                 createIndex(props.getIndex());
-                log.info("ES 索引 {} 已创建（{} 维向量 + HNSW + tenantId）", props.getIndex(), props.getDimensions());
+                log.info("ES 索引 {} 已创建（{} 维向量 + HNSW + tenantId/visibleSubtree）",
+                        props.getIndex(), props.getDimensions());
             } else {
                 log.info("ES 索引 {} 已存在，复用", props.getIndex());
-                ensureTenantField();
+                ensureFields();
             }
+            backfillVisibleSubtree();
         } catch (Exception e) {
             // ES 未启动时不要让整个应用起不来——问答仍可用（检索降级为空）
             log.error("ES 索引初始化失败，检索将降级为空：{}", e.getMessage());
@@ -71,25 +75,53 @@ public class EsIndexService {
     }
 
     /**
-     * 老索引平滑升级：补 tenantId mapping（ES 允许给已有索引加新字段，无需 reindex）。
-     * 历史数据没有该字段时按 default 租户处理，由查询侧 terms 兼容逻辑覆盖。
+     * 老索引平滑升级：补 tenantId / visibleSubtree mapping（ES 允许加新字段，无需 reindex）。
+     * 历史数据没有 tenantId 时按 default 部门处理；没有 visibleSubtree 时由
+     * {@link #backfillVisibleSubtree()} 统一补 true（保持升级前"同组织都能看"的现状）。
      */
-    private void ensureTenantField() {
+    private void ensureFields() {
         try {
             JsonNode mapping = parse(client.get().uri("/" + props.getIndex() + "/_mapping")
                     .retrieve().body(byte[].class));
-            boolean has = !mapping.path(props.getIndex()).path("mappings").path("properties")
-                    .path("tenantId").isMissingNode();
-            if (!has) {
-                String patch = "{\"properties\":{\"tenantId\":{\"type\":\"keyword\"}}}";
-                client.put().uri("/" + props.getIndex() + "/_mapping")
-                        .contentType(JSON_UTF8)
-                        .body(patch.getBytes(StandardCharsets.UTF_8))
-                        .retrieve().toBodilessEntity();
+            JsonNode fields = mapping.path(props.getIndex()).path("mappings").path("properties");
+            StringBuilder patch = new StringBuilder("{\"properties\":{");
+            if (fields.path("tenantId").isMissingNode()) {
+                patch.append("\"tenantId\":{\"type\":\"keyword\"},");
                 log.info("ES 索引 {} 已补 tenantId 字段", props.getIndex());
             }
+            if (fields.path("visibleSubtree").isMissingNode()) {
+                patch.append("\"visibleSubtree\":{\"type\":\"boolean\"}");
+                log.info("ES 索引 {} 已补 visibleSubtree 字段", props.getIndex());
+            }
+            if (patch.charAt(patch.length() - 1) == '{') return; // 两个字段都有，无需补
+            patch.append("}}");
+            client.put().uri("/" + props.getIndex() + "/_mapping")
+                    .contentType(JSON_UTF8)
+                    .body(patch.toString().getBytes(StandardCharsets.UTF_8))
+                    .retrieve().toBodilessEntity();
         } catch (Exception e) {
-            log.warn("补 tenantId mapping 失败：{}", e.getMessage());
+            log.warn("补 mapping 失败：{}", e.getMessage());
+        }
+    }
+
+    /**
+     * 存量数据迁移：部门可见模型上线前入库的切片没有 visibleSubtree 字段，
+     * 统一补 true——即历史文档按"对部门及其子树下发"处理，保证升级后原来能看的人照样能看。
+     * 查询条件只命中缺字段的切片，重复执行幂等（updated 递减到 0）。
+     */
+    private void backfillVisibleSubtree() {
+        try {
+            String dsl = """
+                {"query":{"bool":{"must_not":{"exists":{"field":"visibleSubtree"}}}},
+                 "script":{"source":"ctx._source.visibleSubtree = true"}}
+                """;
+            JsonNode r = postJson("/" + props.getIndex() + "/_update_by_query?conflicts=proceed", dsl);
+            long updated = r.path("updated").asLong(0);
+            if (updated > 0) {
+                log.info("ES 存量切片补 visibleSubtree=true：{} 个（部门可见模型升级）", updated);
+            }
+        } catch (Exception e) {
+            log.warn("补 visibleSubtree 失败（下次启动重试）：{}", e.getMessage());
         }
     }
 
@@ -133,7 +165,8 @@ public class EsIndexService {
                   "uploadedAt": {"type": "date"},
                   "ownerUser": {"type": "keyword"},
                   "allowedGroups": {"type": "keyword"},
-                  "tenantId": {"type": "keyword"}
+                  "tenantId": {"type": "keyword"},
+                  "visibleSubtree": {"type": "boolean"}
                 }
               }
             }
@@ -196,15 +229,38 @@ public class EsIndexService {
         }
     }
 
-    /** 按文件名删除（先 _delete_by_query，再 refresh）——强制带租户与账号可见范围 */
+    /**
+     * 按文件名删除（先 _delete_by_query，再 refresh）。
+     * 范围由 {@link DocVisibilityService#deleteScopeFilter()} 决定：非 admin 只删本部门的同名文档，
+     * 祖先下发的、兄弟部门的同名文档不会被误删（同名跨部门在列表里是独立条目）。
+     */
     public int deleteByFileName(String fileName) {
         // fileName 本身就是 keyword 类型，没有 .keyword 子字段
         String dsl = "{\"query\":{\"bool\":{\"must\":["
-                + "{\"term\":{\"fileName\":" + quote(fileName) + "}}," + visibilityQuery() + "]}}}";
+                + "{\"term\":{\"fileName\":" + quote(fileName) + "}}," + visibility.deleteScopeFilter() + "]}}}";
         try {
             return postJson("/" + props.getIndex() + "/_delete_by_query?refresh=true", dsl).path("deleted").asInt();
         } catch (Exception e) {
             throw new IllegalStateException("ES 删除失败：" + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * 在当前账号<b>可见范围</b>内查某文件名的归属部门（取任意一个切片的 tenantId）。
+     * 删除失败时用来区分"文档不存在"和"文档可见但归属别的部门"两种情况，
+     * 前者提示不存在，后者提示没有权限——提示准确，用户才知道该找谁删。
+     */
+    public String findDocTenant(String fileName) {
+        try {
+            String dsl = """
+                {"size":0,"query":{"bool":{"must":[{"term":{"fileName":%s}},%s]}},
+                 "aggs":{"t":{"terms":{"field":"tenantId","size":1}}}}
+                """.formatted(quote(fileName), visibility.visibilityFilter());
+            JsonNode buckets = search(props.getIndex(), dsl)
+                    .path("aggregations").path("t").path("buckets");
+            return buckets.isEmpty() ? null : buckets.get(0).path("key").asText(null);
+        } catch (Exception e) {
+            return null;
         }
     }
 
@@ -251,14 +307,23 @@ public class EsIndexService {
         }
     }
 
-    /** 文档清单：按 fileName 聚合切片数与权限字段，只看当前账号可见的文档 */
+    /**
+     * 文档清单：按（部门, 文件名）复合键聚合切片数与可见范围，只看当前账号可见的文档。
+     *
+     * <p>为什么用 composite 聚合而不是单字段 terms：同名文档可能同时存在于两个部门
+     * （各自传各自的「手册.docx」），单字段聚合会把它们并成一条，删除时还会误伤别家。
+     * 复合键把"部门+文件名"当独立条目，列表里同名不同部门各占一行。
+     * missing_bucket 让历史无 tenantId 的老切片（default 部门）不被聚合丢弃。</p>
+     */
     public JsonNode listDocuments() {
         String dsl = """
-            {"size":0,"query":%s,"aggs":{"files":{"terms":{"field":"fileName","size":1000},
+            {"size":0,"query":%s,"aggs":{"files":{"composite":{"size":1000,"sources":[
+              {"t":{"terms":{"field":"tenantId","missing_bucket":true}}},
+              {"f":{"terms":{"field":"fileName"}}}]},
               "aggs":{"latest":{"max":{"field":"uploadedAt"}},
                       "owner":{"terms":{"field":"ownerUser","size":1}},
-                      "groups":{"terms":{"field":"allowedGroups","size":10}}}}}}
-            """.formatted(visibilityQuery());
+                      "sub":{"terms":{"field":"visibleSubtree","size":2}}}}}}
+            """.formatted(visibility.visibilityFilter());
         return search(props.getIndex(), dsl).path("aggregations").path("files").path("buckets");
     }
 
@@ -299,38 +364,10 @@ public class EsIndexService {
     }
 
     /**
-     * 账号可见范围（与检索 EsHybridSearchService 同一规则）：
-     * 租户隔离 AND（自己上传 OR 组可见 OR public）。管理员看全租户，便于后台维护。
+     * 账号可见范围（与检索同一规则）：委托 {@link DocVisibilityService}，规则只维护一份。
      */
     private String visibilityQuery() {
-        com.joylin.waterkb.security.UserContext.CurrentUser user =
-                com.joylin.waterkb.security.UserContext.get();
-        if (user.hasGroup("admin")) return tenantQuery(user.tenantId());
-        StringBuilder sb = new StringBuilder("{\"bool\":{\"filter\":[")
-                .append(tenantClause(user.tenantId()))
-                .append(",{\"bool\":{\"should\":[")
-                .append("{\"term\":{\"ownerUser\":").append(quote(user.userId())).append("}}")
-                .append(",{\"term\":{\"allowedGroups\":\"public\"}}");
-        for (String group : user.groups()) {
-            sb.append(",{\"term\":{\"allowedGroups\":").append(quote(group)).append("}}");
-        }
-        return sb.append("],\"minimum_should_match\":1}}]}}").toString();
-    }
-
-    /** 租户过滤子句：tenantId=当前租户；历史无该字段的数据仅在 default 租户下可见 */
-    private String tenantClause(String tenant) {
-        if ("default".equals(tenant)) {
-            return "{\"bool\":{\"should\":["
-                    + "{\"term\":{\"tenantId\":\"default\"}},"
-                    + "{\"bool\":{\"must_not\":{\"exists\":{\"field\":\"tenantId\"}}}}"
-                    + "],\"minimum_should_match\":1}}";
-        }
-        return "{\"term\":{\"tenantId\":" + quote(tenant) + "}}";
-    }
-
-    /** 供查询 DSL 的顶层 query 使用（返回完整 query 对象） */
-    private String tenantQuery(String tenant) {
-        return "{\"bool\":{\"filter\":[" + tenantClause(tenant) + "]}}";
+        return visibility.visibilityFilter();
     }
 
     private JsonNode parse(byte[] raw) {

@@ -37,7 +37,10 @@ class EsHybridSearchServiceTest {
         props.setDimensions(4);
         props.setKnnCandidates(50);
         props.setRrfRankConstant(60);
-        service = new EsHybridSearchService(null, props, null);
+        // OrgStore 用 null JdbcTemplate：ensure() 吞掉异常后走 fallback（只剩 default 顶层组织，无层级），
+        // 正好用来验证"无层级时的基础 filter"；层级下发的结构校验在 CDP 真库场景做
+        service = new EsHybridSearchService(null, props, null,
+                new DocVisibilityService(new com.joylin.waterkb.security.OrgStore(null)));
     }
 
     @AfterEach
@@ -51,35 +54,41 @@ class EsHybridSearchServiceTest {
     }
 
     @Test
-    void 权限过滤包含用户与组() {
-        UserContext.CURRENT_TEST(new UserContext.CurrentUser("zhangsan", List.of("water-dept", "admin")));
+    void 权限过滤包含用户与部门() {
+        UserContext.CURRENT_TEST(new UserContext.CurrentUser("zhangsan", List.of("water-dept", "hydro-team"), "dept-a", "jwt"));
         String filter = service.buildPermissionFilter();
         assertTrue(filter.contains("zhangsan"));
-        assertTrue(filter.contains("water-dept"));
-        assertTrue(filter.contains("admin"));
-        assertTrue(filter.contains("public"));
+        assertTrue(filter.contains("dept-a"));
         assertTrue(filter.contains("minimum_should_match"));
+        assertFalse(filter.contains("allowedGroups"), "功能角色组不参与数据可见过滤（防兄弟部门同角色越权）");
     }
 
     @Test
-    void 权限过滤强制包含租户隔离() {
+    void admin不受部门隔离限制() {
+        UserContext.CURRENT_TEST(new UserContext.CurrentUser("boss", List.of("admin"), "dept-a", "jwt"));
+        String filter = service.buildPermissionFilter();
+        assertEquals("{\"match_all\":{}}", filter, "admin 全库可见，不拼任何过滤");
+    }
+
+    @Test
+    void 权限过滤强制包含部门隔离() {
         UserContext.CURRENT_TEST(new UserContext.CurrentUser("u", List.of("g1"), "dept-b", "jwt"));
         String filter = service.buildPermissionFilter();
         assertTrue(filter.contains("tenantId"));
         assertTrue(filter.contains("dept-b"));
-        assertFalse(filter.contains("\"tenantId\":\"default\""), "非默认租户不能放宽到 default");
+        assertFalse(filter.contains("\"tenantId\":\"default\""), "非默认部门不能放宽到 default");
 
         UserContext.CURRENT_TEST(new UserContext.CurrentUser("u", List.of(), "default", "header"));
         String def = service.buildPermissionFilter();
-        assertTrue(def.contains("must_not"), "默认租户需兼容历史无tenantId数据");
+        assertTrue(def.contains("must_not"), "默认部门需兼容历史无tenantId数据");
     }
 
     @Test
-    void 匿名用户只匹配公开() {
+    void 匿名用户只匹配本部门与自己的上传() {
         String filter = service.buildPermissionFilter();
         assertTrue(filter.contains("anonymous"));
-        assertTrue(filter.contains("public"));
-        assertFalse(filter.contains("admin"));
+        assertFalse(filter.contains("public"), "public 兜底已移除，匿名只能看 default 部门数据");
+        assertFalse(filter.contains("\"match_all\""), "匿名不是 admin，不能全库可见");
     }
 
     @Test
@@ -115,7 +124,7 @@ class EsHybridSearchServiceTest {
         JsonNode knn = mapper.readTree(service.buildDsl("问题", vec, EsHybridSearchService.Mode.KNN));
         assertEquals("embedding", knn.path("knn").path("field").asText());
         assertEquals(4, knn.path("knn").path("query_vector").size());
-        assertTrue(knn.path("knn").path("filter").get(0).toString().contains("g1"));
+        assertTrue(knn.path("knn").path("filter").get(0).toString().contains("ownerUser"), "kNN 同样强制注入权限过滤");
         assertTrue(knn.path("query").isMissingNode(), "kNN 必须是顶层字段，不能塞进 query");
 
         // ES 8.13 不支持 retriever API，HYBRID 不能用黑盒 retriever

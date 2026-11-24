@@ -2,7 +2,6 @@ package com.joylin.waterkb.search;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.joylin.waterkb.config.EsProperties;
-import com.joylin.waterkb.security.UserContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.document.Document;
@@ -30,8 +29,8 @@ import java.util.Map;
  * 比黑盒 retriever 更可控。代价是两次 HTTP 往返，内网 ES 可忽略。</p>
  *
  * <p>权限不可绕过：每次查询都从 UserContext 强制读取当前用户，
- * 构造 filter（ownerUser=自己 OR allowedGroups 命中用户组 OR 公开），
- * 注入到两路检索的 query 中。调用方无法传参覆盖。</p>
+ * 部门层级可见 filter（本部门 ∪ 上级下发 ∪ 下级默认 ∪ 自己上传 ∪ 组命中）由
+ * {@link DocVisibilityService} 统一构造注入到两路检索的 query 中。调用方无法传参覆盖。</p>
  */
 @Service
 public class EsHybridSearchService {
@@ -41,11 +40,14 @@ public class EsHybridSearchService {
     private final EsIndexService es;
     private final EsProperties props;
     private final EmbeddingModel embeddingModel;
+    private final DocVisibilityService visibility;
 
-    public EsHybridSearchService(EsIndexService es, EsProperties props, EmbeddingModel embeddingModel) {
+    public EsHybridSearchService(EsIndexService es, EsProperties props, EmbeddingModel embeddingModel,
+            DocVisibilityService visibility) {
         this.es = es;
         this.props = props;
         this.embeddingModel = embeddingModel;
+        this.visibility = visibility;
     }
 
     /** 检索模式：用于 A/B 对比演示 */
@@ -142,27 +144,11 @@ public class EsHybridSearchService {
     }
 
     /**
-     * 行级权限过滤条件：租户匹配 AND (owner=自己 OR 组命中 OR 公开)。
-     * 这是整个权限模型的唯一入口，任何检索都必须经过这里——调用方无法关闭租户过滤。
+     * 行级权限过滤条件：委托 {@link DocVisibilityService}（部门层级可见模型）。
+     * 保留方法是为了单测与旧调用——规则本身只在 DocVisibilityService 一处维护。
      */
     String buildPermissionFilter() {
-        UserContext.CurrentUser user = UserContext.get();
-        StringBuilder sb = new StringBuilder();
-        // 租户条件：非 default 租户严格匹配；default 兼容历史无 tenantId 的老数据
-        String tenant = user.tenantId();
-        String tenantClause = "default".equals(tenant)
-                ? "{\"bool\":{\"should\":[{\"term\":{\"tenantId\":\"default\"}},"
-                        + "{\"bool\":{\"must_not\":{\"exists\":{\"field\":\"tenantId\"}}}}],"
-                        + "\"minimum_should_match\":1}}"
-                : "{\"term\":{\"tenantId\":" + jsonString(tenant) + "}}";
-        sb.append("{\"bool\":{\"filter\":[").append(tenantClause).append(",{\"bool\":{\"should\":[")
-                .append("{\"term\":{\"ownerUser\":").append(jsonString(user.userId())).append("}}")
-                .append(",{\"term\":{\"allowedGroups\":\"public\"}}");
-        for (String group : user.groups()) {
-            sb.append(",{\"term\":{\"allowedGroups\":").append(jsonString(group)).append("}}");
-        }
-        sb.append("],\"minimum_should_match\":1}}]}}");
-        return sb.toString();
+        return visibility.visibilityFilter();
     }
 
     /** 解析 ES hits → Spring AI Document（保留 esId 供 RRF 去重、fileName/chunkIndex 供引用溯源） */

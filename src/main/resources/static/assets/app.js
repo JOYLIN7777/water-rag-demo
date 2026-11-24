@@ -347,12 +347,18 @@
     el.style.display = 'block';
     if (text !== undefined) el.textContent = text;
   }
+  // 上传时把页面上「含下级部门可见」勾选一起带给后端（各页面共用同一勾选框 id）
+  function appendVisibility(fd) {
+    const sub = document.getElementById('includeSubtree');
+    if (sub && sub.checked) fd.append('includeSubtree', 'true');
+  }
   async function uploadOne(file) {
     if (!file) return;
     const oversize = sizeError(file);
     if (oversize) { uploadMsg('✗ ' + file.name + '：' + oversize, 'err'); return; }
     uploadMsg('正在解析 ' + file.name + '（' + fmtSize(file.size) + '）…');
     const fd = new FormData(); fd.append('file', file);
+    appendVisibility(fd);
     const started = Date.now();
     try {
       const r = await fetch('/api/docs/upload', { method: 'POST', body: fd });
@@ -369,6 +375,7 @@
     const oversize = sizeError(file);
     if (oversize) throw new Error(oversize);
     const fd = new FormData(); fd.append('file', file);
+    appendVisibility(fd);
     const started = Date.now();
     const r = await fetch('/api/docs/upload', { method: 'POST', body: fd });
     const j = await r.json().catch(function () { return {}; });

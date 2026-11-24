@@ -24,7 +24,11 @@ public class VectorStoreAdminRepository {
         this.es = es;
     }
 
-    /** 文档清单：从 ES 聚合按文件名分组，返回与旧版一致的结构 */
+    /**
+     * 文档清单：解析 ES composite（部门,文件名）聚合桶，返回列表行结构。
+     * 同名文档在不同部门是独立条目（fileName 相同但 tenantId 不同），
+     * 前端据此显示部门徽标、删除时后端也按部门范围拦截。
+     */
     public List<Map<String, Object>> listDocuments() {
         List<Map<String, Object>> out = new ArrayList<>();
         try {
@@ -33,16 +37,21 @@ public class VectorStoreAdminRepository {
             while (it.hasNext()) {
                 JsonNode b = it.next();
                 JsonNode owner = b.path("owner").path("buckets");
-                JsonNode groups = b.path("groups").path("buckets");
-                List<String> groupNames = new ArrayList<>();
-                Iterator<JsonNode> git = groups.elements();
-                while (git.hasNext()) groupNames.add(git.next().path("key").asText());
-                out.add(Map.of(
-                        "fileName", b.path("key").asText(),
-                        "chunks", b.path("doc_count").asInt(),
-                        "uploadedAt", b.path("latest").path("value_as_string").asText(""),
-                        "ownerUser", owner.isEmpty() ? "" : owner.get(0).path("key").asText(),
-                        "allowedGroups", groupNames));
+                // composite key：t=部门键（missing_bucket 时缺该字段 → 视为 default 历史）
+                JsonNode key = b.path("key");
+                String tenantId = key.has("t") ? key.path("t").asText("") : "default";
+                boolean subtree = false;
+                for (JsonNode s : b.path("sub").path("buckets")) {
+                    if (s.path("key").asBoolean()) subtree = true;
+                }
+                Map<String, Object> row = new java.util.LinkedHashMap<>();
+                row.put("fileName", key.path("f").asText());
+                row.put("chunks", b.path("doc_count").asInt());
+                row.put("uploadedAt", b.path("latest").path("value_as_string").asText(""));
+                row.put("ownerUser", owner.isEmpty() ? "" : owner.get(0).path("key").asText());
+                row.put("tenantId", tenantId);
+                row.put("visibleSubtree", subtree);
+                out.add(row);
             }
         } catch (Exception e) {
             return List.of(); // ES 未就绪时返回空清单，不让接口 500
@@ -52,6 +61,11 @@ public class VectorStoreAdminRepository {
 
     public int deleteByFileName(String fileName) {
         return es.deleteByFileName(fileName);
+    }
+
+    /** 可见范围内查文件归属部门（删除失败时区分"不存在"与"归属别部门"） */
+    public String findDocTenant(String fileName) {
+        return es.findDocTenant(fileName);
     }
 
     /** 单份文档的全部切片（供分片树状预览） */
