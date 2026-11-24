@@ -960,27 +960,32 @@
     if (old) old.remove();
     const navHtml = ADMIN_GROUPS.map(g =>
       '<div class="admin-nav-group">' +
-      '<div class="section-label">' + g.label + '</div>' +
+      '<div class="section-label" style="margin:14px 0 6px">' + g.label + '</div>' +
       g.keys.map(k => {
         const n = ADMIN_NAV.find(x => x.key === k);
-        return '<a class="nav-item admin-nav-item' + (n.key === active ? ' active' : '') + '"' +
-          ' href="' + n.href + '" data-perm="' + n.perm + '" title="' + n.label + '">' +
-          '<span class="nav-ic">' + n.icon + '</span><span>' + n.label + '</span></a>';
+        return '<a class="admin-nav-item' + (n.key === active ? ' active' : '') + '"' +
+          ' href="' + n.href + '" data-panel="' + n.key + '" data-perm="' + n.perm + '" title="' + n.label + '">' +
+          '<span class="ic">' + n.icon + '</span>' + n.label + '</a>';
       }).join('') + '</div>'
     ).join('');
     const aside = document.createElement('div');
     aside.innerHTML =
-      '<aside class="sidebar admin-sidebar">' +
-        '<div class="brand"><div class="brand-mark has-logo"><img class="brand-logo" src="assets/logo.svg" alt="水利知识库"></div>' +
+      '<aside class="admin-sidebar">' +
+        '<div class="brand"><div class="brand-mark has-logo"><img class="brand-logo" src="assets/logo.svg" alt=""></div>' +
           '<div><div class="brand-title">管理后台</div><div class="brand-sub">水利知识库</div></div></div>' +
-        '<nav class="nav-list">' + navHtml + '</nav>' +
-        '<div class="admin-back"><a class="nav-item" href="index.html"><span class="nav-ic">⌂</span>返回问答</a></div>' +
-        '<div class="user-block" id="sidebarUserBlock"></div>' +
-        '<div class="sidebar-footer">水利知识库 · 让知识更好用</div>' +
+        navHtml +
+        '<div class="admin-back"><a class="admin-nav-item" href="index.html"><span class="ic">⌂</span>返回问答</a>' +
+        '<div class="user-block" id="adminUserBlock"></div></div>' +
       '</aside>';
     host.insertBefore(aside.firstElementChild, host.firstChild);
-    renderUser();
     renderAdminEntry();
+    const u = global.WrkAuth && global.WrkAuth.getUser() || {};
+    const box = document.getElementById('adminUserBlock');
+    if (box) box.innerHTML =
+      '<a class="user-avatar" href="profile.html" title="个人中心">' + avatar(u.displayName || u.user || '管', 'md') + '</a>' +
+      '<a class="user-meta" href="profile.html" title="个人中心"><div class="user-name">' + esc(u.displayName || u.user || '管') + '</div>' +
+      '<div class="user-tenant">' + esc(tenantLabel(u.tenant)) + '</div></a>' +
+      '<button class="user-logout" title="退出登录" onclick="Shell.logout()">⏻</button>';
     bindSidebarEvents();
   }
 

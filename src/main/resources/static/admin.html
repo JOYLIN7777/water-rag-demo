@@ -589,7 +589,7 @@
   <div class="deny">
     <div class="deny-mark">!</div>
     <h2 style="margin:0 0 8px">没有访问权限</h2>
-    <p class="page-desc" style="margin:0 0 6px">当前账号不在管理员组，无法进入管理后台。</p>
+    <p class="page-desc" style="margin:0 0 6px">当前账号没有这个后台页面的访问权限，如需使用请联系管理员开通。</p>
     <p class="page-desc" style="margin:0 0 20px;color:var(--muted)">问答、知识库文档等日常功能不受影响，可直接返回继续使用。</p>
     <div style="display:flex;gap:10px;justify-content:center">
       <a class="btn btn-primary" href="index.html">返回问答</a>
@@ -640,15 +640,15 @@ async function guard(){
       audit:'audit','audit.html':'audit'};
     const file=location.pathname.split('/').pop()||'admin.html';
     const panel=FILE_PANEL[file]||new URLSearchParams(location.search).get('panel')||'users';
-    // 日志页面按菜单权限授予，不必是管理员；但只开放对应的那一个面板
-    const logOnly = panel==='loginlogs'||panel==='audit';
     const r=await fetch('/api/auth/permissions');
     if(r.status===401){WrkAuth.goLogin();return false}
     if(r.status===403||!r.ok){showDeny();return false}
     const p=await r.json();
     const isAdmin=!!p.admin||(p.permissions||[]).includes('admin:access');
-    const need=panel==='loginlogs'?'loginlog:read':'audit:read';
-    if(!isAdmin && !(logOnly&&(p.permissions||[]).includes(need))){showDeny();return false}
+    const NEED={users:'user:read',org:'org:read',roles:'role:read',perms:'perm:read',
+      docs:'admin:docs',usage:'usage:read',loginlogs:'loginlog:read',audit:'audit:read'};
+    const need=NEED[panel]||'admin:access';
+    if(!isAdmin && !(p.permissions||[]).includes(need)){showDeny();return false}
     $('adminRoot').style.display='flex';
     const u=WrkAuth.getUser()||{};
     // 头像/名称进入后台自己的个人中心（后台相对独立，不跳问答系统页面）
