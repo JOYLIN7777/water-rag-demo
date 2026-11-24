@@ -352,7 +352,7 @@
 
     <div class="page">
       <!-- 用户管理 -->
-      <section class="admin-panel active" data-panel="users">
+      <section class="admin-panel" data-panel="users">
         <div class="page-head"><h1 class="page-title">用户管理</h1>
           <p class="page-desc">按组织筛选和管理账号；左侧组织树仅作筛选，不在此处维护组织机构。</p></div>
         <div class="filter-bar">
@@ -2286,7 +2286,13 @@ document.querySelectorAll('#uStats .drillable').forEach(c=>{
   c.onkeydown=e=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); go(); } };
 });
 
-initShell(window.__consolePanel||'users',{adminSidebar:true});
+(function(){
+  const m={users:'users',org:'org',roles:'roles',perms:'perms',docs:'docs',usage:'usage',loginlogs:'loginlogs',audit:'audit'};
+  const f=location.pathname.split('/').pop()||'';
+  const p=m[f]||new URLSearchParams(location.search).get('panel')||'users';
+  document.documentElement.setAttribute('data-early-panel',p);
+  initShell(p,{adminSidebar:true});
+})();
 guard();
 </script>
 </body>

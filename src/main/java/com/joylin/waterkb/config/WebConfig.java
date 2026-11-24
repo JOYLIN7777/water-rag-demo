@@ -2,7 +2,9 @@ package com.joylin.waterkb.config;
 
 import com.joylin.waterkb.security.PermissionInterceptor;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.CacheControl;
 import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
+import org.springframework.web.servlet.config.annotation.ResourceHandlerRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
 /** 注册权限拦截器，覆盖所有 API 请求（静态页面不拦截） */
@@ -18,5 +20,13 @@ public class WebConfig implements WebMvcConfigurer {
     @Override
     public void addInterceptors(InterceptorRegistry registry) {
         registry.addInterceptor(permissionInterceptor).addPathPatterns("/api/**");
+    }
+
+    /** 前端页面与脚本不缓存，避免改版后浏览器继续用旧 DOM 导致"闪回用户管理" */
+    @Override
+    public void addResourceHandlers(ResourceHandlerRegistry registry) {
+        registry.addResourceHandler("/**")
+                .addResourceLocations("classpath:/static/")
+                .setCacheControl(CacheControl.noStore());
     }
 }

@@ -31,6 +31,7 @@ public class ConsolePageController {
     public ResponseEntity<byte[]> consolePage() throws IOException {
         ClassPathResource resource = new ClassPathResource("static/admin.html");
         return ResponseEntity.ok()
+                .header("Cache-Control", "no-store")
                 .contentType(MediaType.valueOf("text/html;charset=UTF-8"))
                 .body(resource.getContentAsByteArray());
     }
