@@ -43,8 +43,8 @@
         </div>
         <div class="field"><label>服务地址</label><input id="fUrl" type="text" placeholder="云服务地址或内网模型地址"></div>
         <div class="row">
-          <div class="field"><label>模型名</label><input id="fModel" type="text" placeholder="qwen-plus / text-embedding-v3"></div>
-          <div class="field"><label>访问密钥（内网可留空）</label><input id="fKey" type="password" placeholder="留空表示保持原值"></div>
+          <div class="field"><label>模型名</label><input id="fModel" type="text" autocomplete="off" name="modelNameInput" data-no-autofill="1" placeholder="qwen-plus / text-embedding-v3"></div>
+          <div class="field"><label>访问密钥（内网可留空）</label><input id="fKey" type="password" autocomplete="new-password" name="apiKeyInput" data-no-autofill="1" placeholder="留空表示保持原值"></div>
         </div>
         <div class="field" id="dimField" style="display:none"><label>向量维度（EMBEDDING 必填）</label><input id="fDim" type="number" placeholder="1024"></div>
         <button class="primary-btn" data-perm="model:write" onclick="createModel()">＋ 添加配置</button>
@@ -156,6 +156,9 @@ async function delModel(id){
   }catch(e){show('activeMsg','✗ '+e.message,false)}
 }
 initShell('models',{adminSidebar:true});
+// 浏览器密码管理器常把「模型名 + 密钥」识别成账号密码自动填入，加载后清空，只保留用户手动输入
+['fModel','fKey'].forEach(function(id){var el=document.getElementById(id);if(el)el.value=''});
+setTimeout(function(){['fModel','fKey'].forEach(function(id){var el=document.getElementById(id);if(el&&document.activeElement!==el)el.value=''})},300);
 loadModels();
 // 页面级权限守卫：菜单权限页没勾「模型设置」的账号，直接敲 URL 也进不来
 (async function guardPerm(){

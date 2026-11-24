@@ -1159,14 +1159,18 @@
   function modalError(msg) {
     const el = document.getElementById('modalAlert');
     if (!el) { toast(msg || '操作失败', 'err'); return; }
-    el.textContent = msg || '操作失败';
+    // 每次显示都重建内容，保证关闭按钮的事件不丢
+    el.innerHTML = '<span class="modal-alert-text">' + esc(msg || '操作失败') + '</span>' +
+      '<button type="button" class="modal-alert-close" title="关闭提示" aria-label="关闭提示">×</button>';
+    const btn = el.querySelector('.modal-alert-close');
+    if (btn) btn.onclick = clearModalError;
     el.classList.add('show');
     const box = el.closest ? el.closest('.modal-box') : null;
     if (box) box.scrollTop = 0;
   }
   function clearModalError() {
     const el = document.getElementById('modalAlert');
-    if (el) { el.classList.remove('show'); el.textContent = ''; }
+    if (el) { el.classList.remove('show'); el.innerHTML = ''; }
   }
 
   // ---------- 全局自定义弹框（替代浏览器原生 confirm/prompt） ----------
