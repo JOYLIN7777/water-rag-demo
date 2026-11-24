@@ -17,9 +17,10 @@
     settings: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.87l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.7 1.7 0 0 0-1.87-.34 1.7 1.7 0 0 0-1.03 1.56V21a2 2 0 1 1-4 0v-.09A1.7 1.7 0 0 0 9 19.4a1.7 1.7 0 0 0-1.87.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-1.56-1.03H3a2 2 0 1 1 0-4h.09A1.7 1.7 0 0 0 4.6 9a1.7 1.7 0 0 0-.34-1.87l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.7 1.7 0 0 0 9 4.6a1.7 1.7 0 0 0 1.03-1.56V3a2 2 0 1 1 4 0v.09A1.7 1.7 0 0 0 15 4.6a1.7 1.7 0 0 0 1.87-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.7 1.7 0 0 0 19.4 9v0a1.7 1.7 0 0 0 1.56 1.03H21a2 2 0 1 1 0 4h-.09A1.7 1.7 0 0 0 19.4 15z"/>'
   };
   // 工作台主导航只保留高频两项；其余功能统一收进「设置」页，避免侧栏冗长
+  // perm = 菜单权限码：权限页没勾的账号，侧栏不渲染该项（页面内还有第二道守卫）
   const NAV = [
     { key: 'index', href: 'index.html', label: '智能问答', icon: 'chat', groups: [] },
-    { key: 'manage', href: 'manage.html', label: '知识库文档', icon: 'doc', groups: [] }
+    { key: 'manage', href: 'manage.html', label: '知识库文档', icon: 'doc', perm: 'doc:read', groups: [] }
   ];
   // 设置页内的功能入口（含功能权限控制）
   // 设置只放面向普通用户的功能；模型配置、权限审计等管理动作统一收进管理后台，
@@ -863,7 +864,9 @@
     const groups = user && Array.isArray(user.groups) ? user.groups : [];
     const isAdmin = groups.indexOf('admin') >= 0;
     const visible = !user ? NAV
-      : NAV.filter(n => !n.groups.length || isAdmin || n.groups.some(g => groups.indexOf(g) >= 0));
+      : NAV.filter(n => (!n.groups.length || isAdmin || n.groups.some(g => groups.indexOf(g) >= 0))
+        // 权限码过滤：权限清单已加载时直接不渲染，避免"先闪现再摘除"
+        && (!n.perm || ownedPermissions.size === 0 || hasPermission(n.perm)));
     const items = visible.map(n =>
       '<a class="nav-item' + (n.key === active ? ' active' : '') + '" href="' + n.href + '" title="' + n.label + '">' +
       svg(n.icon) + '<span>' + n.label + '</span></a>'
@@ -926,9 +929,24 @@
         const j = await r.json();
         ownedPermissions = new Set(j.permissions || []);
         renderAdminEntry();
+        applySidebarPerms();
       } catch (e) { /* 权限接口失败时保持默认不显示，默认拒绝 */ }
     })();
     return permsReady;
+  }
+  // 权限清单回来后二次收敛侧栏：renderSidebar 是同步渲染（当时权限多半还没回来），
+  // 这里把无权限的导航项与上传区从 DOM 摘掉——菜单隐藏只是第一道门，页面内还有守卫。
+  // 注意空权限集也是"加载完成"：没有任何权限的账号同样要摘（size 只是防"还没加载就误摘"）
+  function applySidebarPerms() {
+    const host = document.getElementById('sidebarHost');
+    if (!host) return;
+    NAV.filter(n => n.perm && !hasPermission(n.perm)).forEach(n => {
+      const el = host.querySelector('.nav-item[href="' + n.href + '"]');
+      if (el) el.remove();
+    });
+    // 快速上传区需要 doc:write；只读用户（没勾上传文档）不显示，点了也只会 403
+    const up = host.querySelector('.upload-area');
+    if (up && !hasPermission('doc:write')) up.remove();
   }
   // 右上角管理后台入口：仅拥有 admin:access 才显示，免登录跳转（同源共享会话令牌）
   function renderAdminEntry() {

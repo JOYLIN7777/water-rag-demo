@@ -157,6 +157,21 @@ async function delModel(id){
 }
 initShell('settings');
 loadModels();
+// 页面级权限守卫：菜单权限页没勾「模型设置」的账号，直接敲 URL 也进不来
+(async function guardPerm(){
+  if(window.Shell&&Shell.permsReady)await Shell.permsReady();
+  if(!(window.Shell&&Shell.hasPermission&&Shell.hasPermission('model:read'))){
+    const main=document.querySelector('main')||document.body;
+    Array.from(main.children).forEach(el=>{if(!el.classList.contains('topbar'))el.style.display='none'});
+    const bar=document.createElement('div');
+    bar.className='card';bar.style.cssText='margin:40px auto;max-width:520px;padding:36px;text-align:center';
+    bar.innerHTML='<div style="font-size:34px;margin-bottom:12px">🔒</div>'+
+      '<div style="font-size:15px;font-weight:650;margin-bottom:8px">没有使用权限</div>'+
+      '<div style="font-size:13px;color:#6b7a99;line-height:1.7">当前账号未被授予「模型设置」的使用权限。<br>如需使用，请联系管理员为你的角色勾选该功能。</div>'+
+      '<a href="index.html" style="display:inline-block;margin-top:18px;color:var(--primary,#3b6ef5);text-decoration:none;font-size:13px">← 返回智能问答</a>';
+    main.insertBefore(bar,main.firstChild);
+  }
+})();
 </script>
 </body>
 </html>
