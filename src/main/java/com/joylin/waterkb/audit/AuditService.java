@@ -94,6 +94,34 @@ public class AuditService {
         }
     }
 
+    /** 查询全部审计日志（审计部门专用）：不限租户，只返回最近 limit 条 */
+    public List<Map<String, Object>> recentAll(int limit) {
+        try {
+            return jdbc.queryForList("""
+                SELECT ts,tenant_id,user_id,groups,action,resource,detail,ip,status,duration_ms,result
+                FROM audit_log ORDER BY ts DESC LIMIT ?
+                """, Math.min(Math.max(limit, 1), 500));
+        } catch (Exception e) {
+            log.warn("全量审计查询失败：{}", e.getMessage());
+            return new ArrayList<>();
+        }
+    }
+
+    /** 全量审计统计（审计部门专用） */
+    public Map<String, Object> statsAll() {
+        try {
+            return jdbc.queryForMap("""
+                SELECT COUNT(*) AS total,
+                       COUNT(*) FILTER (WHERE result='DENIED') AS denied,
+                       COUNT(*) FILTER (WHERE result='ERROR') AS errors
+                FROM audit_log
+                """);
+        } catch (Exception e) {
+            log.warn("全量审计统计失败：{}", e.getMessage());
+            return Map.of("total", 0L, "denied", 0L, "errors", 0L);
+        }
+    }
+
     /** 审计统计：总条数 / 拒绝数 / 错误数 */
     public Map<String, Object> stats(String tenant) {
         try {

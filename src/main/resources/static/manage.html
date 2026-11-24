@@ -217,10 +217,22 @@ function render(){
     nums.map(p=>p==='…'?'<span style="padding:0 2px">…</span>':
       '<button class="'+(p===pageCur?'cur':'')+'" data-go="'+p+'">'+p+'</button>').join('')+
     '<button '+(pageCur>=totalPages?'disabled':'')+' data-go="'+(pageCur+1)+'">›</button>'+
-    '<button '+(pageCur>=totalPages?'disabled':'')+' data-go="'+totalPages+'">»</button>';
+    '<button '+(pageCur>=totalPages?'disabled':'')+' data-go="'+totalPages+'">»</button>'+
+    '<span style="display:inline-flex;align-items:center;gap:4px;margin-left:8px">跳至 '+
+    '<input type="number" min="1" max="'+totalPages+'" value="'+pageCur+'" id="pageJump" '+
+    'style="width:46px;padding:4px 6px;font-size:12px;border:1px solid var(--line);border-radius:6px;text-align:center">'+
+    ' 页</span>';
   pager.querySelectorAll('button[data-go]').forEach(b=>{
     b.onclick=()=>{pageCur=Number(b.dataset.go);render()};
   });
+  // 指定跳页：回车触发，超范围自动夹到 1..totalPages
+  const jump=document.getElementById('pageJump');
+  if(jump)jump.onkeydown=e=>{
+    if(e.key!=='Enter')return;
+    let p=parseInt(jump.value,10);
+    if(!p||p<1)p=1; if(p>totalPages)p=totalPages;
+    pageCur=p;render();
+  };
 }
 document.getElementById('search').addEventListener('input',()=>{pageCur=1;render()});
 

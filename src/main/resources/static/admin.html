@@ -121,6 +121,24 @@
   .type-quick{display:flex;flex-wrap:wrap;gap:5px;margin-top:5px}
   .type-quick button{border:1px solid var(--line);background:#fff;color:var(--ink-2);font-size:10.5px;padding:3px 8px;border-radius:5px}
   .type-quick button:hover{border-color:var(--primary);color:var(--primary)}
+  /* 角色权限树：若依风格的目录/菜单/按钮三级勾选，带折叠与父子联动 */
+  .perm-tree{border:1px solid var(--line);border-radius:9px;max-height:360px;overflow:auto;padding:8px 10px;background:#fff}
+  .pt-row{display:flex;align-items:center;gap:7px;padding:5px 4px;border-radius:6px;font-size:12.5px}
+  .pt-row:hover{background:#f7f9fd}
+  .pt-row label{display:flex;align-items:center;gap:7px;cursor:pointer;flex:1;min-width:0}
+  .pt-row input[type=checkbox]{width:15px;height:15px;min-width:15px;padding:0;margin:0;accent-color:var(--primary);cursor:pointer}
+  .pt-caret{width:14px;flex:0 0 14px;text-align:center;color:var(--muted);font-size:10px;cursor:pointer;user-select:none}
+  .pt-caret.leaf{visibility:hidden}
+  .pt-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .pt-dir .pt-name{font-weight:650;color:var(--ink)}
+  .pt-type{font-size:9.5px;padding:1px 5px;border-radius:4px;flex:0 0 auto}
+  .pt-type.directory{background:#e8f7f1;color:#0d8f62}
+  .pt-type.menu{background:var(--primary-soft);color:#25469b}
+  .pt-type.btn{background:#fef4e6;color:var(--warn)}
+  .pt-children{margin-left:18px;border-left:1px dashed #dbe3f0;padding-left:8px}
+  .pt-children.collapsed{display:none}
+  .pt-tools{display:flex;gap:10px;margin-bottom:8px;font-size:11.5px;color:var(--muted)}
+  .pt-tools a{cursor:pointer;color:var(--primary)}
   /* 权限模块分组行：整行可点击折叠，箭头单独给反馈 */
   tr.perm-group{cursor:pointer;user-select:none}
   tr.perm-group>td{background:#f7f9fc;font-weight:650;color:var(--ink)}
@@ -434,6 +452,7 @@
             <table class="data-table"><thead><tr><th>文档名称</th><th>所属部门 / 可见范围</th><th>片段数</th><th>上传人</th><th>上传时间</th><th>操作</th></tr></thead>
               <tbody id="dList"><tr><td colspan="6" class="empty">加载中…</td></tr></tbody></table>
           </div>
+          <div class="pager" id="dPager"></div>
         </div>
       </section>
 
@@ -481,8 +500,9 @@
           <p class="page-desc">登录成功与失败的尝试都留有记录，失败原因可追溯。</p></div>
         <div class="card"><div class="card-head"><h3>登录记录</h3>
           <button class="btn btn-sm" onclick="loadLoginLogs()">刷新</button></div>
-          <div class="scroll" style="max-height:520px"><table class="data-table"><thead><tr><th>时间</th><th>账号</th><th>操作</th><th>状态</th><th>结果</th><th>耗时</th><th>来源 IP</th></tr></thead>
+          <div class="table-wrap"><table class="data-table"><thead><tr><th>时间</th><th>账号</th><th>操作</th><th>状态</th><th>结果</th><th>耗时</th><th>来源 IP</th></tr></thead>
             <tbody id="lList"><tr><td colspan="7" class="empty">加载中…</td></tr></tbody></table></div>
+          <div class="pager" id="lPager"></div>
         </div>
       </section>
 
@@ -492,8 +512,9 @@
           <p class="page-desc">查看账号在系统中的操作记录。</p></div>
         <div class="card"><div class="card-head"><h3>操作记录</h3>
           <button class="btn btn-sm" onclick="loadAudit()">刷新</button></div>
-          <div class="scroll" style="max-height:520px"><table class="data-table"><thead><tr><th>时间</th><th>账号</th><th>动作</th><th>状态</th><th>耗时</th><th>结果</th></tr></thead>
+          <div class="table-wrap"><table class="data-table"><thead><tr><th>时间</th><th>账号</th><th>动作</th><th>状态</th><th>耗时</th><th>结果</th></tr></thead>
             <tbody id="aList"><tr><td colspan="6" class="empty">加载中…</td></tr></tbody></table></div>
+          <div class="pager" id="aPager"></div>
         </div>
       </section>
 
@@ -990,12 +1011,14 @@ function renderUserTable(page){
   renderPager('uPager',total,USER_PAGE.page,size,'renderUserTable');
 }
 
-// 通用分页器：首页/上一页/页码窗口/下一页/末页 + 总数
+// 通用分页器：上一页/下一页 + 页码窗口 + 指定页码跳转 + 总数，全站统一一套行为
 function renderPager(id,total,page,size,fn){
   const host=$(id);if(!host)return;
   const pages=Math.max(1,Math.ceil(total/size));
+  if(page>pages)page=pages;
   const html=['<span>共 '+total+' 条</span>','<span style="color:#c3cddd">|</span>','<span>每页 '+size+' 条</span>'];
   const btn=(p,label,extra,dis)=>'<button class="pg-btn'+(extra||'')+'"'+(dis?' disabled':'')+' onclick="'+fn+'('+p+')">'+label+'</button>';
+  html.push(btn(1,'首页','',page<=1));
   html.push(btn(page-1,'上一页','',page<=1));
   const win=new Set([1,pages]);
   for(let p=Math.max(1,page-2);p<=Math.min(pages,page+2);p++)win.add(p);
@@ -1006,8 +1029,20 @@ function renderPager(id,total,page,size,fn){
     prev=p;
   });
   html.push(btn(page+1,'下一页','',page>=pages));
-  html.push('<span class="pg-info">第 '+page+' / '+pages+' 页</span>');
+  html.push(btn(pages,'末页','',page>=pages));
+  // 指定跳页：输入框回车或点「跳转」，超范围自动夹到 1..pages
+  html.push('<span class="pg-info">第 '+page+' / '+pages+' 页 · 跳至 '+
+    '<input type="number" min="1" max="'+pages+'" value="'+page+'" id="'+id+'Jump" aria-label="跳转到页码">'+
+    '<button class="pg-btn" onclick="pagerJump(\''+id+'\',\''+fn+'\','+pages+')">跳转</button></span>');
   host.innerHTML=html.join('');
+  const inp=document.getElementById(id+'Jump');
+  if(inp)inp.onkeydown=e=>{if(e.key==='Enter')pagerJump(id,fn,pages)};
+}
+function pagerJump(id,fn,pages){
+  const inp=document.getElementById(id+'Jump');if(!inp)return;
+  let p=parseInt(inp.value,10);
+  if(!p||p<1)p=1; if(p>pages)p=pages;
+  window[fn](p);
 }
 
 function resetUserFilter(){
@@ -1522,20 +1557,70 @@ async function refreshRoles(){
   try{DB.roles=await api('/api/admin/roles');renderRoleTable()}
   catch(e){appToast('加载角色失败：'+e.message,'err')}
 }
-// 权限勾选器：按模块分组，数据来自数据库权限节点目录
+// 权限勾选器：若依风格三级树（目录 → 菜单 → 按钮），父子联动 + 折叠。
+// 数据来自菜单权限页维护的同一棵权限树（DB.perms 的 parentCode / nodeType），
+// 两处再也不会不一致；目录节点只是分组，不产生权限码。
 function permEditor(perms){
   const owned=perms||[];
-  const groups={};
-  DB.perms.forEach(x=>{(groups[x.module||'其他']=groups[x.module||'其他']||[]).push(x)});
-  return Object.keys(groups).map(m=>
-    '<div style="font-size:11.5px;color:var(--muted);font-weight:650;margin:10px 0 6px">'+esc(m)+'</div>'+
-    '<div>'+groups[m].map(x=>
-      '<label style="display:inline-flex;align-items:center;gap:5px;margin:0 16px 6px 0;font-size:12.5px">'+
-      '<input type="checkbox" name="rp" value="'+esc(x.code)+'"'+(owned.includes(x.code)?' checked':'')+'>'+
-      esc(x.name)+'</label>').join('')+'</div>').join('');
+  const byParent={};
+  DB.perms.forEach(x=>{const p=x.parentCode||'';(byParent[p]=byParent[p]||[]).push(x)});
+  Object.keys(byParent).forEach(p=>byParent[p].sort((a,b)=>(a.orderNum||0)-(b.orderNum||0)));
+  const roots=DB.perms.filter(x=>!x.parentCode||!byParent[x.parentCode]);
+  const typeTag=x=>'<span class="pt-type '+esc(x.nodeType||'menu')+'">'+
+    ({directory:'目录',menu:'菜单',btn:'按钮'}[x.nodeType]||'菜单')+'</span>';
+  // 收集某节点所有叶子后代（真正产生权限码的节点）
+  const rpDescendants=x=>{
+    const out=[];
+    (byParent[x.code]||[]).forEach(k=>{
+      if(k.nodeType!=='directory')out.push(k.code);
+      out.push.apply(out,rpDescendants(k));
+    });
+    return out;
+  };
+  const nodeHtml=(x,depth)=>{
+    const kids=byParent[x.code]||[];
+    const leaf=!kids.length;
+    // 目录/菜单的勾选态：自身权限 + 其下所有 rp 后代是否都拥有
+    const allRp=rpDescendants(x);
+    const groupChecked=allRp.length>0&&allRp.every(c=>owned.includes(c));
+    const checked=owned.includes(x.code)||groupChecked;
+    // 目录不绑定接口权限码：用 no name 的 checkbox 仅做联动开关；
+    // 菜单本身是真实权限码，必须保留 name=rp，只是额外带联动 class。
+    const input=x.nodeType==='directory'
+      ? '<input type="checkbox" class="pt-dir-toggle" data-code="'+esc(x.code)+'"'+(checked?' checked':'')+'>'
+      : '<input type="checkbox" name="rp" value="'+esc(x.code)+'"'+(kids.length?' class="pt-parent-toggle"':'')+(checked?' checked':'')+'>';
+    const row='<div class="pt-row'+(x.nodeType==='directory'?' pt-dir':'')+'">'+
+      '<span class="pt-caret'+(leaf?' leaf':'')+'"'+(leaf?'':' data-toggle="'+esc(x.code)+'"')+'>'+(leaf?'':'▾')+'</span>'+
+      '<label>'+input+'<span class="pt-name">'+esc(x.name)+'</span></label>'+typeTag(x)+'</div>';
+    if(leaf)return row;
+    return row+'<div class="pt-children" data-children="'+esc(x.code)+'">'+kids.map(k=>nodeHtml(k,depth+1)).join('')+'</div>';
+  };
+  return '<div class="pt-tools"><span>勾选父级会同步子级，取消父级会清除子级</span>'+
+    '<a onclick="permTreeAll(true)">全选</a><a onclick="permTreeAll(false)">清空</a></div>'+
+    '<div class="perm-tree" id="permTree">'+roots.map(r=>nodeHtml(r,0)).join('')+'</div>';
+}
+// 折叠/展开
+document.addEventListener('click',function(e){
+  const c=e.target.closest&&e.target.closest('.pt-caret[data-toggle]');
+  if(!c)return;
+  const box=c.closest('.pt-row').nextElementSibling;
+  if(!box||!box.classList.contains('pt-children'))return;
+  const collapsed=box.classList.toggle('collapsed');
+  c.textContent=collapsed?'▸':'▾';
+});
+// 目录/菜单勾选联动：父级勾选 → 全部子级勾选，取消 → 全部清除
+document.addEventListener('change',function(e){
+  const t=e.target;
+  if(!t||!t.matches||!(t.matches('.pt-dir-toggle')||t.matches('.pt-parent-toggle')))return;
+  const box=t.closest('.pt-row').nextElementSibling;
+  if(!box||!box.classList.contains('pt-children'))return;
+  box.querySelectorAll('input[name=rp]').forEach(c=>{c.checked=t.checked});
+});
+function permTreeAll(on){
+  document.querySelectorAll('#permTree input').forEach(c=>{c.checked=on});
 }
 function readPermEditor(){
-  return Array.prototype.slice.call(document.querySelectorAll('input[name=rp]:checked')).map(x=>x.value);
+  return Array.prototype.slice.call(document.querySelectorAll('#permTree input[name=rp]:checked')).map(x=>x.value);
 }
 function createRole(){
   Shell.modal({title:'新增角色',okText:'创建',wide:true,body:
@@ -1786,22 +1871,30 @@ function togglePermTree(expand){
   renderPermTable();
 }
 
-async function loadDocs(){
+const DOC_PAGE={page:1,size:10};
+async function loadDocs(page){
+  if(typeof page==='number')DOC_PAGE.page=page;
   try{
     const docs=await api('/api/docs/list');
     const list=docs.slice().sort((a,b)=>String(b.uploadedAt||'').localeCompare(String(a.uploadedAt||'')));
     $('dList')._rows=list;
-    $('dList').innerHTML=list.map((d,i)=>{
+    const total=list.length,pages=Math.max(1,Math.ceil(total/DOC_PAGE.size));
+    if(DOC_PAGE.page>pages)DOC_PAGE.page=pages;
+    const start=(DOC_PAGE.page-1)*DOC_PAGE.size;
+    const slice=list.slice(start,start+DOC_PAGE.size);
+    $('dList').innerHTML=slice.map((d,i)=>{
       // 与「知识库文档」页同步：显示归属部门 + 可见范围（下发/仅本部门）
       const org=esc(window.Shell?Shell.tenantLabel(d.tenantId||'default'):(d.tenantId||'default'));
       const scope=d.visibleSubtree?org+' · 含下级':org+' · 仅本部门+上级';
+      const gi=start+i;   // 操作按钮用全局索引，分页后仍指向正确文档
       return '<tr><td class="name">'+esc(d.fileName)+'</td>'+
         '<td><span class="tag" title="文档归属部门与可见范围">'+scope+'</span></td>'+
         '<td>'+num(d.chunks)+'</td><td>'+esc(d.ownerUser||'—')+'</td>'+
         '<td>'+esc(String(d.uploadedAt||'').slice(0,19))+'</td>'+
-        '<td><button class="op-btn" onclick="showChunks('+i+')">查看分片</button>'+
-        '<button class="btn btn-sm btn-danger" style="margin-left:8px" onclick="delDocAt('+i+')">删除</button></td></tr>';
+        '<td><button class="op-btn" onclick="showChunks('+gi+')">查看分片</button>'+
+        '<button class="btn btn-sm btn-danger" style="margin-left:8px" onclick="delDocAt('+gi+')">删除</button></td></tr>';
     }).join('')||'<tr><td colspan="6" class="empty">知识库暂无文档</td></tr>';
+    renderPager('dPager',total,DOC_PAGE.page,DOC_PAGE.size,'loadDocs');
   }catch(e){console.error(e)}
 }
 
@@ -1861,16 +1954,23 @@ function tsLocal(ts){
   return p(d.getMonth()+1)+'-'+p(d.getDate())+' '+p(d.getHours())+':'+p(d.getMinutes())+':'+p(d.getSeconds());
 }
 
-async function loadLoginLogs(){
+const LOGINLOG_PAGE={page:1,size:15};
+async function loadLoginLogs(page){
+  if(typeof page==='number')LOGINLOG_PAGE.page=page;
   try{
-    const list=await api('/api/admin/login-logs?limit=200');
-    $('lList').innerHTML=list.map(l=>
+    const list=await api('/api/admin/login-logs?limit=500');
+    const pages=Math.max(1,Math.ceil(list.length/LOGINLOG_PAGE.size));
+    if(LOGINLOG_PAGE.page>pages)LOGINLOG_PAGE.page=pages;
+    const start=(LOGINLOG_PAGE.page-1)*LOGINLOG_PAGE.size;
+    const slice=list.slice(start,start+LOGINLOG_PAGE.size);
+    $('lList').innerHTML=slice.map(l=>
       '<tr><td>'+tsLocal(l.ts)+'</td><td class="name">'+esc(l.user_id)+'</td>'+
       '<td>'+esc(actionCn(l.action))+'</td><td>'+statusTag(l.status)+'</td>'+
       '<td>'+resultCn(l.result,l.status)+'</td>'+
       '<td>'+(l.duration_ms!=null?esc(l.duration_ms)+' ms':'—')+'</td>'+
       '<td class="mono" style="font-size:11.5px;display:table-cell">'+esc(l.ip||'—')+'</td></tr>'
     ).join('')||'<tr><td colspan="7" class="empty">暂无登录记录</td></tr>';
+    renderPager('lPager',list.length,LOGINLOG_PAGE.page,LOGINLOG_PAGE.size,'loadLoginLogs');
   }catch(e){$('lList').innerHTML='<tr><td colspan="7" class="empty">加载失败：'+esc(e.message)+'</td></tr>'}
 }
 
@@ -2020,13 +2120,21 @@ async function openUsageRecords(scope){
     :'<div class="empty-inline">'+label+'还没有调用记录</div>');
 }
 
-async function loadAudit(){
+const AUDIT_PAGE={page:1,size:15};
+async function loadAudit(page){
+  if(typeof page==='number')AUDIT_PAGE.page=page;
   try{
-    const j=await api('/api/audit/logs?limit=200');
-    $('aList').innerHTML=(j.logs||[]).map(l=>
+    const j=await api('/api/audit/logs?limit=500');
+    const list=j.logs||[];
+    const pages=Math.max(1,Math.ceil(list.length/AUDIT_PAGE.size));
+    if(AUDIT_PAGE.page>pages)AUDIT_PAGE.page=pages;
+    const start=(AUDIT_PAGE.page-1)*AUDIT_PAGE.size;
+    const slice=list.slice(start,start+AUDIT_PAGE.size);
+    $('aList').innerHTML=slice.map(l=>
       '<tr><td>'+tsLocal(l.ts)+'</td><td>'+esc(l.user_id)+'</td><td>'+esc(l.action)+'</td>'+
       '<td>'+statusTag(l.status)+'</td><td>'+esc(l.duration_ms||l.duration||'—')+'</td><td>'+esc(resultCn(l.result,l.status))+'</td></tr>'
     ).join('')||'<tr><td colspan="6" class="empty">暂无记录</td></tr>';
+    renderPager('aPager',list.length,AUDIT_PAGE.page,AUDIT_PAGE.size,'loadAudit');
   }catch(e){console.error(e)}
 }
 

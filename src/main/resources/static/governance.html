@@ -28,6 +28,13 @@
   .res-SUCCESS,.res-ALLOW{color:var(--ok);font-weight:600}
   .res-DENIED,.res-ERROR{color:var(--danger);font-weight:600}
   .notice{background:#fff8ec;border:1px solid #f5deb3;border-left:3px solid var(--warn);border-radius:9px;padding:11px 14px;font-size:11.5px;color:#8a5a12;line-height:1.7;margin-bottom:16px}
+  /* 操作记录分页 */
+  .pager{display:flex;gap:6px;align-items:center;justify-content:flex-end;font-size:12px;color:var(--ink-2)}
+  .pager button{border:1px solid var(--line);background:#fff;border-radius:6px;padding:4px 10px;cursor:pointer;color:var(--ink-2);font-size:12px}
+  .pager button:hover:not(:disabled){border-color:var(--primary);color:var(--primary)}
+  .pager button:disabled{opacity:.45;cursor:not-allowed}
+  .pager .cur{background:var(--primary);border-color:var(--primary);color:#fff}
+  .pager input{width:46px;padding:4px 6px;font-size:12px;border:1px solid var(--line);border-radius:6px;text-align:center}
 </style>
 </head>
 <body>
@@ -73,9 +80,10 @@
         <button class="btn btn-sm btn-primary" style="margin-left:6px" onclick="exportAuditCsv()">导出记录</button></span></div>
       <div class="sub">最近的登录与操作情况，方便你核对是谁在什么时候做了什么。</div>
       <div class="kv" id="auditStats"></div>
-      <div class="scroll" style="margin-top:14px;max-height:420px">
+      <div style="margin-top:14px">
         <table><thead><tr><th>时间</th><th>部门</th><th>账号</th><th>动作</th><th>状态</th><th>耗时</th><th>结果</th><th>详情</th></tr></thead><tbody id="auditBody"></tbody></table>
       </div>
+      <div class="pager" id="auditPager" style="margin-top:10px"></div>
     </div>
   </div>
 </main>
@@ -125,23 +133,61 @@ async function loadPermissions(){
 }
 
 let auditRows=[];
+const AUDIT_PAGE={page:1,size:15};
+function renderAuditPage(page){
+  AUDIT_PAGE.page=page||AUDIT_PAGE.page;
+  const list=auditRows;
+  const totalPages=Math.max(1,Math.ceil(list.length/AUDIT_PAGE.size));
+  if(AUDIT_PAGE.page>totalPages)AUDIT_PAGE.page=totalPages;
+  const start=(AUDIT_PAGE.page-1)*AUDIT_PAGE.size;
+  const slice=list.slice(start,start+AUDIT_PAGE.size);
+  document.getElementById('auditBody').innerHTML=slice.map(l=>{
+    const t=new Date(l.ts);
+    const hh=isNaN(t.getTime())?String(l.ts||'').slice(11,19):
+      [t.getHours(),t.getMinutes(),t.getSeconds()].map(n=>String(n).padStart(2,'0')).join(':');
+    return '<tr><td>'+esc(hh)+'</td><td>'+esc(Shell.tenantLabel(l.tenant_id))+'</td><td>'+esc(l.user_id)+'</td>'+
+    '<td>'+esc(l.action)+'</td><td>'+esc(l.status)+'</td><td>'+esc(l.duration_ms||0)+'ms</td>'+
+    '<td class="res-'+esc(l.result)+'">'+esc(resultCn(l.result,l.status))+'</td><td class="detail">'+esc(l.detail)+'</td></tr>';
+  }).join('')||'<tr><td colspan="8" class="empty">暂无记录</td></tr>';
+  // 分页控件：上下页 + 页码 + 指定跳页
+  const pager=document.getElementById('auditPager');
+  const nums=[];
+  for(let p=1;p<=totalPages;p++){
+    if(p===1||p===totalPages||Math.abs(p-AUDIT_PAGE.page)<=1)nums.push(p);
+    else if(nums[nums.length-1]!=='…')nums.push('…');
+  }
+  pager.style.display='flex';
+  pager.innerHTML='<span>共 '+list.length+' 条 · 第 '+AUDIT_PAGE.page+'/'+totalPages+' 页</span>'+
+    '<button '+(AUDIT_PAGE.page<=1?'disabled':'')+' data-go="1">«</button>'+
+    '<button '+(AUDIT_PAGE.page<=1?'disabled':'')+' data-go="'+(AUDIT_PAGE.page-1)+'">‹</button>'+
+    nums.map(p=>p==='…'?'<span style="padding:0 2px">…</span>':
+      '<button class="'+(p===AUDIT_PAGE.page?'cur':'')+'" data-go="'+p+'">'+p+'</button>').join('')+
+    '<button '+(AUDIT_PAGE.page>=totalPages?'disabled':'')+' data-go="'+(AUDIT_PAGE.page+1)+'">›</button>'+
+    '<button '+(AUDIT_PAGE.page>=totalPages?'disabled':'')+' data-go="'+totalPages+'">»</button>'+
+    '<span style="display:inline-flex;align-items:center;gap:4px;margin-left:8px">跳至 '+
+    '<input type="number" min="1" max="'+totalPages+'" value="'+AUDIT_PAGE.page+'" id="auditPageJump">'+
+    ' 页</span>';
+  pager.querySelectorAll('button[data-go]').forEach(b=>{
+    b.onclick=()=>{renderAuditPage(Number(b.dataset.go))};
+  });
+  const jump=document.getElementById('auditPageJump');
+  if(jump)jump.onkeydown=e=>{
+    if(e.key!=='Enter')return;
+    let p=parseInt(jump.value,10);
+    if(!p||p<1)p=1; if(p>totalPages)p=totalPages;
+    renderAuditPage(p);
+  };
+}
 async function loadAudit(){
   try{
     const s=await (await fetch('/api/audit/stats')).json();
+    const scopeLabel=s.scope==='all'?'全部部门':(window.Shell?Shell.tenantLabel(s.tenant):s.tenant);
     document.getElementById('auditStats').innerHTML=
       '<span>共 <b>'+s.total+'</b> 条</span><span>未通过 <b style="color:var(--danger)">'+s.denied+'</b></span>'+
-      '<span>异常 <b style="color:var(--danger)">'+s.errors+'</b></span><span>部门 <b>'+esc(window.Shell?Shell.tenantLabel(s.tenant):s.tenant)+'</b></span>';
-    const j2=await (await fetch('/api/audit/logs?limit=200')).json();
+      '<span>异常 <b style="color:var(--danger)">'+s.errors+'</b></span><span>范围 <b>'+esc(scopeLabel)+'</b></span>';
+    const j2=await (await fetch('/api/audit/logs?limit=500')).json();
     auditRows=j2.logs||[];
-    const d=new Date();
-    document.getElementById('auditBody').innerHTML=auditRows.map(l=>{
-      const t=new Date(l.ts);
-      const hh=isNaN(t.getTime())?String(l.ts||'').slice(11,19):
-        [t.getHours(),t.getMinutes(),t.getSeconds()].map(n=>String(n).padStart(2,'0')).join(':');
-      return '<tr><td>'+esc(hh)+'</td><td>'+esc(Shell.tenantLabel(l.tenant_id))+'</td><td>'+esc(l.user_id)+'</td>'+
-      '<td>'+esc(l.action)+'</td><td>'+esc(l.status)+'</td><td>'+esc(l.duration_ms||0)+'ms</td>'+
-      '<td class="res-'+esc(l.result)+'">'+esc(resultCn(l.result,l.status))+'</td><td class="detail">'+esc(l.detail)+'</td></tr>';
-    }).join('')||'<tr><td colspan="8" class="empty">暂无记录</td></tr>';
+    renderAuditPage(1);
   }catch(e){document.getElementById('auditBody').innerHTML='<tr><td colspan="8" class="empty">记录加载失败</td></tr>'}
 }
 function resultCn(r,status){return r==='SUCCESS'?'成功':r==='DENIED'?'未通过':r==='ERROR'?'异常':(Number(status)>=400?'失败':r||'—')}
