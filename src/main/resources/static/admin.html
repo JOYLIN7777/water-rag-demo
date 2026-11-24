@@ -334,6 +334,10 @@
   .msg-close{flex:0 0 16px;width:16px;height:16px;line-height:14px;text-align:center;border:0;
     border-radius:4px;background:transparent;color:inherit;font-size:14px;cursor:pointer;padding:0;opacity:.75}
   .msg-close:hover{opacity:1;background:rgba(0,0,0,.06)}
+  .model-ops{display:flex;gap:6px;flex-wrap:nowrap;align-items:center;white-space:nowrap}
+  .model-ops .btn{white-space:nowrap;flex:0 0 auto}
+  .model-test-row td{padding:0 12px 8px;border-bottom:1px solid var(--line)}
+  .model-test-row .msg{margin:0}
 </style>
 </head>
 <script>
@@ -470,7 +474,7 @@
         </div>
         <div class="table-card">
           <div class="scroll"><table class="data-table">
-            <thead><tr><th>名称 / 类型</th><th>端点 / 模型</th><th>Key</th><th>状态</th><th style="width:190px">操作</th></tr></thead>
+            <thead><tr><th>名称 / 类型</th><th>端点 / 模型</th><th>Key</th><th>状态</th><th style="width:230px">操作</th></tr></thead>
             <tbody id="tbody"><tr><td colspan="5" class="empty">加载中…</td></tr></tbody>
           </table></div>
         </div>
@@ -2222,11 +2226,12 @@ async function loadModels(){
       '<td><span class="mono">'+esc(m.baseUrl)+'</span><span class="mono">'+esc(m.model)+'</span></td>'+
       '<td><span class="mono">'+esc(m.apiKey)+'</span></td>'+
       '<td><span class="tag '+(m.active?'active':'off')+'">'+(m.active?'使用中':(m.enabled?'待命':'已禁用'))+'</span></td>'+
-      '<td><div style="display:flex;gap:6px;flex-wrap:wrap">'+
+      '<td><div class="model-ops">'+
       (m.active?'<button class="btn btn-sm" disabled>已激活</button>':'<button class="btn btn-sm" data-perm="model:write" onclick="activateModelNew('+m.id+')">激活</button>')+
       '<button class="btn btn-sm" data-perm="model:write" onclick="testModelNew('+m.id+',this)">测试</button>'+
       '<button class="btn btn-sm btn-danger" data-perm="model:write" onclick="delModelNew('+m.id+')"'+(m.active?' disabled':'')+'>删除</button>'+
-      '</div></td></tr>').join('');
+      '</div></td></tr>'+
+      '<tr class="model-test-row" id="testRow-'+m.id+'" style="display:none"><td colspan="5"><div class="msg" id="testMsg-'+m.id+'"></div></td></tr>').join('');
     renderActive();
   }catch(e){$('tbody').innerHTML='<tr><td colspan="5" class="empty">加载失败：'+esc(e.message)+'</td></tr>'}
 }
@@ -2258,10 +2263,15 @@ async function activateModelNew(id){
   catch(e){modelMsg('activeMsg','✗ '+e.message,false)}
 }
 async function testModelNew(id,btn){
+  const row=$('testRow-'+id),box=$('testMsg-'+id);
+  if(row)row.style.display='table-row';
+  if(box){box.className='msg ok';box.innerHTML='<span>正在测试…</span>'}
   btn.disabled=true;btn.textContent='测试中…';
-  try{const j=await apiWrite('/api/models/'+id+'/test',{method:'POST'});
-    modelMsg('activeMsg',(j.result.startsWith('OK')?'✓ ':'✗ ')+j.name+'：'+j.result,j.result.startsWith('OK'));}
-  catch(e){modelMsg('activeMsg','✗ '+e.message,false)}
+  try{
+    const j=await apiWrite('/api/models/'+id+'/test',{method:'POST'});
+    const ok=j.result.startsWith('OK');
+    if(box)modelMsg('testMsg-'+id,(ok?'✓ ':'✗ ')+j.name+'：'+j.result,ok);
+  }catch(e){if(box)modelMsg('testMsg-'+id,'✗ '+e.message,false)}
   finally{btn.disabled=false;btn.textContent='测试'}
 }
 async function delModelNew(id){
