@@ -450,6 +450,13 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,te
 .admin-back{margin-top:auto;border-top:1px solid rgba(255,255,255,.09);padding-top:10px}
 .brand-crumb{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--muted)}
 .brand-crumb .sep{color:#c3cddd;font-size:12px}
+/* 独立后台页之间跳转时的过渡遮罩：盖住旧页面，避免"闪一下上一页" */
+.console-nav-mask{position:fixed;inset:0;z-index:99999;background:rgba(247,249,252,.96);
+  display:flex;align-items:center;justify-content:center;gap:10px;
+  font-size:13px;color:#667085;letter-spacing:.2px}
+.console-nav-spinner{width:15px;height:15px;border:2px solid #d6e4ff;border-top-color:#2f6bff;
+  border-radius:50%;animation:console-spin .7s linear infinite}
+@keyframes console-spin{to{transform:rotate(360deg)}}
 .perm-denied-actions{display:flex;gap:10px;justify-content:center}
 .perm-denied-primary,.perm-denied-secondary{padding:9px 16px;border-radius:8px;font-size:13px;cursor:pointer;
   text-decoration:none;border:1px solid transparent}

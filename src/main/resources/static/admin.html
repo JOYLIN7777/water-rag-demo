@@ -319,20 +319,24 @@
   }
   /* 分片预览：树状层级靠缩进 + 左侧引导线表达，不用折叠面板那套重控件 */
   .chunk-modal .modal-box{max-width:820px}
+  /* 模型设置面板（原 models.html 内联样式） */
+  .row{display:flex;gap:12px;flex-wrap:wrap}
+  .row .field{flex:1;min-width:150px}
+  #activeBox .active-item{margin-bottom:16px}
+  #activeBox .active-label{font-size:11.5px;color:var(--muted);margin-bottom:4px}
+  #activeBox .active-name{font-size:15px;font-weight:650;color:var(--ink)}
+  #activeBox .active-divider{border-top:1px solid var(--line);margin:16px 0}
 </style>
 </head>
 <script>
 // 独立路由首屏防闪：在任何内容绘制前先按路径锁定目标面板，等权限接口回来再交给 goPanel()
 (function(){
   const FILE_PANEL={users:'users','users.html':'users',org:'org','org.html':'org',
-    roles:'roles','roles.html':'roles',perms:'perms','perms.html':'perms',docs:'docs','docs.html':'docs',
+    roles:'roles','roles.html':'roles',perms:'perms','perms.html':'perms',docs:'docs','docs.html':'docs',models:'models','models.html':'models',
     usage:'usage','usage.html':'usage',loginlogs:'loginlogs','loginlogs.html':'loginlogs',
     audit:'audit','audit.html':'audit'};
   const f=location.pathname.split('/').pop()||'';
   const p=FILE_PANEL[f]||new URLSearchParams(location.search).get('panel')||'users';
-  if(f==='admin.html'&&new URLSearchParams(location.search).get('panel')==='models'){
-    location.replace('models.html');return;
-  }
   window.__consolePanel=p;
   document.documentElement.setAttribute('data-early-panel',p);
 })();
@@ -410,6 +414,45 @@
             <thead><tr><th>部门 / 组织架构名称</th><th>部门编码（Key）</th><th>排序号</th><th>状态</th><th>操作</th></tr></thead>
             <tbody id="oTable"><tr><td colspan="5" class="empty">加载中…</td></tr></tbody>
           </table>
+        </div>
+      </section>
+
+      <!-- 模型设置：新版配置界面（原 models.html 内容并入同一后台页） -->
+      <section class="admin-panel" data-panel="models">
+        <div class="page-head"><h1 class="page-title">模型设置</h1>
+          <p class="page-desc">设置对话模型和文档检索模型，支持公有云服务与内网私有部署。</p></div>
+        <div class="intro">
+          对话模型切换后立即生效；文档检索模型切换前会校验向量维度，与已入库数据不一致时会阻止切换，避免影响现有知识库。
+          密钥只显示前 4 后 4 位，更新时不填写即保持原值。
+        </div>
+        <div class="grid">
+          <div class="card">
+            <div class="card-head"><h3>新增模型配置</h3></div>
+            <div class="row">
+              <div class="field" style="flex:2"><label>名称</label><input id="fName" type="text" autocomplete="off" placeholder="如：内网-Qwen3.5-397B"></div>
+              <div class="field"><label>类型</label><select id="fType"><option value="CHAT">CHAT 对话</option><option value="EMBEDDING">EMBEDDING 向量</option></select></div>
+            </div>
+            <div class="field"><label>服务地址</label><input id="fUrl" type="text" autocomplete="off" placeholder="云服务地址或内网模型地址"></div>
+            <div class="row">
+              <div class="field"><label>模型名</label><input id="fModel" type="text" autocomplete="off" name="modelNameInput" data-no-autofill="1" placeholder="qwen-plus / text-embedding-v3"></div>
+              <div class="field"><label>访问密钥（内网可留空）</label><input id="fKey" type="password" autocomplete="new-password" name="apiKeyInput" data-no-autofill="1" placeholder="留空表示保持原值"></div>
+            </div>
+            <div class="field" id="dimField" style="display:none"><label>向量维度（EMBEDDING 必填）</label><input id="fDim" type="number" placeholder="1024"></div>
+            <button class="primary-btn" data-perm="model:write" onclick="createModel()">＋ 添加配置</button>
+            <div class="msg" id="createMsg"></div>
+            <div class="hint">提示：切换文档检索模型前，建议先点「测试」确认服务可用；不同维度的模型不能共用同一个知识库。</div>
+          </div>
+          <div class="card">
+            <div class="card-head"><h3>当前生效配置</h3></div>
+            <div id="activeBox"><div class="empty">加载中…</div></div>
+            <div class="msg" id="activeMsg"></div>
+          </div>
+        </div>
+        <div class="table-card">
+          <div class="scroll"><table class="data-table">
+            <thead><tr><th>名称 / 类型</th><th>端点 / 模型</th><th>Key</th><th>状态</th><th style="width:190px">操作</th></tr></thead>
+            <tbody id="tbody"><tr><td colspan="5" class="empty">加载中…</td></tr></tbody>
+          </table></div>
         </div>
       </section>
 
@@ -616,7 +659,7 @@ async function guard(){
   try{
     const FILE_PANEL={users:'users','users.html':'users',org:'org','org.html':'org',
       roles:'roles','roles.html':'roles',perms:'perms','perms.html':'perms',
-      docs:'docs','docs.html':'docs',models:'models','models.html':'models',
+      docs:'docs','docs.html':'docs',models:'models','models.html':'models',models:'models','models.html':'models',
       usage:'usage','usage.html':'usage',loginlogs:'loginlogs','loginlogs.html':'loginlogs',
       audit:'audit','audit.html':'audit'};
     const file=location.pathname.split('/').pop()||'admin.html';
@@ -2048,69 +2091,68 @@ function resultCn(r,status){
   return '—';
 }
 
-async function loadModelsInfo(){
+// ===== 模型设置（新版，原 models.html 脚本） =====
+let models=[];
+function modelMsg(id,text,ok){const el=$(id);if(!el)return;el.className='msg '+(ok?'ok':'err');el.textContent=text}
+async function loadModels(){
   try{
-    const m=await api('/api/models');
-    $('mTable')._rows=m;
-    $('mTable').innerHTML=m.length?m.map((x,i)=>
-      '<tr><td class="name">'+esc(x.name)+'</td><td>'+(x.type==='CHAT'?'对话模型':'检索模型')+'</td>'+
-      '<td class="mono" style="font-size:11px">'+esc(x.model)+'</td>'+
-      '<td class="mono" style="font-size:11px;max-width:210px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(x.baseUrl||'')+'</td>'+
-      '<td>'+(x.active?'<span class="tag ok">生效中</span>':x.enabled?'<span class="tag">已启用</span>':'<span class="tag off">已停用</span>')+'</td>'+
-      '<td><button class="op-btn" data-perm="model:write" onclick="editModel('+i+')">编辑</button>'+
-        (x.active?'':'<button class="op-btn" data-perm="model:write" onclick="activateModel('+x.id+')">启用</button>')+
-        '<button class="op-btn" data-perm="model:write" onclick="testModel('+x.id+')">测试</button>'+
-        (x.active?'':'<button class="op-btn danger" data-perm="model:write" onclick="delModel('+x.id+')">删除</button>')+'</td></tr>').join('')
-      :'<tr><td colspan="6" class="empty">暂无模型配置</td></tr>';
-  }catch(e){$('mTable').innerHTML='<tr><td colspan="6" class="empty">加载失败：'+esc(e.message)+'</td></tr>'}
+    models=await api('/api/models');
+    const tb=$('tbody');
+    if(!tb)return;
+    if(!models.length){tb.innerHTML='<tr><td colspan="5" class="empty">暂无配置</td></tr>';renderActive();return}
+    tb.innerHTML=models.map(m=>
+      '<tr><td><span class="name">'+esc(m.name)+'</span><br><span class="tag '+(m.type==='EMBEDDING'?'emb':'')+'">'+esc(m.type)+'</span>'+
+      (m.dimensions?' <span class="tag">'+m.dimensions+'维</span>':'')+'</td>'+
+      '<td><span class="mono">'+esc(m.baseUrl)+'</span><span class="mono">'+esc(m.model)+'</span></td>'+
+      '<td><span class="mono">'+esc(m.apiKey)+'</span></td>'+
+      '<td><span class="tag '+(m.active?'active':'off')+'">'+(m.active?'使用中':(m.enabled?'待命':'已禁用'))+'</span></td>'+
+      '<td><div style="display:flex;gap:6px;flex-wrap:wrap">'+
+      (m.active?'<button class="btn btn-sm" disabled>已激活</button>':'<button class="btn btn-sm" data-perm="model:write" onclick="activateModelNew('+m.id+')">激活</button>')+
+      '<button class="btn btn-sm" data-perm="model:write" onclick="testModelNew('+m.id+',this)">测试</button>'+
+      '<button class="btn btn-sm btn-danger" data-perm="model:write" onclick="delModelNew('+m.id+')"'+(m.active?' disabled':'')+'>删除</button>'+
+      '</div></td></tr>').join('');
+    renderActive();
+  }catch(e){$('tbody').innerHTML='<tr><td colspan="5" class="empty">加载失败：'+esc(e.message)+'</td></tr>'}
 }
-function modelForm(m){
-  const v=k=>esc(m?m[k]:'');
-  return '<div class="field"><label for="mfName">配置名称</label><input id="mfName" value="'+v('name')+'" autocomplete="off" placeholder="例如：生产对话模型"></div>'+
-    '<div class="field"><label for="mfType">类型</label><select id="mfType">'+
-      '<option value="CHAT"'+(m&&m.type==='CHAT'?' selected':'')+'>对话模型</option>'+
-      '<option value="EMBEDDING"'+(m&&m.type==='EMBEDDING'?' selected':'')+'>检索模型</option></select></div>'+
-    '<div class="field"><label for="mfModel">模型标识</label><input id="mfModel" value="'+v('model')+'" autocomplete="off" placeholder="例如：qwen-plus"></div>'+
-    '<div class="field"><label for="mfUrl">接口地址</label><input id="mfUrl" value="'+v('baseUrl')+'" autocomplete="off" placeholder="https://..."></div>'+
-    '<div class="field"><label for="mfKey">API Key</label><input id="mfKey" type="password" autocomplete="new-password" value="" placeholder="'+(m?'留空表示保持原值':'首次配置必填')+'"></div>'+
-    '<div class="field"><label for="mfDim">向量维度（检索模型必填）</label><input id="mfDim" type="number" value="'+(m&&m.dimensions?m.dimensions:'')+'" autocomplete="off"></div>'+
-    '<div class="field"><label class="field-check"><input id="mfEnabled" type="checkbox"'+(!m||m.enabled?' checked':'')+'>启用此配置</label></div>';
+function renderActive(){
+  const box=$('activeBox');if(!box)return;
+  const chat=models.find(m=>m.type==='CHAT'&&m.active),emb=models.find(m=>m.type==='EMBEDDING'&&m.active);
+  box.innerHTML='<div class="active-item"><div class="active-label">对话模型（CHAT）</div>'+
+    '<div class="active-name">'+esc(chat?chat.name:'未配置')+'</div>'+
+    '<span class="mono">'+(chat?esc(chat.model):'—')+'</span></div>'+
+    '<div class="active-divider"></div>'+
+    '<div><div class="active-label">向量模型（EMBEDDING）</div>'+
+    '<div class="active-name">'+esc(emb?emb.name:'未配置')+'</div>'+
+    '<span class="mono">'+(emb?esc(emb.model+' · '+emb.dimensions+'维'):'—')+'</span></div>';
 }
-function editModel(i){
-  const m=i==null?null:($('mTable')._rows||[])[i];
-  Shell.modal({title:m?'编辑模型 · '+m.name:'新增模型',body:modelForm(m),okText:'保存',onOk:async function(close){
-    const type=$('mfType').value;
-    const p={name:$('mfName').value.trim(),type,baseUrl:$('mfUrl').value.trim(),
-      apiKey:$('mfKey').value.trim(),model:$('mfModel').value.trim(),
-      dimensions:$('mfDim').value?Number($('mfDim').value):null,enabled:$('mfEnabled').checked};
-    if(!p.name||!p.model||!p.baseUrl){Shell.modalError('请填写名称、模型标识和接口地址');return false}
-    if(type==='EMBEDDING'&&!p.dimensions){Shell.modalError('检索模型必须填写向量维度');return false}
-    if(!m&&!p.apiKey){Shell.modalError('请填写 API Key（仅保存在服务端）');return false}
-    try{
-      await apiWrite(m?'/api/models/'+m.id:'/api/models',
-        {method:m?'PUT':'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(p)});
-      close();appToast(m?'模型配置已更新':'模型配置已创建','ok');loadModelsInfo();
-    }catch(e){Shell.modalError(e.message);return false}
-  }});
-}
-async function activateModel(id){
-  try{const j=await apiWrite('/api/models/'+id+'/activate',{method:'POST'});appToast(j.message||'已启用','ok');loadModelsInfo()}
-  catch(e){appToast(e.message,'err')}
-}
-async function testModel(id){
+$('fType')&&($('fType').onchange=e=>{const d=$('dimField');if(d)d.style.display=e.target.value==='EMBEDDING'?'block':'none'});
+async function createModel(){
+  const type=$('fType').value;
+  const body={name:$('fName').value.trim(),type,baseUrl:$('fUrl').value.trim(),model:$('fModel').value.trim(),
+    apiKey:$('fKey').value.trim(),dimensions:type==='EMBEDDING'?Number($('fDim').value):null,enabled:true,active:false};
   try{
-    const j=await apiWrite('/api/models/'+id+'/test',{method:'POST'});
-    Shell.modal({title:'连通性测试 · '+j.name,okText:'关闭',cancelText:'',
-      body:'<pre style="white-space:pre-wrap;font-size:12px;line-height:1.7;margin:0">'+esc(JSON.stringify(j.result,null,2))+'</pre>'});
-  }catch(e){appToast(e.message,'err')}
+    const r=await apiWrite('/api/models',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+    modelMsg('createMsg','✓ '+r.message,true);
+    ['fName','fUrl','fModel','fKey','fDim'].forEach(id=>{const el=$(id);if(el)el.value=''});
+    appToast('配置已添加','ok');loadModels();
+  }catch(e){modelMsg('createMsg','✗ '+e.message,false)}
 }
-function delModel(id){
-  Shell.modal({title:'删除模型配置',danger:true,okText:'确认删除',
-    body:'<p style="margin:0">删除后无法恢复。正在使用的配置需先启用其他模型。</p>',
-    onOk:async function(close){
-      try{await apiWrite('/api/models/'+id,{method:'DELETE'});close();appToast('配置已删除','ok');loadModelsInfo()}
-      catch(e){Shell.modalError(e.message);return false}
-    }});
+async function activateModelNew(id){
+  try{const j=await apiWrite('/api/models/'+id+'/activate',{method:'POST'});modelMsg('activeMsg','✓ '+j.message+'（已即时生效，无需重启）',true);appToast('模型已切换','ok');loadModels()}
+  catch(e){modelMsg('activeMsg','✗ '+e.message,false)}
+}
+async function testModelNew(id,btn){
+  btn.disabled=true;btn.textContent='测试中…';
+  try{const j=await apiWrite('/api/models/'+id+'/test',{method:'POST'});
+    modelMsg('activeMsg',(j.result.startsWith('OK')?'✓ ':'✗ ')+j.name+'：'+j.result,j.result.startsWith('OK'));}
+  catch(e){modelMsg('activeMsg','✗ '+e.message,false)}
+  finally{btn.disabled=false;btn.textContent='测试'}
+}
+async function delModelNew(id){
+  const m=models.find(x=>x.id===id);
+  if(!confirm('确定删除模型配置「'+(m?m.name:id)+'」吗？'))return;
+  try{await apiWrite('/api/models/'+id,{method:'DELETE'});appToast('配置已删除','ok');loadModels()}
+  catch(e){modelMsg('activeMsg','✗ '+e.message,false)}
 }
 
 async function loadUsage(){
@@ -2209,7 +2251,7 @@ function goPanel(key){
   if($('panelTitle'))$('panelTitle').textContent=TITLES[key]||'管理后台';
   if(key==='docs')loadDocs();
   else if(key==='org'){renderOrgTree();renderOrgTable();renderOrgHead();}
-  else if(key==='models')loadModelsInfo();
+  else if(key==='models')loadModels();
   else if(key==='usage')loadUsage();
   else if(key==='loginlogs')loadLoginLogs();
   else if(key==='audit')loadAudit();
@@ -2274,7 +2316,7 @@ document.querySelectorAll('.admin-nav-item[data-panel]').forEach(btn=>{
     $('panelTitle').textContent=TITLES[key]||'管理后台';
     if(key==='docs')loadDocs();
     else if(key==='org'){renderOrgTree();renderOrgTable();renderOrgHead();}
-    else if(key==='models')loadModelsInfo();
+    else if(key==='models')loadModels();
     else if(key==='usage')loadUsage();
     else if(key==='loginlogs')loadLoginLogs();
     else if(key==='audit')loadAudit();
@@ -2290,7 +2332,7 @@ document.querySelectorAll('#uStats .drillable').forEach(c=>{
 
 (function(){
   const FILE_PANEL={users:'users','users.html':'users',org:'org','org.html':'org',
-    roles:'roles','roles.html':'roles',perms:'perms','perms.html':'perms',docs:'docs','docs.html':'docs',
+    roles:'roles','roles.html':'roles',perms:'perms','perms.html':'perms',docs:'docs','docs.html':'docs',models:'models','models.html':'models',
     usage:'usage','usage.html':'usage',loginlogs:'loginlogs','loginlogs.html':'loginlogs',
     audit:'audit','audit.html':'audit'};
   const f=location.pathname.split('/').pop()||'';

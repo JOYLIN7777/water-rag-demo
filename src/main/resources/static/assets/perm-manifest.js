@@ -31,7 +31,7 @@
       ]},
       { code: 'console.biz:root', name: '业务管理', type: 'directory', order: 22, children: [
         { code: 'admin:docs', name: '文档管理', type: 'menu', order: 221, routePath: '/docs.html' },
-        { code: 'model:read', name: '模型设置', type: 'menu', order: 222, routePath: '/models.html', children: [
+        { code: 'model:read', name: '模型设置', type: 'menu', order: 222, routePath: '/admin.html?panel=models', children: [
           { code: 'model:write', name: '修改模型', type: 'btn', order: 2221 }
         ]},
         { code: 'usage:read', name: '用量统计', type: 'menu', order: 223, routePath: '/usage.html' }

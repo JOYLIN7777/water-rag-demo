@@ -42,7 +42,7 @@
     { key: 'roles', label: '角色定义', icon: '❖', href: 'roles.html', perm: 'role:read' },
     { key: 'perms', label: '菜单权限', icon: '☷', href: 'perms.html', perm: 'perm:read' },
     { key: 'docs', label: '文档管理', icon: '▤', href: 'docs.html', perm: 'admin:docs' },
-    { key: 'models', label: '模型设置', icon: '◇', href: 'models.html', perm: 'model:read' },
+    { key: 'models', label: '模型设置', icon: '◇', href: 'admin.html?panel=models', perm: 'model:read' },
     { key: 'usage', label: '用量统计', icon: '◷', href: 'usage.html', perm: 'usage:read' },
     // 日志类入口直接按菜单权限目录的路由进入各自页面（管理员与审计员看到同一页面）
     { key: 'loginlogs', label: '登录日志', icon: '⎗', href: 'loginlogs.html', perm: 'loginlog:read' },
@@ -1088,7 +1088,7 @@
     const pages = [
       ['admin:access', 'users.html'], ['user:read', 'users.html'], ['org:read', 'org.html'],
       ['role:read', 'roles.html'], ['perm:read', 'perms.html'], ['admin:docs', 'docs.html'],
-      ['model:read', 'models.html'], ['usage:read', 'usage.html'],
+      ['model:read', 'admin.html?panel=models'], ['usage:read', 'usage.html'],
       ['loginlog:read', 'loginlogs.html'], ['audit:read', 'audit.html']
     ];
     const canChat = hasPermission('chat:use');
@@ -1331,7 +1331,7 @@
     'manage.html': 'doc:read',
     'search.html': 'search:use',
     'tree.html': 'tree:use',
-    'models.html': 'model:read',
+    'admin.html?panel=models': 'model:read',
     'users.html': 'user:read',
     'org.html': 'org:read',
     'roles.html': 'role:read',
@@ -1402,7 +1402,22 @@
       if (!a || e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
       const key = a.getAttribute('data-panel');
       const panel = document.querySelector('.admin-panel[data-panel="' + key + '"]');
-      if (!panel || typeof window.goPanel !== 'function') return; // 独立页面（models.html 等）照常整页跳
+      // 独立页面（models.html 等）不在当前 DOM 里，只能整页跳。
+      // 先盖一层遮罩再跳，避免旧页面在新文档加载完成前一直留在屏幕上（用户看到的就是"闪一下"）。
+      if (!panel || typeof window.goPanel !== 'function') {
+        e.preventDefault();
+        const href = a.getAttribute('href');
+        if (document.getElementById('consoleNavMask')) return;
+        const mask = document.createElement('div');
+        mask.id = 'consoleNavMask';
+        mask.className = 'console-nav-mask';
+        mask.innerHTML = '<div class="console-nav-spinner"></div><span>正在打开页面…</span>';
+        document.body.appendChild(mask);
+        requestAnimationFrame(function () {
+          setTimeout(function () { location.href = href; }, 90);
+        });
+        return;
+      }
       e.preventDefault();
       history.pushState({ panel: key }, '', a.getAttribute('href'));
       window.goPanel(key);
