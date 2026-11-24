@@ -107,6 +107,29 @@ public class AuditService {
         }
     }
 
+    /** 按类型导出：login=登录/登出/刷新令牌，operation=其余业务操作；审计部门不限租户 */
+    public List<Map<String, Object>> export(String tenant, boolean all, String type, int limit) {
+        String loginCond = "(action LIKE '%/api/auth/login%' OR action LIKE '%/api/auth/logout%' "
+                + "OR action LIKE '%/api/auth/refresh%')";
+        StringBuilder sql = new StringBuilder(
+                "SELECT ts,tenant_id,user_id,groups,action,resource,detail,ip,status,duration_ms,result FROM audit_log");
+        List<Object> args = new ArrayList<>();
+        if (!all) { sql.append(" WHERE tenant_id=?"); args.add(tenant); }
+        if ("login".equals(type)) {
+            sql.append(all ? " WHERE " : " AND ").append(loginCond);
+        } else if ("operation".equals(type)) {
+            sql.append(all ? " WHERE NOT " : " AND NOT ").append(loginCond);
+        }
+        sql.append(" ORDER BY ts DESC LIMIT ?");
+        args.add(Math.min(Math.max(limit, 1), 5000));
+        try {
+            return jdbc.queryForList(sql.toString(), args.toArray());
+        } catch (Exception e) {
+            log.warn("审计导出查询失败：{}", e.getMessage());
+            return new ArrayList<>();
+        }
+    }
+
     /** 全量审计统计（审计部门专用） */
     public Map<String, Object> statsAll() {
         try {

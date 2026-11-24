@@ -46,7 +46,7 @@
     { key: 'usage', label: '用量统计', icon: '◷', href: 'admin.html?panel=usage', perm: 'usage:read' },
     { key: 'governance', label: '权限与日志', icon: '◈', href: 'governance.html', perm: 'audit:read' },
     // 日志类入口落在治理页自身：审计员只有 audit:read，进 admin.html 会被 admin:access 守卫拦住
-    { key: 'loginlogs', label: '登录日志', icon: '⎗', href: 'governance.html#audit', perm: 'loginlog:read' },
+    { key: 'loginlogs', label: '登录日志', icon: '⎗', href: 'governance.html#loginlogs', perm: 'loginlog:read' },
     { key: 'audit', label: '操作日志', icon: '≡', href: 'governance.html#audit', perm: 'audit:read' }
   ];
   const ADMIN_GROUPS = [
@@ -880,8 +880,6 @@
         '<div class="user-name">' + esc(name) + '</div>' +
         '<div class="user-tenant">' + esc(tenantLabel(tenant)) + '</div></a>' +
       '<a class="user-icon-btn" href="settings.html" title="设置">' + svg('settings') + '</a>' +
-      // 管理后台是低频入口，跟「设置/退出」一起收在左下角用户区，不占顶栏主位置
-      '<a class="user-icon-btn admin-shortcut" href="admin.html" title="进入管理后台" style="display:none">◈</a>' +
       '<button class="user-logout" title="退出登录" onclick="Shell.logout()">⏻</button>';
   }
 
@@ -953,13 +951,14 @@
     const old = host.querySelector('.sidebar');
     if (old) old.remove();
     const navHtml = ADMIN_GROUPS.map(g =>
+      '<div class="admin-nav-group">' +
       '<div class="section-label">' + g.label + '</div>' +
       g.keys.map(k => {
         const n = ADMIN_NAV.find(x => x.key === k);
         return '<a class="nav-item admin-nav-item' + (n.key === active ? ' active' : '') + '"' +
           ' href="' + n.href + '" data-perm="' + n.perm + '" title="' + n.label + '">' +
           '<span class="nav-ic">' + n.icon + '</span><span>' + n.label + '</span></a>';
-      }).join('')
+      }).join('') + '</div>'
     ).join('');
     const aside = document.createElement('div');
     aside.innerHTML =
@@ -1030,6 +1029,10 @@
     host.querySelectorAll('.admin-nav-item[data-perm]').forEach(el => {
       if (!hasPermission(el.getAttribute('data-perm'))) el.remove();
     });
+    // 一组里全被权限过滤掉时连组标题一起收起，避免侧栏出现"空组+标题"的错位空白
+    host.querySelectorAll('.admin-nav-group').forEach(gr => {
+      gr.style.display = gr.querySelector('.admin-nav-item') ? '' : 'none';
+    });
   }
   /**
    * 全局按钮级权限：页面上任何元素都可以用 data-perm="权限码" 声明入口门槛。
@@ -1066,12 +1069,10 @@
     const inAdmin = file === 'admin.html' || file === 'governance.html';
     const slot = document.getElementById('adminEntrySlot');
     if (slot) {
-      // 已经在后台里就不再显示指向自己的按钮
+      // 已经在后台里就不再显示指向自己的按钮；用户卡里不再放第二个入口
       slot.innerHTML = (allowed && !inAdmin)
         ? '<a class="admin-entry-btn" href="admin.html" title="进入管理后台">⚙ 管理后台</a>' : '';
     }
-    const btn = document.querySelector('.admin-shortcut');
-    if (btn) btn.style.display = allowed ? '' : 'none';
   }
 
   // ---------- 服务探活 ----------

@@ -115,17 +115,17 @@
   .tag-role.analyst{background:var(--primary-soft);color:#25469b}
   .empty-inline{padding:36px;text-align:center;color:var(--muted);font-size:13px}
   .node-type{display:inline-block;font-size:10px;padding:2px 7px;border-radius:5px;background:#eef2f8;color:var(--ink-2)}
-  .node-type.directory{background:#e8f7f1;color:#0d8f62}
-  .node-type.menu{background:var(--primary-soft);color:#25469b}
-  .node-type.btn{background:#fef4e6;color:var(--warn)}
+  .node-type.perm-lv-directory{background:#e8f7f1;color:#0d8f62}
+  .node-type.perm-lv-menu{background:var(--primary-soft);color:#25469b}
+  .node-type.perm-lv-btn{background:#fef4e6;color:var(--warn)}
   /* 权限树名称按层级着色：目录=绿、菜单=蓝、按钮=橙，一眼分出层级 */
-  .perm-name.directory{color:#0d8f62;font-weight:650}
-  .perm-name.menu{color:#25469b}
-  .perm-name.btn{color:#a86a10}
+  .perm-name.perm-lv-directory{color:#0d8f62;font-weight:650}
+  .perm-name.perm-lv-menu{color:#25469b}
+  .perm-name.perm-lv-btn{color:#a86a10}
   .perm-name .pn-ico{display:inline-block;width:18px;font-size:13px;margin-right:3px;opacity:.85}
-  .perm-name.directory .pn-ico{color:#0d8f62}
-  .perm-name.menu .pn-ico{color:#3b68c4}
-  .perm-name.btn .pn-ico{color:#d18a17}
+  .perm-name.perm-lv-directory .pn-ico{color:#0d8f62}
+  .perm-name.perm-lv-menu .pn-ico{color:#3b68c4}
+  .perm-name.perm-lv-btn .pn-ico{color:#d18a17}
   .perm-name .pg-caret{color:var(--muted)}
   .type-quick{display:flex;flex-wrap:wrap;gap:5px;margin-top:5px}
   .type-quick button{border:1px solid var(--line);background:#fff;color:var(--ink-2);font-size:10.5px;padding:3px 8px;border-radius:5px}
@@ -139,13 +139,13 @@
   .pt-caret{width:14px;flex:0 0 14px;text-align:center;color:var(--muted);font-size:10px;cursor:pointer;user-select:none}
   .pt-caret.leaf{visibility:hidden}
   .pt-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .pt-name.directory{font-weight:650;color:#0d8f62}
-  .pt-name.menu{color:#25469b}
-  .pt-name.btn{color:#a86a10}
+  .pt-name.perm-lv-directory{font-weight:650;color:#0d8f62}
+  .pt-name.perm-lv-menu{color:#25469b}
+  .pt-name.perm-lv-btn{color:#a86a10}
   .pt-type{font-size:9.5px;padding:1px 5px;border-radius:4px;flex:0 0 auto}
-  .pt-type.directory{background:#e8f7f1;color:#0d8f62}
-  .pt-type.menu{background:var(--primary-soft);color:#25469b}
-  .pt-type.btn{background:#fef4e6;color:var(--warn)}
+  .pt-type.perm-lv-directory{background:#e8f7f1;color:#0d8f62}
+  .pt-type.perm-lv-menu{background:var(--primary-soft);color:#25469b}
+  .pt-type.perm-lv-btn{background:#fef4e6;color:var(--warn)}
   .pt-children{margin-left:18px;border-left:1px dashed #dbe3f0;padding-left:8px}
   .pt-children.collapsed{display:none}
   .pt-tools{display:flex;gap:10px;margin-bottom:8px;font-size:11.5px;color:var(--muted)}
@@ -1578,7 +1578,7 @@ function permEditor(perms){
   DB.perms.forEach(x=>{const p=x.parentCode||'';(byParent[p]=byParent[p]||[]).push(x)});
   Object.keys(byParent).forEach(p=>byParent[p].sort((a,b)=>(a.orderNum||0)-(b.orderNum||0)));
   const roots=DB.perms.filter(x=>!x.parentCode||!byParent[x.parentCode]);
-  const typeTag=x=>'<span class="pt-type '+esc(x.nodeType||'menu')+'">'+
+  const typeTag=x=>'<span class="pt-type '+LV(x.nodeType)+'">'+
     ({directory:'目录',menu:'菜单',btn:'按钮'}[x.nodeType]||'菜单')+'</span>';
   // 收集某节点所有叶子后代（真正产生权限码的节点）
   const rpDescendants=x=>{
@@ -1603,7 +1603,7 @@ function permEditor(perms){
       : '<input type="checkbox" name="rp" value="'+esc(x.code)+'"'+(kids.length?' class="pt-parent-toggle"':'')+(checked?' checked':'')+'>';
     const row='<div class="pt-row'+(x.nodeType==='directory'?' pt-dir':'')+'">'+
       '<span class="pt-caret'+(leaf?' leaf':'')+'"'+(leaf?'':' data-toggle="'+esc(x.code)+'"')+'>'+(leaf?'':'▾')+'</span>'+
-      '<label>'+input+'<span class="pt-name '+esc(x.nodeType||'menu')+'">'+
+      '<label>'+input+'<span class="pt-name '+LV(x.nodeType)+'">'+
       (({directory:'▦',menu:'▤',btn:'◆'})[x.nodeType]||'▤')+' '+esc(x.name)+'</span></label>'+typeTag(x)+'</div>';
     if(leaf)return row;
     return row+'<div class="pt-children" data-children="'+esc(x.code)+'">'+kids.map(k=>nodeHtml(k,depth+1)).join('')+'</div>';
@@ -1709,6 +1709,7 @@ function permDesc(code){
 const PERM_FOLDED=new Set();
 const TYPE_CN={directory:'目录',menu:'菜单',btn:'按钮'};
 const TYPE_ICON={directory:'▦',menu:'▤',btn:'◆'};
+const LV = t => 'perm-lv-' + (t || 'menu');
 function renderPermTable(){
   const kw=($('pKw').value||'').trim().toLowerCase();
   const match=x=>!kw||((x.name||'')+' '+x.code+' '+(x.description||'')+' '+(x.routePath||'')).toLowerCase().includes(kw);
@@ -1731,10 +1732,10 @@ function renderPermTable(){
       '<button class="op-btn" data-perm="perm:read" onclick="editPerm(\''+esc(x.code)+'\')">编辑</button>'+
       (x.builtin?'':'<button class="op-btn" style="color:#c0392b" data-perm="perm:read" onclick="delPerm(\''+esc(x.code)+'\')">删除</button>');
     const typ=x.nodeType||'menu';
-    html+='<tr data-code="'+esc(x.code)+'"><td style="padding-left:'+indent+'px" class="name perm-name '+esc(typ)+'">'+
+    html+='<tr data-code="'+esc(x.code)+'"><td style="padding-left:'+indent+'px" class="name perm-name '+LV(typ)+'">'+
       caret+'<span class="pn-ico">'+(TYPE_ICON[typ]||'▤')+'</span>'+esc(x.name)+
       (x.builtin?'':' <span class="tag">自定义</span>')+'</td>'+
-      '<td><span class="node-type '+esc(typ)+'">'+(TYPE_CN[typ]||'功能菜单')+'</span></td>'+
+      '<td><span class="node-type '+LV(typ)+'">'+(TYPE_CN[typ]||'功能菜单')+'</span></td>'+
       '<td class="mono" style="font-size:11px">'+esc(x.code)+'</td>'+
       '<td class="mono" style="font-size:11px;color:var(--muted)">'+esc(x.routePath||'—')+'</td>'+
       '<td>'+esc(x.orderNum||0)+'</td>'+
