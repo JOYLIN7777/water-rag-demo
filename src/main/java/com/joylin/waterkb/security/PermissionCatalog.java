@@ -157,7 +157,6 @@ public class PermissionCatalog {
             if (name.length() > 32) name = name.substring(0, 32);
             if (name.isEmpty()) name = code;
             String parent = s(item.get("parentCode"));
-            if (!parent.isEmpty() && !exists(parent)) parent = "";
             String route = s(item.get("routePath"));
             String module = s(item.get("module"));
             if (module.isEmpty()) module = "自定义";
@@ -212,21 +211,29 @@ public class PermissionCatalog {
             try {
                 if (exists(code)) {
                     // 只同步内置节点；同名自定义节点保留管理员的手工配置
-                    jdbc.update("UPDATE perm_node SET name=?,node_type=?,parent_code=?,route_path=?,order_num=?,"
+                    jdbc.update("UPDATE perm_node SET name=?,node_type=?,route_path=?,order_num=?,"
                                     + "module=CASE WHEN ?='' THEN module ELSE ? END,retired=FALSE,last_seen_at=CURRENT_TIMESTAMP "
                                     + "WHERE code=? AND builtin=TRUE",
-                            name, type, parent, route, order, module, module, code);
+                            name, type, route, order, module, module, code);
                     updated.add(code);
                 } else {
                     jdbc.update("INSERT INTO perm_node(code,name,node_type,module,description,builtin,"
                                     + "parent_code,route_path,order_num,last_seen_at) "
-                                    + "VALUES(?,?,?,?,'页面清单定义',TRUE,?,?,?,CURRENT_TIMESTAMP)",
-                            code, name, type, module.isEmpty() ? "自定义" : module, parent, route, order);
+                                    + "VALUES(?,?,?,?,'页面清单定义',TRUE,'',?,?,CURRENT_TIMESTAMP)",
+                            code, name, type, module.isEmpty() ? "自定义" : module, route, order);
                     added.add(code);
                 }
             } catch (org.springframework.dao.DuplicateKeyException e) {
                 updated.add(code);
             }
+        }
+        // 第二阶段：所有节点都建好后统一修正父子关系，避免清单里父节点排在子节点后面导致层级被清空
+        for (Map<String, Object> item : safe) {
+            String code = s(item.get("code"));
+            String parent = s(item.get("parentCode"));
+            if (code.isEmpty() || parent.isEmpty()) continue;
+            if (!codes.contains(parent) && !exists(parent)) continue;
+            jdbc.update("UPDATE perm_node SET parent_code=? WHERE code=? AND builtin=TRUE", parent, code);
         }
         // 清单中消失的内置节点：标记下线，不删除
         try {
