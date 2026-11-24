@@ -330,6 +330,15 @@ loadFormats();
     main.insertBefore(bar,main.firstChild);
   }
 })();
+
+// 问答页「上传文档」跳过来时，直接把上传区带到眼前
+if(location.hash==='#upload')setTimeout(()=>{
+  const row=document.querySelector('.folder-row');
+  if(!row)return;
+  row.scrollIntoView({behavior:'smooth',block:'center'});
+  const b=row.querySelector('.folder-btn[data-perm]');
+  if(b&&getComputedStyle(b).display!=='none'){b.focus();b.style.outline='2px solid var(--primary)';setTimeout(()=>b.style.outline='',2200)}
+},1000);
 </script>
 </body>
 </html>

@@ -44,9 +44,9 @@
     { key: 'docs', label: '文档管理', icon: '▤', href: 'admin.html?panel=docs', perm: 'admin:docs' },
     { key: 'models', label: '模型设置', icon: '◇', href: 'admin.html?panel=models', perm: 'model:read' },
     { key: 'usage', label: '用量统计', icon: '◷', href: 'admin.html?panel=usage', perm: 'usage:read' },
-    // 日志页入口只有登录日志/操作日志（同一页面按锚点切换筛选）
-    { key: 'loginlogs', label: '登录日志', icon: '⎗', href: 'governance.html#loginlogs', perm: 'loginlog:read' },
-    { key: 'audit', label: '操作日志', icon: '≡', href: 'governance.html#audit', perm: 'audit:read' }
+    // 日志类入口直接按菜单权限目录的路由进入各自页面（管理员与审计员看到同一页面）
+    { key: 'loginlogs', label: '登录日志', icon: '⎗', href: 'admin.html?panel=loginlogs', perm: 'loginlog:read' },
+    { key: 'audit', label: '操作日志', icon: '≡', href: 'admin.html?panel=audit', perm: 'audit:read' }
   ];
   const ADMIN_GROUPS = [
     { label: '权限配置目录', keys: ['users', 'org', 'roles', 'perms'] },
@@ -1324,7 +1324,13 @@
   function enforcePagePermission(file) {
     // 权限接口失败时不误拦页面（服务端接口仍有权限校验），只做入口收敛
     if (!permsLoaded) return;
-    const code = PAGE_PERMS[file];
+    let code = PAGE_PERMS[file];
+    // 后台页面按 panel 参数细分：日志面板只需对应日志权限，不必进管理后台
+    if (file === 'admin.html') {
+      const panel = new URLSearchParams(location.search).get('panel');
+      if (panel === 'loginlogs') code = ['loginlog:read', 'admin:access'];
+      if (panel === 'audit') code = ['audit:read', 'admin:access'];
+    }
     if (!code) return;
     if (document.getElementById('permDeniedScreen')) return;
     const codes = Array.isArray(code) ? code : [code];

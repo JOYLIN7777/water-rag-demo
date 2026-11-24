@@ -56,8 +56,8 @@ public class PermissionCatalog {
             new String[]{"model:write", "修改模型", "btn", "系统管理", "增删改与切换模型", "model:read", "", "2221"},
             new String[]{"usage:read", "用量统计", "menu", "系统管理", "查看模型调用用量", "console.biz:root", "/admin/usage", "223"},
             new String[]{"console.log:root", "日志审计", "directory", "系统管理", "后台侧栏第三组", "system:root", "", "23"},
-            new String[]{"loginlog:read", "登录日志", "menu", "系统管理", "查看登录日志", "console.log:root", "/admin/loginlogs", "231"},
-            new String[]{"audit:read", "操作日志", "menu", "系统管理", "查看操作日志与治理页审计", "console.log:root", "/governance", "232"});
+            new String[]{"loginlog:read", "登录日志", "menu", "系统管理", "查看登录日志（独立页面）", "console.log:root", "/admin.html?panel=loginlogs", "231"},
+            new String[]{"audit:read", "操作日志", "menu", "系统管理", "查看操作日志（独立页面）", "console.log:root", "/admin.html?panel=audit", "232"});
 
     /** 内置节点改名（旧名 → 新名）：只改仍用旧名的行，用户自定义的名称不覆盖 */
     private static final Map<String, String[]> RENAMES = Map.of(

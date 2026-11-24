@@ -505,7 +505,8 @@
         <div class="page-head"><h1 class="page-title">登录日志</h1>
           <p class="page-desc">登录成功与失败的尝试都留有记录，失败原因可追溯。</p></div>
         <div class="card"><div class="card-head"><h3>登录记录</h3>
-          <button class="btn btn-sm" data-perm="loginlog:read" onclick="loadLoginLogs()">刷新</button></div>
+          <span><button class="btn btn-sm" data-perm="loginlog:read" onclick="loadLoginLogs()">刷新</button>
+          <button class="btn btn-sm btn-primary" style="margin-left:6px" data-perm="loginlog:read" onclick="exportAdminLogs('login')">导出登录日志</button></span></div>
           <div class="table-wrap"><table class="data-table"><thead><tr><th>时间</th><th>账号</th><th>操作</th><th>状态</th><th>结果</th><th>耗时</th><th>来源 IP</th></tr></thead>
             <tbody id="lList"><tr><td colspan="7" class="empty">加载中…</td></tr></tbody></table></div>
           <div class="pager" id="lPager"></div>
@@ -517,7 +518,8 @@
         <div class="page-head"><h1 class="page-title">操作日志</h1>
           <p class="page-desc">查看账号在系统中的操作记录。</p></div>
         <div class="card"><div class="card-head"><h3>操作记录</h3>
-          <button class="btn btn-sm" data-perm="audit:read" onclick="loadAudit()">刷新</button></div>
+          <span><button class="btn btn-sm" data-perm="audit:read" onclick="loadAudit()">刷新</button>
+          <button class="btn btn-sm btn-primary" style="margin-left:6px" data-perm="audit:read" onclick="exportAdminLogs('operation')">导出操作日志</button></span></div>
           <div class="table-wrap"><table class="data-table"><thead><tr><th>时间</th><th>账号</th><th>动作</th><th>状态</th><th>耗时</th><th>结果</th></tr></thead>
             <tbody id="aList"><tr><td colspan="6" class="empty">加载中…</td></tr></tbody></table></div>
           <div class="pager" id="aPager"></div>
@@ -614,11 +616,16 @@ function showDeny(){
 }
 async function guard(){
   try{
+    const panel=new URLSearchParams(location.search).get('panel')||'users';
+    // 日志页面按菜单权限授予，不必是管理员；但只开放对应的那一个面板
+    const logOnly = panel==='loginlogs'||panel==='audit';
     const r=await fetch('/api/auth/permissions');
     if(r.status===401){WrkAuth.goLogin();return false}
     if(r.status===403||!r.ok){showDeny();return false}
     const p=await r.json();
-    if(!p.admin&&!(p.permissions||[]).includes('admin:access')){showDeny();return false}
+    const isAdmin=!!p.admin||(p.permissions||[]).includes('admin:access');
+    const need=panel==='loginlogs'?'loginlog:read':'audit:read';
+    if(!isAdmin && !(logOnly&&(p.permissions||[]).includes(need))){showDeny();return false}
     $('adminRoot').style.display='flex';
     const u=WrkAuth.getUser()||{};
     // 头像/名称进入后台自己的个人中心（后台相对独立，不跳问答系统页面）
@@ -627,6 +634,11 @@ async function guard(){
       '<a class="user-meta" href="javascript:void(0)" onclick="openProfile()"><div class="user-name">'+esc(u.displayName||u.user)+'</div>'+
       '<div class="user-tenant">'+esc(tl(u.tenant))+'</div></a>'+
       '<button class="user-logout" title="退出登录" onclick="Shell.logout()">⏻</button>';
+    // 非管理员只看自己被授权的日志面板，不加载用户/角色等后台主数据
+    if(!isAdmin){
+      goPanel(panel);
+      return true;
+    }
     DB.allPerms=p.allPermissions||[];
     DB.myPerms=p.permissions||[];
     DB.roles=p.roleMatrix||[];
@@ -635,6 +647,7 @@ async function guard(){
     renderOrgTree();
     renderOrgTable();
     renderRoleTable();
+    goPanel(panel);
     return true;
   }catch(e){showDeny();return false}
 }
@@ -1257,6 +1270,17 @@ function delUser(i){
     }});
 }
 
+/** 日志导出：走服务端接口拿全量 CSV（最多 5000 条），各页面只导出自己的类型 */
+async function exportAdminLogs(type){
+  try{
+    const r=await fetch('/api/audit/logs/export?type='+type);
+    if(!r.ok){appToast('导出失败，请稍后重试','err');return}
+    const blob=await r.blob(),url=URL.createObjectURL(blob),a=document.createElement('a');
+    a.href=url;
+    a.download=(type==='login'?'登录日志':'操作日志')+'-'+new Date().toISOString().slice(0,10)+'.csv';
+    a.click();setTimeout(()=>URL.revokeObjectURL(url),2000);
+  }catch(e){appToast('导出失败，请检查网络','err')}
+}
 function exportUsers(){
   const rows=[['账号','显示名','角色','所属组织','状态']].concat(
     DB.users.map(u=>[u.username,u.displayName,(u.groups||[]).map(gl).join(' / '),tl(u.tenant),u.enabled?'正常':'停用']));
