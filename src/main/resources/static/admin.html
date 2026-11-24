@@ -872,7 +872,7 @@ async function approveReset(id){
     Shell.modal({title:'重置码已生成',okText:'知道了',cancelText:'',
       body:'<p style="margin:0 0 12px">请通过可靠渠道告知本人：<b>30 分钟内有效，用一次即作废</b>。</p>'+
         '<div class="reset-code-wrap"><div class="reset-code" id="resetCode">'+esc(j.code)+'</div>'+
-        '<button class="btn btn-sm copy-btn" type="button" onclick="copyResetCode(this)">复制</button></div>'+
+        '<button class="btn btn-sm copy-btn" type="button" data-perm="user:resetcode" onclick="copyResetCode(this)">复制</button></div>'+
         '<p class="hint" style="margin:12px 0 0">系统只保存重置码的哈希，关闭本弹框后无法再次查看。'+
         '若已丢失，可让用户重新提交申请，或直接在账号列表里为他重置密码。</p>',
       // 关掉码之后回到消息中心：不然批一条就得重新点一次铃铛。

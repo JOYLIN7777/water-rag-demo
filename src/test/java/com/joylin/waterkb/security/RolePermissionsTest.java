@@ -15,7 +15,7 @@ class RolePermissionsTest {
 
     @Test
     void 权限码覆盖真实后台面板() {
-        assertEquals(23, Permission.ALL.size());
+        assertEquals(24, Permission.ALL.size());
         assertTrue(Permission.ALL.containsAll(List.of(
                 Permission.ORG_READ, Permission.ROLE_READ, Permission.PERM_READ,
                 Permission.ADMIN_DOCS, Permission.LOGINLOG_READ)),

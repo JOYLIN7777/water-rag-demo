@@ -33,6 +33,7 @@ public final class Permission {
     // 细粒度操作码：前端按钮独立控制，不绑定服务端接口（接口仍由父权限兜底）
     public static final String USER_EXPORT = "user:export";           // 导出用户
     public static final String USER_RESETPWD = "user:resetpwd";       // 重置账号密码
+    public static final String USER_RESETCODE = "user:resetcode";     // 复制密码重置码
     public static final String DOC_CHUNKS = "doc:chunks";             // 查看文档分片
     public static final String LOGINLOG_EXPORT = "loginlog:export";   // 导出登录日志
     public static final String AUDIT_EXPORT = "audit:export";         // 导出操作日志
@@ -40,7 +41,7 @@ public final class Permission {
     /** 全部权限码，按展示顺序排列，供权限矩阵与单测使用 */
     public static final java.util.List<String> ALL = java.util.List.of(
             ADMIN_ACCESS, CHAT_USE, DOC_READ, DOC_WRITE, DOC_DELETE, DOC_CHUNKS,
-            SEARCH_USE, TREE_USE, USER_READ, USER_WRITE, USER_RESETPWD, USER_EXPORT,
+            SEARCH_USE, TREE_USE, USER_READ, USER_WRITE, USER_RESETPWD, USER_RESETCODE, USER_EXPORT,
             ORG_READ, ROLE_READ, PERM_READ, ADMIN_DOCS, MODEL_READ, MODEL_WRITE,
             LOGINLOG_READ, LOGINLOG_EXPORT, AUDIT_READ, AUDIT_EXPORT, USAGE_READ);
 

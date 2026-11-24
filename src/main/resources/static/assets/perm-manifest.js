@@ -26,6 +26,7 @@
         { code: 'user:read', name: '用户管理', type: 'menu', order: 211, routePath: '/users.html', children: [
           { code: 'user:write', name: '用户维护', type: 'btn', order: 2111 },
           { code: 'user:resetpwd', name: '重置密码', type: 'btn', order: 2112 },
+          { code: 'user:resetcode', name: '复制重置码', type: 'btn', order: 2114 },
           { code: 'user:export', name: '导出用户', type: 'btn', order: 2113 }
         ]},
         { code: 'org:read', name: '组织架构', type: 'menu', order: 212, routePath: '/org.html' },
