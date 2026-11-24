@@ -9,6 +9,9 @@
 <style>
   .admin-sidebar{width:232px;flex:0 0 232px;background:linear-gradient(180deg,#0d1730 0%,#16223c 100%);color:#c8d3e8;display:flex;flex-direction:column;padding:20px 12px 12px;position:sticky;top:0;height:100vh;overflow-y:auto}
   .admin-sidebar .brand{padding-bottom:16px}
+  .admin-panel[data-panel="org"] .tree-pane{display:none}
+  .admin-panel[data-panel="org"] .data-pane{width:100%}
+  .org-search{max-width:260px;padding:7px 10px;border:1px solid var(--line);border-radius:7px;font-size:12px}
   .admin-panel{display:none}
   .admin-panel.active{display:block}
   /* 后台内容区占满视口高度：main→page→panel→工作台逐层拉伸，
@@ -298,18 +301,24 @@
     <div class="brand"><div class="brand-mark has-logo"><img class="brand-logo" src="assets/logo.svg" alt=""></div>
       <div><div class="brand-title">管理后台</div><div class="brand-sub">水利知识库</div></div></div>
     <!-- 概览页已去掉：后台进来直接是用户管理，管理动作都在下面这几组里 -->
-    <div class="section-label" style="margin-top:6px">权限配置目录</div>
-    <button class="admin-nav-item active" data-panel="users" data-perm="user:read"><span class="ic">◈</span>用户管理</button>
-    <button class="admin-nav-item" data-panel="org" data-perm="org:read"><span class="ic">⌘</span>组织架构</button>
-    <button class="admin-nav-item" data-panel="roles" data-perm="role:read"><span class="ic">❖</span>角色定义</button>
-    <button class="admin-nav-item" data-panel="perms" data-perm="perm:read"><span class="ic">☷</span>菜单权限</button>
-    <div class="section-label" style="margin:14px 0 6px">业务管理</div>
-    <button class="admin-nav-item" data-panel="docs" data-perm="admin:docs"><span class="ic">▤</span>文档管理</button>
-    <button class="admin-nav-item" data-panel="models" data-perm="model:read"><span class="ic">◇</span>模型设置</button>
-    <button class="admin-nav-item" data-panel="usage" data-perm="usage:read"><span class="ic">◷</span>用量统计</button>
-    <div class="section-label" style="margin:14px 0 6px">日志审计</div>
-    <button class="admin-nav-item" data-panel="loginlogs" data-perm="loginlog:read"><span class="ic">⎗</span>登录日志</button>
-    <button class="admin-nav-item" data-panel="audit" data-perm="audit:read"><span class="ic">≡</span>操作日志</button>
+    <div class="admin-nav-group">
+      <div class="section-label" style="margin-top:6px">权限配置目录</div>
+      <a class="admin-nav-item active" data-panel="users" href="users.html" data-perm="user:read"><span class="ic">◈</span>用户管理</a>
+      <a class="admin-nav-item" data-panel="org" href="org.html" data-perm="org:read"><span class="ic">⌘</span>组织架构</a>
+      <a class="admin-nav-item" data-panel="roles" href="roles.html" data-perm="role:read"><span class="ic">❖</span>角色定义</a>
+      <a class="admin-nav-item" data-panel="perms" href="perms.html" data-perm="perm:read"><span class="ic">☷</span>菜单权限</a>
+    </div>
+    <div class="admin-nav-group">
+      <div class="section-label" style="margin:14px 0 6px">业务管理</div>
+      <a class="admin-nav-item" data-panel="docs" href="docs.html" data-perm="admin:docs"><span class="ic">▤</span>文档管理</a>
+      <a class="admin-nav-item" data-panel="models" href="models.html" data-perm="model:read"><span class="ic">◇</span>模型设置</a>
+      <a class="admin-nav-item" data-panel="usage" href="usage.html" data-perm="usage:read"><span class="ic">◷</span>用量统计</a>
+    </div>
+    <div class="admin-nav-group">
+      <div class="section-label" style="margin:14px 0 6px">日志审计</div>
+      <a class="admin-nav-item" data-panel="loginlogs" href="loginlogs.html" data-perm="loginlog:read"><span class="ic">⎗</span>登录日志</a>
+      <a class="admin-nav-item" data-panel="audit" href="audit.html" data-perm="audit:read"><span class="ic">≡</span>操作日志</a>
+    </div>
     <div class="admin-back">
       <a class="admin-nav-item" href="index.html"><span class="ic">⌂</span>返回问答</a>
       <div class="user-block" id="adminUserBlock"></div>
@@ -386,6 +395,9 @@
               <div class="org-crumb" id="oPath">全部组织</div>
               <div class="org-summary" id="oStats"></div>
               <div class="org-actions">
+                <input class="org-search" id="orgKeyword" placeholder="搜索组织名称 / 标识" oninput="renderOrgTable()">
+                <button class="btn btn-sm" onclick="toggleOrgTree()">展开/收起</button>
+                <button class="btn btn-sm" onclick="loadOrgData()">刷新</button>
                 <button class="btn btn-sm btn-primary" data-perm="user:write" onclick="orgCreate(orgSel.key)">＋ 新建子组织</button>
                 <button class="btn btn-sm" id="oEditBtn" data-perm="user:write" onclick="orgEdit(orgSel.key)">编辑</button>
                 <button class="btn btn-sm" data-perm="user:read" onclick="toggleOrgTree()">展开/收起</button>
@@ -393,7 +405,7 @@
             </div>
             <div class="org-section">下级组织</div>
             <div class="table-wrap" id="orgChildTableWrap"><table class="data-table">
-              <thead><tr><th class="row-idx">序号</th><th>组织名称</th><th>标识</th><th>上级组织</th><th>操作</th></tr></thead>
+              <thead><tr><th class="row-idx">序号</th><th>组织名称</th><th>标识</th><th>排序号</th><th>状态</th><th>操作</th></tr></thead>
               <tbody id="oTable"><tr><td colspan="5" class="empty">加载中…</td></tr></tbody></table></div>
                       </div>
         </div>
@@ -616,7 +628,13 @@ function showDeny(){
 }
 async function guard(){
   try{
-    const panel=new URLSearchParams(location.search).get('panel')||'users';
+    const FILE_PANEL={users:'users','users.html':'users',org:'org','org.html':'org',
+      roles:'roles','roles.html':'roles',perms:'perms','perms.html':'perms',
+      docs:'docs','docs.html':'docs',models:'models','models.html':'models',
+      usage:'usage','usage.html':'usage',loginlogs:'loginlogs','loginlogs.html':'loginlogs',
+      audit:'audit','audit.html':'audit'};
+    const file=location.pathname.split('/').pop()||'admin.html';
+    const panel=FILE_PANEL[file]||new URLSearchParams(location.search).get('panel')||'users';
     // 日志页面按菜单权限授予，不必是管理员；但只开放对应的那一个面板
     const logOnly = panel==='loginlogs'||panel==='audit';
     const r=await fetch('/api/auth/permissions');
@@ -669,6 +687,11 @@ async function loadUsersData(){
  * 都按它分家。组织全部可改名、可调上级、可删除，没有"内置"这种动不了的角色；
  * 唯一的约束是至少要留一个，否则账号失去归属。</p>
  */
+/** 组织页刷新：重拉组织树并重绘单表 */
+async function loadOrgData(){
+  await loadOrgs();
+  renderOrgTree();renderOrgTable();renderOrgHead();
+}
 async function loadOrgs(){
   try{
     DB.orgs=await api('/api/admin/orgs');
@@ -1327,18 +1350,36 @@ function renderOrgHead(){
 
 /** 下级组织表：全部组织时列出顶层，选中节点时列出它的直接下级 */
 function renderOrgTable(){
-  const rows=orgChildren(orgSel.key);
-  $('oTable').innerHTML=rows.length?rows.map((o,i)=>{
-    const ops='<button class="op-btn" data-perm="user:write" onclick="orgCreate(\''+esc(o.key)+'\')">＋子组织</button>'+
-      '<button class="op-btn" data-perm="user:write" onclick="orgEdit(\''+esc(o.key)+'\')">编辑</button>'+
-      '<button class="op-btn danger" data-perm="user:write" onclick="orgDelete(\''+esc(o.key)+'\')">删除</button>';
+  const inOrgPage=!!document.querySelector('.admin-panel[data-panel="org"].active');
+  let rows;
+  if(inOrgPage){
+    const kw=(document.getElementById('orgKeyword')?.value||'').trim().toLowerCase();
+    rows=[];
+    const walk=(parent,depth)=>{
+      orgChildren(parent).forEach((o,i)=>{
+        if(!kw||o.name.toLowerCase().includes(kw)||String(o.key).toLowerCase().includes(kw))
+          rows.push({o:o,d:depth,idx:i});
+        walk(o.key,depth+1);
+      });
+    };
+    walk('',0);
+  }else{
+    rows=orgChildren(orgSel.key).map((o,i)=>({o:o,d:0,idx:i}));
+  }
+  const acts=o=>'<button class="op-btn" data-perm="user:write" onclick="orgCreate(\''+esc(o.key)+'\')">＋子组织</button>'+
+    '<button class="op-btn" data-perm="user:write" onclick="orgEdit(\''+esc(o.key)+'\')">编辑</button>'+
+    '<button class="op-btn danger" data-perm="user:write" onclick="orgDelete(\''+esc(o.key)+'\')">删除</button>';
+  $('oTable').innerHTML=rows.length?rows.map((r,i)=>{
+    const o=r.o;
+    const name=(r.d?'│ '.repeat(r.d-1)+'├ ':'' )+esc(o.name);
     return '<tr><td class="row-idx">'+(i+1)+'</td>'+
-      '<td class="name"><a href="javascript:void(0)" style="color:var(--primary);text-decoration:none" onclick="orgPick(\''+esc(o.key)+'\')">'+esc(o.name)+'</a></td>'+
+      '<td class="name"><a href="javascript:void(0)" style="color:var(--primary);text-decoration:none" onclick="orgPick(\''+esc(o.key)+'\')">'+name+'</a>'+
+      (r.d===0?' <span class="tag ok">顶层</span>':'')+'</td>'+
       '<td class="mono" style="font-size:11px">'+esc(o.key)+'</td>'+
-      '<td>'+esc(o.parentKey?orgLabel(o.parentKey):'（顶层）')+'</td>'+
-      '<td>'+ops+'</td></tr>';
-  }).join(''):'<tr><td colspan="5" class="empty-inline">'+(orgSel.key?'该组织下还没有子组织':'还没有任何组织')+'</td></tr>';
-  $('oTable')._rows=rows;
+      '<td>'+r.idx+'</td><td><span class="tag ok">正常</span></td>'+
+      '<td>'+acts(o)+'</td></tr>';
+  }).join(''):'<tr><td colspan="6" class="empty-inline">'+(inOrgPage?'没有匹配的组织':'该组织下还没有子组织')+'</td></tr>';
+  $('oTable')._rows=rows.map(r=>r.o);
 }
 
 /** 直属成员表（不含下级；要看整棵子树的成员点表格里的「成员」） */
@@ -2175,11 +2216,17 @@ const TITLES={users:'用户管理',org:'组织架构',roles:'角色定义',perms
 // 切面板：优先点侧栏导航项；个人中心等无导航入口的面板直接切换并取消导航高亮
 function goPanel(key){
   if(key==='profile'){openProfile();return}
-  const b=document.querySelector('.admin-nav-item[data-panel="'+key+'"]');
-  if(b){b.click();return}
-  document.querySelectorAll('.admin-nav-item[data-panel]').forEach(x=>x.classList.remove('active'));
+  // 导航项现在是独立页面链接，不能再 click()（会触发同页自跳转）
+  document.querySelectorAll('.admin-nav-item[data-panel]').forEach(x=>
+    x.classList.toggle('active',x.dataset.panel===key));
   document.querySelectorAll('.admin-panel').forEach(p=>p.classList.toggle('active',p.dataset.panel===key));
-  $('panelTitle').textContent=TITLES[key]||'管理后台';
+  if($('panelTitle'))$('panelTitle').textContent=TITLES[key]||'管理后台';
+  if(key==='docs')loadDocs();
+  else if(key==='org'){renderOrgTree();renderOrgTable();renderOrgHead();}
+  else if(key==='models')loadModelsInfo();
+  else if(key==='usage')loadUsage();
+  else if(key==='loginlogs')loadLoginLogs();
+  else if(key==='audit')loadAudit();
 }
 
 // 后台个人中心：左侧身份卡 + 右侧账号信息 / 权限清单
@@ -2233,12 +2280,14 @@ function openProfile(){
   $('panelTitle').textContent=TITLES.profile;
 }
 document.querySelectorAll('.admin-nav-item[data-panel]').forEach(btn=>{
-  btn.onclick=()=>{
+  btn.onclick=(e)=>{
+    if(btn.tagName==='A')return; // 独立路由由 href 负责
     const key=btn.dataset.panel;
     document.querySelectorAll('.admin-nav-item[data-panel]').forEach(b=>b.classList.toggle('active',b===btn));
     document.querySelectorAll('.admin-panel').forEach(p=>p.classList.toggle('active',p.dataset.panel===key));
     $('panelTitle').textContent=TITLES[key]||'管理后台';
     if(key==='docs')loadDocs();
+    else if(key==='org'){renderOrgTree();renderOrgTable();renderOrgHead();}
     else if(key==='models')loadModelsInfo();
     else if(key==='usage')loadUsage();
     else if(key==='loginlogs')loadLoginLogs();

@@ -35,29 +35,29 @@ public class PermissionCatalog {
     private static final List<String[]> BUILT_IN = List.of(
             // ===== 工作台：问答侧栏 =====
             new String[]{"workbench:root", "工作台", "directory", "工作台", "问答侧栏：问答、文档与检索", "", "", "10"},
-            new String[]{"chat:use", "智能问答", "menu", "工作台", "进入智能问答页", "workbench:root", "/index", "11"},
-            new String[]{"doc:read", "知识库文档", "menu", "工作台", "查看知识库文档列表", "workbench:root", "/manage", "12"},
+            new String[]{"chat:use", "智能问答", "menu", "工作台", "进入智能问答页", "workbench:root", "/index.html", "11"},
+            new String[]{"doc:read", "知识库文档", "menu", "工作台", "查看知识库文档列表", "workbench:root", "/manage.html", "12"},
             new String[]{"doc:write", "上传文档", "btn", "工作台", "上传与批量上传文档入库", "doc:read", "", "121"},
             new String[]{"doc:delete", "删除文档", "btn", "工作台", "删除文档及其全部切片", "doc:read", "", "122"},
-            new String[]{"search:use", "检索对比", "menu", "工作台", "对比不同检索方式的结果", "workbench:root", "/search", "13"},
-            new String[]{"tree:use", "会话结构", "menu", "工作台", "查看与切换问答分支", "workbench:root", "/tree", "14"},
+            new String[]{"search:use", "检索对比", "menu", "工作台", "对比不同检索方式的结果", "workbench:root", "/search.html", "13"},
+            new String[]{"tree:use", "会话结构", "menu", "工作台", "查看与切换问答分支", "workbench:root", "/tree.html", "14"},
             // ===== 管理后台：后台侧栏三组，与真实导航一一对应 =====
             new String[]{"system:root", "管理后台", "directory", "系统管理", "后台侧栏：权限配置、业务管理与日志审计", "", "/admin", "20"},
             new String[]{"admin:access", "进入管理后台", "menu", "系统管理", "进入管理后台入口", "system:root", "/admin", "201"},
             new String[]{"console.config:root", "权限配置目录", "directory", "系统管理", "后台侧栏第一组", "system:root", "", "21"},
-            new String[]{"user:read", "用户管理", "menu", "系统管理", "查看账号列表", "console.config:root", "/admin/users", "211"},
+            new String[]{"user:read", "用户管理", "menu", "系统管理", "查看账号列表", "console.config:root", "/users.html", "211"},
             new String[]{"user:write", "用户维护", "btn", "系统管理", "账号增删改与密码重置", "user:read", "", "2111"},
-            new String[]{"org:read", "组织架构", "menu", "系统管理", "查看与维护组织架构", "console.config:root", "/admin/org", "212"},
-            new String[]{"role:read", "角色定义", "menu", "系统管理", "查看与维护角色定义", "console.config:root", "/admin/roles", "213"},
-            new String[]{"perm:read", "菜单权限", "menu", "系统管理", "查看与维护菜单权限树", "console.config:root", "/admin/perms", "214"},
+            new String[]{"org:read", "组织架构", "menu", "系统管理", "查看与维护组织架构", "console.config:root", "/org.html", "212"},
+            new String[]{"role:read", "角色定义", "menu", "系统管理", "查看与维护角色定义", "console.config:root", "/roles.html", "213"},
+            new String[]{"perm:read", "菜单权限", "menu", "系统管理", "查看与维护菜单权限树", "console.config:root", "/perms.html", "214"},
             new String[]{"console.biz:root", "业务管理", "directory", "系统管理", "后台侧栏第二组", "system:root", "", "22"},
-            new String[]{"admin:docs", "文档管理", "menu", "系统管理", "后台文档管理面板（接口仍按 doc:read 校验）", "console.biz:root", "/admin/docs", "221"},
-            new String[]{"model:read", "模型设置", "menu", "系统管理", "查看模型配置", "console.biz:root", "/admin/models", "222"},
+            new String[]{"admin:docs", "文档管理", "menu", "系统管理", "后台文档管理面板（接口仍按 doc:read 校验）", "console.biz:root", "/docs.html", "221"},
+            new String[]{"model:read", "模型设置", "menu", "系统管理", "查看模型配置", "console.biz:root", "/models.html", "222"},
             new String[]{"model:write", "修改模型", "btn", "系统管理", "增删改与切换模型", "model:read", "", "2221"},
-            new String[]{"usage:read", "用量统计", "menu", "系统管理", "查看模型调用用量", "console.biz:root", "/admin/usage", "223"},
+            new String[]{"usage:read", "用量统计", "menu", "系统管理", "查看模型调用用量", "console.biz:root", "/usage.html", "223"},
             new String[]{"console.log:root", "日志审计", "directory", "系统管理", "后台侧栏第三组", "system:root", "", "23"},
-            new String[]{"loginlog:read", "登录日志", "menu", "系统管理", "查看登录日志（独立页面）", "console.log:root", "/admin.html?panel=loginlogs", "231"},
-            new String[]{"audit:read", "操作日志", "menu", "系统管理", "查看操作日志（独立页面）", "console.log:root", "/admin.html?panel=audit", "232"});
+            new String[]{"loginlog:read", "登录日志", "menu", "系统管理", "查看登录日志（独立页面）", "console.log:root", "/loginlogs.html", "231"},
+            new String[]{"audit:read", "操作日志", "menu", "系统管理", "查看操作日志（独立页面）", "console.log:root", "/audit.html", "232"});
 
     /** 内置节点改名（旧名 → 新名）：只改仍用旧名的行，用户自定义的名称不覆盖 */
     private static final Map<String, String[]> RENAMES = Map.of(

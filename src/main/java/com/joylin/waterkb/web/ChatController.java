@@ -23,6 +23,8 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import reactor.core.publisher.Flux;
 
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 
@@ -64,6 +66,31 @@ public class ChatController {
     @PostMapping(value = "/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public Flux<ServerSentEvent<String>> chat(@RequestBody @Valid ChatRequest req) {
         return ragChatService.chatStream(req.sessionId(), req.question(), req.parentId());
+    }
+
+    /**
+     * 首页推荐问题：从当前账号最近的提问里去重整理，不是写死的示例。
+     * 没历史时返回空列表，由前端回退到默认引导语。
+     */
+    @GetMapping("/suggestions")
+    public List<String> suggestions(@RequestParam(required = false, defaultValue = "4") int limit) {
+        LinkedHashSet<String> asked = new LinkedHashSet<>();
+        try {
+            for (Map<String, Object> s : sessionStore.list()) {
+                String sid = String.valueOf(s.getOrDefault("id", ""));
+                if (sid.isEmpty()) continue;
+                for (Map<String, Object> m : treeStore.historyList(sid)) {
+                    if (!"user".equals(String.valueOf(m.get("role")))) continue;
+                    String q = String.valueOf(m.getOrDefault("content", "")).trim();
+                    if (q.length() >= 5 && q.length() <= 60) asked.add(q);
+                    if (asked.size() >= limit * 3) break;
+                }
+                if (asked.size() >= limit * 3) break;
+            }
+        } catch (Exception e) {
+            // 推荐是辅助能力，异常时回退默认示例，不影响问答
+        }
+        return new ArrayList<>(asked).stream().limit(Math.max(1, Math.min(limit, 8))).toList();
     }
 
     /**

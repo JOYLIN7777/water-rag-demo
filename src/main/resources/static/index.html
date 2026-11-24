@@ -152,6 +152,9 @@
   .send-btn.stop:hover{background:#fff5f6;border-color:#e69caa;transform:none;box-shadow:0 2px 8px rgba(224,90,109,.12)}
   .send-btn.stop .stop-ico{display:inline-block;width:9px;height:9px;border-radius:2px;background:#c74457;flex:0 0 9px}
   .composer-tip{text-align:center;font-size:10.5px;color:var(--muted);margin-top:9px;letter-spacing:.2px}
+  .upload-msg{max-width:660px;margin:8px auto 0;padding:8px 12px;border-radius:8px;font-size:12px;background:#eef4ff;color:#2457b8}
+  .upload-msg.err{background:#fdeef3;color:#b4232a}
+  .upload-msg.ok{background:#e8f7f1;color:#0d8f62}
 
   /* ============ Markdown 正文 ============ */
   .md-body p{margin:0 0 10px}.md-body p:last-child{margin-bottom:0}
@@ -209,13 +212,8 @@
         <div class="welcome-mark has-logo"><img class="brand-logo" src="assets/logo.svg" alt=""></div>
         <h1>水利知识库智能问答</h1>
         <p>上传规程、报告或表格文档后，基于知识库内容提问。回答下方会标注引用的原文片段，支持多轮追问与会话分支。</p>
-        <div class="quick-list">
-          <button class="quick-item" onclick="fillAsk(this.textContent)">云溪水库的汛限水位是多少？</button>
-          <button class="quick-item" onclick="fillAsk(this.textContent)">汛期入库流量超过2000时怎么调度？</button>
-          <button class="quick-item" onclick="fillAsk(this.textContent)">云溪水库现在的实时水位是多少？</button>
-          <button class="quick-item" onclick="fillAsk(this.textContent)">闸门开启有哪些操作原则？</button>
-        </div>
-        <div class="quick-tip">点击示例可填入输入框，改完再发送</div>
+        <div class="quick-list" id="quickList"></div>
+        <div class="quick-tip" id="quickTip">根据你的提问记录推荐，点击可填入输入框</div>
       </div>
       <div class="branch-note" id="branchNote" style="display:none"></div>
       <div class="messages" id="messages" style="display:none"></div>
@@ -231,11 +229,14 @@
         <textarea id="question" rows="1" placeholder="输入你的问题，Enter 发送，Shift+Enter 换行"></textarea>
         <div class="composer-bar">
           <span class="composer-tool" title="基于知识库检索作答"><span style="color:var(--primary)">◈</span> 知识库问答</span>
-          <button class="composer-tool" data-perm="doc:write" onclick="location.href='manage.html#upload'" title="到知识库页上传文档">⇪ 上传文档</button>
+          <button class="composer-tool" data-perm="doc:write" onclick="document.getElementById('fileInput').click()" title="上传文档到知识库">⇪ 上传文档</button>
+          <input id="fileInput" type="file" multiple accept=".pdf,.doc,.docx,.xls,.xlsx,.txt,.md,.csv" style="display:none"
+                 onchange="Shell.uploadFiles(this.files).finally(()=>{this.value=''})">
           <button class="send-btn" id="sendBtn" onclick="sendOrStop()">发送 <span style="opacity:.75">↵</span></button>
         </div>
       </div>
-      <div class="composer-tip">回答基于知识库生成，关键数据请以正式规程为准</div>
+      <div class="composer-tip" id="composerTip">回答基于知识库生成，关键数据请以正式规程为准</div>
+      <div class="upload-msg" id="uploadMsg" style="display:none"></div>
     </div>
   </main>
 </div>
@@ -684,6 +685,24 @@ function markAskHints(root){
     });
   });
 }
+/** 推荐问题：取当前账号最近提问，去重后展示；没历史才用默认示例 */
+async function loadSuggestions(){
+  const box=document.getElementById('quickList');
+  const tip=document.getElementById('quickTip');
+  const defaults=['云溪水库的汛限水位是多少？','闸门开启有哪些操作原则？'];
+  let list=[];
+  try{
+    const r=await fetch('/api/chat/suggestions?limit=4');
+    if(r.ok)list=await r.json();
+  }catch(e){}
+  if(!Array.isArray(list)||!list.length){list=defaults;if(tip)tip.textContent='点击示例可填入输入框，改完再发送'}
+  if(box)box.innerHTML=list.slice(0,4).map(q=>{
+    const t=String(q).replace(/"/g,'&quot;').replace(/</g,'&lt;');
+    return '<button class="quick-item" onclick="fillAsk(this.textContent)">'+t+'</button>';
+  }).join('');
+}
+loadSuggestions();
+
 /** 把一句话填进输入框并聚焦，由用户自己决定发不发 */
 function fillAsk(q){
   draftBox.value=String(q||'').replace(/^[✦\s]+/,'').trim();

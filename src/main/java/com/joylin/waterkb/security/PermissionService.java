@@ -34,7 +34,8 @@ public class PermissionService {
             menu("检索对比", "search.html", List.of(Permission.SEARCH_USE)),
             menu("问答分支", "tree.html", List.of(Permission.TREE_USE)),
             menu("模型设置", "models.html", List.of(Permission.MODEL_READ)),
-            menu("权限与日志", "governance.html", List.of(Permission.AUDIT_READ)),
+            menu("登录日志", "loginlogs.html", List.of(Permission.LOGINLOG_READ)),
+            menu("操作日志", "audit.html", List.of(Permission.AUDIT_READ)),
             menu("管理后台", "admin.html", List.of(Permission.ADMIN_ACCESS)),
             menu("个人中心", "profile.html", List.of())
     );

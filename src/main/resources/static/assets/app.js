@@ -37,16 +37,16 @@
   // 统一显示后台导航而不是问答侧栏（审计员登录后看到的应该是后台的一套入口）。
   // href 指向 admin.html 的对应面板；带 panel 参数由后台页面自己激活。
   const ADMIN_NAV = [
-    { key: 'users', label: '用户管理', icon: '◈', href: 'admin.html?panel=users', perm: 'user:read' },
-    { key: 'org', label: '组织架构', icon: '⌘', href: 'admin.html?panel=org', perm: 'org:read' },
-    { key: 'roles', label: '角色定义', icon: '❖', href: 'admin.html?panel=roles', perm: 'role:read' },
-    { key: 'perms', label: '菜单权限', icon: '☷', href: 'admin.html?panel=perms', perm: 'perm:read' },
-    { key: 'docs', label: '文档管理', icon: '▤', href: 'admin.html?panel=docs', perm: 'admin:docs' },
-    { key: 'models', label: '模型设置', icon: '◇', href: 'admin.html?panel=models', perm: 'model:read' },
-    { key: 'usage', label: '用量统计', icon: '◷', href: 'admin.html?panel=usage', perm: 'usage:read' },
+    { key: 'users', label: '用户管理', icon: '◈', href: 'users.html', perm: 'user:read' },
+    { key: 'org', label: '组织架构', icon: '⌘', href: 'org.html', perm: 'org:read' },
+    { key: 'roles', label: '角色定义', icon: '❖', href: 'roles.html', perm: 'role:read' },
+    { key: 'perms', label: '菜单权限', icon: '☷', href: 'perms.html', perm: 'perm:read' },
+    { key: 'docs', label: '文档管理', icon: '▤', href: 'docs.html', perm: 'admin:docs' },
+    { key: 'models', label: '模型设置', icon: '◇', href: 'models.html', perm: 'model:read' },
+    { key: 'usage', label: '用量统计', icon: '◷', href: 'usage.html', perm: 'usage:read' },
     // 日志类入口直接按菜单权限目录的路由进入各自页面（管理员与审计员看到同一页面）
-    { key: 'loginlogs', label: '登录日志', icon: '⎗', href: 'admin.html?panel=loginlogs', perm: 'loginlog:read' },
-    { key: 'audit', label: '操作日志', icon: '≡', href: 'admin.html?panel=audit', perm: 'audit:read' }
+    { key: 'loginlogs', label: '登录日志', icon: '⎗', href: 'loginlogs.html', perm: 'loginlog:read' },
+    { key: 'audit', label: '操作日志', icon: '≡', href: 'audit.html', perm: 'audit:read' }
   ];
   const ADMIN_GROUPS = [
     { label: '权限配置目录', keys: ['users', 'org', 'roles', 'perms'] },
@@ -246,6 +246,8 @@
     logout: confirmLogout,
     /** 选文件后先列清单再上传（知识库文档页也复用这套） */
     openUploadPicker: openUploadPicker,
+    /** 问答页上传：选完文件直接入库，不跳页面 */
+    uploadFiles: uploadFiles,
     /** 选文件夹批量上传：优先目录选择器，避免浏览器原生"上传到此网站"确认 */
     pickFolder: pickFolder,
     /** 分片树状预览（后台文档管理与知识库文档页共用） */
@@ -1067,6 +1069,12 @@
         el.style.display = 'none';
       }
     });
+    // 分组里一个可见入口都没有时，连组标题一起收起，避免留下空目录
+    document.querySelectorAll('.admin-nav-group').forEach(gr => {
+      const any = Array.from(gr.querySelectorAll('.admin-nav-item'))
+        .some(a => getComputedStyle(a).display !== 'none');
+      gr.style.display = any ? '' : 'none';
+    });
   }
   // 管理后台入口：管理员是高频用户，顶栏保留醒目的文字按钮（问页/文档页等都能一键进入）；
   // 左下角用户卡同时保留快捷入口。权限不足时两处都不显示。
@@ -1074,7 +1082,7 @@
     const allowed = hasPermission('admin:access') ||
       (function () { const u = global.WrkAuth && global.WrkAuth.getUser(); return !!(u && (u.groups || []).indexOf('admin') >= 0); })();
     const file = location.pathname.split('/').pop();
-    const inAdmin = file === 'admin.html' || file === 'governance.html';
+    const inAdmin = file === 'admin.html';
     const slot = document.getElementById('adminEntrySlot');
     if (slot) {
       // 已经在后台里就不再显示指向自己的按钮；用户卡里不再放第二个入口
@@ -1229,7 +1237,6 @@
     'tree.html': { label: '会话结构', parent: 'settings.html', parentLabel: '设置' },
     'models.html': { label: '模型配置', parent: 'settings.html', parentLabel: '设置' },
     // 权限与日志属于管理域，左侧已有完整后台导航，顶栏不再重复塞"返回设置/设置/…"
-    'governance.html': { label: '权限与日志', noNav: true },
     'profile.html': { label: '个人中心', back: 'index.html', backText: '返回问答' },
     'manage.html': { label: '知识库文档', back: 'index.html', backText: '返回问答' }
   };
@@ -1267,7 +1274,7 @@
   /** 收集本页声明式权限：按钮/链接上的 data-perm，名称直接取可见文案 */
   function collectPermDeclarations() {
     const seen = new Set(), out = [];
-    const isAdminPage = /admin\.html|governance\.html/.test(location.pathname);
+    const isAdminPage = /admin\.html/.test(location.pathname);
     document.querySelectorAll('button[data-perm],a[data-perm],[data-perm-kind]').forEach(el => {
       const code = el.getAttribute('data-perm');
       if (!code || seen.has(code)) return;
@@ -1312,9 +1319,16 @@
     'search.html': 'search:use',
     'tree.html': 'tree:use',
     'models.html': 'model:read',
-    'admin.html': 'admin:access',
-    // 治理页同时承载登录日志与操作日志，两者任一权限都能进入；卡片内再按权限收敛
-    'governance.html': ['audit:read', 'loginlog:read']
+    'users.html': 'user:read',
+    'org.html': 'org:read',
+    'roles.html': 'role:read',
+    'perms.html': 'perm:read',
+    'docs.html': 'admin:docs',
+    'models.html': 'model:read',
+    'usage.html': 'usage:read',
+    'loginlogs.html': 'loginlog:read',
+    'audit.html': 'audit:read',
+    'admin.html': 'admin:access'
   };
   const PAGE_PERM_NAMES = {
     'chat:use': '智能问答', 'doc:read': '知识库文档', 'search:use': '检索对比',

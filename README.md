@@ -232,7 +232,7 @@ mvn package -DskipTests   # 打包后 docker compose up -d --build app
 
 ## 企业能力演示
 
-浏览器打开 `http://localhost:18080/admin.html`（管理后台）或 `http://localhost:18080/governance.html`（权限与日志），可现场演示：
+浏览器打开 `http://localhost:18080/admin.html`（管理后台入口），各功能有独立页面路由（`users.html`、`org.html`、`roles.html`、`perms.html`、`loginlogs.html`、`audit.html`），可现场演示：
 
 | 演示项 | 操作 | 预期效果 |
 |---|---|---|

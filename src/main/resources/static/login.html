@@ -160,7 +160,7 @@ async function pickLandingPage(){
   if(!perms.size)return 'profile.html';
   var routes=[
     ['chat:use','index.html'], ['admin:access','admin.html'],
-    ['audit:read','governance.html'], ['model:read','models.html'],
+    ['loginlog:read','loginlogs.html'], ['audit:read','audit.html'], ['model:read','models.html'],
     ['doc:read','manage.html'], ['search:use','search.html'],
     ['tree:use','tree.html']
   ];

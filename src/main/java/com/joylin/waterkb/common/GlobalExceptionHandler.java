@@ -57,6 +57,13 @@ public class GlobalExceptionHandler {
                 .body(Map.of("code", 502, "message", "大模型接口调用失败：" + e.getMessage()));
     }
 
+    /** 静态资源不存在（例如已删除的旧页面）应返回 404，不要被兜底成 500 */
+    @ExceptionHandler(org.springframework.web.servlet.resource.NoResourceFoundException.class)
+    public ResponseEntity<Map<String, Object>> handleNoResource(Exception e) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(Map.of("code", 404, "message", "页面不存在或已下线"));
+    }
+
     /** 兜底：500（必须把异常打进日志，否则排查时无迹可循） */
     @ExceptionHandler(Exception.class)
     public ResponseEntity<Map<String, Object>> handleOther(Exception e) {
