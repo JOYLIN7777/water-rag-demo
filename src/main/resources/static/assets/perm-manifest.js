@@ -14,7 +14,8 @@
       { code: 'chat:use', name: '智能问答', type: 'menu', order: 11, routePath: '/index.html' },
       { code: 'doc:read', name: '知识库文档', type: 'menu', order: 12, routePath: '/manage.html', children: [
         { code: 'doc:write', name: '上传文档', type: 'btn', order: 121 },
-        { code: 'doc:delete', name: '删除文档', type: 'btn', order: 122 }
+        { code: 'doc:delete', name: '删除文档', type: 'btn', order: 122 },
+        { code: 'doc:chunks', name: '查看分片', type: 'btn', order: 123 }
       ]},
       { code: 'search:use', name: '检索对比', type: 'menu', order: 13, routePath: '/search.html' },
       { code: 'tree:use', name: '会话结构', type: 'menu', order: 14, routePath: '/tree.html' }
@@ -23,7 +24,9 @@
       { code: 'admin:access', name: '进入管理后台', type: 'menu', order: 201, routePath: '/admin.html' },
       { code: 'console.config:root', name: '权限配置目录', type: 'directory', order: 21, children: [
         { code: 'user:read', name: '用户管理', type: 'menu', order: 211, routePath: '/users.html', children: [
-          { code: 'user:write', name: '用户维护', type: 'btn', order: 2111 }
+          { code: 'user:write', name: '用户维护', type: 'btn', order: 2111 },
+          { code: 'user:resetpwd', name: '重置密码', type: 'btn', order: 2112 },
+          { code: 'user:export', name: '导出用户', type: 'btn', order: 2113 }
         ]},
         { code: 'org:read', name: '组织架构', type: 'menu', order: 212, routePath: '/org.html' },
         { code: 'role:read', name: '角色定义', type: 'menu', order: 213, routePath: '/roles.html' },
@@ -37,8 +40,12 @@
         { code: 'usage:read', name: '用量统计', type: 'menu', order: 223, routePath: '/usage.html' }
       ]},
       { code: 'console.log:root', name: '日志审计', type: 'directory', order: 23, children: [
-        { code: 'loginlog:read', name: '登录日志', type: 'menu', order: 231, routePath: '/loginlogs.html' },
-        { code: 'audit:read', name: '操作日志', type: 'menu', order: 232, routePath: '/audit.html' }
+        { code: 'loginlog:read', name: '登录日志', type: 'menu', order: 231, routePath: '/loginlogs.html', children: [
+          { code: 'loginlog:export', name: '导出登录日志', type: 'btn', order: 2311 }
+        ]},
+        { code: 'audit:read', name: '操作日志', type: 'menu', order: 232, routePath: '/audit.html', children: [
+          { code: 'audit:export', name: '导出操作日志', type: 'btn', order: 2321 }
+        ]}
       ]}
     ]}
   ];

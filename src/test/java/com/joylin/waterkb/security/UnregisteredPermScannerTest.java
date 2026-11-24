@@ -15,13 +15,17 @@ import static org.mockito.Mockito.*;
 class UnregisteredPermScannerTest {
 
     @Test
-    void 已注册权限码不出现在快捷列表() {
+    void 已注册权限码不出现在快捷列表() throws Exception {
         JdbcTemplate jdbc = mock(JdbcTemplate.class);
-        // 模拟所有扫描到的码都已注册
-        when(jdbc.queryForList(anyString(), eq(String.class))).thenReturn(List.of(
-                "chat:use", "doc:read", "doc:write", "doc:delete", "search:use", "tree:use",
-                "admin:access", "user:read", "user:write", "org:read", "role:read", "perm:read",
-                "admin:docs", "model:read", "model:write", "usage:read", "loginlog:read", "audit:read"));
+        // 模拟所有扫描到的码都已注册：从清单取真实节点码，避免新增细粒度码后测试过期
+        String manifest = new String(java.util.Objects.requireNonNull(
+                getClass().getResourceAsStream("/static/assets/perm-manifest.js")).readAllBytes(),
+                java.nio.charset.StandardCharsets.UTF_8);
+        List<String> all = new java.util.ArrayList<>();
+        java.util.regex.Matcher m = java.util.regex.Pattern
+                .compile("code: '([a-z][a-z0-9_.-]*:[a-z][a-z0-9_.-]*)'").matcher(manifest);
+        while (m.find()) all.add(m.group(1));
+        when(jdbc.queryForList(anyString(), eq(String.class))).thenReturn(all);
         RequestMappingHandlerMapping mapping = mock(RequestMappingHandlerMapping.class);
         when(mapping.getHandlerMethods()).thenReturn(Map.of());
         UnregisteredPermScanner scanner = new UnregisteredPermScanner(jdbc, mapping);

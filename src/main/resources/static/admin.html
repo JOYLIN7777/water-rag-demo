@@ -390,7 +390,7 @@
           <div class="filter-actions">
             <button class="btn btn-sm btn-search" data-perm="user:read" onclick="renderUserTable(1)">搜索</button>
             <button class="btn btn-sm" data-perm="user:read" onclick="resetUserFilter()">重置</button>
-            <button class="btn btn-sm btn-green" data-perm="user:read" onclick="exportUsers()">导出用户</button>
+            <button class="btn btn-sm btn-green" data-perm="user:export" onclick="exportUsers()">导出用户</button>
             <button class="btn btn-sm btn-amber" data-perm="user:write" onclick="createUser(userFilter.type==='org'?userFilter.value:'')">＋ 新增账号</button>
           </div>
         </div>
@@ -562,7 +562,7 @@
           <p class="page-desc">登录成功与失败的尝试都留有记录，失败原因可追溯。</p></div>
         <div class="card"><div class="card-head"><h3>登录记录</h3>
           <span><button class="btn btn-sm" data-perm="loginlog:read" onclick="loadLoginLogs()">刷新</button>
-          <button class="btn btn-sm btn-primary" style="margin-left:6px" data-perm="loginlog:read" onclick="exportAdminLogs('login')">导出登录日志</button></span></div>
+          <button class="btn btn-sm btn-primary" style="margin-left:6px" data-perm="loginlog:export" onclick="exportAdminLogs('login')">导出登录日志</button></span></div>
           <div class="table-wrap"><table class="data-table"><thead><tr><th>时间</th><th>账号</th><th>操作</th><th>状态</th><th>结果</th><th>耗时</th><th>来源 IP</th></tr></thead>
             <tbody id="lList"><tr><td colspan="7" class="empty">加载中…</td></tr></tbody></table></div>
           <div class="pager" id="lPager"></div>
@@ -575,7 +575,7 @@
           <p class="page-desc">查看账号在系统中的操作记录。</p></div>
         <div class="card"><div class="card-head"><h3>操作记录</h3>
           <span><button class="btn btn-sm" data-perm="audit:read" onclick="loadAudit()">刷新</button>
-          <button class="btn btn-sm btn-primary" style="margin-left:6px" data-perm="audit:read" onclick="exportAdminLogs('operation')">导出操作日志</button></span></div>
+          <button class="btn btn-sm btn-primary" style="margin-left:6px" data-perm="audit:export" onclick="exportAdminLogs('operation')">导出操作日志</button></span></div>
           <div class="table-wrap"><table class="data-table"><thead><tr><th>时间</th><th>账号</th><th>动作</th><th>状态</th><th>耗时</th><th>结果</th></tr></thead>
             <tbody id="aList"><tr><td colspan="6" class="empty">加载中…</td></tr></tbody></table></div>
           <div class="pager" id="aPager"></div>
@@ -1075,7 +1075,7 @@ function renderUserTable(page){
     const ops=isAdmin
       ? '<span style="color:var(--muted);font-size:11.5px" title="系统管理员账号受保护，不能编辑/重置/删除">不可编辑</span>'
       : '<button class="op-btn" data-perm="user:write" onclick="editUser('+gi+')">编辑</button>'+
-        '<button class="op-btn warn" data-perm="user:write" onclick="resetUserPwd('+gi+')">重置密码</button>'+
+        '<button class="op-btn warn" data-perm="user:resetpwd" onclick="resetUserPwd('+gi+')">重置密码</button>'+
         '<button class="op-btn danger" data-perm="user:write" onclick="delUser('+gi+')">删除</button>';
     return '<tr><td class="row-idx">'+(gi+1)+'</td>'+
       '<td><span style="display:inline-flex;align-items:center;gap:8px">'+
@@ -2046,7 +2046,7 @@ async function loadDocs(page){
         '<td><span class="tag" title="文档归属部门与可见范围">'+scope+'</span></td>'+
         '<td>'+num(d.chunks)+'</td><td>'+esc(d.ownerUser||'—')+'</td>'+
         '<td>'+esc(String(d.uploadedAt||'').slice(0,19))+'</td>'+
-        '<td><button class="op-btn" data-perm="doc:read" onclick="showChunks('+gi+')">查看分片</button>'+
+        '<td><button class="op-btn" data-perm="doc:chunks" onclick="showChunks('+gi+')">查看分片</button>'+
         '<button class="btn btn-sm btn-danger" data-perm="doc:delete" style="margin-left:8px" onclick="delDocAt('+gi+')">删除</button></td></tr>';
     }).join('')||'<tr><td colspan="6" class="empty">知识库暂无文档</td></tr>';
     renderPager('dPager',total,DOC_PAGE.page,DOC_PAGE.size,'loadDocs');
