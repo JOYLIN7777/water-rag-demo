@@ -2200,6 +2200,7 @@ const TITLES={users:'用户管理',org:'组织架构',roles:'角色定义',perms
 // 切面板：优先点侧栏导航项；个人中心等无导航入口的面板直接切换并取消导航高亮
 function goPanel(key){
   if(key==='profile'){openProfile();return}
+  window.__consolePanel=key;
   document.documentElement.removeAttribute('data-early-panel');
   // 导航项现在是独立页面链接，不能再 click()（会触发同页自跳转）
   document.querySelectorAll('.admin-nav-item[data-panel]').forEach(x=>

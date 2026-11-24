@@ -1389,8 +1389,36 @@
         if (n.nodeType === 1) applyPermControls(n);
       }))).observe(document.body, { childList: true, subtree: true });
     }
-    // 管理域页面（如权限与日志）用后台侧栏；问答域保持原侧栏
-    if (opts.adminSidebar) renderAdminSidebar(active); else renderSidebar(active);
+  /**
+   * 后台软导航：users/org/roles/... 共用同一份 admin.html，没必要整页刷新。
+   * 整页刷新会让旧页面（用户管理）在新文档加载完成前一直留在屏幕上，看起来就是"闪一下用户管理"。
+   * 这里拦截侧栏链接：目标面板在当前 DOM 里就用 pushState + goPanel 原地切换。
+   */
+  function setupConsoleSoftNav() {
+    if (document.body.dataset.softNavReady) return;
+    document.body.dataset.softNavReady = '1';
+    document.addEventListener('click', function (e) {
+      const a = e.target.closest && e.target.closest('a.admin-nav-item[data-panel]');
+      if (!a || e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
+      const key = a.getAttribute('data-panel');
+      const panel = document.querySelector('.admin-panel[data-panel="' + key + '"]');
+      if (!panel || typeof window.goPanel !== 'function') return; // 独立页面（models.html 等）照常整页跳
+      e.preventDefault();
+      history.pushState({ panel: key }, '', a.getAttribute('href'));
+      window.goPanel(key);
+    });
+    window.addEventListener('popstate', function () {
+      if (typeof window.goPanel !== 'function') return;
+      const file = location.pathname.split('/').pop() || '';
+      const key = ({ 'users.html': 'users', 'org.html': 'org', 'roles.html': 'roles',
+        'perms.html': 'perms', 'docs.html': 'docs', 'usage.html': 'usage',
+        'loginlogs.html': 'loginlogs', 'audit.html': 'audit', 'admin.html': 'users' })[file];
+      if (key && document.querySelector('.admin-panel[data-panel="' + key + '"]')) window.goPanel(key);
+    });
+  }
+
+  // 管理域页面（如权限与日志）用后台侧栏；问答域保持原侧栏
+  if (opts.adminSidebar) { renderAdminSidebar(active); setupConsoleSoftNav(); } else renderSidebar(active);
     renderTopbarNav();
     injectAdminHealth();
     checkHealth();
