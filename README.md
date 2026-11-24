@@ -240,7 +240,7 @@ mvn package -DskipTests   # 打包后 docker compose up -d --build app
 | 令牌安全 | 登录响应里的 refresh token 拿来调 `/api/docs/list`；再用它刷新后拿旧 refresh 重放 | refresh 访问业务 API 被拒（401）；旧 refresh 重放被拒；登出后 access 立即失效 |
 | 管理后台入口 | admin 登录看问答页右上角「管理后台」，点击进入；换 analyst 登录再看 | admin 显示入口且免登录进后台；analyst 看不到入口，直访 `/admin.html` 只显示拒绝页 |
 | 企业级 RBAC | 用 analyst 的令牌直接调 `/api/models`、`/api/audit/logs`；再换 admin 调 | analyst 返回 403（服务端强制拒绝，不是前端隐藏）；admin 返回 200 |
-| 权限矩阵 | 管理后台「用户与权限」看角色矩阵与权限码；分别用 admin 与 analyst 对比 | admin 全部 13 项权限；analyst 7 项且无模型/审计/后台权限 |
+| 权限矩阵 | 管理后台「菜单权限」看角色可勾选的目录/菜单/按钮三级权限树；分别用 admin 与 analyst 对比 | admin 全部 18 项权限；analyst 7 项且无模型/审计/后台权限 |
 | 页面与按钮权限 | 用 viewer 登录直访 `/models.html`、`/admin.html`；再看问答页上传按钮 | 无权限页面显示拒绝页；无 doc:write 的账号看不到上传入口；按钮权限按目录/菜单/按钮三级树分配，全站统一生效 |
 | 用量统计 | 管理后台「用量统计」点刷新 | 未配置工作空间 ID 时给出配置提示；配置后显示百炼官方请求数与 Token 消耗 |
 | 个人中心 | 进「个人中心」看登录剩余时间，输原密码改新密码后用新密码重新登录 | 显示倒计时；错误原密码 400；改密成功后再用旧密码登录失败、新密码成功 |

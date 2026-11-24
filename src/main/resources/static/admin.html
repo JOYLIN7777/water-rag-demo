@@ -118,6 +118,15 @@
   .node-type.directory{background:#e8f7f1;color:#0d8f62}
   .node-type.menu{background:var(--primary-soft);color:#25469b}
   .node-type.btn{background:#fef4e6;color:var(--warn)}
+  /* 权限树名称按层级着色：目录=绿、菜单=蓝、按钮=橙，一眼分出层级 */
+  .perm-name.directory{color:#0d8f62;font-weight:650}
+  .perm-name.menu{color:#25469b}
+  .perm-name.btn{color:#a86a10}
+  .perm-name .pn-ico{display:inline-block;width:18px;font-size:13px;margin-right:3px;opacity:.85}
+  .perm-name.directory .pn-ico{color:#0d8f62}
+  .perm-name.menu .pn-ico{color:#3b68c4}
+  .perm-name.btn .pn-ico{color:#d18a17}
+  .perm-name .pg-caret{color:var(--muted)}
   .type-quick{display:flex;flex-wrap:wrap;gap:5px;margin-top:5px}
   .type-quick button{border:1px solid var(--line);background:#fff;color:var(--ink-2);font-size:10.5px;padding:3px 8px;border-radius:5px}
   .type-quick button:hover{border-color:var(--primary);color:var(--primary)}
@@ -130,7 +139,9 @@
   .pt-caret{width:14px;flex:0 0 14px;text-align:center;color:var(--muted);font-size:10px;cursor:pointer;user-select:none}
   .pt-caret.leaf{visibility:hidden}
   .pt-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .pt-dir .pt-name{font-weight:650;color:var(--ink)}
+  .pt-name.directory{font-weight:650;color:#0d8f62}
+  .pt-name.menu{color:#25469b}
+  .pt-name.btn{color:#a86a10}
   .pt-type{font-size:9.5px;padding:1px 5px;border-radius:4px;flex:0 0 auto}
   .pt-type.directory{background:#e8f7f1;color:#0d8f62}
   .pt-type.menu{background:var(--primary-soft);color:#25469b}
@@ -199,14 +210,15 @@
   .op-btn.warn{color:var(--warn)}
   .op-btn.danger{color:var(--danger)}
   /* 分页器 */
-  .pager{display:flex;align-items:center;gap:8px;padding:11px 16px;font-size:12px;color:var(--muted);border-top:1px solid var(--line);flex-wrap:wrap;background:#fff}
-  .pg-btn{min-width:28px;height:28px;padding:0 8px;border:1px solid var(--line);background:#fff;border-radius:6px;font-size:12px;color:var(--ink-2);transition:all .15s}
+  .pager{display:flex;align-items:center;gap:12px;padding:15px 16px 6px;font-size:12.5px;color:var(--muted);
+    border-top:1px solid var(--line);flex-wrap:wrap;background:#fff;position:sticky;bottom:0;z-index:5}
+  .pg-btn{min-width:35px;height:34px;padding:0 11px;border:1px solid var(--line);background:#fff;border-radius:7px;font-size:12.5px;color:var(--ink-2);transition:all .15s}
   .pg-btn:hover:not(:disabled){border-color:var(--primary);color:var(--primary)}
   .pg-btn.on{background:var(--primary);border-color:var(--primary);color:#fff;font-weight:600}
   .pg-btn:disabled{opacity:.4}
-  .pager .pg-sep{color:#c3cddd;padding:0 2px}
-  .pager .pg-info{margin-left:auto;display:flex;align-items:center;gap:8px}
-  .pager input{width:46px;padding:4px 6px;font-size:12px;border:1px solid var(--line);border-radius:6px;text-align:center}
+  .pager .pg-sep{color:#c3cddd;padding:0 3px}
+  .pager .pg-info{margin-left:auto;display:flex;align-items:center;gap:10px}
+  .pager input{width:56px;padding:6px 8px;font-size:12.5px;border:1px solid var(--line);border-radius:7px;text-align:center}
   /* 概览页卡片区限宽，避免超宽屏把卡片拉得过散（列表/表格页保持铺满） */
   /* 概览页已移除，相关的 .quick-cards / .stats 限宽规则一并删除 */
   /* 复选项网格：等宽列对齐，标签不折行（新增/编辑账号弹框） */
@@ -288,15 +300,15 @@
     <!-- 概览页已去掉：后台进来直接是用户管理，管理动作都在下面这几组里 -->
     <div class="section-label" style="margin-top:6px">权限配置目录</div>
     <button class="admin-nav-item active" data-panel="users" data-perm="user:read"><span class="ic">◈</span>用户管理</button>
-    <button class="admin-nav-item" data-panel="org" data-perm="user:read"><span class="ic">⌘</span>组织架构</button>
-    <button class="admin-nav-item" data-panel="roles" data-perm="admin:access"><span class="ic">❖</span>角色定义</button>
-    <button class="admin-nav-item" data-panel="perms" data-perm="admin:access"><span class="ic">☷</span>菜单权限</button>
+    <button class="admin-nav-item" data-panel="org" data-perm="org:read"><span class="ic">⌘</span>组织架构</button>
+    <button class="admin-nav-item" data-panel="roles" data-perm="role:read"><span class="ic">❖</span>角色定义</button>
+    <button class="admin-nav-item" data-panel="perms" data-perm="perm:read"><span class="ic">☷</span>菜单权限</button>
     <div class="section-label" style="margin:14px 0 6px">业务管理</div>
-    <button class="admin-nav-item" data-panel="docs" data-perm="doc:read"><span class="ic">▤</span>文档管理</button>
+    <button class="admin-nav-item" data-panel="docs" data-perm="admin:docs"><span class="ic">▤</span>文档管理</button>
     <button class="admin-nav-item" data-panel="models" data-perm="model:read"><span class="ic">◇</span>模型设置</button>
     <button class="admin-nav-item" data-panel="usage" data-perm="usage:read"><span class="ic">◷</span>用量统计</button>
     <div class="section-label" style="margin:14px 0 6px">日志审计</div>
-    <button class="admin-nav-item" data-panel="loginlogs" data-perm="audit:read"><span class="ic">⎗</span>登录日志</button>
+    <button class="admin-nav-item" data-panel="loginlogs" data-perm="loginlog:read"><span class="ic">⎗</span>登录日志</button>
     <button class="admin-nav-item" data-panel="audit" data-perm="audit:read"><span class="ic">≡</span>操作日志</button>
     <div class="admin-back">
       <a class="admin-nav-item" href="index.html"><span class="ic">⌂</span>返回问答</a>
@@ -401,8 +413,8 @@
           <div class="toolbar" style="background:#fff;border:1px solid var(--line);border-bottom:0;border-radius:var(--radius) var(--radius) 0 0">
             <input class="kw" id="rKw" type="text" placeholder="搜索角色名称 / 标识…">
             <span class="grow"></span>
-            <button class="btn btn-sm" data-perm="admin:access" onclick="refreshRoles()">刷新</button>
-            <button class="btn btn-sm btn-primary" data-perm="admin:access" onclick="createRole()">＋ 新增角色</button>
+            <button class="btn btn-sm" data-perm="role:read" onclick="refreshRoles()">刷新</button>
+            <button class="btn btn-sm btn-primary" data-perm="role:read" onclick="createRole()">＋ 新增角色</button>
           </div>
           <div class="table-wrap" style="border:1px solid var(--line);border-radius:0 0 var(--radius) var(--radius);background:#fff">
             <table class="data-table">
@@ -420,9 +432,9 @@
           <div class="toolbar" style="background:#fff;border:1px solid var(--line);border-bottom:0;border-radius:var(--radius) var(--radius) 0 0">
             <input class="kw" id="pKw" type="text" placeholder="查询菜单 / 按钮 / 权限标识…">
             <span class="grow"></span>
-            <button class="btn btn-sm" data-perm="admin:access" onclick="togglePermTree(true)">展开全部</button>
-            <button class="btn btn-sm" data-perm="admin:access" onclick="togglePermTree(false)">收起全部</button>
-            <button class="btn btn-sm btn-primary" data-perm="admin:access" onclick="createPerm()">＋ 新增权限</button>
+            <button class="btn btn-sm" data-perm="perm:read" onclick="togglePermTree(true)">展开全部</button>
+            <button class="btn btn-sm" data-perm="perm:read" onclick="togglePermTree(false)">收起全部</button>
+            <button class="btn btn-sm btn-primary" data-perm="perm:read" onclick="createPerm()">＋ 新增权限</button>
           </div>
           <div class="table-wrap" style="border:1px solid var(--line);border-radius:0 0 var(--radius) var(--radius);background:#fff">
             <table class="data-table">
@@ -445,7 +457,7 @@
             </label>
             <span id="adminUploadMsg" style="font-size:12px;color:var(--muted)">可多选文件，也可直接拖到下方列表</span>
             <span class="grow"></span>
-            <button class="btn btn-sm" data-perm="doc:read" onclick="loadDocs()">刷新</button>
+            <button class="btn btn-sm" data-perm="admin:docs" onclick="loadDocs()">刷新</button>
           </div>
           <div class="table-wrap" style="border:1px solid var(--line);border-radius:0 0 var(--radius) var(--radius);background:#fff"
                ondragover="event.preventDefault()" ondrop="adminDropDocs(event)">
@@ -499,7 +511,7 @@
         <div class="page-head"><h1 class="page-title">登录日志</h1>
           <p class="page-desc">登录成功与失败的尝试都留有记录，失败原因可追溯。</p></div>
         <div class="card"><div class="card-head"><h3>登录记录</h3>
-          <button class="btn btn-sm" data-perm="audit:read" onclick="loadLoginLogs()">刷新</button></div>
+          <button class="btn btn-sm" data-perm="loginlog:read" onclick="loadLoginLogs()">刷新</button></div>
           <div class="table-wrap"><table class="data-table"><thead><tr><th>时间</th><th>账号</th><th>操作</th><th>状态</th><th>结果</th><th>耗时</th><th>来源 IP</th></tr></thead>
             <tbody id="lList"><tr><td colspan="7" class="empty">加载中…</td></tr></tbody></table></div>
           <div class="pager" id="lPager"></div>
@@ -1545,9 +1557,9 @@ function renderRoleTable(){
     return '<tr><td class="row-idx">'+(i+1)+'</td><td class="name">'+esc(gl(r.role))+'</td>'+
       '<td class="mono" style="font-size:11px">'+esc(r.role)+'</td><td>'+esc(scope)+'</td>'+
       '<td>'+perms.length+'</td><td>'+perms.slice(0,3).map(p=>'<span class="tag">'+esc(p)+'</span>').join(' ')+(perms.length>3?' <span class="tag off">+'+(perms.length-3)+'</span>':'')+'</td>'+
-      '<td><button class="op-btn" data-perm="admin:access" onclick="showRolePerms('+i+')">查看</button>'+
-      (r.role==='admin'?'':'<button class="op-btn" data-perm="admin:access" onclick="editRolePerms('+i+')">编辑权限</button>'+
-      '<button class="op-btn danger" data-perm="admin:access" onclick="delRole('+i+')">删除</button>')+'</td></tr>';
+      '<td><button class="op-btn" data-perm="role:read" onclick="showRolePerms('+i+')">查看</button>'+
+      (r.role==='admin'?'':'<button class="op-btn" data-perm="role:read" onclick="editRolePerms('+i+')">编辑权限</button>'+
+      '<button class="op-btn danger" data-perm="role:read" onclick="delRole('+i+')">删除</button>')+'</td></tr>';
   }).join(''):'<tr><td colspan="7" class="empty-inline">没有匹配的角色</td></tr>';
   $('rTable')._rows=list;
 }
@@ -1591,7 +1603,8 @@ function permEditor(perms){
       : '<input type="checkbox" name="rp" value="'+esc(x.code)+'"'+(kids.length?' class="pt-parent-toggle"':'')+(checked?' checked':'')+'>';
     const row='<div class="pt-row'+(x.nodeType==='directory'?' pt-dir':'')+'">'+
       '<span class="pt-caret'+(leaf?' leaf':'')+'"'+(leaf?'':' data-toggle="'+esc(x.code)+'"')+'>'+(leaf?'':'▾')+'</span>'+
-      '<label>'+input+'<span class="pt-name">'+esc(x.name)+'</span></label>'+typeTag(x)+'</div>';
+      '<label>'+input+'<span class="pt-name '+esc(x.nodeType||'menu')+'">'+
+      (({directory:'▦',menu:'▤',btn:'◆'})[x.nodeType]||'▤')+' '+esc(x.name)+'</span></label>'+typeTag(x)+'</div>';
     if(leaf)return row;
     return row+'<div class="pt-children" data-children="'+esc(x.code)+'">'+kids.map(k=>nodeHtml(k,depth+1)).join('')+'</div>';
   };
@@ -1695,6 +1708,7 @@ function permDesc(code){
 // 分组行上没有任何点击事件，一旦点了"收起全部"就再也展不开，只能刷新页面。
 const PERM_FOLDED=new Set();
 const TYPE_CN={directory:'目录',menu:'菜单',btn:'按钮'};
+const TYPE_ICON={directory:'▦',menu:'▤',btn:'◆'};
 function renderPermTable(){
   const kw=($('pKw').value||'').trim().toLowerCase();
   const match=x=>!kw||((x.name||'')+' '+x.code+' '+(x.description||'')+' '+(x.routePath||'')).toLowerCase().includes(kw);
@@ -1713,12 +1727,14 @@ function renderPermTable(){
     const kids=(byParent[x.code]||[]).filter(match);
     const indent=16+depth*20;
     const caret=kids.length?'<span class="pg-caret" data-fold="'+esc(x.code)+'" style="cursor:pointer">'+(folded?'▸':'▾')+'</span>':'<span class="pg-caret"></span>';
-    const ops='<button class="op-btn" data-perm="admin:access" onclick="showPermRoles(\''+esc(x.code)+'\')">查看角色</button>'+
-      '<button class="op-btn" data-perm="admin:access" onclick="editPerm(\''+esc(x.code)+'\')">编辑</button>'+
-      (x.builtin?'':'<button class="op-btn" style="color:#c0392b" data-perm="admin:access" onclick="delPerm(\''+esc(x.code)+'\')">删除</button>');
-    html+='<tr data-code="'+esc(x.code)+'"><td style="padding-left:'+indent+'px" class="name">'+caret+esc(x.name)+
+    const ops='<button class="op-btn" data-perm="perm:read" onclick="showPermRoles(\''+esc(x.code)+'\')">查看角色</button>'+
+      '<button class="op-btn" data-perm="perm:read" onclick="editPerm(\''+esc(x.code)+'\')">编辑</button>'+
+      (x.builtin?'':'<button class="op-btn" style="color:#c0392b" data-perm="perm:read" onclick="delPerm(\''+esc(x.code)+'\')">删除</button>');
+    const typ=x.nodeType||'menu';
+    html+='<tr data-code="'+esc(x.code)+'"><td style="padding-left:'+indent+'px" class="name perm-name '+esc(typ)+'">'+
+      caret+'<span class="pn-ico">'+(TYPE_ICON[typ]||'▤')+'</span>'+esc(x.name)+
       (x.builtin?'':' <span class="tag">自定义</span>')+'</td>'+
-      '<td><span class="node-type '+esc(x.nodeType||'menu')+'">'+(TYPE_CN[x.nodeType]||'功能菜单')+'</span></td>'+
+      '<td><span class="node-type '+esc(typ)+'">'+(TYPE_CN[typ]||'功能菜单')+'</span></td>'+
       '<td class="mono" style="font-size:11px">'+esc(x.code)+'</td>'+
       '<td class="mono" style="font-size:11px;color:var(--muted)">'+esc(x.routePath||'—')+'</td>'+
       '<td>'+esc(x.orderNum||0)+'</td>'+
@@ -1749,7 +1765,7 @@ const PERM_ACTIONS=[['select','查询'],['create','新增'],['edit','编辑'],['
   ['export','导出'],['import','导入'],['audit','审核'],['config','配置']];
 function permQuickBtns(){
   return '<div class="type-quick">'+PERM_ACTIONS.map(([code,label])=>
-    '<button type="button" data-perm="admin:access" onclick="fillPermAction(\''+code+'\',\''+label+'\')">'+label+'</button>').join('')+'</div>';
+    '<button type="button" data-perm="perm:read" onclick="fillPermAction(\''+code+'\',\''+label+'\')">'+label+'</button>').join('')+'</div>';
 }
 function fillPermAction(action,label){
   const mod=($('fPModule').value||'').trim();

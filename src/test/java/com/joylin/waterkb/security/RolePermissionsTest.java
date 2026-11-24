@@ -13,6 +13,15 @@ class RolePermissionsTest {
     private final RolePermissions service = new RolePermissions();
 
     @Test
+    void 权限码覆盖真实后台面板() {
+        assertEquals(18, Permission.ALL.size());
+        assertTrue(Permission.ALL.containsAll(List.of(
+                Permission.ORG_READ, Permission.ROLE_READ, Permission.PERM_READ,
+                Permission.ADMIN_DOCS, Permission.LOGINLOG_READ)),
+                "组织架构/角色定义/菜单权限/后台文档/登录日志都要有独立权限码");
+    }
+
+    @Test
     void admin拥有全部权限码() {
         UserContext.CurrentUser admin =
                 new UserContext.CurrentUser("admin", List.of("admin", "water-dept"), "default", "jwt");

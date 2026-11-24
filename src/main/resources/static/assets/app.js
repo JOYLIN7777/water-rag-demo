@@ -38,15 +38,15 @@
   // href 指向 admin.html 的对应面板；带 panel 参数由后台页面自己激活。
   const ADMIN_NAV = [
     { key: 'users', label: '用户管理', icon: '◈', href: 'admin.html?panel=users', perm: 'user:read' },
-    { key: 'org', label: '组织架构', icon: '⌘', href: 'admin.html?panel=org', perm: 'user:read' },
-    { key: 'roles', label: '角色定义', icon: '❖', href: 'admin.html?panel=roles', perm: 'user:read' },
-    { key: 'perms', label: '菜单权限', icon: '☷', href: 'admin.html?panel=perms', perm: 'user:read' },
-    { key: 'docs', label: '文档管理', icon: '▤', href: 'admin.html?panel=docs', perm: 'doc:read' },
+    { key: 'org', label: '组织架构', icon: '⌘', href: 'admin.html?panel=org', perm: 'org:read' },
+    { key: 'roles', label: '角色定义', icon: '❖', href: 'admin.html?panel=roles', perm: 'role:read' },
+    { key: 'perms', label: '菜单权限', icon: '☷', href: 'admin.html?panel=perms', perm: 'perm:read' },
+    { key: 'docs', label: '文档管理', icon: '▤', href: 'admin.html?panel=docs', perm: 'admin:docs' },
     { key: 'models', label: '模型设置', icon: '◇', href: 'admin.html?panel=models', perm: 'model:read' },
     { key: 'usage', label: '用量统计', icon: '◷', href: 'admin.html?panel=usage', perm: 'usage:read' },
     { key: 'governance', label: '权限与日志', icon: '◈', href: 'governance.html', perm: 'audit:read' },
     // 日志类入口落在治理页自身：审计员只有 audit:read，进 admin.html 会被 admin:access 守卫拦住
-    { key: 'loginlogs', label: '登录日志', icon: '⎗', href: 'governance.html#audit', perm: 'audit:read' },
+    { key: 'loginlogs', label: '登录日志', icon: '⎗', href: 'governance.html#audit', perm: 'loginlog:read' },
     { key: 'audit', label: '操作日志', icon: '≡', href: 'governance.html#audit', perm: 'audit:read' }
   ];
   const ADMIN_GROUPS = [
@@ -1254,7 +1254,8 @@
     'tree.html': 'tree:use',
     'models.html': 'model:read',
     'admin.html': 'admin:access',
-    'governance.html': 'audit:read'
+    // 治理页同时承载登录日志与操作日志，两者任一权限都能进入；卡片内再按权限收敛
+    'governance.html': ['audit:read', 'loginlog:read']
   };
   const PAGE_PERM_NAMES = {
     'chat:use': '智能问答', 'doc:read': '知识库文档', 'search:use': '检索对比',
@@ -1265,8 +1266,11 @@
     // 权限接口失败时不误拦页面（服务端接口仍有权限校验），只做入口收敛
     if (!permsLoaded) return;
     const code = PAGE_PERMS[file];
-    if (!code || hasPermission(code) || document.getElementById('permDeniedScreen')) return;
-    const name = PAGE_PERM_NAMES[code] || code;
+    if (!code) return;
+    if (document.getElementById('permDeniedScreen')) return;
+    const codes = Array.isArray(code) ? code : [code];
+    if (codes.some(c => hasPermission(c))) return;
+    const name = PAGE_PERM_NAMES[codes[0]] || codes[0];
     document.body.insertAdjacentHTML('beforeend',
       '<div class="perm-denied-screen" id="permDeniedScreen">' +
         '<div class="perm-denied-card">' +

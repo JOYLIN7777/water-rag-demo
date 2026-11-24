@@ -25,12 +25,17 @@ public final class Permission {
     public static final String USAGE_READ = "usage:read";       // 查看模型用量
     public static final String USER_READ = "user:read";         // 查看用户
     public static final String USER_WRITE = "user:write";       // 管理用户
+    public static final String ORG_READ = "org:read";           // 组织架构（后台独立面板）
+    public static final String ROLE_READ = "role:read";         // 角色定义（后台独立面板）
+    public static final String PERM_READ = "perm:read";         // 菜单权限（后台独立面板）
+    public static final String ADMIN_DOCS = "admin:docs";       // 后台文档管理面板
+    public static final String LOGINLOG_READ = "loginlog:read"; // 登录日志（后台独立面板）
 
     /** 全部权限码，按展示顺序排列，供权限矩阵与单测使用 */
     public static final java.util.List<String> ALL = java.util.List.of(
             ADMIN_ACCESS, CHAT_USE, DOC_READ, DOC_WRITE, DOC_DELETE,
-            SEARCH_USE, TREE_USE, MODEL_READ, MODEL_WRITE,
-            AUDIT_READ, USAGE_READ, USER_READ, USER_WRITE);
+            SEARCH_USE, TREE_USE, USER_READ, USER_WRITE, ORG_READ, ROLE_READ, PERM_READ,
+            ADMIN_DOCS, MODEL_READ, MODEL_WRITE, LOGINLOG_READ, AUDIT_READ, USAGE_READ);
 
     private Permission() { }
 }

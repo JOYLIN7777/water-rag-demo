@@ -35,12 +35,15 @@
   .scope{display:inline-flex;align-items:center;gap:4px;border:1px solid var(--line);border-radius:20px;padding:1px 8px;font-size:10.5px;color:var(--ink-2);background:#f7f9fc;white-space:nowrap}
   .scope.sub{border-color:#cfe3d6;background:#f2f9f4;color:#2f7a4d}
   .scope.from{border-color:#dbe6ff;background:#f3f7ff;color:#3a5fb0}
-  /* 分页控件：右对齐小按钮，页码只显示前后各一页，溢出用省略号 */
-  .pager{display:flex;gap:6px;align-items:center;justify-content:flex-end;margin-top:12px;font-size:12px;color:var(--ink-2)}
-  .pager button{border:1px solid var(--line);background:#fff;border-radius:6px;padding:4px 10px;cursor:pointer;color:var(--ink-2);font-size:12px}
+  /* 分页控件：放到卡片底部并吸底，按钮之间留出可点击的间距 */
+  .pager{display:flex;gap:11px;align-items:center;justify-content:flex-end;margin-top:18px;padding:14px 2px 4px;
+    border-top:1px solid var(--line);background:#fff;position:sticky;bottom:0;z-index:5;font-size:12.5px;color:var(--ink-2)}
+  .pager button{border:1px solid var(--line);background:#fff;border-radius:7px;padding:7px 13px;min-width:34px;min-height:34px;
+    cursor:pointer;color:var(--ink-2);font-size:12.5px;line-height:1.2}
   .pager button:hover:not(:disabled){border-color:var(--primary);color:var(--primary)}
   .pager button:disabled{opacity:.45;cursor:not-allowed}
   .pager .cur{background:var(--primary);border-color:var(--primary);color:#fff}
+  .pager input{width:56px;padding:6px 8px;margin:0 5px;font-size:12.5px;border:1px solid var(--line);border-radius:7px;text-align:center}
 </style>
 </head>
 <body>
