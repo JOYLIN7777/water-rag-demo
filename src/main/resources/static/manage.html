@@ -80,8 +80,8 @@
           <span>含下级部门可见：勾选后本部门及其所有下级部门都能看到；不勾则仅本部门与上级可见。其他部门的文档始终隔离。</span>
         </label>
         <div class="folder-row">
-          <button class="folder-btn" data-perm="doc:write" onclick="Shell.pickFolder()" title="同一页面内重复点击会直接读取上次那个文件夹，不再弹授权">📁 选择文件夹批量上传</button>
-          <button class="folder-btn folder-other" id="folderOther" data-perm="doc:write" style="display:none" onclick="Shell.pickFolder(true)" title="换一个文件夹（会重新弹一次读取授权）">↻</button>
+          <button class="folder-btn" data-perm="doc:write_batch" onclick="Shell.pickFolder()" title="同一页面内重复点击会直接读取上次那个文件夹，不再弹授权">📁 选择文件夹批量上传</button>
+          <button class="folder-btn folder-other" id="folderOther" data-perm="doc:write_batch" style="display:none" onclick="Shell.pickFolder(true)" title="换一个文件夹（会重新弹一次读取授权）">↻</button>
         </div>
         <div class="hint" id="folderHint" style="margin:0">单个文件最大 500MB，文件夹上传会自动遍历支持的类型。</div>
       </div>

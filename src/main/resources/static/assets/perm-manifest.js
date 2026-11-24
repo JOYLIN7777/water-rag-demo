@@ -13,7 +13,10 @@
     { code: 'workbench:root', name: '工作台', type: 'directory', module: '工作台', order: 10, routePath: '', children: [
       { code: 'chat:use', name: '智能问答', type: 'menu', order: 11, routePath: '/index.html' },
       { code: 'doc:read', name: '知识库文档', type: 'menu', order: 12, routePath: '/manage.html', children: [
-        { code: 'doc:write', name: '上传文档', type: 'btn', order: 121 },
+        { code: 'doc:write', name: '上传文档（父权限）', type: 'btn', order: 121 },
+        { code: 'doc:write_chat', name: '问答框上传', type: 'btn', order: 124 },
+        { code: 'doc:write_batch', name: '批量上传', type: 'btn', order: 125 },
+        { code: 'doc:write_admin', name: '后台上传', type: 'btn', order: 126 },
         { code: 'doc:delete', name: '删除文档', type: 'btn', order: 122 },
         { code: 'doc:chunks', name: '查看分片', type: 'btn', order: 123 }
       ]},

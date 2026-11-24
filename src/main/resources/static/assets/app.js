@@ -976,15 +976,34 @@
     if (!host) return;
     const old = host.querySelector('.sidebar');
     if (old) old.remove();
-    const navHtml = ADMIN_GROUPS.map(g =>
-      '<div class="admin-nav-group">' +
-      '<div class="section-label" style="margin:14px 0 6px">' + g.label + '</div>' +
-      g.keys.map(k => {
-        const n = ADMIN_NAV.find(x => x.key === k);
-        return '<a class="admin-nav-item' + (n.key === active ? ' active' : '') + '"' +
-          ' href="' + n.href + '" data-panel="' + n.key + '" data-perm="' + n.perm + '" title="' + n.label + '">' +
-          '<span class="ic">' + n.icon + '</span>' + n.label + '</a>';
-      }).join('') + '</div>'
+    // 菜单数据以服务端权限目录为准（名称/路由/权限都可写库）；
+    // 图标与分组属于 UI 细节，保留前端映射。接口未就绪时用静态清单兜底。
+    const serverMenus = global.__serverMenus || [];
+    const navOf = (srv) => {
+      const hit = ADMIN_NAV.find(x => x.perm === (srv.permissions || [])[0] ||
+        srv.href === x.href || ('/' + srv.href) === x.href);
+      return hit || { key: String(srv.href || '').replace(/\.html$/, ''), icon: '▤', perm: (srv.permissions || [])[0] || '' };
+    };
+    const items = serverMenus.length
+      ? serverMenus.filter(m => m.allowed && !/^(index|manage|search|tree|profile)\.html$/.test(m.href))
+          .map(m => Object.assign({}, navOf(m), { label: m.name, href: String(m.href).replace(/^\//, '') }))
+      : ADMIN_NAV;
+    const keySet = new Set(items.map(n => n.key));
+    const navHtml = ADMIN_GROUPS.map(g => {
+      const keys = g.keys.filter(k => keySet.has(k));
+      if (!keys.length) return '';
+      return '<div class="admin-nav-group">' +
+        '<div class="section-label" style="margin:14px 0 6px">' + g.label + '</div>' +
+        keys.map(k => {
+          const n = items.find(x => x.key === k);
+          if (!n) return '';
+          return '<a class="admin-nav-item' + (n.key === active ? ' active' : '') + '"' +
+            ' href="' + n.href + '" data-panel="' + n.key + '" data-perm="' + n.perm + '" title="' + n.label + '">' +
+            '<span class="ic">' + n.icon + '</span>' + n.label + '</a>';
+        }).join('') + '</div>';
+    }).join('') || items.map(n =>
+      '<a class="admin-nav-item' + (n.key === active ? ' active' : '') + '" href="' + n.href +
+      '" data-panel="' + n.key + '" data-perm="' + n.perm + '"><span class="ic">' + n.icon + '</span>' + n.label + '</a>'
     ).join('');
     const aside = document.createElement('div');
     aside.innerHTML =
@@ -1011,7 +1030,11 @@
   let ownedPermissions = new Set();
   let permsLoaded = false;
   function hasPermission(code) {
-    return ownedPermissions.has(code);
+    if (ownedPermissions.has(code)) return true;
+    // 细分上传权限继承父码 doc:write：老角色只勾了父码也照常看到三处上传入口，
+    // 需要单独管控时再给角色配细分码（父码不自动替细分码放行反向不成立）
+    if (typeof code === 'string' && code.startsWith('doc:write_') && ownedPermissions.has('doc:write')) return true;
+    return false;
   }
   // 权限清单的加载 promise：功能页守卫要等它回来再判定，否则拿空集合会把有权限的人也拦住
   let permsReady = null;
@@ -1029,6 +1052,8 @@
         }
         const j = await r.json();
         ownedPermissions = new Set(j.permissions || []);
+        // 菜单与导航结构以服务端权限目录为准；接口失败时保留静态兜底
+        if (Array.isArray(j.menus) && j.menus.length) global.__serverMenus = j.menus;
         permsLoaded = true;
         renderAdminEntry();
         applySidebarPerms(); applyPermControls();

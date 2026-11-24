@@ -27,18 +27,28 @@ public class PermissionService {
     private final RolePermissions rolePermissions;
     private final PermissionCatalog permCatalog;
 
-    /** 功能菜单定义：名称 / 地址 / 需要的权限码（空=所有认证用户） */
-    private static final List<Map<String, Object>> MENUS = List.of(
-            menu("智能问答", "index.html", List.of()),
-            menu("知识库文档", "manage.html", List.of(Permission.DOC_READ)),
-            menu("检索对比", "search.html", List.of(Permission.SEARCH_USE)),
-            menu("问答分支", "tree.html", List.of(Permission.TREE_USE)),
-            menu("模型设置", "models.html", List.of(Permission.MODEL_READ)),
-            menu("登录日志", "loginlogs.html", List.of(Permission.LOGINLOG_READ)),
-            menu("操作日志", "audit.html", List.of(Permission.AUDIT_READ)),
-            menu("管理后台", "admin.html", List.of(Permission.ADMIN_ACCESS)),
-            menu("个人中心", "profile.html", List.of())
-    );
+    /**
+     * 功能菜单：从权限目录（数据库）读取 node_type=menu 且配置了路由的节点，
+     * 改菜单只改库/种子 JSON，不再改 Java 常量。个人中心不需要权限码，单独保留。
+     */
+    private List<Map<String, Object>> menus() {
+        List<Map<String, Object>> out = new ArrayList<>();
+        try {
+            for (Map<String, Object> n : permCatalog.list()) {
+                String type = String.valueOf(n.getOrDefault("nodeType", ""));
+                String route = String.valueOf(n.getOrDefault("routePath", ""));
+                if (!"menu".equals(type) || route.isEmpty() || "null".equals(route)) continue;
+                String code = String.valueOf(n.getOrDefault("code", ""));
+                List<String> required = (!code.isEmpty() && !"null".equals(code))
+                        ? List.of(code) : List.of();
+                out.add(menu(String.valueOf(n.getOrDefault("name", code)), route, required));
+            }
+        } catch (Exception ignored) {
+            // 目录不可用时返回空菜单，不编造
+        }
+        out.add(menu("个人中心", "profile.html", List.of()));
+        return out;
+    }
 
     public PermissionService(ToolPermissionRegistry toolRegistry, RolePermissions rolePermissions,
                              PermissionCatalog permCatalog) {
@@ -62,7 +72,7 @@ public class PermissionService {
         // 功能权限：按权限码判定，与服务端接口拦截使用同一套规则
         Set<String> owned = rolePermissions.permissionsOf(u);
         List<Map<String, Object>> menus = new ArrayList<>();
-        for (Map<String, Object> m : MENUS) {
+        for (Map<String, Object> m : menus()) {
             @SuppressWarnings("unchecked")
             List<String> need = (List<String>) m.get("permissions");
             boolean allowed = need.isEmpty() || need.stream().anyMatch(owned::contains);

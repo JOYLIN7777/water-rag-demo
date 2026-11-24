@@ -41,7 +41,8 @@ class UnregisteredPermScannerTest {
         UnregisteredPermScanner scanner = new UnregisteredPermScanner(jdbc, mapping);
         List<Map<String, Object>> list = scanner.scan();
         assertFalse(list.isEmpty(), "没有任何已注册码时，应扫出前端 data-perm 声明");
-        assertTrue(list.stream().anyMatch(x -> "doc:write".equals(x.get("code"))), "应包含问答页上传按钮的 doc:write");
+        assertTrue(list.stream().anyMatch(x -> String.valueOf(x.get("code")).startsWith("doc:write")),
+                "应包含问答页上传按钮的 doc:write 系列权限码");
         assertTrue(list.stream().allMatch(x -> x.get("sources") instanceof List), "每条都要带来源");
     }
 }

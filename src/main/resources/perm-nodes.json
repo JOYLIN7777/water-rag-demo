@@ -1,0 +1,38 @@
+{
+  "_comment": "权限节点种子（后端启动时写入 perm_node）。前端 perm-manifest.js 的清单与此保持一致，管理员进后台时由 /api/admin/perms/sync 以清单为准对账。",
+  "nodes": [
+    {"code":"workbench:root","name":"工作台","type":"directory","module":"工作台","desc":"问答侧栏：问答、文档与检索","parent":"","route":"","order":10},
+    {"code":"chat:use","name":"智能问答","type":"menu","module":"工作台","desc":"进入智能问答页","parent":"workbench:root","route":"/index.html","order":11},
+    {"code":"doc:read","name":"知识库文档","type":"menu","module":"工作台","desc":"查看知识库文档列表","parent":"workbench:root","route":"/manage.html","order":12},
+    {"code":"doc:write","name":"上传文档（父权限）","type":"btn","module":"工作台","desc":"上传接口兜底权限","parent":"doc:read","route":"","order":121},
+    {"code":"doc:write_chat","name":"问答框上传","type":"btn","module":"工作台","desc":"问答框上传文档","parent":"doc:read","route":"","order":124},
+    {"code":"doc:write_batch","name":"批量上传","type":"btn","module":"工作台","desc":"选择文件夹批量上传","parent":"doc:read","route":"","order":125},
+    {"code":"doc:write_admin","name":"后台上传","type":"btn","module":"工作台","desc":"后台文档管理上传","parent":"doc:read","route":"","order":126},
+    {"code":"doc:delete","name":"删除文档","type":"btn","module":"工作台","desc":"删除文档及其全部切片","parent":"doc:read","route":"","order":122},
+    {"code":"doc:chunks","name":"查看分片","type":"btn","module":"工作台","desc":"查看文档分片","parent":"doc:read","route":"","order":123},
+    {"code":"search:use","name":"检索对比","type":"menu","module":"工作台","desc":"对比不同检索方式的结果","parent":"workbench:root","route":"/search.html","order":13},
+    {"code":"tree:use","name":"会话结构","type":"menu","module":"工作台","desc":"查看与切换问答分支","parent":"workbench:root","route":"/tree.html","order":14},
+
+    {"code":"system:root","name":"管理后台","type":"directory","module":"系统管理","desc":"后台侧栏：权限配置、业务管理与日志审计","parent":"","route":"/admin.html","order":20},
+    {"code":"admin:access","name":"进入管理后台","type":"menu","module":"系统管理","desc":"进入管理后台入口","parent":"system:root","route":"/admin.html","order":201},
+    {"code":"console.config:root","name":"权限配置目录","type":"directory","module":"系统管理","desc":"后台侧栏第一组","parent":"system:root","route":"","order":21},
+    {"code":"user:read","name":"用户管理","type":"menu","module":"系统管理","desc":"查看账号列表","parent":"console.config:root","route":"/users.html","order":211},
+    {"code":"user:write","name":"用户维护","type":"btn","module":"系统管理","desc":"账号增删改","parent":"user:read","route":"","order":2111},
+    {"code":"user:resetpwd","name":"重置密码","type":"btn","module":"系统管理","desc":"重置账号密码","parent":"user:read","route":"","order":2112},
+    {"code":"user:resetcode","name":"复制重置码","type":"btn","module":"系统管理","desc":"复制密码重置码","parent":"user:read","route":"","order":2114},
+    {"code":"user:export","name":"导出用户","type":"btn","module":"系统管理","desc":"导出用户列表","parent":"user:read","route":"","order":2113},
+    {"code":"org:read","name":"组织架构","type":"menu","module":"系统管理","desc":"查看与维护组织架构","parent":"console.config:root","route":"/org.html","order":212},
+    {"code":"role:read","name":"角色定义","type":"menu","module":"系统管理","desc":"查看与维护角色定义","parent":"console.config:root","route":"/roles.html","order":213},
+    {"code":"perm:read","name":"菜单权限","type":"menu","module":"系统管理","desc":"查看与维护菜单权限树","parent":"console.config:root","route":"/perms.html","order":214},
+    {"code":"console.biz:root","name":"业务管理","type":"directory","module":"系统管理","desc":"后台侧栏第二组","parent":"system:root","route":"","order":22},
+    {"code":"admin:docs","name":"文档管理","type":"menu","module":"系统管理","desc":"后台文档管理面板","parent":"console.biz:root","route":"/docs.html","order":221},
+    {"code":"model:read","name":"模型设置","type":"menu","module":"系统管理","desc":"查看模型配置","parent":"console.biz:root","route":"/models.html","order":222},
+    {"code":"model:write","name":"修改模型","type":"btn","module":"系统管理","desc":"增删改与切换模型","parent":"model:read","route":"","order":2221},
+    {"code":"usage:read","name":"用量统计","type":"menu","module":"系统管理","desc":"查看模型调用用量","parent":"console.biz:root","route":"/usage.html","order":223},
+    {"code":"console.log:root","name":"日志审计","type":"directory","module":"系统管理","desc":"后台侧栏第三组","parent":"system:root","route":"","order":23},
+    {"code":"loginlog:read","name":"登录日志","type":"menu","module":"系统管理","desc":"查看登录日志","parent":"console.log:root","route":"/loginlogs.html","order":231},
+    {"code":"loginlog:export","name":"导出登录日志","type":"btn","module":"系统管理","desc":"导出登录日志","parent":"loginlog:read","route":"","order":2311},
+    {"code":"audit:read","name":"操作日志","type":"menu","module":"系统管理","desc":"查看操作日志","parent":"console.log:root","route":"/audit.html","order":232},
+    {"code":"audit:export","name":"导出操作日志","type":"btn","module":"系统管理","desc":"导出操作日志","parent":"audit:read","route":"","order":2321}
+  ]
+}

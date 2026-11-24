@@ -15,7 +15,10 @@ public final class Permission {
     public static final String ADMIN_ACCESS = "admin:access";   // 进入管理后台
     public static final String CHAT_USE = "chat:use";           // 智能问答
     public static final String DOC_READ = "doc:read";           // 查看文档
-    public static final String DOC_WRITE = "doc:write";         // 上传文档
+    public static final String DOC_WRITE = "doc:write";         // 上传文档（父权限/接口兜底）
+    public static final String DOC_WRITE_CHAT = "doc:write_chat";   // 问答框上传
+    public static final String DOC_WRITE_BATCH = "doc:write_batch"; // 批量上传
+    public static final String DOC_WRITE_ADMIN = "doc:write_admin"; // 后台上传
     public static final String DOC_DELETE = "doc:delete";       // 删除文档
     public static final String SEARCH_USE = "search:use";       // 检索对比
     public static final String TREE_USE = "tree:use";           // 问答分支
@@ -40,7 +43,8 @@ public final class Permission {
 
     /** 全部权限码，按展示顺序排列，供权限矩阵与单测使用 */
     public static final java.util.List<String> ALL = java.util.List.of(
-            ADMIN_ACCESS, CHAT_USE, DOC_READ, DOC_WRITE, DOC_DELETE, DOC_CHUNKS,
+            ADMIN_ACCESS, CHAT_USE, DOC_READ, DOC_WRITE, DOC_WRITE_CHAT, DOC_WRITE_BATCH, DOC_WRITE_ADMIN,
+            DOC_DELETE, DOC_CHUNKS,
             SEARCH_USE, TREE_USE, USER_READ, USER_WRITE, USER_RESETPWD, USER_RESETCODE, USER_EXPORT,
             ORG_READ, ROLE_READ, PERM_READ, ADMIN_DOCS, MODEL_READ, MODEL_WRITE,
             LOGINLOG_READ, LOGINLOG_EXPORT, AUDIT_READ, AUDIT_EXPORT, USAGE_READ);

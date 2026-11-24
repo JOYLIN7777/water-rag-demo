@@ -38,32 +38,34 @@ public class PermissionCatalog {
      * 列依次为 code, 名称, 类型, 模块(分组), 说明, 上级code, 路由, 排序。
      * 目录节点（*:root）不绑定接口权限码，仅作树形分组，role 不可勾选。
      */
-    private static final List<String[]> BUILT_IN = List.of(
-            // ===== 工作台：问答侧栏 =====
-            new String[]{"workbench:root", "工作台", "directory", "工作台", "问答侧栏：问答、文档与检索", "", "", "10"},
-            new String[]{"chat:use", "智能问答", "menu", "工作台", "进入智能问答页", "workbench:root", "/index.html", "11"},
-            new String[]{"doc:read", "知识库文档", "menu", "工作台", "查看知识库文档列表", "workbench:root", "/manage.html", "12"},
-            new String[]{"doc:write", "上传文档", "btn", "工作台", "上传与批量上传文档入库", "doc:read", "", "121"},
-            new String[]{"doc:delete", "删除文档", "btn", "工作台", "删除文档及其全部切片", "doc:read", "", "122"},
-            new String[]{"search:use", "检索对比", "menu", "工作台", "对比不同检索方式的结果", "workbench:root", "/search.html", "13"},
-            new String[]{"tree:use", "会话结构", "menu", "工作台", "查看与切换问答分支", "workbench:root", "/tree.html", "14"},
-            // ===== 管理后台：后台侧栏三组，与真实导航一一对应 =====
-            new String[]{"system:root", "管理后台", "directory", "系统管理", "后台侧栏：权限配置、业务管理与日志审计", "", "/admin", "20"},
-            new String[]{"admin:access", "进入管理后台", "menu", "系统管理", "进入管理后台入口", "system:root", "/admin", "201"},
-            new String[]{"console.config:root", "权限配置目录", "directory", "系统管理", "后台侧栏第一组", "system:root", "", "21"},
-            new String[]{"user:read", "用户管理", "menu", "系统管理", "查看账号列表", "console.config:root", "/users.html", "211"},
-            new String[]{"user:write", "用户维护", "btn", "系统管理", "账号增删改与密码重置", "user:read", "", "2111"},
-            new String[]{"org:read", "组织架构", "menu", "系统管理", "查看与维护组织架构", "console.config:root", "/org.html", "212"},
-            new String[]{"role:read", "角色定义", "menu", "系统管理", "查看与维护角色定义", "console.config:root", "/roles.html", "213"},
-            new String[]{"perm:read", "菜单权限", "menu", "系统管理", "查看与维护菜单权限树", "console.config:root", "/perms.html", "214"},
-            new String[]{"console.biz:root", "业务管理", "directory", "系统管理", "后台侧栏第二组", "system:root", "", "22"},
-            new String[]{"admin:docs", "文档管理", "menu", "系统管理", "后台文档管理面板（接口仍按 doc:read 校验）", "console.biz:root", "/docs.html", "221"},
-            new String[]{"model:read", "模型设置", "menu", "系统管理", "查看模型配置", "console.biz:root", "/models.html", "222"},
-            new String[]{"model:write", "修改模型", "btn", "系统管理", "增删改与切换模型", "model:read", "", "2221"},
-            new String[]{"usage:read", "用量统计", "menu", "系统管理", "查看模型调用用量", "console.biz:root", "/usage.html", "223"},
-            new String[]{"console.log:root", "日志审计", "directory", "系统管理", "后台侧栏第三组", "system:root", "", "23"},
-            new String[]{"loginlog:read", "登录日志", "menu", "系统管理", "查看登录日志（独立页面）", "console.log:root", "/loginlogs.html", "231"},
-            new String[]{"audit:read", "操作日志", "menu", "系统管理", "查看操作日志（独立页面）", "console.log:root", "/audit.html", "232"});
+    /**
+     * 内置节点种子从 perm-nodes.json 读取，避免与前端 perm-manifest.js 双份维护。
+     * 首次启动写入，之后以库为准；结构字段（层级/路由/排序）每次启动按种子校正，
+     * 名称只在仍是旧名时改，管理员改过的显示名保留。
+     */
+    private List<Map<String, Object>> builtInNodes() {
+        try (java.io.InputStream in = getClass().getClassLoader().getResourceAsStream("perm-nodes.json")) {
+            if (in == null) throw new IllegalStateException("perm-nodes.json 不存在");
+            com.fasterxml.jackson.databind.JsonNode root =
+                    new com.fasterxml.jackson.databind.ObjectMapper().readTree(in);
+            List<Map<String, Object>> out = new ArrayList<>();
+            for (com.fasterxml.jackson.databind.JsonNode n : root.path("nodes")) {
+                Map<String, Object> row = new LinkedHashMap<>();
+                row.put("code", n.path("code").asText());
+                row.put("name", n.path("name").asText());
+                row.put("type", n.path("type").asText("menu"));
+                row.put("module", n.path("module").asText(""));
+                row.put("desc", n.path("desc").asText(""));
+                row.put("parent", n.path("parent").asText(""));
+                row.put("route", n.path("route").asText(""));
+                row.put("order", n.path("order").asInt(0));
+                out.add(row);
+            }
+            return out;
+        } catch (Exception e) {
+            throw new IllegalStateException("权限节点种子读取失败：" + e.getMessage(), e);
+        }
+    }
 
     /** 内置节点改名（旧名 → 新名）：只改仍用旧名的行，用户自定义的名称不覆盖 */
     private static final Map<String, String[]> RENAMES = Map.of(
@@ -91,17 +93,19 @@ public class PermissionCatalog {
         jdbc.execute("ALTER TABLE perm_node ADD COLUMN IF NOT EXISTS last_seen_at TIMESTAMP");
         jdbc.execute("ALTER TABLE perm_node ADD COLUMN IF NOT EXISTS retired BOOLEAN DEFAULT FALSE");
         // 内置节点首次初始化写入，之后以库为准（用户改过的显示信息不会被启动覆盖）
-        for (String[] n : BUILT_IN) {
+        List<Map<String, Object>> builtins = builtInNodes();
+        for (Map<String, Object> n : builtins) {
             jdbc.update("INSERT INTO perm_node(code,name,node_type,module,description,builtin,parent_code,route_path,order_num) "
                             + "VALUES(?,?,?,?,?,TRUE,?,?,?) ON CONFLICT (code) DO NOTHING",
-                    n[0], n[1], n[2], n[3], n[4], n[5], n[6], Integer.parseInt(n[7]));
+                    n.get("code"), n.get("name"), n.get("type"), n.get("module"), n.get("desc"),
+                    n.get("parent"), n.get("route"), n.get("order"));
         }
-        // 存量内置节点按真实导航重排（结构字段以代码为准，避免老库层级对不上页面）；
+        // 存量内置节点按真实导航重排（结构字段以种子为准，避免老库层级对不上页面）；
         // 名称只在仍是旧名时改，管理员改过的显示名保留。
-        for (String[] n : BUILT_IN) {
+        for (Map<String, Object> n : builtins) {
             jdbc.update("UPDATE perm_node SET parent_code=?, route_path=?, order_num=?, node_type=?, module=? "
                             + "WHERE code=? AND builtin=TRUE",
-                    n[5], n[6], Integer.parseInt(n[7]), n[2], n[3], n[0]);
+                    n.get("parent"), n.get("route"), n.get("order"), n.get("type"), n.get("module"), n.get("code"));
         }
         RENAMES.forEach((code, pair) -> jdbc.update(
                 "UPDATE perm_node SET name=? WHERE code=? AND builtin=TRUE AND name=?",
