@@ -19,8 +19,8 @@
 <div class="layout" id="sidebarHost">
 <main class="main">
   <header class="topbar">
-    <div class="topbar-left"><div class="topbar-title">模型配置</div><span class="topbar-sub">/ 模型</span></div>
-    <span id="adminEntrySlot" class="admin-slot"></span>
+    <div class="topbar-left"><div class="brand-crumb"><span>管理后台</span><span class="sep">/</span><span>模型设置</span></div>
+      <span class="topbar-sub">管理员可见</span></div>
   </header>
 
   <div class="page">
@@ -155,7 +155,7 @@ async function delModel(id){
     loadModels();
   }catch(e){show('activeMsg','✗ '+e.message,false)}
 }
-initShell('settings');
+initShell('models',{adminSidebar:true});
 loadModels();
 // 页面级权限守卫：菜单权限页没勾「模型设置」的账号，直接敲 URL 也进不来
 (async function guardPerm(){

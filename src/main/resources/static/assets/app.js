@@ -1088,7 +1088,7 @@
     ];
     const canChat = hasPermission('chat:use');
     const target = canChat ? (pages.find(p => hasPermission(p[0])) || [])[1] : null;
-    const inAdmin = /admin\.html|users\.html|org\.html|roles\.html|perms\.html|docs\.html|usage\.html|loginlogs\.html|audit\.html/
+    const inAdmin = /admin\.html|users\.html|org\.html|roles\.html|perms\.html|docs\.html|models\.html|usage\.html|loginlogs\.html|audit\.html/
       .test(location.pathname);
     const slot = document.getElementById('adminEntrySlot');
     if (slot) {
@@ -1241,7 +1241,6 @@
     'settings.html': { label: '设置', back: 'index.html', backText: '返回问答' },
     'search.html': { label: '检索对比', parent: 'settings.html', parentLabel: '设置' },
     'tree.html': { label: '会话结构', parent: 'settings.html', parentLabel: '设置' },
-    'models.html': { label: '模型配置', parent: 'settings.html', parentLabel: '设置' },
     // 权限与日志属于管理域，左侧已有完整后台导航，顶栏不再重复塞"返回设置/设置/…"
     'profile.html': { label: '个人中心', back: 'index.html', backText: '返回问答' },
     'manage.html': { label: '知识库文档', back: 'index.html', backText: '返回问答' }
