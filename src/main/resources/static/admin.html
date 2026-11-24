@@ -105,6 +105,11 @@
   /* 字段下方的补充说明（比 .form-note 轻，不占整块底色） */
   .form-hint{font-size:11.5px;color:var(--muted);line-height:1.6;margin-top:5px}
   .table-wrap{flex:1;overflow:auto}
+  /* 上下两个表格区之间的拖拽手柄：按住上下拖，调整各自高度（记忆到本机） */
+  .v-resizer{flex:0 0 9px;height:9px;cursor:row-resize;display:flex;align-items:center;justify-content:center;
+    background:#fbfcfe;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+  .v-resizer::after{content:'';width:36px;height:3px;border-radius:2px;background:#c9d5e8;transition:background .15s}
+  .v-resizer:hover::after{background:var(--primary)}
   .tag-role{display:inline-block;padding:2px 8px;border-radius:10px;font-size:10.5px;margin-right:4px;background:#eef2f8;color:var(--ink-2)}
   .tag-role.admin{background:#f3efff;color:var(--violet)}
   .tag-role.analyst{background:var(--primary-soft);color:#25469b}
@@ -350,11 +355,12 @@
               </div>
             </div>
             <div class="org-section">下级组织</div>
-            <div class="table-wrap"><table class="data-table">
+            <div class="table-wrap" id="orgChildTableWrap"><table class="data-table">
               <thead><tr><th class="row-idx">序号</th><th>组织名称</th><th>标识</th><th>上级组织</th><th>直属成员</th><th>含下级成员</th><th>操作</th></tr></thead>
               <tbody id="oTable"><tr><td colspan="7" class="empty">加载中…</td></tr></tbody></table></div>
+            <div class="v-resizer" id="orgSplitter" title="按住上下拖动，调整两个表格的高度"></div>
             <div class="org-section">直属成员<button class="btn btn-sm" style="margin-left:10px" onclick="createUser(orgSel.key)">＋ 添加</button></div>
-            <div class="table-wrap"><table class="data-table">
+            <div class="table-wrap" id="orgMemberTableWrap"><table class="data-table">
               <thead><tr><th class="row-idx">序号</th><th>账号</th><th>显示名</th><th>所属角色</th><th>账号状态</th><th>操作</th></tr></thead>
               <tbody id="oMemberTable"><tr><td colspan="6" class="empty">请选择左侧组织</td></tr></tbody></table></div>
           </div>
@@ -726,8 +732,7 @@ function renderPasswordResets(){ renderMsgCenter(); }
 function msgRowsHtml(){
   const rows=msgCollectAll();
   if(!rows.length){
-    return '<div class="empty-inline">暂无待办。用户提交密码重置申请后会出现在这里；'+
-      '以后系统公告、账号变更等通知也集中在此，不再各页弹窗。</div>';
+    return '<div class="empty-inline">暂无待办</div>';
   }
   return rows.map(x=>'<div class="msg-row" data-kind="'+esc(x.kind)+'"><div class="msg-main">'+
       '<div class="msg-title">'+x.title+'</div>'+
@@ -736,9 +741,7 @@ function msgRowsHtml(){
 }
 function openMsgCenter(){
   Shell.modal({title:'消息中心',okText:'关闭',cancelText:'',
-    body:'<div class="form-note">所有待办通知都在这里：目前是密码重置申请（批准后生成一次性重置码，30 分钟有效、用一次作废），'+
-      '系统公告、账号变更等后续也统一收在这一处，不再各自弹窗。'+
-      '若只是临时帮某人改密码，直接到「用户管理」点行内「重置密码」更快，不必走申请。</div>'+
+    body:'<div class="form-note">待办都在这里，处理完就会消失。</div>'+
       '<div id="msgList">'+msgRowsHtml()+'</div>'});
 }
 async function approveReset(id){
@@ -949,19 +952,25 @@ function renderUserTable(page){
   const rows=list.slice(start,start+size);
   $('uTable').innerHTML=rows.length?rows.map((u,i)=>{
     const gi=start+i;   // 全量索引，详情/编辑弹框按它取数据
-    const sw='<label class="switch" title="'+(u.enabled?'点击停用该账号':'点击启用该账号')+'">'+
-      '<input type="checkbox"'+(u.enabled?' checked':'')+' onchange="toggleUserEnabled(\''+esc(u.username)+'\',this.checked,this)">'+
-      '<span class="track"></span><span class="thumb"></span></label>'+
-      '<span style="margin-left:8px;font-size:11.5px;color:'+(u.enabled?'var(--ok)':'var(--muted)')+'">'+(u.enabled?'正常':'停用')+'</span>';
+    const isAdmin=!!(u.groups||[]).includes('admin');
+    const sw=isAdmin
+      ? '<span class="tag ok">正常</span><span style="margin-left:8px;font-size:11.5px;color:var(--muted)">系统管理员不可停用</span>'
+      : '<label class="switch" title="'+(u.enabled?'点击停用该账号':'点击启用该账号')+'">'+
+        '<input type="checkbox"'+(u.enabled?' checked':'')+' onchange="toggleUserEnabled(\''+esc(u.username)+'\',this.checked,this)">'+
+        '<span class="track"></span><span class="thumb"></span></label>'+
+        '<span style="margin-left:8px;font-size:11.5px;color:'+(u.enabled?'var(--ok)':'var(--muted)')+'">'+(u.enabled?'正常':'停用')+'</span>';
+    const ops=isAdmin
+      ? '<span style="color:var(--muted);font-size:11.5px" title="系统管理员账号受保护，不能编辑/重置/删除">不可编辑</span>'
+      : '<button class="op-btn" onclick="editUser('+gi+')">编辑</button>'+
+        '<button class="op-btn warn" onclick="resetUserPwd('+gi+')">重置密码</button>'+
+        '<button class="op-btn danger" onclick="delUser('+gi+')">删除</button>';
     return '<tr><td class="row-idx">'+(gi+1)+'</td>'+
       '<td><span style="display:inline-flex;align-items:center;gap:8px">'+
         (window.Shell?Shell.avatar(u.displayName||u.username,'sm'):'')+
         '<a class="name" href="javascript:void(0)" style="color:var(--primary);text-decoration:none" onclick="showUser('+gi+')">'+esc(u.username)+'</a></span></td>'+
       '<td>'+esc(u.displayName)+'</td><td>'+roleTags(u.groups)+'</td><td>'+esc(tl(u.tenant))+'</td>'+
       '<td>'+sw+'</td>'+
-      '<td><button class="op-btn" onclick="editUser('+gi+')">编辑</button>'+
-      '<button class="op-btn warn" onclick="resetUserPwd('+gi+')">重置密码</button>'+
-      '<button class="op-btn danger" onclick="delUser('+gi+')">删除</button></td></tr>';
+      '<td>'+ops+'</td></tr>';
   }).join(''):'<tr><td colspan="7" class="empty-inline">没有符合条件的账号</td></tr>';
   $('uTable')._rows=list;
   const fh=$('uFilterHint');
@@ -1309,6 +1318,70 @@ function orgParentOptions(selectedKey,selfKey){
     (r.depth>=0?'　'.repeat(r.depth)+'└ '+esc(r.name):esc(r.name))+'</option>').join('');
 }
 
+// 通用上下拖拽分隔条：调整上/下两块内容区的高度，偏好记在本机。
+// 目前后台里"下级组织 + 直属成员"是唯一的上下双表格区，先在这里启用。
+function initVSplitter(handleId,topId,bottomId,storeKey){
+  const h=$(handleId),top=$(topId),bottom=$(bottomId);
+  if(!h||!top||!bottom)return;
+  try{const saved=Number(localStorage.getItem(storeKey)||0);if(saved>=120)top.style.flex='0 0 '+saved+'px'}catch(e){}
+  h.addEventListener('mousedown',function(e){
+    e.preventDefault();
+    const startY=e.clientY,startH=top.getBoundingClientRect().height;
+    const maxH=Math.max(160,top.parentElement.clientHeight-220);
+    document.body.style.cursor='row-resize';document.body.style.userSelect='none';
+    function move(ev){
+      const next=Math.min(maxH,Math.max(120,startH+ev.clientY-startY));
+      top.style.flex='0 0 '+next+'px';
+    }
+    function up(){
+      document.removeEventListener('mousemove',move);
+      document.removeEventListener('mouseup',up);
+      document.body.style.cursor='';document.body.style.userSelect='';
+      try{localStorage.setItem(storeKey,String(Math.round(top.getBoundingClientRect().height)))}catch(e){}
+    }
+    document.addEventListener('mousemove',move);
+    document.addEventListener('mouseup',up);
+  });
+}
+initVSplitter('orgSplitter','orgChildTableWrap','orgMemberTableWrap','wb-split-org');
+
+// 组织名转英文标识：常见组织用字 → 拼音；含英文则直接取英文。
+// 未收录的中文字符跳过（不硬猜），全猜不出时回落 org。
+const ORG_PINYIN={
+  '水':'shui','利':'li','中':'zhong','心':'xin','开':'kai','发':'fa','部':'bu','业':'ye','务':'wu',
+  '财':'cai','应':'ying','急':'ji','处':'chu','审':'shen','计':'ji','管':'guan','理':'li','信':'xin',
+  '息':'xi','技':'ji','调':'diao','度':'du','运':'yun','行':'xing','维':'wei','护':'hu','研':'yan',
+  '究':'jiu','院':'yuan','分':'fen','局':'ju','科':'ke','大':'da','队':'dui','站':'zhan','所':'suo',
+  '组':'zu','办':'ban','公':'gong','室':'shi','主':'zhu','任':'ren','工':'gong','程':'cheng','检':'jian',
+  '测':'ce','监':'jian','控':'kong','数':'shu','据':'ju','安':'an','徽':'hui','广':'guang','东':'dong',
+  '西':'xi','云':'yun','南':'nan','贵':'gui','州':'zhou','海':'hai','湖':'hu','北':'bei','江':'jiang',
+  '苏':'su','浙':'zhe','山':'shan','河':'he','宁':'ning','夏':'xia','陕':'shan','甘':'gan','肃':'su',
+  '青':'qing','新':'xin','疆':'jiang','藏':'zang','内':'nei','蒙':'meng','吉':'ji','林':'lin','黑':'hei',
+  '龙':'long','四':'si','川':'chuan','重':'chong','庆':'qing','京':'jing','上':'shang','天':'tian',
+  '津':'jin','福':'fu','建':'jian','总':'zong','司':'si','集':'ji','团':'tuan','事':'shi','闸':'zha',
+  '门':'men','库':'ku','汛':'xun','防':'fang','洪':'hong','调':'diao','蓄':'xu','泄':'xie','董':'dong'
+};
+function orgSlug(name){
+  const s=String(name||'').trim();
+  const ascii=(s.match(/[A-Za-z][A-Za-z0-9]*/g)||[]).join('-').toLowerCase();
+  const raw=ascii||Array.from(s).map(c=>ORG_PINYIN[c]||'').filter(Boolean).join('');
+  return raw.replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'').slice(0,24).replace(/-+$/,'')||'org';
+}
+function orgRand2(){
+  let s='';for(let i=0;i<2;i++)s+='abcdefghijklmnopqrstuvwxyz'[Math.floor(Math.random()*26)];
+  return s;
+}
+function orgKeySuggest(name){
+  const base='org-'+orgSlug(name);
+  const used=(DB.orgs||[]).map(o=>o&&o.key);
+  if(!used.includes(base))return base;
+  let k;do{k=base+orgRand2()}while(used.includes(k));
+  return k;
+}
+function orgKeyAutoFill(){
+  const n=$('oName'),k=$('oKey');
+  if(n&&k&&!k.dataset.touched)k.value=orgKeySuggest(n.value);
+}
 function orgCreate(parentKey){
   const parent=parentKey||'';
   Shell.modal({title:parent?('新建子组织 · '+orgLabel(parent)):'新建组织',
@@ -1316,17 +1389,17 @@ function orgCreate(parentKey){
       '层级只决定归属与展示，不会让下级自动继承上级的文档。</div>'+
       '<div class="field"><label for="oParent">上级组织</label><select id="oParent">'+orgParentOptions(parent)+'</select></div>'+
       '<div class="field"><label for="oName">组织名称</label>'+
-        '<input id="oName" autocomplete="off" placeholder="例如：水利业务部"></div>'+
-      '<div class="field"><label for="oKey">组织标识（可留空）</label>'+
-        '<input id="oKey" autocomplete="off" placeholder="留空自动生成，如 org-m3k9x">'+
-        '<div class="form-hint">标识用于数据归属，创建后不可修改，只能用英文小写字母、数字和短横线。</div></div>',
+        '<input id="oName" autocomplete="off" placeholder="例如：水利业务部" oninput="orgKeyAutoFill()"></div>'+
+      '<div class="field"><label for="oKey">组织标识</label>'+
+        '<input id="oKey" autocomplete="off" placeholder="按名称自动生成，可修改" oninput="this.dataset.touched=\'1\'">'+
+        '<div class="form-hint">按组织名称的英文名生成（如 org-shuili），重名时自动追加两个随机字母。创建后不可修改。</div></div>',
     okText:'创建',onOk:async function(close){
       const name=($('oName').value||'').trim();
       const pk=($('oParent').value||'');
       if(name.length<2){Shell.modalError('组织名称至少 2 个字');return false}
       try{
         await apiWrite('/api/admin/orgs',{method:'POST',headers:{'Content-Type':'application/json'},
-          body:JSON.stringify({name:name,key:($('oKey').value||'').trim(),parentKey:pk})});
+          body:JSON.stringify({name:name,key:($('oKey').value||'').trim()||orgKeySuggest(name),parentKey:pk})});
         close();
         if(pk)orgFolded[pk]=false;      // 新建的子组织要能被看见，父节点先展开
         appToast('组织已创建','ok');
@@ -1754,7 +1827,9 @@ const RESULT_CN={SUCCESS:'成功',OK:'成功',DENIED:'已拒绝',ERROR:'异常',
 function resultCn(r,status){
   const key=String(r||'').toUpperCase();
   if(RESULT_CN[key])return RESULT_CN[key];
-  if(Number(status)>=400)return '失败';
+  const code=Number(status);
+  if(code>=400)return '失败';
+  if(code>=200&&code<400)return '成功';   // 审计表只有 HTTP 状态，兜底显示
   return '—';
 }
 

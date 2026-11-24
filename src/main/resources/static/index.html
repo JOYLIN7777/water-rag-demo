@@ -74,14 +74,20 @@
   .branch-note b{color:#2f5fe0}
   .branch-note a{margin-left:auto;color:#3b6ef5;text-decoration:none;white-space:nowrap;font-size:11.5px;cursor:pointer}
   .branch-note a:hover{text-decoration:underline}
-  /* 提示条展开后的其它分支清单：问题+回答预览都在当前页可见，一键切回该分支 */
-  .branch-list{display:none;flex:0 0 100%;margin-top:12px;border-top:1px solid #dbe6fb;padding-top:10px}
+  /* 历史提问清单：时间线样式，每条是一段"问+当时回答"，点一下就能看完整对话 */
+  .branch-list{display:none;flex:0 0 100%;margin-top:12px;border-top:1px solid #dbe6fb;padding:12px 0 2px 18px;position:relative}
   .branch-list.open{display:block}
-  .branch-item{border:1px solid #dbe6fb;border-radius:8px;background:#fff;padding:10px 12px;margin-bottom:8px}
-  .branch-item .bi-q{font-size:12px;color:var(--ink);font-weight:600;line-height:1.6}
-  .branch-item .bi-a{font-size:11.5px;color:var(--ink-2);line-height:1.6;margin-top:4px;max-height:42px;overflow:hidden}
-  .branch-item button{margin-top:8px;border:1px solid #c9d9ff;background:#f2f6ff;color:#315ec9;border-radius:6px;padding:3px 10px;font-size:11px;cursor:pointer}
+  .branch-list::before{content:'';position:absolute;left:5px;top:20px;bottom:12px;width:1px;background:#dbe6fb}
+  .branch-lead{flex:0 0 100%;font-size:11.5px;color:var(--muted);margin:0 0 10px}
+  .branch-item{position:relative;border:1px solid #dbe6fb;border-radius:8px;background:#fff;padding:10px 12px;margin-bottom:9px}
+  .branch-item::before{content:'';position:absolute;left:-16px;top:15px;width:7px;height:7px;border-radius:50%;background:#6b8be8;box-shadow:0 0 0 3px #eef3ff}
+  .branch-item .bi-tag{font-size:10.5px;color:var(--muted);font-weight:600;letter-spacing:.2px}
+  .branch-item .bi-q{font-size:12px;color:var(--ink);font-weight:600;line-height:1.6;margin-top:2px}
+  .branch-item .bi-a{font-size:11.5px;color:var(--ink-2);line-height:1.6;margin-top:4px;max-height:38px;overflow:hidden}
+  .branch-item .bi-a b{color:#4b5c78;font-weight:600}
+  .branch-item button{margin-top:8px;border:1px solid #c9d9ff;background:#f2f6ff;color:#315ec9;border-radius:6px;padding:4px 11px;font-size:11px;cursor:pointer}
   .branch-item button:hover{background:#e3ecff}
+  .branch-note .branch-back{color:#3b6ef5;cursor:pointer;font-size:11.5px;text-decoration:none;margin-left:12px;white-space:nowrap}
   /* 用户气泡：宽度有上限，超宽屏不拉成横幅，保持对话气泡形态 */
   .user-bubble{max-width:min(78%,760px);background:var(--primary-soft);color:#1e3a8a;border:1px solid #d6e4ff;border-radius:14px 14px 4px 14px;padding:12px 18px;font-size:14px;line-height:1.7;white-space:pre-wrap;box-shadow:var(--shadow-sm)}
   /* 回答卡片：占满主区，内部三层（标题栏/正文/引用）用底色与分隔线分层；
@@ -405,17 +411,32 @@ async function refreshBranchNote(id){
     const others=nodes.filter(n=>n&&n.role==='user'&&!chain.has(n.id));
     if(!others.length)return;
     const items=others.map(u=>({q:u,a:nodes.find(n=>n&&n.role==='assistant'&&n.parentId===u.id)}));
-    el.innerHTML='<span>⑃</span><span>本会话另有 <b>'+items.length+'</b> 轮提问保存在其它分支，点开可查看原回答或切回该分支</span>'+
-      '<a id="branchToggle">展开查看 →</a>'+
-      '<div class="branch-list" id="branchList">'+items.map(it=>
-        '<div class="branch-item"><div class="bi-q">问：'+escapeHtml(String(it.q.content||'').slice(0,160))+'</div>'+
-        '<div class="bi-a">'+(it.a?'答：'+escapeHtml(String(it.a.content||'').slice(0,120)):'（该轮暂无回答）')+'</div>'+
-        '<button onclick="switchBranch(\''+escapeHtml((it.a&&it.a.id)||it.q.id)+'\')">切换到这个分支 →</button></div>').join('')+'</div>';
+    // 用户不懂"分支"这个词——按实际体验说成"历史提问"：选一条就是看当时那段完整问答。
+    const allUsers=nodes.filter(n=>n&&n.role==='user');
+    const lastUser=allUsers.length?allUsers[allUsers.length-1]:null;
+    const lastAnswer=lastUser?nodes.find(n=>n&&n.role==='assistant'&&n.parentId===lastUser.id):null;
+    const atLatest=!!(lastUser&&chain.has(lastUser.id));
+    el.innerHTML='<span>⑃</span><span>这条会话还有 <b>'+items.length+'</b> 条历史提问，点开可查看当时的回答</span>'+
+      '<a id="branchToggle">查看 →</a>'+
+      (atLatest?'':'<a class="branch-back" id="branchBack">回到最新 →</a>')+
+      '<div class="branch-list" id="branchList">'+
+        '<div class="branch-lead">选一条查看当时的完整对话</div>'+
+        items.map((it,i)=>
+          '<div class="branch-item"><div class="bi-tag">历史提问 '+(i+1)+'</div>'+
+          '<div class="bi-q">问：'+escapeHtml(String(it.q.content||'').slice(0,160))+'</div>'+
+          '<div class="bi-a"><b>答：</b>'+(it.a?escapeHtml(String(it.a.content||'').slice(0,110)):'当时没有回答')+'</div>'+
+          '<button onclick="switchBranch(\''+escapeHtml((it.a&&it.a.id)||it.q.id)+'\')">查看这次对话 →</button></div>').join('')+
+      '</div>';
     el.style.display='';
     const list=document.getElementById('branchList');
     document.getElementById('branchToggle').onclick=function(){
       const open=list.classList.toggle('open');
-      this.textContent=open?'收起 ↑':'展开查看 →';
+      this.textContent=open?'收起 ↑':'查看 →';
+    };
+    const back=document.getElementById('branchBack');
+    if(back)back.onclick=function(){
+      if(lastAnswer)switchBranch(lastAnswer.id);
+      else if(lastUser)switchBranch(lastUser.id);
     };
   }catch(e){}
 }
@@ -434,7 +455,7 @@ async function switchBranch(nodeId){
     messages=list.map(m=>({role:m.role,content:m.content,sources:m.sources||[],streaming:false,
       usage:m.usage||null,nodeId:m.id||'',parentId:m.parentId||''}));
     msgStore[id]=messages;renderMessages();scrollBottom(true);refreshBranchNote(id);
-    toast('已切到该分支，原分支的对话随时可以再切回来','ok');
+    toast('已显示这次提问的完整对话，顶部还能再选其它提问','ok');
   }catch(e){showError('切换分支失败：'+e.message)}
 }
 // 注意：这里原来有个本地版 removeSession（只删内存+localStorage），侧栏 DOM 早已由

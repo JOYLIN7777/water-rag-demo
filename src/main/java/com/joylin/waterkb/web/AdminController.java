@@ -205,9 +205,15 @@ public class AdminController {
             throw new IllegalArgumentException("不能禁用自己或移除自己的管理员角色");
         }
         UserStore.UserAccount before = users.find(name);
-        if (before != null && before.groups().contains("admin")
-                && (!enabled || !groups.contains("admin")) && isLastAdmin(name)) {
-            throw new IllegalArgumentException("不能停用或降级最后一个管理员");
+        // 系统管理员账号是系统底座：不允许改显示名/角色/组织/状态。
+        // 仅保留"改自己密码"入口（走 reset-password，另有限制），避免被接管。
+        if (before != null && before.groups().contains("admin")) {
+            throw new IllegalArgumentException("系统管理员账号不可编辑");
+        }
+        // 非 admin 调用者不得自行提权进 admin 组
+        boolean callerAdmin = UserContext.get().hasGroup("admin");
+        if (!callerAdmin && groups.contains("admin")) {
+            throw new IllegalArgumentException("只有管理员可以授予管理员角色");
         }
         if (!users.update(name, str(body.get("displayName")), groups, str(body.get("tenant")), enabled)) {
             throw new IllegalArgumentException("账号不存在：" + name);
@@ -231,6 +237,10 @@ public class AdminController {
     @PostMapping("/users/{username}/reset-password")
     public Map<String, Object> resetPassword(@PathVariable String username, @RequestBody Map<String, Object> body) {
         String name = username.toLowerCase();
+        UserStore.UserAccount target = users.find(name);
+        if (target != null && target.groups().contains("admin")) {
+            throw new IllegalArgumentException("系统管理员账号的密码不可在用户管理中重置");
+        }
         if (!users.resetPassword(name, str(body.get("password")))) {
             throw new IllegalArgumentException("账号不存在，或新密码不足 8 位");
         }
@@ -362,7 +372,13 @@ public class AdminController {
             String action = String.valueOf(row.getOrDefault("action", ""));
             // 只认真正的登录/刷新端点；不能用 contains("login")，否则查询本接口自身也会被算进去
             if (action.endsWith("/api/auth/login") || action.endsWith("/api/auth/refresh")) {
-                out.add(row);
+                // 审计表只记 HTTP 状态，没有 result 字段；补一个供界面显示"结果"列
+                int code = 0;
+                try { code = Integer.parseInt(String.valueOf(row.getOrDefault("status", "0"))); }
+                catch (Exception ignored) { }
+                Map<String, Object> enriched = new LinkedHashMap<>(row);
+                enriched.put("result", code >= 200 && code < 400 ? "SUCCESS" : "FAIL");
+                out.add(enriched);
             }
         }
         return out;

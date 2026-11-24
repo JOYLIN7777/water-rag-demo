@@ -164,7 +164,7 @@ public class RagChatService {
                         ? promptTokens + completionTokens : u.getTotalTokens();
                 String model = activeChatModelName();
                 usageRecorder.record(userAtStart, model, promptTokens, completionTokens, durationMs,
-                        sessionId, question);
+                        sessionId, question, tenantAtStart);
                 usage = new LinkedHashMap<>();
                 usage.put("promptTokens", promptTokens);
                 usage.put("completionTokens", completionTokens);

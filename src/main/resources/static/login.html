@@ -154,11 +154,9 @@ async function pickLandingPage(){
     });
     if(r.ok){var j=await r.json();perms=new Set(j.permissions||[])}
   }catch(e){}
-  var groups=[];
-  try{groups=(JSON.parse(sessionStorage.getItem(KEY_USER)||'{}').groups)||[]}catch(e){}
-  var isAdmin=groups.indexOf('admin')>=0;
-  // 权限接口暂时不可用时，管理员仍可进后台，普通账号落个人中心而不是白屏
-  if(!perms.size)return isAdmin?'admin.html':'profile.html';
+  // 权限接口失败时不要信任客户端可篡改的 groups，统一落个人中心；
+  // 管理页自己有服务端权限复核，不会被这个前端选择带偏。
+  if(!perms.size)return 'profile.html';
   var routes=[
     ['chat:use','index.html'], ['admin:access','admin.html'],
     ['audit:read','governance.html'], ['model:read','models.html'],

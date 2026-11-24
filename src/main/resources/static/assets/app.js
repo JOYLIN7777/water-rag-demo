@@ -245,6 +245,8 @@
     hasPermission: hasPermission,
     /** 等权限清单就绪：功能页守卫用它保证判定时权限已加载 */
     permsReady: function () { return loadPermissions(); },
+    /** 后台改完角色权限后调用，强制重拉（返回 Promise） */
+    refreshPermissions: refreshPermissions,
     /** 诊断用：确认会话切换钩子是否真的绑上了（前端行为异常时先查这里） */
     handlerBound: function () { return typeof sessionChangeHandler === 'function'; },
     /** 供页面主动清理：删除会话时统一走这里，保证缓存/后端历史/首页副本一起清 */
@@ -928,14 +930,27 @@
     permsReady = (async function () {
       try {
         const r = await fetch('/api/auth/permissions');
-        if (!r.ok) return;
+        if (!r.ok) {
+          // 权限接口非 2xx：清空权限集并收敛菜单，不能让"权限加载失败"变成"全都可见"
+          ownedPermissions = new Set();
+          applySidebarPerms(); renderAdminEntry();
+          return;
+        }
         const j = await r.json();
         ownedPermissions = new Set(j.permissions || []);
         renderAdminEntry();
         applySidebarPerms();
-      } catch (e) { /* 权限接口失败时保持默认不显示，默认拒绝 */ }
+      } catch (e) {
+        ownedPermissions = new Set();
+        applySidebarPerms(); renderAdminEntry();   // 网络失败同样按无权限收敛
+      }
     })();
     return permsReady;
+  }
+  /** 角色权限在后台改动后强制重拉，避免当前页面一直用旧权限缓存 */
+  function refreshPermissions() {
+    permsReady = null;
+    return loadPermissions();
   }
   // 权限清单回来后二次收敛侧栏：renderSidebar 是同步渲染（当时权限多半还没回来），
   // 这里把无权限的导航项从 DOM 摘掉——菜单隐藏只是第一道门，页面内还有守卫

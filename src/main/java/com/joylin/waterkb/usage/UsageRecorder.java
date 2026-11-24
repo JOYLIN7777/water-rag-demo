@@ -41,7 +41,10 @@ public class UsageRecorder {
             // 用 ADD COLUMN IF NOT EXISTS 增量升级，不动历史行（老数据 question 为空，明细里显示"—"）。
             jdbc.execute("ALTER TABLE model_usage ADD COLUMN IF NOT EXISTS session_id VARCHAR(128)");
             jdbc.execute("ALTER TABLE model_usage ADD COLUMN IF NOT EXISTS question TEXT");
+            // 用量明细里带提问原文，必须按租户隔离，否则 analyst 能翻到其他部门的提问
+            jdbc.execute("ALTER TABLE model_usage ADD COLUMN IF NOT EXISTS tenant_id VARCHAR(64)");
             jdbc.execute("CREATE INDEX IF NOT EXISTS idx_model_usage_ts ON model_usage(ts DESC)");
+            jdbc.execute("CREATE INDEX IF NOT EXISTS idx_model_usage_tenant_ts ON model_usage(tenant_id, ts DESC)");
         } catch (Exception ignored) {
             // 表建不出来（如无 DB）只影响本地用量，主链路不受影响
         }
@@ -60,14 +63,21 @@ public class UsageRecorder {
      */
     public void record(String userId, String model, long promptTokens, long completionTokens,
                        long durationMs, String sessionId, String question) {
+        record(userId, model, promptTokens, completionTokens, durationMs, sessionId, question, "default");
+    }
+
+    /** tenantId 参与写入，查询时才能按部门过滤（admin 传 null 表示看全库） */
+    public void record(String userId, String model, long promptTokens, long completionTokens,
+                       long durationMs, String sessionId, String question, String tenantId) {
         try {
             jdbc.update("INSERT INTO model_usage(user_id,model,prompt_tokens,completion_tokens,duration_ms,"
-                            + "session_id,question) VALUES(?,?,?,?,?,?,?)",
+                            + "session_id,question,tenant_id) VALUES(?,?,?,?,?,?,?,?)",
                     userId == null ? "anonymous" : userId,
                     model == null || model.isBlank() ? "unknown" : model,
                     Math.max(0, promptTokens), Math.max(0, completionTokens), Math.max(0, durationMs),
                     sessionId == null ? "" : sessionId,
-                    question == null ? "" : question);
+                    question == null ? "" : question,
+                    tenantId == null || tenantId.isBlank() ? "default" : tenantId);
         } catch (Exception ignored) { }
     }
 
@@ -78,14 +88,21 @@ public class UsageRecorder {
      * @param limit 最多返回条数（默认 200，上限 500）
      */
     public List<Map<String, Object>> records(String scope, int limit) {
+        return records(scope, limit, null);
+    }
+
+    /** tenant 非空时只返回本部门明细；admin 传 null 看全库 */
+    public List<Map<String, Object>> records(String scope, int limit, String tenant) {
         int cap = Math.min(Math.max(limit <= 0 ? 200 : limit, 1), 500);
         LocalDate today = LocalDate.now(ZONE);
         LocalDate from = "month".equalsIgnoreCase(scope) ? today.withDayOfMonth(1) : today;
         java.sql.Timestamp start = java.sql.Timestamp.valueOf(from.atStartOfDay(ZONE).toLocalDateTime());
+        boolean scoped = tenant != null && !tenant.isBlank();
+        String where = "ts >= ?" + (scoped ? " AND tenant_id=?" : "");
         List<Map<String, Object>> out = new ArrayList<>();
         try {
             jdbc.query("SELECT ts,user_id,model,prompt_tokens,completion_tokens,duration_ms,session_id,question "
-                            + "FROM model_usage WHERE ts >= ? ORDER BY ts DESC LIMIT ?", rs -> {
+                            + "FROM model_usage WHERE " + where + " ORDER BY ts DESC LIMIT ?", rs -> {
                 Map<String, Object> row = new LinkedHashMap<>();
                 row.put("ts", rs.getTimestamp("ts") == null ? null : rs.getTimestamp("ts").toLocalDateTime().toString());
                 row.put("user", rs.getString("user_id"));
@@ -97,7 +114,7 @@ public class UsageRecorder {
                 row.put("sessionId", rs.getString("session_id"));
                 row.put("question", rs.getString("question"));
                 out.add(row);
-            }, start, cap);
+            }, scoped ? new Object[]{start, tenant, cap} : new Object[]{start, cap});
         } catch (Exception ignored) { }
         return out;
     }
@@ -106,27 +123,36 @@ public class UsageRecorder {
      * 本地聚合：今日/本月请求次数与 Token 消耗 + 按模型明细。
      * 返回结构与百炼官方 summary 一致，前端无需区分数据来源。
      */
-    public Map<String, Object> summary() {
+    public Map<String, Object> summary() { return summary(null); }
+
+    /** tenant 非空时只统计本部门；admin 传 null 看全库 */
+    public Map<String, Object> summary(String tenant) {
         LocalDate today = LocalDate.now(ZONE);
+        boolean scoped = tenant != null && !tenant.isBlank();
+        String todayWhere = "ts >= ?" + (scoped ? " AND tenant_id=?" : "");
+        Object[] todayArgs = scoped ? new Object[]{java.sql.Timestamp.valueOf(today.atStartOfDay(ZONE).toLocalDateTime()), tenant}
+                : new Object[]{java.sql.Timestamp.valueOf(today.atStartOfDay(ZONE).toLocalDateTime())};
         Map<String, Object> totals = new LinkedHashMap<>();
-        totals.put("todayRequests", count("ts >= ?", java.sql.Timestamp.valueOf(today.atStartOfDay(ZONE).toLocalDateTime())));
-        totals.put("todayTokens", tokens("ts >= ?", java.sql.Timestamp.valueOf(today.atStartOfDay(ZONE).toLocalDateTime())));
+        totals.put("todayRequests", count(todayWhere, todayArgs));
+        totals.put("todayTokens", tokens(todayWhere, todayArgs));
         java.sql.Timestamp monthStart = java.sql.Timestamp.valueOf(today.withDayOfMonth(1).atStartOfDay(ZONE).toLocalDateTime());
-        totals.put("monthRequests", count("ts >= ?", monthStart));
-        totals.put("monthTokens", tokens("ts >= ?", monthStart));
+        String monthWhere = "ts >= ?" + (scoped ? " AND tenant_id=?" : "");
+        Object[] monthArgs = scoped ? new Object[]{monthStart, tenant} : new Object[]{monthStart};
+        totals.put("monthRequests", count(monthWhere, monthArgs));
+        totals.put("monthTokens", tokens(monthWhere, monthArgs));
 
         List<Map<String, Object>> models = new ArrayList<>();
         try {
             jdbc.query("SELECT model, COUNT(*) AS reqs, COALESCE(SUM(prompt_tokens),0) AS pt, "
                             + "COALESCE(SUM(completion_tokens),0) AS ct FROM model_usage "
-                            + "WHERE ts >= ? GROUP BY model ORDER BY reqs DESC", rs -> {
+                            + "WHERE " + monthWhere + " GROUP BY model ORDER BY reqs DESC", rs -> {
                 Map<String, Object> row = new LinkedHashMap<>();
                 row.put("model", rs.getString("model"));
                 row.put("requests", rs.getLong("reqs"));
                 row.put("inputTokens", rs.getLong("pt"));
                 row.put("outputTokens", rs.getLong("ct"));
                 models.add(row);
-            }, monthStart);
+            }, monthArgs);
         } catch (Exception ignored) { }
 
         Map<String, Object> result = new LinkedHashMap<>();
@@ -139,18 +165,18 @@ public class UsageRecorder {
         return result;
     }
 
-    private long count(String where, Object arg) {
+    private long count(String where, Object... args) {
         try {
-            Long n = jdbc.queryForObject("SELECT COUNT(*) FROM model_usage WHERE " + where, Long.class, arg);
+            Long n = jdbc.queryForObject("SELECT COUNT(*) FROM model_usage WHERE " + where, Long.class, args);
             return n == null ? 0 : n;
         } catch (Exception e) { return 0; }
     }
 
-    private long tokens(String where, Object arg) {
+    private long tokens(String where, Object... args) {
         try {
             Long n = jdbc.queryForObject(
                     "SELECT COALESCE(SUM(prompt_tokens+completion_tokens),0) FROM model_usage WHERE " + where,
-                    Long.class, arg);
+                    Long.class, args);
             return n == null ? 0 : n;
         } catch (Exception e) { return 0; }
     }

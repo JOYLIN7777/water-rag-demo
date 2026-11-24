@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.joylin.waterkb.security.Permission;
 import com.joylin.waterkb.security.RequirePermission;
+import com.joylin.waterkb.security.UserContext;
 import com.joylin.waterkb.usage.UsageRecorder;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -75,7 +76,9 @@ public class UsageController {
      */
     @GetMapping("/summary")
     public Map<String, Object> summary() {
-        Map<String, Object> local = recorder.summary();
+        // 用量明细里有提问原文，普通角色只能看本部门；admin 看全库
+        String scopeTenant = UserContext.get().hasGroup("admin") ? null : UserContext.get().tenantId();
+        Map<String, Object> local = recorder.summary(scopeTenant);
         // 未配置官方工作空间：直接用本地真实调用记录
         if (workspaceId.isBlank() || apiKey == null || apiKey.isBlank()) {
             return local;
@@ -128,7 +131,8 @@ public class UsageController {
     @GetMapping("/records")
     public Map<String, Object> records(@RequestParam(defaultValue = "today") String scope,
                                        @RequestParam(defaultValue = "200") int limit) {
-        List<Map<String, Object>> rows = recorder.records(scope, limit);
+        String scopeTenant = UserContext.get().hasGroup("admin") ? null : UserContext.get().tenantId();
+        List<Map<String, Object>> rows = recorder.records(scope, limit, scopeTenant);
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("scope", "month".equalsIgnoreCase(scope) ? "month" : "today");
         result.put("records", rows);

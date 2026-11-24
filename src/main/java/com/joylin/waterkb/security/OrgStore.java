@@ -123,7 +123,7 @@ public class OrgStore {
      * 新建组织（可挂在任意节点下）。
      *
      * @param name      组织名称（2-20 字）
-     * @param key       组织标识；留空自动生成 org-xxxxxx（中文名没法转拼音，不硬猜）
+     * @param key       组织标识；前端按名称英文名生成（如 org-shuili），重名自动追加 2 个随机字母
      * @param parentKey 上级组织键；空字符串/null 表示顶层
      * @return 新组织键
      */
@@ -133,11 +133,18 @@ public class OrgStore {
         if (n.length() < 2 || n.length() > 20) throw new IllegalArgumentException("组织名称需 2-20 个字");
         String k = key == null ? "" : key.trim().toLowerCase();
         if (k.isEmpty()) {
-            k = "org-" + Long.toString(System.currentTimeMillis(), 36);
+            // 前端总会传按名称生成的英文标识；API 直调时取名称里的 ASCII 兜底
+            String ascii = n.replaceAll("[^A-Za-z0-9]+", "-").replaceAll("^-|-$", "").toLowerCase();
+            k = "org-" + (ascii.isEmpty() ? "unit" : ascii);
+            if (k.length() > 28) k = k.substring(0, 28).replaceAll("-$", "");
         } else if (!k.matches("^[a-z][a-z0-9-]{1,31}$")) {
             throw new IllegalArgumentException("组织标识需以小写字母开头，2-32 位，只能含小写字母、数字、短横线");
         }
-        if (exists(k)) throw new IllegalArgumentException("组织标识「" + k + "」已被占用");
+        // 重名不再报错：追加 2 个随机字母，直到不冲突（按用户约定的生成规则）
+        if (exists(k)) {
+            String base = k;
+            do { k = base + randomLetters(2); } while (exists(k));
+        }
         String parent = parentKey == null ? "" : parentKey.trim();
         if (!parent.isEmpty() && !exists(parent)) {
             throw new IllegalArgumentException("上级组织不存在：" + parent);
@@ -155,6 +162,13 @@ public class OrgStore {
     /** 兼容旧调用：建在顶层 */
     public String create(String name, String key) {
         return create(name, key, null);
+    }
+
+    private static String randomLetters(int n) {
+        java.security.SecureRandom rnd = new java.security.SecureRandom();
+        StringBuilder sb = new StringBuilder(n);
+        for (int i = 0; i < n; i++) sb.append((char) ('a' + rnd.nextInt(26)));
+        return sb.toString();
     }
 
     /** 重命名组织：只改显示名，组织键与上级关系都不动 */
