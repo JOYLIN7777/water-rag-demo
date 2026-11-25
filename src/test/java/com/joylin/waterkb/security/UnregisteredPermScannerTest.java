@@ -15,21 +15,19 @@ import static org.mockito.Mockito.*;
 class UnregisteredPermScannerTest {
 
     @Test
-    void 已注册权限码不出现在快捷列表() throws Exception {
+    void 已注册权限码不出现在快捷列表() {
         JdbcTemplate jdbc = mock(JdbcTemplate.class);
-        // 模拟所有扫描到的码都已注册：从清单取真实节点码，避免新增细粒度码后测试过期
-        String manifest = new String(java.util.Objects.requireNonNull(
-                getClass().getResourceAsStream("/static/assets/perm-manifest.js")).readAllBytes(),
-                java.nio.charset.StandardCharsets.UTF_8);
-        List<String> all = new java.util.ArrayList<>();
-        java.util.regex.Matcher m = java.util.regex.Pattern
-                .compile("code: '([a-z][a-z0-9_.-]*:[a-z][a-z0-9_.-]*)'").matcher(manifest);
-        while (m.find()) all.add(m.group(1));
+        // 把 Vue 源码里所有 has('xxx') 都视为已注册，扫描结果应为空
+        List<String> all = List.of("chat:use", "doc:read", "doc:write_chat",
+                "doc:write_batch", "doc:write_admin", "doc:chunks", "doc:delete",
+                "user:read", "user:write", "role:read", "perm:read", "admin:docs",
+                "model:read", "model:write", "usage:read", "loginlog:read", "audit:read",
+                "search:use", "tree:use", "loginlog:export", "audit:export");
         when(jdbc.queryForList(anyString(), eq(String.class))).thenReturn(all);
         RequestMappingHandlerMapping mapping = mock(RequestMappingHandlerMapping.class);
         when(mapping.getHandlerMethods()).thenReturn(Map.of());
         UnregisteredPermScanner scanner = new UnregisteredPermScanner(jdbc, mapping);
-        assertTrue(scanner.scan().isEmpty(), "真实页面/接口的权限码都已注册时，快捷列表应为空");
+        assertTrue(scanner.scan().isEmpty(), "全部在用码都已注册时，快捷列表应为空");
     }
 
     @Test
@@ -40,7 +38,7 @@ class UnregisteredPermScannerTest {
         when(mapping.getHandlerMethods()).thenReturn(Map.of());
         UnregisteredPermScanner scanner = new UnregisteredPermScanner(jdbc, mapping);
         List<Map<String, Object>> list = scanner.scan();
-        assertFalse(list.isEmpty(), "没有任何已注册码时，应扫出前端 data-perm 声明");
+        assertFalse(list.isEmpty(), "没有任何已注册码时，应扫出 Vue 组件里的权限声明");
         assertTrue(list.stream().anyMatch(x -> String.valueOf(x.get("code")).startsWith("doc:write")),
                 "应包含问答页上传按钮的 doc:write 系列权限码");
         assertTrue(list.stream().allMatch(x -> x.get("sources") instanceof List), "每条都要带来源");

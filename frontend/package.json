@@ -3,19 +3,28 @@
   "private": true,
   "version": "1.0.0",
   "type": "module",
-  "description": "水利知识库智能问答系统前端 - Vue 3 + Vite",
+  "description": "水利知识库智能问答系统 - Vue 3 + TypeScript + Pinia + Element Plus",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
-    "preview": "vite preview"
+    "build": "vue-tsc --noEmit && vite build",
+    "build:fast": "vite build",
+    "preview": "vite preview",
+    "typecheck": "vue-tsc --noEmit"
   },
   "dependencies": {
-    "vue": "^3.5.13",
+    "@element-plus/icons-vue": "^2.3.2",
+    "dompurify": "^3.2.4",
+    "element-plus": "^2.14.8",
     "marked": "^15.0.6",
-    "dompurify": "^3.2.4"
+    "pinia": "^2.3.1",
+    "vue": "^3.5.13",
+    "vue-router": "^4.6.5"
   },
   "devDependencies": {
+    "@types/node": "^26.6.8",
     "@vitejs/plugin-vue": "^5.2.1",
-    "vite": "^6.0.11"
+    "typescript": "^5.9.3",
+    "vite": "^6.0.11",
+    "vue-tsc": "^2.2.12"
   }
 }

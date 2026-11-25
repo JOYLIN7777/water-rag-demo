@@ -22,6 +22,8 @@
         <spring-ai.version>1.0.1</spring-ai.version>
         <tika.version>3.2.3</tika.version>
         <poi.version>5.4.1</poi.version>
+        <!-- 设为 true 可跳过前端构建，使用已有 static 产物 -->
+        <skipFrontend>false</skipFrontend>
     </properties>
 
     <dependencyManagement>
@@ -113,6 +115,83 @@
             <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
+            </plugin>
+            <!-- 前端构建：mvn package 时自动 npm ci + vite build，产物直接进 static。
+                 -DskipFrontend 可跳过（只用现有 static 产物）。 -->
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>exec-maven-plugin</artifactId>
+                <version>3.1.0</version>
+                <executions>
+                    <execution>
+                        <id>npm-install</id>
+                        <phase>generate-resources</phase>
+                        <goals><goal>exec</goal></goals>
+                        <configuration>
+                            <skip>${skipFrontend}</skip>
+                            <executable>npm</executable>
+                            <arguments>
+                                <argument>ci</argument>
+                                <argument>--cache</argument>
+                                <argument>./.npm-cache</argument>
+                                <argument>--no-audit</argument>
+                                <argument>--no-fund</argument>
+                            </arguments>
+                            <workingDirectory>${project.basedir}/frontend</workingDirectory>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>npm-build</id>
+                        <phase>generate-resources</phase>
+                        <goals><goal>exec</goal></goals>
+                        <configuration>
+                            <skip>${skipFrontend}</skip>
+                            <executable>npm</executable>
+                            <arguments><argument>run</argument><argument>build:fast</argument></arguments>
+                            <workingDirectory>${project.basedir}/frontend</workingDirectory>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <!-- 构建前清掉 target/classes/static，避免旧 static 页残留混入 jar（增量构建坑） -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-antrun-plugin</artifactId>
+                <version>3.1.0</version>
+                <executions>
+                    <execution>
+                        <id>clean-stale-static</id>
+                        <phase>generate-resources</phase>
+                        <goals><goal>run</goal></goals>
+                        <configuration>
+                            <target>
+                                <delete dir="${project.build.outputDirectory}/static" />
+                            </target>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <!-- 把 vite 产物复制进 Spring Boot 静态资源目录 -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-resources-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>copy-frontend-dist</id>
+                        <phase>process-resources</phase>
+                        <goals><goal>copy-resources</goal></goals>
+                        <configuration>
+                            <skip>${skipFrontend}</skip>
+                            <outputDirectory>${project.basedir}/src/main/resources/static</outputDirectory>
+                            <resources>
+                                <resource>
+                                    <directory>${project.basedir}/frontend/dist</directory>
+                                    <filtering>false</filtering>
+                                </resource>
+                            </resources>
+                        </configuration>
+                    </execution>
+                </executions>
             </plugin>
         </plugins>
     </build>
