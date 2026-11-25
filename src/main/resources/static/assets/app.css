@@ -227,6 +227,14 @@ a{color:var(--primary);text-decoration:none}
 input[type=text],input[type=password],input:not([type]),select,textarea{
   width:100%;padding:9px 11px;border:1px solid #d9e0ec;border-radius:8px;font-size:13px;outline:0;background:#fff;color:var(--ink);transition:all .15s
 }
+/* 原生 select 的箭头按钮会另画一块区域，和圆角输入框不齐；自绘箭头保持整框统一。
+   注意必须写在上面简写规则之后且选择器特异性更高，否则 background/padding 简写会把箭头冲掉。 */
+.field select,select.field,select{
+  appearance:none;-webkit-appearance:none;padding-right:34px;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5 6 6.5 11 1.5' fill='none' stroke='%2355668c' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat:no-repeat;background-position:right 12px center
+}
+.field .toolbar select,.field .filter-item select,.toolbar select,.filter-item select{padding-right:10px;background-image:none}
 .field input:focus,.field select:focus,.field textarea:focus,
 input:focus,select:focus,textarea:focus{border-color:var(--primary);box-shadow:0 0 0 3px rgba(59,110,245,.12)}
 input::placeholder,textarea::placeholder{color:#aab3c2}
