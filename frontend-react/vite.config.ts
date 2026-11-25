@@ -10,7 +10,8 @@ export default defineConfig({
   server: {
     port: 5174,
     proxy: {
-      '/api': { target: 'http://localhost:18080', changeOrigin: true }
+      '/api': { target: 'http://localhost:18080', changeOrigin: true },
+      '/assets/logo.svg': { target: 'http://localhost:18080', changeOrigin: true }
     }
   },
   build: {

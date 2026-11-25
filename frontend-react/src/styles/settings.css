@@ -1,0 +1,18 @@
+  .setting-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px}
+  .setting-card{display:flex;align-items:flex-start;gap:14px;background:#fff;border:1px solid var(--line);border-radius:var(--radius);
+    padding:20px;text-decoration:none;box-shadow:var(--shadow-sm);transition:all .18s}
+  .setting-card:hover{border-color:#b9cbff;box-shadow:0 8px 22px rgba(59,110,245,.13);transform:translateY(-2px)}
+  .setting-card.locked{opacity:.55;cursor:not-allowed}
+  .setting-card.locked:hover{transform:none;border-color:var(--line);box-shadow:var(--shadow-sm)}
+  .setting-icon{width:44px;height:44px;border-radius:12px;flex:0 0 44px;background:var(--primary-soft);color:var(--primary);
+    display:flex;align-items:center;justify-content:center}
+  .setting-icon svg{width:22px;height:22px}
+  .setting-text{min-width:0;flex:1}
+  .setting-name{font-size:15px;font-weight:650;color:var(--ink);display:flex;align-items:center;gap:9px}
+  .setting-desc{font-size:12.5px;color:var(--ink-2);line-height:1.7;margin-top:7px}
+  .setting-go{font-size:11.5px;color:var(--primary);margin-top:12px;display:inline-flex;align-items:center;gap:4px}
+  .setting-card.locked .setting-go{color:var(--muted)}
+  /* React 版修正：旧版这三个 span 靠父级 flex 才分行；这里显式 block 保证描述与入口分行 */
+  .setting-text{display:block}
+  .setting-desc,.setting-go{display:block}
+  .setting-go{margin-top:12px}
