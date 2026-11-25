@@ -21,3 +21,4 @@ frontend-react/node_modules/
 frontend-react/.npm-cache/
 frontend-react/dist/
 *.tsbuildinfo
+target/login-rsa-private.b64

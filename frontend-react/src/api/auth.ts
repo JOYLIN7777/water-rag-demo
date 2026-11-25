@@ -42,9 +42,9 @@ export function scope(): string {
   return u && u.user ? String(u.user) : 'demo'
 }
 
-/** RSA-OAEP 加密密码，对齐旧版 crypto.js */
+/** RSA-OAEP 加密密码。缓存 CryptoKey，但每次都校验服务端公钥指纹——服务重启换了密钥要立刻失效 */
 let cachedKey: CryptoKey | null = null
-let cachedPromise: Promise<CryptoKey> | null = null
+let cachedFingerprint = ''
 
 function toBytes(b64: string): Uint8Array {
   const raw = atob(b64)
@@ -53,27 +53,23 @@ function toBytes(b64: string): Uint8Array {
   return out
 }
 
-async function publicKey(): Promise<CryptoKey> {
-  if (cachedKey) return cachedKey
-  if (!cachedPromise) {
-    cachedPromise = (async () => {
-      const r = await fetch('/api/auth/public-key')
-      if (!r.ok) throw new AppError('无法获取加密公钥，请稍后重试')
-      const j = await r.json() as { publicKey: string }
-      const bytes = toBytes(j.publicKey)
-      return crypto.subtle.importKey(
-        'spki',
-        bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer,
-        { name: 'RSA-OAEP', hash: 'SHA-256' }, false, ['encrypt'])
-    })()
-  }
-  try {
-    cachedKey = await cachedPromise
-    return cachedKey
-  } catch (e) {
-    cachedPromise = null   // 失败时允许重试，不要永久缓存失败的 Promise
-    throw e
-  }
+async function importPublicKey(b64: string): Promise<CryptoKey> {
+  const bytes = toBytes(b64)
+  return crypto.subtle.importKey(
+    'spki',
+    bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer,
+    { name: 'RSA-OAEP', hash: 'SHA-256' }, false, ['encrypt'])
+}
+
+async function publicKey(forceReload = false): Promise<CryptoKey> {
+  const r = await fetch('/api/auth/public-key')
+  if (!r.ok) throw new AppError('无法获取加密公钥，请稍后重试')
+  const j = await r.json() as { publicKey: string }
+  const fingerprint = j.publicKey
+  if (!forceReload && cachedKey && cachedFingerprint === fingerprint) return cachedKey
+  cachedKey = await importPublicKey(fingerprint)
+  cachedFingerprint = fingerprint
+  return cachedKey
 }
 
 export async function encryptPassword(value: string): Promise<string> {
@@ -82,7 +78,7 @@ export async function encryptPassword(value: string): Promise<string> {
     console.warn('当前不是安全上下文，密码无法加密传输')
     return value
   }
-  const key = await publicKey()
+  let key = await publicKey()
   const buf = await crypto.subtle.encrypt({ name: 'RSA-OAEP' }, key, new TextEncoder().encode(value))
   let bin = ''
   new Uint8Array(buf).forEach(b => { bin += String.fromCharCode(b) })

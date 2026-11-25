@@ -1,8 +1,9 @@
 (function (global) {
-  // 登录/密码类接口的公钥加密工具：公钥由服务端启动时生成，不落盘、不进 Git。
-  // 仅在 localhost/HTTPS 下可用（Web Crypto 安全上下文要求），符合部署场景。
+  // 登录/密码类接口的公钥加密工具。仅在 localhost/HTTPS 下可用（Web Crypto 安全上下文要求）。
+  // 缓存 CryptoKey 但每次校验服务端公钥指纹：服务重启换了密钥要立刻失效，
+  // 否则用旧公钥加密的密码服务端解不开，表现为"密码正确却登录失败"。
   let cachedKey = null;
-  let cachedPromise = null;
+  let cachedFingerprint = '';
 
   function toBytes(b64) {
     const raw = atob(b64);
@@ -12,18 +13,14 @@
   }
 
   async function publicKey() {
-    if (cachedKey) return cachedKey;
-    if (!cachedPromise) {
-      cachedPromise = (async function () {
-        const r = await fetch('/api/auth/public-key');
-        if (!r.ok) throw new Error('无法获取加密公钥');
-        const j = await r.json();
-        return await crypto.subtle.importKey(
-          'spki', toBytes(j.publicKey),
-          { name: 'RSA-OAEP', hash: 'SHA-256' }, false, ['encrypt']);
-      })();
-    }
-    cachedKey = await cachedPromise;
+    const r = await fetch('/api/auth/public-key');
+    if (!r.ok) throw new Error('无法获取加密公钥');
+    const j = await r.json();
+    if (cachedKey && cachedFingerprint === j.publicKey) return cachedKey;
+    cachedKey = await crypto.subtle.importKey(
+      'spki', toBytes(j.publicKey),
+      { name: 'RSA-OAEP', hash: 'SHA-256' }, false, ['encrypt']);
+    cachedFingerprint = j.publicKey;
     return cachedKey;
   }
 

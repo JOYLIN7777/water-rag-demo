@@ -83,6 +83,10 @@ services:
       REDIS_PORT: 6379
       # Key 从启动 compose 的 shell 环境变量读取，不写进文件、不进 Git
       AI_API_KEY: ${AI_API_KEY}
+      # 登录密码加密用的 RSA 私钥（PKCS#8 Base64）：所有实例共用一把，重启/多实例登录不受影响。
+      # 本地生成：openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 | openssl pkcs8 -topk8 -nocrypt -outform DER | base64 -w0
+      # 从 shell 环境变量注入，永不写进文件、不进 Git；未配置时后端启动时随机生成（仅开发可用）。
+      LOGIN_RSA_PRIVATE_KEY: ${LOGIN_RSA_PRIVATE_KEY:-}
       AI_BASE_URL: ${AI_BASE_URL:-https://dashscope.aliyuncs.com/compatible-mode}
       AI_CHAT_MODEL: ${AI_CHAT_MODEL:-qwen-plus}
       AI_EMBEDDING_MODEL: ${AI_EMBEDDING_MODEL:-text-embedding-v3}
