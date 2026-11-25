@@ -702,11 +702,17 @@ async function guard(){
     $('adminRoot').style.display='flex';
     const u=WrkAuth.getUser()||{};
     // 头像/名称进入后台自己的个人中心（后台相对独立，不跳问答系统页面）
-    $('adminUserBlock').innerHTML=
-      '<a class="user-avatar" href="javascript:void(0)" onclick="openProfile()" title="个人中心">'+(window.Shell?Shell.avatar(u.displayName||u.user||'管','md'):esc((u.displayName||u.user||'管').slice(0,1)))+'</a>'+
-      '<a class="user-meta" href="javascript:void(0)" onclick="openProfile()"><div class="user-name">'+esc(u.displayName||u.user)+'</div>'+
-      '<div class="user-tenant">'+esc(tl(u.tenant))+'</div></a>'+
-      '<button class="user-logout" title="退出登录" onclick="Shell.logout()">⏻</button>';
+    const av=E('a',{className:'user-avatar',attrs:{href:'javascript:void(0)',title:'个人中心'},
+      on:{click:()=>openProfile()}});
+    av.append((window.Shell?Shell.avatar(u.displayName||u.user||'管','md')
+      :document.createTextNode((u.displayName||u.user||'管').slice(0,1))));
+    $('adminUserBlock').replaceChildren(av,
+      E('a',{className:'user-meta',attrs:{href:'javascript:void(0)'},on:{click:()=>openProfile()}},[
+        E('div',{className:'user-name',text:u.displayName||u.user}),
+        E('div',{className:'user-tenant',text:tl(u.tenant)})
+      ]),
+      E('button',{className:'user-logout',type:'button',title:'退出登录',text:'⏻',
+        on:{click:()=>Shell.logout()}}));
     // 非管理员只看自己被授权的日志面板，不加载用户/角色等后台主数据
     if(!isAdmin){
       goPanel(panel);
@@ -1073,28 +1079,54 @@ function renderUserTable(page){
   if(USER_PAGE.page>pages)USER_PAGE.page=pages;
   const start=(USER_PAGE.page-1)*size;
   const rows=list.slice(start,start+size);
-  $('uTable').innerHTML=rows.length?rows.map((u,i)=>{
+  const trs=rows.length?rows.map((u,i)=>{
     const gi=start+i;   // 全量索引，详情/编辑弹框按它取数据
     const isAdmin=!!(u.groups||[]).includes('admin');
-    const sw=isAdmin
-      ? '<span class="tag ok">正常</span><span style="margin-left:8px;font-size:11.5px;color:var(--muted)">系统管理员不可停用</span>'
-      : '<label class="switch" title="'+(u.enabled?'点击停用该账号':'点击启用该账号')+'">'+
-        '<input type="checkbox"'+(u.enabled?' checked':'')+' onchange="toggleUserEnabled(\''+esc(u.username)+'\',this.checked,this)">'+
-        '<span class="track"></span><span class="thumb"></span></label>'+
-        '<span style="margin-left:8px;font-size:11.5px;color:'+(u.enabled?'var(--ok)':'var(--muted)')+'">'+(u.enabled?'正常':'停用')+'</span>';
-    const ops=isAdmin
-      ? '<span style="color:var(--muted);font-size:11.5px" title="系统管理员账号受保护，不能编辑/重置/删除">不可编辑</span>'
-      : '<button class="op-btn" data-perm="user:write" onclick="editUser('+gi+')">编辑</button>'+
-        '<button class="op-btn warn" data-perm="user:resetpwd" onclick="resetUserPwd('+gi+')">重置密码</button>'+
-        '<button class="op-btn danger" data-perm="user:write" onclick="delUser('+gi+')">删除</button>';
-    return '<tr><td class="row-idx">'+(gi+1)+'</td>'+
-      '<td><span style="display:inline-flex;align-items:center;gap:8px">'+
-        (window.Shell?Shell.avatar(u.displayName||u.username,'sm'):'')+
-        '<a class="name" href="javascript:void(0)" style="color:var(--primary);text-decoration:none" onclick="showUser('+gi+')">'+esc(u.username)+'</a></span></td>'+
-      '<td>'+esc(u.displayName)+'</td><td>'+roleTags(u.groups)+'</td><td>'+esc(tl(u.tenant))+'</td>'+
-      '<td>'+sw+'</td>'+
-      '<td>'+ops+'</td></tr>';
-  }).join(''):'<tr><td colspan="7" class="empty-inline">没有符合条件的账号</td></tr>';
+    const td=idx=>E('td',{className:idx===0?'row-idx':''});
+    const tr=E('tr');
+    tr.append(td(0));
+    tr.firstChild.textContent=String(gi+1);
+    // 账号列：头像 + 可点名称
+    const nameCell=td(1);
+    const inline=E('span',{attrs:{style:'display:inline-flex;align-items:center;gap:8px'}});
+    if(window.Shell)inline.append(Shell.avatar(u.displayName||u.username,'sm'));
+    inline.append(E('a',{className:'name',text:u.username,
+      attrs:{href:'javascript:void(0)',style:'color:var(--primary);text-decoration:none'},
+      on:{click:()=>showUser(gi)}}));
+    nameCell.append(inline);tr.append(nameCell);
+    tr.append(E('td',{text:u.displayName||''}));
+    const roleCell=td(4);roleCell.innerHTML=roleTags(u.groups);tr.append(roleCell); // roleTags 存量字符串
+    tr.append(E('td',{text:tl(u.tenant)}));
+    // 状态列
+    const stCell=td(5);
+    if(isAdmin){
+      stCell.append(UI.createTag({text:'正常',variant:'ok'}),
+        E('span',{text:'系统管理员不可停用',attrs:{style:'margin-left:8px;font-size:11.5px;color:var(--muted)'}}));
+    }else{
+      const label=E('label',{className:'switch',title:u.enabled?'点击停用该账号':'点击启用该账号'});
+      const cb=E('input',{attrs:{type:'checkbox'}});cb.checked=!!u.enabled;
+      cb.addEventListener('change',()=>toggleUserEnabled(u.username,cb.checked,cb));
+      label.append(cb,E('span',{className:'track'}),E('span',{className:'thumb'}));
+      stCell.append(label,E('span',{text:u.enabled?'正常':'停用',
+        attrs:{style:'margin-left:8px;font-size:11.5px;color:'+(u.enabled?'var(--ok)':'var(--muted)')}}));
+    }
+    tr.append(stCell);
+    // 操作列
+    const opCell=td(6);
+    if(isAdmin){
+      opCell.append(E('span',{text:'不可编辑',attrs:{style:'color:var(--muted);font-size:11.5px',
+        title:'系统管理员账号受保护，不能编辑/重置/删除'}}));
+    }else{
+      opCell.append(
+        E('button',{className:'op-btn',type:'button',text:'编辑',dataset:{perm:'user:write'},on:{click:()=>editUser(gi)}}),
+        E('button',{className:'op-btn warn',type:'button',text:'重置密码',dataset:{perm:'user:resetpwd'},on:{click:()=>resetUserPwd(gi)}}),
+        E('button',{className:'op-btn danger',type:'button',text:'删除',dataset:{perm:'user:write'},on:{click:()=>delUser(gi)}})
+      );
+    }
+    tr.append(opCell);
+    return tr;
+  }):[UI.createEmptyRow({text:'没有符合条件的账号',colspan:7,inline:true})];
+  $('uTable').replaceChildren(...trs);
   $('uTable')._rows=list;
   const fh=$('uFilterHint');
   if(fh){
@@ -1151,8 +1183,8 @@ function fillRoleFilter(){
   const sel=$('uRole');if(!sel)return;
   const cur=sel.value;
   const roles=[...new Set((DB.users||[]).flatMap(u=>u.groups||[]))];
-  sel.innerHTML='<option value="">全部角色</option>'+
-    roles.map(g=>'<option value="'+esc(g)+'">'+esc(gl(g))+'</option>').join('');
+  sel.replaceChildren(E('option',{text:'全部角色',attrs:{value:''}}),
+    ...roles.map(g=>E('option',{text:gl(g),attrs:{value:g}})));
   sel.value=roles.indexOf(cur)>=0?cur:'';
 }
 
@@ -2389,12 +2421,15 @@ function openProfile(){
   const tenant=(acc&&acc.tenant)||u.tenant||'default';
   const enabled=!(acc&&acc.enabled===false);
 
-  $('pfAvatar').innerHTML=Shell.avatar(name,'xl');
+  $('pfAvatar').replaceChildren(Shell.avatar(name,'xl'));
   $('pfName').textContent=name;
   $('pfAccount').textContent='@'+(u.user||'—');
-  $('pfRoles').innerHTML=roles.length?roleTags(roles):'<span class="tag off">未分配角色</span>';
+  if(roles.length){ $('pfRoles').innerHTML=roleTags(roles); }  // roleTags 存量返回字符串，待其调用方一并迁移
+  else $('pfRoles').replaceChildren(UI.createTag({text:'未分配角色',variant:'off'}));
   $('pfTenant').textContent=tl(tenant);
-  $('pfStatus').innerHTML=enabled?'<span style="color:var(--ok)">正常</span>':'<span style="color:var(--danger)">已停用</span>';
+  $('pfStatus').replaceChildren(E('span',{
+    attrs:{style:enabled?'color:var(--ok)':'color:var(--danger)'}, text:enabled?'正常':'已停用'
+  }));
   const permCount=(DB.myPerms||[]).length;
   $('pfPermCount').textContent=permCount+' 项';
   $('pfPermTotal').textContent=permCount+' 项';
