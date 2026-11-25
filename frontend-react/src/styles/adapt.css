@@ -17,3 +17,8 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC'
 /* 侧栏图标：AntD 图标对齐旧版 nav-icon */
 .sidebar .nav-item .anticon { width: 16px; height: 16px; font-size: 14px; opacity: .85; }
 .sidebar .nav-item.active .anticon { opacity: 1; }
+
+/* AntD Modal 居中对齐（旧版自绘弹框是 flex 居中，AntD 默认 top） */
+.ant-modal-wrap { display: flex; align-items: center; justify-content: center; }
+.ant-modal { top: 0 !important; padding: 0 !important; margin: auto !important; }
+.ant-modal-confirm .ant-modal-body { padding: 24px !important; }

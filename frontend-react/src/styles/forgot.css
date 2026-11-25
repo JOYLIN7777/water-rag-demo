@@ -1,5 +1,5 @@
-  *{box-sizing:border-box}
-  html,body{height:100%;margin:0}
+  .login-page *{box-sizing:border-box}
+  /* 布局由 adapt.css 统一管理 */
   .login-page{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
        background:var(--bg);color:var(--ink);display:flex;align-items:center;justify-content:center;
        -webkit-font-smoothing:antialiased;min-height:100vh}

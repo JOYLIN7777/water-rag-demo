@@ -55,7 +55,11 @@ export const useChatStore = create<ChatState>((set, get) => ({
   },
 
   cacheMessages: (id, msgs) => {
-    set(s => ({ bySession: { ...s.bySession, [id]: msgs } }))
+    // 当前会话必须同步更新 messages 视图，否则流式回答要切一次会话才显示
+    set(s => ({
+      bySession: { ...s.bySession, [id]: msgs },
+      messages: s.currentId === id ? [...msgs] : s.messages
+    }))
     try { localStorage.setItem(scopedKey('msgs:' + id), JSON.stringify(msgs)) }
     catch { /* 同上 */ }
   },

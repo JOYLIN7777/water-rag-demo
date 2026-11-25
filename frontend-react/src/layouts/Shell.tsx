@@ -4,7 +4,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { Modal, message } from 'antd'
 import { useAuthStore } from '@/store/auth'
 import { useChatStore } from '@/store/chat'
-import { isLoggedIn, logout } from '@/api/auth'
+import { isLoggedIn, logout, getUser } from '@/api/auth'
 import { Icon } from '@/components/Icon'
 import { Avatar, fmtTime } from '@/components/Avatar'
 
@@ -39,8 +39,29 @@ export default function Shell({ children }: { children: React.ReactNode }) {
     : null
 
   const user = auth.user
-  const name = user ? (user.displayName || user.user) : '演示用户'
   const tenant = user?.tenant || 'default'
+  const [orgLabels, setOrgLabels] = useState<Record<string, string>>({})
+  const [displayOverride, setDisplayOverride] = useState('')
+  const name = displayOverride || (user ? (user.displayName || user.user) : '演示用户')
+  useEffect(() => {
+    if (!isLoggedIn()) return
+    void import('@/api/http').then(async ({ http }) => {
+      const orgs = await http.get<Array<Record<string, unknown>>>('/api/orgs').catch(() => [])
+      const map: Record<string, string> = {}
+      for (const o of Array.isArray(orgs) ? orgs : []) {
+        const k = String(o.key || '')
+        if (k) map[k] = String(o.name || k)
+      }
+      setOrgLabels(map)
+      // /api/auth/me 不返回 displayName；有用户管理权限时从用户表取真实显示名
+      if (auth.has('user:read')) {
+        const users = await http.get<Array<Record<string, unknown>>>('/api/admin/users').catch(() => [])
+        const me = (Array.isArray(users) ? users : []).find(x => x.username === getUser()?.user)
+        if (me?.displayName) setDisplayOverride(String(me.displayName))
+      }
+    })
+  }, [auth.loaded])
+  const tenantLabel = (t: string) => orgLabels[t] || t || '顶层组织'
 
   function newChat() {
     const id = chat.newSession()
@@ -48,7 +69,18 @@ export default function Shell({ children }: { children: React.ReactNode }) {
     if (!location.pathname.includes('index.html')) navigate('/index.html')
   }
   function pickSession(id: string) { void chat.switchSession(id) }
-  function removeSession(id: string) { chat.removeSession(id) }
+  async function removeSession(id: string) {
+    const s = chat.sessions.find(x => x.id === id)
+    const ok = await new Promise<boolean>(resolve => {
+      Modal.confirm({
+        title: '删除会话',
+        content: `确定删除会话「${s?.title || '新会话'}」吗？其中所有对话记录都会被清除，无法恢复。`,
+        okText: '删除', cancelText: '取消', okButtonProps: { danger: true },
+        onOk: () => resolve(true), onCancel: () => resolve(false)
+      })
+    })
+    if (ok) chat.removeSession(id)
+  }
 
   async function confirmLogout() {
     const detail = auth.has('chat:use')
@@ -164,7 +196,7 @@ export default function Shell({ children }: { children: React.ReactNode }) {
           <Link className="user-avatar" to="/profile.html" title="个人中心"><Avatar name={name} size="md" /></Link>
           <Link className="user-meta" to="/profile.html" title="个人中心">
             <div className="user-name">{name}</div>
-            <div className="user-tenant">{tenant}</div>
+            <div className="user-tenant">{tenantLabel(tenant)}</div>
           </Link>
           <Link className="user-icon-btn" to="/settings.html" title="设置"><Icon name="settings" className="nav-icon" /></Link>
           <button className="user-logout" type="button" title="退出登录" onClick={() => void confirmLogout()}>⏻</button>
