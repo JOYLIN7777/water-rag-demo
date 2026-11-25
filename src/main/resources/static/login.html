@@ -142,31 +142,26 @@ function showErr(msg){
   var b=document.getElementById('errBox');b.textContent=msg;b.classList.add('show');
 }
 
-// 登录落地页按权限决定，不再一律写死问答页。
-// 之前审计员账号（没有 chat:use）登录后被硬塞进问答页，侧栏和输入框全都露出来，
-// 观感像"权限没生效"。现在先读一次权限清单，落到这个账号真正能用的第一个页面。
-// 优先级：问答 > 后台 > 审计 > 模型 > 文档 > 检索 > 会话结构；全都没有就落个人中心。
+// 登录落地页：完全按服务端下发的菜单动态决定，不写死任何路由。
+// 菜单顺序由权限目录维护（问答类在前、后台类在后），第一个 allowed=true 的就是落地页。
+// 新增菜单/改顺序只改权限目录，登录页无需改动。接口失败时落个人中心（不信任客户端 groups）。
 async function pickLandingPage(){
-  var perms=new Set();
   try{
-    // login.html 不引入 auth.js（没有全局 fetch 自动补 Bearer 的补丁），必须显式带 token
     var r=await fetch('/api/auth/permissions',{
       headers:{Authorization:'Bearer '+(sessionStorage.getItem(KEY_ACCESS)||'')}
     });
-    if(r.ok){var j=await r.json();perms=new Set(j.permissions||[])}
+    if(r.ok){
+      var j=await r.json();
+      var menus=j.menus||[];
+      for(var i=0;i<menus.length;i++){
+        var m=menus[i];
+        if(!m.allowed)continue;
+        var href=String(m.href||'').replace(/^\//,'');
+        if(!href||href==='profile.html')continue;   // 个人中心兜底，不作为首选
+        return href;
+      }
+    }
   }catch(e){}
-  // 权限接口失败时不要信任客户端可篡改的 groups，统一落个人中心；
-  // 管理页自己有服务端权限复核，不会被这个前端选择带偏。
-  if(!perms.size)return 'profile.html';
-  var routes=[
-    ['chat:use','index.html'], ['admin:access','admin.html'],
-    ['loginlog:read','loginlogs.html'], ['audit:read','audit.html'], ['model:read','models.html'],
-    ['doc:read','manage.html'], ['search:use','search.html'],
-    ['tree:use','tree.html']
-  ];
-  for(var i=0;i<routes.length;i++){
-    if(perms.has(routes[i][0]))return routes[i][1];
-  }
   return 'profile.html';
 }
 
