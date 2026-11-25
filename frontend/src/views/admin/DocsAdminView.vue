@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { docApi, uploadDocument } from '@/api'
 import { useAuthStore } from '@/stores/auth'
@@ -29,6 +29,9 @@ const filtered = () => {
   const k = kw.value.trim().toLowerCase()
   return k ? rows.value.filter(r => String(r.fileName || '').toLowerCase().includes(k)) : rows.value
 }
+const page = ref(1)
+const size = 10
+const paged = computed(() => filtered().slice((page.value - 1) * size, page.value * size))
 
 async function doUpload() {
   const input = fileInput.value
@@ -72,7 +75,7 @@ async function remove(row: any) {
         <el-button size="small" @click="load">刷新</el-button>
       </div>
       <div v-if="error" class="empty">{{ error }}</div>
-      <el-table v-else :data="filtered()" v-loading="loading" size="small" stripe>
+      <el-table v-else :data="paged" v-loading="loading" size="small" stripe>
         <el-table-column prop="fileName" label="文档名称" min-width="220" />
         <el-table-column prop="chunks" label="切片数" width="100" />
         <el-table-column prop="ownerUser" label="上传人" width="120" />
@@ -84,6 +87,7 @@ async function remove(row: any) {
           </template>
         </el-table-column>
       </el-table>
+      <div class="pager"><el-pagination v-model:current-page="page" :page-size="size" :total="filtered().length" layout="total, prev, pager, next" background /></div>
     </div>
 
     <el-dialog v-model="dialogVisible" title="上传文档" width="460px">

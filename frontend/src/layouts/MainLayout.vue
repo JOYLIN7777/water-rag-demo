@@ -13,20 +13,25 @@ const currentKey = computed(() => {
   return seg.replace('-', '/')
 })
 
+/** 后台侧栏：只取 console.* 分组下的菜单，问答类菜单绝不混进来 */
 const menuGroups = computed(() => {
-  const groups = auth.navGroups.map(g => ({
+  const adminGroups = auth.navGroups.filter(g => g.code.startsWith('console.'))
+  return adminGroups.map(g => ({
     code: g.code,
     label: g.name,
-    items: auth.menus.filter(m => m.allowed && m.group === g.code && m.href !== 'profile.html')
-  }))
-  const grouped = new Set(auth.navGroups.map(g => g.code))
-  const rest = auth.menus.filter(m => m.allowed && !grouped.has(m.code || '') && !grouped.has(m.group || '') && m.href !== 'profile.html')
-  if (rest.length) groups.push({ code: '__rest', label: '', items: rest })
-  return groups.filter(g => g.items.length)
+    items: auth.menus.filter(m =>
+      m.allowed && m.group === g.code &&
+      m.href !== 'profile.html' && m.href !== 'admin.html' &&   // 排除进入后台入口自身
+      !m.permissions.includes('admin:access'))
+  })).filter(g => g.items.length)
 })
 
-const chatMenus = computed(() => auth.menus.filter(m => m.allowed && !m.href.includes('admin') &&
-  ['index.html', 'manage.html', 'search.html', 'tree.html', 'settings.html'].includes(m.href.replace(/^\//, ''))))
+/** 问答侧栏：工作台分组 + 设置，按权限过滤 */
+const chatMenus = computed(() => auth.menus.filter(m => {
+  const href = String(m.href || '').replace(/^\//, '')
+  if (!m.allowed || href === 'profile.html' || href === 'admin.html') return false
+  return ['index.html', 'manage.html', 'search.html', 'tree.html', 'settings.html'].includes(href)
+}))
 
 function hrefOf(m: { href: string }): string {
   return '/' + String(m.href).replace(/^\//, '')

@@ -120,9 +120,12 @@ async function doUpload() {
 </script>
 
 <template>
-  <div class="page chat-page">
+  <div class="chat-page">
     <header class="topbar">
-      <div class="topbar-title">知识库问答</div>
+      <div class="topbar-left">
+        <div class="topbar-title">知识库问答</div>
+        <div class="topbar-sub">基于知识库内容提问，回答会标注引用原文</div>
+      </div>
       <div style="display:flex;gap:8px">
         <el-button size="small" @click="clearHistory" :disabled="!hasMessages">清空历史</el-button>
       </div>
@@ -172,8 +175,10 @@ async function doUpload() {
 </template>
 
 <style scoped>
-.chat-page { display: flex; flex-direction: column; height: 100%; padding: 0; }
-.scroll-area { flex: 1; overflow-y: auto; padding: 26px max(26px, calc((100% - 860px) / 2)); }
+.chat-page { display: flex; flex-direction: column; flex: 1; min-height: 0; height: 100%; padding: 0; overflow: hidden; }
+.chat-page .topbar { flex: 0 0 auto; }
+.scroll-area { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 26px max(26px, calc((100% - 860px) / 2)); }
+.composer { flex: 0 0 auto; padding: 12px max(26px, calc((100% - 860px) / 2)) 18px; background: #fff; border-top: 1px solid var(--line); box-shadow: 0 -2px 12px rgba(16,28,54,.04); }
 .welcome { max-width: 640px; margin: 8vh auto 0; text-align: center; }
 .welcome-mark { width: 58px; height: 58px; border-radius: 16px; margin: 0 auto 18px; background: linear-gradient(135deg, var(--primary-hi), var(--primary)); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 26px; font-weight: 700; }
 .welcome h1 { font-size: 24px; margin: 0 0 8px; }
@@ -191,6 +196,5 @@ async function doUpload() {
 .sources { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
 .source-chip { font-size: 10.5px; background: var(--primary-soft); color: #25469b; padding: 2px 8px; border-radius: 10px; }
 .error-tip { color: var(--danger); font-size: 12px; padding: 0 26px 8px; }
-.composer { padding: 12px max(26px, calc((100% - 860px) / 2)) 22px; background: #fff; border-top: 1px solid var(--line); }
 .composer-bar { display: flex; justify-content: space-between; align-items: center; margin-top: 8px; }
 </style>
