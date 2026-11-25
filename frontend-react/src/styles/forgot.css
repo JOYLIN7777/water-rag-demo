@@ -1,0 +1,73 @@
+  *{box-sizing:border-box}
+  html,body{height:100%;margin:0}
+  body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+       background:var(--bg);color:var(--ink);display:flex;align-items:center;justify-content:center;
+       -webkit-font-smoothing:antialiased}
+  .login-wrap{width:100%;max-width:960px;display:grid;grid-template-columns:1fr 1fr;gap:0;
+       background:#fff;border:1px solid var(--line);border-radius:18px;overflow:hidden;box-shadow:0 24px 70px rgba(16,28,54,.14);margin:24px}
+  /* 左侧品牌区：与登录页保持同一套视觉，用户不会觉得跳到了另一个系统 */
+  .login-brand{background:linear-gradient(160deg,var(--navy) 0%,var(--navy-2) 55%,#1d2c4a 100%);
+       color:#fff;padding:52px 42px;display:flex;flex-direction:column;position:relative;overflow:hidden}
+  .login-brand::after{content:'';position:absolute;right:-70px;bottom:-70px;width:260px;height:260px;border-radius:50%;
+       background:radial-gradient(circle,rgba(59,110,245,.45),transparent 68%)}
+  .lb-mark{width:52px;height:52px;border-radius:14px;background:linear-gradient(135deg,var(--primary-hi),var(--primary));
+       display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:700;box-shadow:0 8px 22px rgba(59,110,245,.5)}
+  .lb-title{font-size:24px;font-weight:680;margin-top:26px;letter-spacing:.4px}
+  .lb-sub{font-size:13px;color:#9fb0d0;margin-top:10px;line-height:1.8;max-width:300px}
+  .lb-features{margin-top:auto;position:relative;z-index:1;display:flex;flex-direction:column;gap:14px}
+  .lb-feature{display:flex;align-items:flex-start;gap:11px;font-size:12.5px;color:#c8d3e8;line-height:1.6}
+  .lb-feature .tick{width:20px;height:20px;border-radius:50%;background:rgba(59,110,245,.28);
+       color:#9fc0ff;display:flex;align-items:center;justify-content:center;font-size:11px;flex:0 0 20px;margin-top:1px}
+  .lb-foot{font-size:10px;color:#5f6f8f;margin-top:32px;position:relative;z-index:1}
+
+  /* 右侧表单区 */
+  .login-form{padding:48px 46px;display:flex;flex-direction:column}
+  .lf-title{font-size:20px;font-weight:680;margin:0 0 6px}
+  .lf-desc{font-size:12.5px;color:var(--muted);margin:0 0 24px;line-height:1.7}
+  /* 两步式流程指示：第几步一目了然，避免用户只看到"要重置码"却不知码从哪来 */
+  .steps{display:flex;align-items:center;gap:10px;margin:0 0 22px}
+  .step{display:flex;align-items:center;gap:7px;font-size:12px;color:#9aa5b8;font-weight:600;white-space:nowrap}
+  .step .n{width:20px;height:20px;border-radius:50%;background:#eef2f8;color:#9aa5b8;display:flex;
+       align-items:center;justify-content:center;font-size:11px;font-weight:700;transition:all .2s}
+  .step.active{color:var(--primary)}
+  .step.active .n{background:var(--primary);color:#fff;box-shadow:0 3px 9px rgba(59,110,245,.35)}
+  .step.done .n{background:#e8f8f1;color:var(--ok)}
+  .step.done{color:#0b8a60}
+  .step-line{flex:1;height:1px;background:#e7ebf2}
+
+  .field{margin-bottom:16px}
+  .field label{display:block;font-size:12px;color:var(--ink-2);margin-bottom:7px;font-weight:600}
+  .field input{width:100%;padding:11px 13px;border:1px solid #d9e0ec;border-radius:9px;font-size:13.5px;
+       outline:0;transition:all .15s;background:#fff}
+  .field input:focus{border-color:var(--primary);box-shadow:0 0 0 3px rgba(59,110,245,.12)}
+  /* 重置码用等宽字体 + 字距，8 位码逐字符核对时不串位 */
+  #code{font-family:ui-monospace,Consolas,monospace;letter-spacing:3px;text-transform:uppercase;font-size:15px}
+  .login-btn{width:100%;padding:12px;border:0;border-radius:9px;background:linear-gradient(135deg,var(--primary-hi),var(--primary));
+       color:#fff;font-size:14px;font-weight:650;letter-spacing:.5px;box-shadow:0 6px 16px rgba(59,110,245,.32);
+       transition:all .18s;display:flex;align-items:center;justify-content:center;gap:8px}
+  .login-btn:hover:not(:disabled){transform:translateY(-1px);box-shadow:0 9px 22px rgba(59,110,245,.4)}
+  .login-btn:disabled{opacity:.6}
+  .err-box{margin-bottom:16px;padding:10px 13px;border-radius:8px;background:#fdeef3;color:#b91c4a;
+       font-size:12px;border:1px solid #f8cfdc;display:none;line-height:1.6}
+  .err-box.show{display:block}
+  .ok-box{margin-bottom:16px;padding:11px 13px;border-radius:8px;background:#e8f8f1;color:#0b7a54;
+       font-size:12px;border:1px solid #c6ecd9;display:none;line-height:1.65}
+  .ok-box.show{display:block}
+  /* 重置码一次性展示：给足视觉权重，用户抄走就会离开这一步 */
+  .code-box{margin:2px 0 16px;padding:14px 16px;border:1px dashed #b9cbff;background:#f6f9ff;border-radius:10px}
+  .code-box .cl{font-size:11px;color:var(--muted);margin-bottom:6px;letter-spacing:.3px}
+  .code-box .cv{font-family:ui-monospace,Consolas,monospace;font-size:20px;font-weight:700;
+       letter-spacing:4px;color:#25469b}
+  .tip{font-size:11.5px;color:var(--muted);line-height:1.75;margin:14px 0 0}
+  .tip b{color:var(--ink-2);font-weight:600}
+  .alt{margin-top:20px;font-size:12px;color:var(--muted);display:flex;align-items:center;gap:9px}
+  .alt a{color:var(--primary);text-decoration:none}
+  .alt a:hover{text-decoration:underline}
+  .alt .dot{color:#c3cddd}
+  @media(max-width:760px){
+    .login-wrap{grid-template-columns:1fr;margin:14px}
+    .login-brand{padding:30px 28px}
+    .lb-features,.lb-foot{display:none}
+    .lb-title{margin-top:16px;font-size:20px}
+    .login-form{padding:30px 26px}
+  }

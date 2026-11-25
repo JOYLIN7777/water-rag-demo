@@ -34,6 +34,8 @@ public class UnregisteredPermScanner {
     private static final Logger log = LoggerFactory.getLogger(UnregisteredPermScanner.class);
     private static final Pattern HTML_PERM = Pattern.compile("data-perm=\"([a-z][a-z0-9_.:-]*)\"");
     private static final Pattern JS_PERM = Pattern.compile("data-perm:\\s*['\"]([a-z][a-z0-9_.:-]*)['\"]");
+    /** React 组件里的权限声明：auth.has('doc:write_chat') */
+    private static final Pattern VUE_PERM = Pattern.compile("has\\(['\"]([a-z][a-z0-9_.:-]*)['\"]\\)");
     private static final Pattern CODE = Pattern.compile("^[a-z][a-z0-9_.-]*:[a-z][a-z0-9_.-]*$");
 
     private final JdbcTemplate jdbc;
@@ -45,23 +47,44 @@ public class UnregisteredPermScanner {
         this.mapping = mapping;
     }
 
+    /** 汇总所有来源：React TSX 源码 + 注解 */
+    private Map<String, List<String>> collectSources() {
+        Map<String, List<String>> out = new LinkedHashMap<>();
+        scanFileSystem("frontend-react/src", VUE_PERM, out);
+        scanAnnotations(out);
+        return out;
+    }
+
+    /** 扫描工程内源码（React TSX 不在 jar 里，从文件系统读） */
+    private void scanFileSystem(String root, Pattern re, Map<String, List<String>> out) {
+        java.io.File dir = new java.io.File(root);
+        if (!dir.isDirectory()) return;
+        java.nio.file.Path base = dir.toPath();
+        try (java.util.stream.Stream<java.nio.file.Path> files = java.nio.file.Files.walk(base)) {
+            files.filter(f -> f.toString().endsWith(".tsx") || f.toString().endsWith(".ts")).forEach(f -> {
+                String rel = base.relativize(f).toString().replace('\\', '/');
+                try {
+                    int lineNo = 0;
+                    for (String line : java.nio.file.Files.readAllLines(f, StandardCharsets.UTF_8)) {
+                        lineNo++;
+                        Matcher m = re.matcher(line);
+                        while (m.find()) out.computeIfAbsent(m.group(1), k -> new ArrayList<>()).add("frontend-react/" + rel + ":" + lineNo);
+                    }
+                } catch (Exception ignored) { /* 单文件失败不影响整体 */ }
+            });
+        } catch (Exception e) { log.debug("React 源码扫描跳过：{}", e.getMessage()); }
+    }
+
     /** 代码里所有在用的权限码（含已注册），用于校验手工填写的码是否真的会生效 */
     public Set<String> allUsedCodes() {
-        Map<String, List<String>> sources = new LinkedHashMap<>();
-        scanResources("classpath*:static/**/*.html", HTML_PERM, sources);
-        scanResources("classpath*:static/assets/*.js", JS_PERM, sources);
-        scanAnnotations(sources);
         Set<String> out = new TreeSet<>();
-        sources.keySet().forEach(code -> { if (CODE.matcher(code).matches()) out.add(code); });
+        collectSources().keySet().forEach(code -> { if (CODE.matcher(code).matches()) out.add(code); });
         return out;
     }
 
     /** code → 来源描述（多个来源合并） */
     public List<Map<String, Object>> scan() {
-        Map<String, List<String>> sources = new LinkedHashMap<>();
-        scanResources("classpath*:static/**/*.html", HTML_PERM, sources);
-        scanResources("classpath*:static/assets/*.js", JS_PERM, sources);
-        scanAnnotations(sources);
+        Map<String, List<String>> sources = collectSources();
 
         Set<String> registered;
         try {

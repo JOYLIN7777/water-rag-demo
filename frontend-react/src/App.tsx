@@ -9,6 +9,7 @@ import TreePage from './pages/TreePage'
 import ManagePage from './pages/ManagePage'
 import IndexPage from './pages/IndexPage'
 import AdminLayout from './layouts/AdminLayout'
+import ForgotPage from './pages/ForgotPage'
 import Shell from './layouts/Shell'
 import { useAuthStore } from './store/auth'
 import { isLoggedIn } from './api/auth'
@@ -56,7 +57,7 @@ export default function App() {
       <Route path="/audit.html" element={<WithShell><AdminLayout /></WithShell>} />
       <Route path="/admin.html" element={<WithShell><AdminLayout /></WithShell>} />
       {/* 未移植页：暂回退 static */}
-      <Route path="/forgot.html" element={<StaticFallback page="forgot.html" />} />
+      <Route path="/forgot.html" element={<ForgotPage />} />
       <Route path="*" element={<Navigate to="/index.html" replace />} />
     </Routes>
   )
