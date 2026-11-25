@@ -1124,10 +1124,13 @@
       E('div', { className: 'brand-sub', text: '水利知识库' })
     ]));
     const back = E('div', { className: 'admin-back' });
-    const backLink = E('a', { className: 'admin-nav-item', attrs: { href: 'index.html' } }, [
+    // 加 data-perm 交给 applySidebarPerms 统一收敛：权限加载后无 chat:use 自动摘除，
+    // 避免渲染时权限还没加载导致管理员也看不到返回入口。
+    back.append(E('a', { className: 'admin-nav-item', dataset: { perm: 'chat:use' },
+      attrs: { href: 'index.html' } }, [
       E('span', { className: 'ic', text: '⌂' }), document.createTextNode('返回问答')
-    ]);
-    back.append(backLink, E('div', { className: 'user-block', id: 'adminUserBlock' }));
+    ]));
+    back.append(E('div', { className: 'user-block', id: 'adminUserBlock' }));
     const aside = E('aside', { className: 'admin-sidebar' }, [brand, ...navNodes, back]);
     host.insertBefore(aside, host.firstChild);
     renderAdminEntry();
@@ -1182,6 +1185,10 @@
         permsLoaded = true;
         renderAdminEntry();
         applySidebarPerms(); applyPermControls();
+        // 权限到位后重绘顶栏返回链接（按是否有 chat:use 决定去问答或个人中心）
+        const oldNav = document.querySelector('.topbar-nav-left');
+        if (oldNav) oldNav.remove();
+        renderTopbarNav();
         // 页面新增/调整 data-perm 后，管理员访问一次就自动补进权限树，无需手改目录
         if (hasPermission('admin:access')) setTimeout(discoverPermissions, 1200);
         return true;
@@ -1463,8 +1470,10 @@
     const meta = PAGE_NAV[file];
     const host = document.querySelector('.topbar-left');
     if (!meta || meta.noNav || !host || host.querySelector('.topbar-nav-left')) return;
-    const backHref = meta.parent || meta.back || 'index.html';
-    const backText = meta.parent ? '返回设置' : (meta.backText || '返回');
+    // 无问答权限时，返回入口指向个人中心，不硬塞用户去无权访问的问答页
+    const canChat = permsLoaded ? hasPermission('chat:use') : false;
+    const backHref = meta.parent || (canChat ? (meta.back || 'index.html') : 'profile.html');
+    const backText = meta.parent ? '返回设置' : (canChat ? (meta.backText || '返回') : '个人中心');
     const crumb = meta.parent
       ? '<a href="' + meta.parent + '">' + esc(meta.parentLabel) + '</a>' +
         '<span class="crumb-sep">/</span><span class="crumb-current">' + esc(meta.label) + '</span>'

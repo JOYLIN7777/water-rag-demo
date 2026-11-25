@@ -636,9 +636,10 @@
     <div class="deny-mark">!</div>
     <h2 style="margin:0 0 8px">没有访问权限</h2>
     <p class="page-desc" style="margin:0 0 6px">当前账号没有这个后台页面的访问权限，如需使用请联系管理员开通。</p>
-    <p class="page-desc" style="margin:0 0 20px;color:var(--muted)">问答、知识库文档等日常功能不受影响，可直接返回继续使用。</p>
+    <p class="page-desc" id="denyHint" style="margin:0 0 20px;color:var(--muted)">问答、知识库文档等日常功能不受影响，可直接返回继续使用。</p>
     <div style="display:flex;gap:10px;justify-content:center">
-      <a class="btn btn-primary" href="index.html">返回问答</a>
+      <a class="btn btn-primary" id="denyBackBtn" data-perm="chat:use" href="index.html">返回问答</a>
+      <a class="btn btn-primary" id="denyProfileBtn" href="profile.html" style="display:none">前往个人中心</a>
       <button class="btn" onclick="Shell.logout()">切换账号</button>
     </div>
   </div>
@@ -687,6 +688,15 @@ const orgFolded={};
 function showDeny(){
   $('adminRoot').style.display='none';
   $('denyWrap').style.display='flex';
+  // 没有问答权限时，"返回问答"换成"个人中心"，并修正提示文案
+  const canChat=window.Shell&&Shell.hasPermission&&Shell.hasPermission('chat:use');
+  const back=$('denyBackBtn'),prof=$('denyProfileBtn');
+  if(back)back.style.display=canChat?'':'none';
+  if(prof)prof.style.display=canChat?'none':'';
+  const hint=$('denyHint');
+  if(hint)hint.textContent=canChat
+    ?'问答、知识库文档等日常功能不受影响，可直接返回继续使用。'
+    :'你可以前往个人中心查看账号信息，或切换账号后重试。';
 }
 async function guard(){
   try{
