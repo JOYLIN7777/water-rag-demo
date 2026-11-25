@@ -59,6 +59,7 @@ public class PermissionCatalog {
                 row.put("parent", n.path("parent").asText(""));
                 row.put("route", n.path("route").asText(""));
                 row.put("order", n.path("order").asInt(0));
+                row.put("icon", n.path("icon").asText(""));
                 out.add(row);
             }
             return out;
@@ -92,20 +93,22 @@ public class PermissionCatalog {
         jdbc.execute("ALTER TABLE perm_node ADD COLUMN IF NOT EXISTS order_num INT DEFAULT 0");
         jdbc.execute("ALTER TABLE perm_node ADD COLUMN IF NOT EXISTS last_seen_at TIMESTAMP");
         jdbc.execute("ALTER TABLE perm_node ADD COLUMN IF NOT EXISTS retired BOOLEAN DEFAULT FALSE");
+        jdbc.execute("ALTER TABLE perm_node ADD COLUMN IF NOT EXISTS icon VARCHAR(32) DEFAULT ''");
         // 内置节点首次初始化写入，之后以库为准（用户改过的显示信息不会被启动覆盖）
         List<Map<String, Object>> builtins = builtInNodes();
         for (Map<String, Object> n : builtins) {
-            jdbc.update("INSERT INTO perm_node(code,name,node_type,module,description,builtin,parent_code,route_path,order_num) "
-                            + "VALUES(?,?,?,?,?,TRUE,?,?,?) ON CONFLICT (code) DO NOTHING",
+            jdbc.update("INSERT INTO perm_node(code,name,node_type,module,description,builtin,parent_code,route_path,order_num,icon) "
+                            + "VALUES(?,?,?,?,?,TRUE,?,?,?,?) ON CONFLICT (code) DO NOTHING",
                     n.get("code"), n.get("name"), n.get("type"), n.get("module"), n.get("desc"),
-                    n.get("parent"), n.get("route"), n.get("order"));
+                    n.get("parent"), n.get("route"), n.get("order"), n.get("icon"));
         }
         // 存量内置节点按真实导航重排（结构字段以种子为准，避免老库层级对不上页面）；
         // 名称只在仍是旧名时改，管理员改过的显示名保留。
         for (Map<String, Object> n : builtins) {
-            jdbc.update("UPDATE perm_node SET parent_code=?, route_path=?, order_num=?, node_type=?, module=? "
+            jdbc.update("UPDATE perm_node SET parent_code=?, route_path=?, order_num=?, node_type=?, module=?, icon=? "
                             + "WHERE code=? AND builtin=TRUE",
-                    n.get("parent"), n.get("route"), n.get("order"), n.get("type"), n.get("module"), n.get("code"));
+                    n.get("parent"), n.get("route"), n.get("order"), n.get("type"), n.get("module"),
+                    n.get("icon"), n.get("code"));
         }
         RENAMES.forEach((code, pair) -> jdbc.update(
                 "UPDATE perm_node SET name=? WHERE code=? AND builtin=TRUE AND name=?",
@@ -115,7 +118,7 @@ public class PermissionCatalog {
     /** 全部权限节点（内置 + 自定义），按模块与内置顺序排列 */
     public List<Map<String, Object>> list() {
         List<Map<String, Object>> out = new ArrayList<>();
-        jdbc.query("SELECT code,name,node_type,module,description,builtin,parent_code,route_path,order_num "
+        jdbc.query("SELECT code,name,node_type,module,description,builtin,parent_code,route_path,order_num,icon "
                 + "FROM perm_node WHERE COALESCE(retired,FALSE)=FALSE ORDER BY builtin DESC, order_num, code", rs -> {
             Map<String, Object> m = new LinkedHashMap<>();
             m.put("code", rs.getString("code"));
@@ -127,6 +130,8 @@ public class PermissionCatalog {
             m.put("parentCode", rs.getString("parent_code") == null ? "" : rs.getString("parent_code"));
             m.put("routePath", rs.getString("route_path") == null ? "" : rs.getString("route_path"));
             m.put("orderNum", rs.getInt("order_num"));
+            String icon = rs.getString("icon");
+            m.put("icon", icon == null ? "" : icon);
             out.add(m);
         });
         return out;

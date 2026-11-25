@@ -28,48 +28,57 @@ import java.util.Set;
 @Service
 public class RolePermissions {
 
-    /** 管理员：所有权限，包括管理后台、模型配置、审计、用量、用户管理 */
-    private static final Set<String> ADMIN = Set.copyOf(Permission.ALL);
-
-    /** 分析员内置默认：日常问答与文档操作，可看用量，但不能改模型、看审计、进管理后台 */
-    private static final Set<String> ANALYST = Set.of(
-            Permission.CHAT_USE, Permission.DOC_READ, Permission.DOC_WRITE,
-            Permission.DOC_WRITE_CHAT, Permission.DOC_WRITE_BATCH, Permission.DOC_WRITE_ADMIN,
-            Permission.DOC_DELETE, Permission.DOC_CHUNKS, Permission.SEARCH_USE, Permission.TREE_USE,
-            Permission.USAGE_READ);
-
-    /** 只读用户内置默认：只能问答、看文档、做检索对比，不能上传或删除 */
-    private static final Set<String> VIEWER = Set.of(
-            Permission.CHAT_USE, Permission.DOC_READ, Permission.SEARCH_USE, Permission.TREE_USE);
-
-    /** 内置默认（角色名与登录配置里的 groups 保持一致），DB 有配置的角色会覆盖同名的默认 */
-    private static final Map<String, Set<String>> BUILT_IN = Map.of(
-            "admin", ADMIN,
-            "analyst", ANALYST,
-            "viewer", VIEWER,
-            // 水利业务组同样要能问答和调用水情工具，否则白名单命中也过不了功能权限门槛
-            "water-dept", ANALYST);
-
-    /** 内置角色的中文显示名；DB 没配名称时回落，用户管理不再露英文键 */
-    private static final Map<String, String> BUILT_IN_NAMES = Map.of(
-            "admin", "系统管理员", "analyst", "水利分析员", "viewer", "只读用户",
-            "user", "普通用户", "ops", "运维人员", "water-dept", "水利业务组");
+    /**
+     * 角色种子从 roles.json 读取（仅首次启动写入 role_definitions / role_permissions），
+     * 运行期一律以库为准：后台角色定义页可直接新增角色、改名、改权限，不需要改代码。
+     */
+    private static final class Seed {
+        final String code, name;
+        final java.util.Set<String> permissions;
+        Seed(String code, String name, java.util.Set<String> permissions) {
+            this.code = code; this.name = name; this.permissions = permissions;
+        }
+    }
+    private static java.util.List<Seed> loadSeeds() {
+        try (java.io.InputStream in = RolePermissions.class.getClassLoader().getResourceAsStream("roles.json")) {
+            if (in == null) throw new IllegalStateException("roles.json 不存在");
+            com.fasterxml.jackson.databind.JsonNode root =
+                    new com.fasterxml.jackson.databind.ObjectMapper().readTree(in);
+            java.util.List<Seed> out = new java.util.ArrayList<>();
+            for (com.fasterxml.jackson.databind.JsonNode n : root.path("roles")) {
+                java.util.Set<String> perms = new java.util.LinkedHashSet<>();
+                for (com.fasterxml.jackson.databind.JsonNode p : n.path("permissions")) perms.add(p.asText());
+                out.add(new Seed(n.path("code").asText(), n.path("name").asText(), perms));
+            }
+            return out;
+        } catch (Exception e) {
+            throw new IllegalStateException("角色种子读取失败：" + e.getMessage(), e);
+        }
+    }
 
     /** 可为 null：单测与无数据库环境只用内置默认 */
     private final JdbcTemplate jdbc;
     /** 权限节点目录：自定义权限码的合法性校验来源 */
     private final PermissionCatalog catalog;
 
-    /**
-     * 运行期角色权限表（内置默认 + DB 覆盖 + 自定义角色合并后的最终视图）。
-     * volatile 保证拦截线程读到最新快照；写操作在事务提交后整体替换。
-     */
-    private volatile Map<String, Set<String>> effective = BUILT_IN;
+    /** 运行期角色权限表（以库为准），volatile 保证并发读到最新快照 */
+    private volatile Map<String, Set<String>> effective = Map.of();
 
     /** 角色中文显示名（role_definitions 表），与权限矩阵一起下发给后台页面 */
     private volatile Map<String, String> roleNames = Map.of();
 
-    public RolePermissions() { this.jdbc = null; this.catalog = null; }
+    /** 无数据库环境（单测）：用 roles.json 种子初始化内存视图，不写库 */
+    public RolePermissions() {
+        this.jdbc = null; this.catalog = null;
+        Map<String, Set<String>> fromSeed = new LinkedHashMap<>();
+        Map<String, String> names = new LinkedHashMap<>();
+        for (Seed seed : loadSeeds()) {
+            names.put(seed.code, seed.name);
+            if (!seed.permissions.contains("*")) fromSeed.put(seed.code, seed.permissions);
+        }
+        this.effective = Map.copyOf(fromSeed);
+        this.roleNames = Map.copyOf(names);
+    }
 
     @Autowired
     public RolePermissions(JdbcTemplate jdbc, PermissionCatalog catalog) {
@@ -88,25 +97,33 @@ public class RolePermissions {
             // 每个权限行重复一遍，改个显示名要更新所有行。
             jdbc.execute("CREATE TABLE IF NOT EXISTS role_definitions ("
                     + "role VARCHAR(64) NOT NULL PRIMARY KEY, role_name VARCHAR(128) NOT NULL)");
+            // 种子仅首次写入：库里已有该角色就不覆盖（后台改过的名称/权限保留）
+            for (Seed seed : loadSeeds()) {
+                jdbc.update("INSERT INTO role_definitions(role, role_name) VALUES(?,?) "
+                        + "ON CONFLICT (role) DO NOTHING", seed.code, seed.name);
+                if (!"admin".equals(seed.code) && !seed.permissions.contains("*")) {
+                    for (String perm : seed.permissions) {
+                        jdbc.update("INSERT INTO role_permissions(role, permission) VALUES(?,?) "
+                                + "ON CONFLICT (role, permission) DO NOTHING", seed.code, perm);
+                    }
+                }
+            }
             refresh();
         } catch (Exception e) {
-            // 持久化表不可用时退化为纯内置默认，权限校验照常工作
+            // 持久化表不可用时保持空视图（默认拒绝），不臆造权限
         }
     }
 
     /** 从数据库重建最终视图：DB 有记录的角色【整体替换】内置默认（后台勾选清单即全部权限），无记录的回落内置默认 */
-    /** 从数据库整体重载角色权限到内存视图（启动、保存、节点删除后调用） */
+    /** 从数据库整体重载角色权限到内存视图（启动、保存、节点删除后调用），一律以库为准 */
     public void refresh() {
-        if (jdbc == null) { effective = Map.copyOf(BUILT_IN); roleNames = Map.of(); return; }
+        if (jdbc == null) { effective = Map.of(); roleNames = Map.of(); return; }
         Map<String, Set<String>> fromDb = new LinkedHashMap<>();
         jdbc.query("SELECT role, permission FROM role_permissions ORDER BY role, permission", rs -> {
             fromDb.computeIfAbsent(rs.getString("role").trim(), k -> new LinkedHashSet<>())
                     .add(rs.getString("permission").trim());
         });
-        Map<String, Set<String>> merged = new LinkedHashMap<>();
-        BUILT_IN.forEach((k, v) -> merged.put(k, new LinkedHashSet<>(v)));
-        fromDb.forEach(merged::put);
-        effective = Map.copyOf(merged);
+        effective = Map.copyOf(fromDb);
         Map<String, String> names = new LinkedHashMap<>();
         jdbc.query("SELECT role, role_name FROM role_definitions", rs -> {
             names.put(rs.getString("role").trim(), rs.getString("role_name").trim());
@@ -120,7 +137,7 @@ public class RolePermissions {
      * 无 catalog 的单测环境回落到内置常量集。
      */
     private Set<String> adminPermissions() {
-        if (catalog == null) return ADMIN;
+        if (catalog == null) return java.util.Set.copyOf(Permission.ALL);
         try {
             Set<String> fromDb = new LinkedHashSet<>();
             for (Map<String, Object> row : catalog.list()) {
@@ -131,7 +148,7 @@ public class RolePermissions {
             fromDb.addAll(Permission.ALL);
             return Set.copyOf(fromDb);
         } catch (Exception e) {
-            return ADMIN;
+            return java.util.Set.copyOf(Permission.ALL);  // 目录暂不可用时 admin 仍需全权限
         }
     }
 
@@ -164,10 +181,10 @@ public class RolePermissions {
         roles.forEach(role -> {
             Map<String, Object> m = new LinkedHashMap<>();
             m.put("role", role);
-            m.put("name", roleNames.getOrDefault(role, BUILT_IN_NAMES.getOrDefault(role, role)));
+            m.put("name", roleNames.getOrDefault(role, role));
             m.put("permissions", role.equals("admin")
                     ? List.copyOf(adminPermissions()) : List.copyOf(effective.getOrDefault(role, Set.of())));
-            m.put("builtin", BUILT_IN.containsKey(role));
+            m.put("builtin", "admin".equals(role));   // 只有 admin 不可删，其余都是库里可配的
             out.add(m);
         });
         return out;
@@ -176,7 +193,7 @@ public class RolePermissions {
     /** 角色中文显示名：DB 自定义名称优先，内置回落，未知角色原样返回 */
     public String roleName(String role) {
         String key = normalize(role);
-        return roleNames.getOrDefault(key, BUILT_IN_NAMES.getOrDefault(key, key));
+        return roleNames.getOrDefault(key, key);
     }
 
     /**

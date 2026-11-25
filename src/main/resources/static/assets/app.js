@@ -55,14 +55,12 @@
   ];
 
   // 内部标识转中文显示名，避免把 admin / water-dept / default 直接暴露给用户
-  const GROUP_LABELS = {
-    admin: '系统管理员', 'water-dept': '水利业务组', analyst: '水利分析员',
-    viewer: '只读用户', user: '普通用户', ops: '运维人员'
-  };
+  // 角色显示名：完全来自后端 role_definitions（后台角色定义页可改），前端不再写死映射
+  let ROLE_LABELS = {};
   // 组织名（原"空间"）：不再写死成 default→默认空间。服务端 /api/orgs 下发，
   // 管理员在后台改了组织名，问答页、个人中心的显示同步跟着变。
   let TENANT_LABELS = { default: '顶层组织' };
-  const groupLabel = g => GROUP_LABELS[g] || g;
+  const groupLabel = g => ROLE_LABELS[g] || TENANT_LABELS[g] || g;
   const tenantLabel = t => TENANT_LABELS[t] || t || '顶层组织';
   async function loadOrgLabels() {
     try {
@@ -976,35 +974,36 @@
     if (!host) return;
     const old = host.querySelector('.sidebar');
     if (old) old.remove();
-    // 菜单数据以服务端权限目录为准（名称/路由/权限都可写库）；
-    // 图标与分组属于 UI 细节，保留前端映射。接口未就绪时用静态清单兜底。
+    // 分组、名称、路由、权限、图标全部来自服务端权限目录；前端不再写死任何导航结构。
+    // 只有权限接口没就绪时才用静态清单兜底，避免白屏。
     const serverMenus = global.__serverMenus || [];
-    const navOf = (srv) => {
-      const hit = ADMIN_NAV.find(x => x.perm === (srv.permissions || [])[0] ||
-        srv.href === x.href || ('/' + srv.href) === x.href);
-      return hit || { key: String(srv.href || '').replace(/\.html$/, ''), icon: '▤', perm: (srv.permissions || [])[0] || '' };
-    };
+    const serverGroups = global.__serverNavGroups || [];
+    const itemOf = (srv) => ({
+      key: String(srv.href || '').replace(/^\//, '').replace(/\.html$/, ''),
+      label: srv.name, href: String(srv.href || '').replace(/^\//, ''),
+      perm: (srv.permissions || [])[0] || '', icon: srv.icon || '▤', group: srv.group || ''
+    });
     const items = serverMenus.length
-      ? serverMenus.filter(m => m.allowed && !/^(index|manage|search|tree|profile)\.html$/.test(m.href))
-          .map(m => Object.assign({}, navOf(m), { label: m.name, href: String(m.href).replace(/^\//, '') }))
-      : ADMIN_NAV;
-    const keySet = new Set(items.map(n => n.key));
-    const navHtml = ADMIN_GROUPS.map(g => {
-      const keys = g.keys.filter(k => keySet.has(k));
-      if (!keys.length) return '';
-      return '<div class="admin-nav-group">' +
+      ? serverMenus.filter(m => m.allowed && !/^(index|manage|search|tree|profile)\.html$/.test(m.href)).map(itemOf)
+      : ADMIN_NAV.map(n => Object.assign({}, n, { group: '' }));
+    const linkHtml = (n) => '<a class="admin-nav-item' + (n.key === active ? ' active' : '') + '"' +
+      ' href="' + n.href + '" data-panel="' + n.key + '" data-perm="' + n.perm + '" title="' + n.label + '">' +
+      '<span class="ic">' + n.icon + '</span>' + n.label + '</a>';
+    let navHtml;
+    if (serverGroups.length) {
+      navHtml = serverGroups.map(g =>
+        '<div class="admin-nav-group"><div class="section-label" style="margin:14px 0 6px">' + g.name + '</div>' +
+        items.filter(n => n.group === g.code).map(linkHtml).join('') + '</div>'
+      ).join('');
+      const grouped = new Set(serverGroups.map(g => g.code));
+      const rest = items.filter(n => !grouped.has(n.group));
+      if (rest.length) navHtml += '<div class="admin-nav-group">' + rest.map(linkHtml).join('') + '</div>';
+    } else {
+      navHtml = ADMIN_GROUPS.map(g => '<div class="admin-nav-group">' +
         '<div class="section-label" style="margin:14px 0 6px">' + g.label + '</div>' +
-        keys.map(k => {
-          const n = items.find(x => x.key === k);
-          if (!n) return '';
-          return '<a class="admin-nav-item' + (n.key === active ? ' active' : '') + '"' +
-            ' href="' + n.href + '" data-panel="' + n.key + '" data-perm="' + n.perm + '" title="' + n.label + '">' +
-            '<span class="ic">' + n.icon + '</span>' + n.label + '</a>';
-        }).join('') + '</div>';
-    }).join('') || items.map(n =>
-      '<a class="admin-nav-item' + (n.key === active ? ' active' : '') + '" href="' + n.href +
-      '" data-panel="' + n.key + '" data-perm="' + n.perm + '"><span class="ic">' + n.icon + '</span>' + n.label + '</a>'
-    ).join('');
+        g.keys.map(k => { const n = items.find(x => x.key === k); return n ? linkHtml(n) : ''; }).join('') +
+        '</div>').join('');
+    }
     const aside = document.createElement('div');
     aside.innerHTML =
       '<aside class="admin-sidebar">' +
@@ -1051,6 +1050,12 @@
         ownedPermissions = new Set(j.permissions || []);
         // 菜单与导航结构以服务端权限目录为准；接口失败时保留静态兜底
         if (Array.isArray(j.menus) && j.menus.length) global.__serverMenus = j.menus;
+        if (Array.isArray(j.navGroups) && j.navGroups.length) global.__serverNavGroups = j.navGroups;
+        if (Array.isArray(j.roleMatrix)) {
+          ROLE_LABELS = {};
+          j.roleMatrix.forEach(r => { if (r.role && r.name) ROLE_LABELS[r.role] = r.name; });
+          // 组织名兜底：角色名表已覆盖 org key 时优先用角色名，其余走 /api/orgs
+        }
         permsLoaded = true;
         renderAdminEntry();
         applySidebarPerms(); applyPermControls();

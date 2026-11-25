@@ -41,7 +41,12 @@ public class PermissionService {
                 String code = String.valueOf(n.getOrDefault("code", ""));
                 List<String> required = (!code.isEmpty() && !"null".equals(code))
                         ? List.of(code) : List.of();
-                out.add(menu(String.valueOf(n.getOrDefault("name", code)), route, required));
+                Map<String, Object> item = menu(String.valueOf(n.getOrDefault("name", code)), route, required);
+                String parent = String.valueOf(n.getOrDefault("parentCode", ""));
+                String icon = String.valueOf(n.getOrDefault("icon", ""));
+                item.put("group", "null".equals(parent) ? "" : parent);
+                item.put("icon", "null".equals(icon) ? "" : icon);
+                out.add(item);
             }
         } catch (Exception ignored) {
             // 目录不可用时返回空菜单，不编造
@@ -81,6 +86,23 @@ public class PermissionService {
             menus.add(item);
         }
 
+        // 侧栏分组目录（从权限树的 directory 节点读，改分组名只改库）
+        List<Map<String, Object>> navGroups = new ArrayList<>();
+        try {
+            for (Map<String, Object> n : permCatalog.list()) {
+                if (!"directory".equals(String.valueOf(n.getOrDefault("nodeType", "")))) continue;
+                String code = String.valueOf(n.getOrDefault("code", ""));
+                if (!code.startsWith("console.")) continue;  // 只取后台侧栏分组目录
+                Map<String, Object> g = new LinkedHashMap<>();
+                g.put("code", code);
+                g.put("name", n.getOrDefault("name", code));
+                g.put("order", n.getOrDefault("orderNum", 0));
+                navGroups.add(g);
+            }
+        } catch (Exception ignored) { }
+        navGroups.sort((a, b) -> Integer.compare(
+                ((Number) a.get("order")).intValue(), ((Number) b.get("order")).intValue()));
+
         // 数据权限
         Map<String, Object> data = new LinkedHashMap<>();
         data.put("tenant", u.tenantId());
@@ -114,6 +136,7 @@ public class PermissionService {
         result.put("allPermissions", allPerms);
         result.put("roleMatrix", rolePermissions.roleMatrix());
         result.put("menus", menus);
+        result.put("navGroups", navGroups);
         result.put("data", data);
         result.put("tools", tools);
         return result;
