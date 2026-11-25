@@ -1,0 +1,19 @@
+/* React + Ant Design 适配层：视觉以旧版 legacy.css 为准，这里只做桥接 */
+html, body, #root { height: 100%; min-height: 100%; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif; }
+
+/* SPA 视口：侧栏固定，主区独立滚动 */
+.layout { height: 100vh; overflow: hidden; }
+.main { height: 100vh; display: flex; flex-direction: column; overflow: hidden; min-width: 0; }
+
+/* AntD 与旧版设计 token 对齐 */
+.ant-btn { font-size: 12.5px; }
+.ant-table { font-size: 12.5px; }
+.ant-table-thead > tr > th { font-weight: 600 !important; color: var(--ink-2) !important; background: #f8fafd !important; }
+.ant-modal-content { border-radius: var(--radius) !important; }
+.ant-modal-title { font-weight: 650 !important; }
+.ant-input, .ant-input-textarea, .ant-select-selector { font-size: 12.5px !important; }
+
+/* 侧栏图标：AntD 图标对齐旧版 nav-icon */
+.sidebar .nav-item .anticon { width: 16px; height: 16px; font-size: 14px; opacity: .85; }
+.sidebar .nav-item.active .anticon { opacity: 1; }

@@ -1,0 +1,32 @@
+{
+  "name": "water-kb-react",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "水利知识库智能问答系统 - React 19 + TypeScript + Ant Design + Vite",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "build:fast": "vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc -b --pretty false"
+  },
+  "dependencies": {
+    "@ant-design/icons": "^5.5.2",
+    "antd": "^5.22.7",
+    "dompurify": "^3.2.4",
+    "marked": "^15.0.6",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "react-router-dom": "^7.1.1",
+    "zustand": "^5.0.2"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.5",
+    "@types/react": "^19.0.3",
+    "@types/react-dom": "^19.0.2",
+    "@vitejs/plugin-react": "^4.3.4",
+    "typescript": "^5.7.3",
+    "vite": "^6.0.11"
+  }
+}
