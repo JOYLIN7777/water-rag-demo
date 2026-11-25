@@ -75,6 +75,15 @@ export default function Shell({ children }: { children: React.ReactNode }) {
   const sessions = chat.sessions.slice().sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0))
   const activeKey = location.pathname.replace(/^\//, '').replace('.html', '')
 
+  /** 后台侧栏：console.* 分组，菜单图标/名称/权限全来自服务端（与旧版 renderAdminSidebar 一致） */
+  const adminGroups = auth.navGroups
+    .filter(g => g.code.startsWith('console.'))
+    .map(g => ({
+      label: g.name,
+      items: auth.menus.filter(m => m.allowed && m.group === g.code &&
+        m.href !== 'admin.html' && m.href !== 'profile.html')
+    })).filter(g => g.items.length)
+
   return (
     <div className="layout" id="sidebarHost">
       <aside className="sidebar">
@@ -84,11 +93,30 @@ export default function Shell({ children }: { children: React.ReactNode }) {
               onError={e => { (e.currentTarget as HTMLImageElement).style.display = 'none' }} />
           </div>
           <div>
-            <div className="brand-title">水利知识库</div>
-            <div className="brand-sub">RAG 智能问答系统</div>
+            <div className="brand-title">{inAdmin ? '管理后台' : '水利知识库'}</div>
+            <div className="brand-sub">{inAdmin ? '水利知识库' : 'RAG 智能问答系统'}</div>
           </div>
         </div>
 
+        {inAdmin ? (
+          /* 后台侧栏：服务端菜单分组 */
+          adminGroups.map(g => (
+            <div className="admin-nav-group" key={g.label}>
+              <div className="section-label" style={{ margin: '14px 0 6px' }}>{g.label}</div>
+              {g.items.map(m => {
+                const key = String(m.href).replace(/^\//, '').replace('.html', '')
+                return (
+                  <Link key={m.href} to={'/' + String(m.href).replace(/^\//, '')}
+                    className={`admin-nav-item${activeKey === key ? ' active' : ''}`}
+                    data-panel={key} title={m.name}>
+                    <span className="ic">{m.icon || '▤'}</span>{m.name}
+                  </Link>
+                )
+              })}
+            </div>
+          ))
+        ) : (
+          <>
         <div className="section-label" style={{ marginTop: 0 }}>工作台</div>
         <nav className="nav-list">
           {CHAT_NAV.filter(n => auth.has(n.perm)).map(n => (
@@ -117,11 +145,18 @@ export default function Shell({ children }: { children: React.ReactNode }) {
               )
             })}
         </div>
+          </>
+        )}
 
         <div id="adminEntrySlot">
           {adminTarget && !inAdmin && (
             <a className="admin-entry-btn" href={adminTarget} title="进入管理后台"
               onClick={e => { e.preventDefault(); navigate('/' + adminTarget) }}>⚙ 管理后台</a>
+          )}
+          {inAdmin && auth.has('chat:use') && (
+            <Link className="admin-nav-item" to="/index.html" title="返回问答">
+              <span className="ic">⌂</span>返回问答
+            </Link>
           )}
         </div>
 

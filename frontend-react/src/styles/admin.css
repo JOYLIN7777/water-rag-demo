@@ -1,0 +1,329 @@
+  #sidebarHost{display:contents}
+  .admin-sidebar{width:232px;flex:0 0 232px;background:linear-gradient(180deg,#0d1730 0%,#16223c 100%);color:#c8d3e8;display:flex;flex-direction:column;padding:20px 12px 12px;position:sticky;top:0;height:100vh;overflow-y:auto}
+  .admin-sidebar .brand{padding-bottom:16px}
+  .admin-panel[data-panel="org"] .tree-pane{display:none}
+  .org-page-head{display:block;margin-bottom:12px}
+  .org-toolbar{display:flex;justify-content:flex-end;align-items:center;gap:8px;flex-wrap:nowrap;margin-bottom:14px}
+  .org-search{width:230px;padding:7px 10px;border:1px solid var(--line);border-radius:7px;font-size:12px;background:#fff}
+  .org-toolbar .btn-sm{white-space:nowrap}
+  .org-table-card{padding:0;overflow:hidden}
+  .org-tree-table th:first-child{width:44%}
+  .org-tree-table td:nth-child(2){color:#3b6ef5;font-family:ui-monospace,monospace;font-size:11.5px}
+  .org-node{display:inline-flex;align-items:center;gap:8px}
+  .org-caret{width:18px;height:18px;border:1px solid var(--line);border-radius:4px;background:#fff;
+    display:inline-flex;align-items:center;justify-content:center;font-size:10px;color:var(--ink-2);cursor:pointer;flex:0 0 18px}
+  .org-caret.leaf{visibility:hidden}
+  .org-ic{font-size:13px;color:#6b7a99}
+  .org-badge{font-size:10px;padding:2px 6px;border-radius:4px;background:#f1f5fb;color:#6b7a99}
+  .org-protected{color:var(--muted);font-size:11.5px}
+  /* 首屏只显示目标面板，避免先闪一下用户管理 */
+  html[data-early-panel] .admin-panel{display:none!important}
+  html[data-early-panel="users"] .admin-panel[data-panel="users"],
+  html[data-early-panel="org"] .admin-panel[data-panel="org"],
+  html[data-early-panel="roles"] .admin-panel[data-panel="roles"],
+  html[data-early-panel="perms"] .admin-panel[data-panel="perms"],
+  html[data-early-panel="docs"] .admin-panel[data-panel="docs"],
+  html[data-early-panel="usage"] .admin-panel[data-panel="usage"],
+  html[data-early-panel="loginlogs"] .admin-panel[data-panel="loginlogs"],
+  html[data-early-panel="audit"] .admin-panel[data-panel="audit"]{display:block!important}
+  .admin-panel[data-panel="org"] .data-pane{width:100%}
+  .org-search{max-width:260px;padding:7px 10px;border:1px solid var(--line);border-radius:7px;font-size:12px}
+  .admin-panel{display:none}
+  .admin-panel.active{display:block}
+  /* 后台内容区占满视口高度：main→page→panel→工作台逐层拉伸，
+     避免表格在一个屏幕中段就结束、下面露出一大片页面底色 */
+  main.main > .page{flex:1;display:flex;flex-direction:column;padding-bottom:48px}
+  .admin-panel.active{flex:1;display:flex;flex-direction:column}
+  .admin-panel.active > .workbench,.admin-panel.active > .card{flex:1}
+  .admin-nav-item{display:flex;align-items:center;gap:10px;padding:8px 11px;border-radius:8px;color:#b9c6de;text-decoration:none;font-size:12.5px;cursor:pointer;margin-bottom:2px;transition:all .15s;border:0;background:transparent;width:100%;text-align:left}
+  .admin-nav-item:hover{background:rgba(255,255,255,.06);color:#fff}
+  .admin-nav-item.active{background:rgba(124,92,214,.3);color:#fff;font-weight:650}
+  .admin-nav-item .ic{width:17px;text-align:center;font-size:13px;opacity:.9}
+  .admin-back{margin-top:auto;border-top:1px solid rgba(255,255,255,.09);padding-top:10px}
+  .kv-table td:first-child{color:var(--muted);width:180px;white-space:nowrap}
+  .deny{background:#fff;border:1px solid var(--line);border-radius:var(--radius);padding:60px 30px;text-align:center;box-shadow:var(--shadow-sm)}
+  .deny-wrap{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:var(--bg);padding:24px;z-index:10}
+  .deny-wrap .deny{width:100%;max-width:470px;padding:48px 34px}
+  .deny-mark{width:56px;height:56px;border-radius:50%;background:#fdeef3;color:var(--danger);display:flex;align-items:center;justify-content:center;font-size:26px;margin:0 auto 16px}
+  .perm-grid2{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:10px}
+  .perm-pill{background:#f8fafc;border:1px solid var(--line);border-radius:8px;padding:10px 12px;font-size:12px;color:var(--ink-2)}
+  .perm-pill b{display:block;color:var(--primary);font-size:12px;margin-bottom:3px}
+  .quick-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:14px;margin-bottom:18px}
+  .quick-card{display:block;width:100%;text-align:left;font-family:inherit;cursor:pointer;background:#fff;border:1px solid var(--line);border-radius:var(--radius);padding:18px 20px;text-decoration:none;box-shadow:var(--shadow-sm);transition:all .18s}
+  .quick-card:hover{border-color:#b9cbff;transform:translateY(-2px);box-shadow:0 8px 22px rgba(59,110,245,.12)}
+  .quick-card .qc-t{font-size:14px;font-weight:650;color:var(--ink)}
+  .quick-card .qc-d{font-size:12px;color:var(--muted);margin-top:6px;line-height:1.6}
+  /* 企业级工作台：左树 + 右表 + 顶部工具栏 */
+  .workbench{display:flex;background:#fff;border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;box-shadow:var(--shadow-sm);min-height:500px}
+  .tree-pane{width:220px;flex:0 0 220px;border-right:1px solid var(--line);background:#fafbfd;padding:12px 8px}
+  .tree-head{font-size:11px;color:var(--muted);letter-spacing:.5px;padding:4px 10px 10px;font-weight:600}
+  .tree-node{display:flex;align-items:center;gap:6px;padding:7px 10px;border-radius:7px;cursor:pointer;font-size:12.5px;color:var(--ink-2);user-select:none;margin-bottom:2px}
+  .tree-node:hover{background:#eef2f8}
+  .tree-node.active{background:var(--primary-soft);color:var(--primary);font-weight:650}
+  /* 三角用 9px 时 ▾ 渲染出来只有几像素，看着像个点、以为这层没有下级；放大加深才分得清 */
+  .tree-node .caret{width:12px;color:#5d6880;font-size:11px;line-height:1;flex:0 0 12px;cursor:pointer;transition:color .15s}
+  .tree-node .caret:hover{color:var(--primary)}
+  /* 分组父节点：字重更实，与可选中的筛选节点区分 */
+  .tree-parent{font-weight:650;color:var(--ink-2)}
+  .tree-node .tn{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .tree-node .cnt{font-size:10px;color:var(--muted);background:#eef2f8;padding:1px 6px;border-radius:8px;flex:0 0 auto}
+  .tree-node.active .cnt{background:#fff}
+  .tree-children{padding-left:13px}
+  .tree-children.collapsed{display:none}
+  /* 树头部的「＋」与节点上的悬浮操作：组织支持任意层新增，操作入口必须贴着节点，
+     不然每加一层就得先选中再跑到右侧点按钮，层级一深就会点错 */
+  .tree-head{display:flex;align-items:center;justify-content:space-between;padding-right:2px}
+  .tree-add{border:1px solid transparent;background:transparent;color:var(--muted);width:20px;height:20px;border-radius:6px;font-size:13px;line-height:1;padding:0}
+  .tree-add:hover{background:var(--primary-soft);color:var(--primary);border-color:#dbe5ff}
+  .tree-node .tree-acts{display:none;align-items:center;gap:2px;flex:0 0 auto}
+  .tree-node:hover .tree-acts,.tree-node.active .tree-acts{display:flex}
+  .tree-acts button{border:1px solid transparent;background:transparent;color:#8a95a8;width:18px;height:18px;border-radius:5px;font-size:11px;line-height:1;padding:0}
+  .tree-acts button:hover{background:#fff;border-color:#dbe5ff;color:var(--primary)}
+  .tree-acts button[data-act="del"]:hover{color:var(--danger);border-color:#f6cfdb}
+  .tree-node .caret.ghost{cursor:default}
+  .tree-node .caret.ghost:hover{color:var(--muted)}
+  /* 组织详情头部：面包屑 + 汇总数字 + 操作按钮，一行放不下就换行 */
+  .org-head{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:12px 14px;border-bottom:1px solid var(--line);background:#fbfcfe}
+  .org-crumb{font-size:13px;color:var(--ink);font-weight:650}
+  .org-crumb span{color:var(--muted);font-weight:400;margin:0 5px}
+  .org-crumb a{color:var(--primary);cursor:pointer;text-decoration:none}
+  .org-crumb a:hover{text-decoration:underline}
+  .org-crumb a.cur{color:var(--ink);font-weight:650;cursor:default}
+  .org-crumb a.cur:hover{text-decoration:none}
+  .org-summary{font-size:11.5px;color:var(--muted)}
+  .org-summary b{color:var(--ink-2);font-variant-numeric:tabular-nums}
+  .org-actions{margin-left:auto;display:flex;gap:7px;flex-wrap:wrap}
+  .org-section{padding:9px 14px 8px;font-size:11.5px;color:var(--muted);font-weight:650;background:#fff;border-top:1px solid var(--line);letter-spacing:.3px;display:flex;align-items:center}
+  .data-pane .table-wrap+.org-section{border-top:1px solid var(--line)}
+  /* 顶栏消息中心：密码重置申请这类待办挂在这里，不占业务页版面 */
+  .topbar-right{display:flex;align-items:center;gap:8px}
+  .msg-bell{position:relative;border:1px solid var(--line);background:#fff;color:var(--ink-2);height:31px;min-width:34px;border-radius:8px;font-size:13px;padding:0 10px;display:inline-flex;align-items:center;gap:6px}
+  .msg-bell:hover{border-color:#b9cbff;color:var(--primary);background:var(--primary-soft)}
+  .msg-bell .dot{position:absolute;top:-5px;right:-5px;min-width:16px;height:16px;border-radius:9px;background:var(--danger);color:#fff;font-size:10px;line-height:16px;text-align:center;padding:0 4px;font-weight:700}
+  .msg-row{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px dashed #eef1f6}
+  .msg-row:last-child{border-bottom:0}
+  .msg-main{flex:1;min-width:0}
+  .msg-title{font-size:13px;color:var(--ink)}
+  .msg-sub{font-size:11px;color:var(--muted);margin-top:3px}
+  .msg-ops{display:flex;gap:6px;flex:0 0 auto}
+  .data-pane{flex:1;min-width:0;display:flex;flex-direction:column}
+  .toolbar{display:flex;align-items:center;gap:8px;padding:12px 14px;border-bottom:1px solid var(--line);flex-wrap:wrap}
+  .toolbar input,.toolbar select{width:auto;padding:7px 10px;font-size:12px}
+  .toolbar .kw{width:190px}
+  .toolbar .grow{flex:1}
+  .data-table{width:100%;border-collapse:collapse;font-size:12px}
+  .data-table th{padding:10px 12px;background:#f7f9fc;color:var(--muted);font-size:11px;font-weight:600;text-align:left;border-bottom:1px solid var(--line);white-space:nowrap}
+  .data-table td{padding:10px 12px;border-bottom:1px solid #f1f4f9;vertical-align:middle}
+  .data-table tbody tr:hover td{background:#fafcff}
+  .row-idx{color:var(--muted);width:38px;text-align:center}
+  .op-btn{color:var(--primary);background:none;border:none;font-size:12px;padding:2px 6px;cursor:pointer}
+  .op-btn:hover{text-decoration:underline}
+  .op-btn.danger{color:var(--danger)}
+  /* 不可点操作的说明文字：占位但不做成按钮，避免用户以为点得动 */
+  .op-note{display:inline-block;padding:2px 6px;font-size:11.5px;color:var(--muted)}
+  /* 字段下方的补充说明（比 .form-note 轻，不占整块底色） */
+  .form-hint{font-size:11.5px;color:var(--muted);line-height:1.6;margin-top:5px}
+  .form-hint.err{color:#c0392b}
+  .form-hint.ok{color:#0d8f62}
+  .perm-quick-row{margin-top:6px}
+  .perm-quick-label{font-size:10.5px;color:var(--muted);letter-spacing:.3px}
+  .table-wrap{flex:1;overflow:auto}
+  /* 上下两个表格区之间的拖拽手柄：按住上下拖，调整各自高度（记忆到本机） */
+  .v-resizer{flex:0 0 9px;height:9px;cursor:row-resize;display:flex;align-items:center;justify-content:center;
+    background:#fbfcfe;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+  .v-resizer::after{content:'';width:36px;height:3px;border-radius:2px;background:#c9d5e8;transition:background .15s}
+  .v-resizer:hover::after{background:var(--primary)}
+  .tag-role{display:inline-block;padding:2px 8px;border-radius:10px;font-size:10.5px;margin-right:4px;background:#eef2f8;color:var(--ink-2)}
+  .tag-role.admin{background:#f3efff;color:var(--violet)}
+  .tag-role.analyst{background:var(--primary-soft);color:#25469b}
+  .empty-inline{padding:36px;text-align:center;color:var(--muted);font-size:13px}
+  .node-type{display:inline-block;font-size:10px;padding:2px 7px;border-radius:5px;background:#eef2f8;color:var(--ink-2)}
+  .node-type.perm-lv-directory{background:#e8f7f1;color:#0d8f62}
+  .node-type.perm-lv-menu{background:var(--primary-soft);color:#25469b}
+  .node-type.perm-lv-btn{background:#fef4e6;color:var(--warn)}
+  /* 权限树名称按层级着色：目录=绿、菜单=蓝、按钮=橙，一眼分出层级 */
+  .perm-name.perm-lv-directory{color:#0d8f62;font-weight:650}
+  .perm-name.perm-lv-menu{color:#25469b}
+  .perm-name.perm-lv-btn{color:#a86a10}
+  .perm-name .pn-ico{display:inline-block;width:18px;font-size:13px;margin-right:3px;opacity:.85}
+  .perm-name.perm-lv-directory .pn-ico{color:#0d8f62}
+  .perm-name.perm-lv-menu .pn-ico{color:#3b68c4}
+  .perm-name.perm-lv-btn .pn-ico{color:#d18a17}
+  .perm-name .pg-caret{color:var(--muted)}
+  .type-quick{display:flex;flex-wrap:wrap;gap:5px;margin-top:5px}
+  .type-quick button{border:1px solid var(--line);background:#fff;color:var(--ink-2);font-size:10.5px;padding:3px 8px;border-radius:5px}
+  .type-quick button:hover{border-color:var(--primary);color:var(--primary)}
+  .unused-code-btn .mono{font-size:10px;color:var(--muted);margin-left:4px}
+  /* 角色权限树：若依风格的目录/菜单/按钮三级勾选，带折叠与父子联动 */
+  .perm-tree{border:1px solid var(--line);border-radius:9px;max-height:360px;overflow:auto;padding:8px 10px;background:#fff}
+  .pt-row{display:flex;align-items:center;gap:7px;padding:5px 4px;border-radius:6px;font-size:12.5px}
+  .pt-row:hover{background:#f7f9fd}
+  .pt-row label{display:flex;align-items:center;gap:7px;cursor:pointer;flex:1;min-width:0}
+  .pt-row input[type=checkbox]{width:15px;height:15px;min-width:15px;padding:0;margin:0;accent-color:var(--primary);cursor:pointer}
+  .pt-caret{width:14px;flex:0 0 14px;text-align:center;color:var(--muted);font-size:10px;cursor:pointer;user-select:none}
+  .pt-caret.leaf{visibility:hidden}
+  .pt-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .pt-name.perm-lv-directory{font-weight:650;color:#0d8f62}
+  .pt-name.perm-lv-menu{color:#25469b}
+  .pt-name.perm-lv-btn{color:#a86a10}
+  .pt-type{font-size:9.5px;padding:1px 5px;border-radius:4px;flex:0 0 auto}
+  .pt-type.perm-lv-directory{background:#e8f7f1;color:#0d8f62}
+  .pt-type.perm-lv-menu{background:var(--primary-soft);color:#25469b}
+  .pt-type.perm-lv-btn{background:#fef4e6;color:var(--warn)}
+  .pt-children{margin-left:18px;border-left:1px dashed #dbe3f0;padding-left:8px}
+  .pt-children.collapsed{display:none}
+  .pt-tools{display:flex;gap:10px;margin-bottom:8px;font-size:11.5px;color:var(--muted)}
+  .pt-tools a{cursor:pointer;color:var(--primary)}
+  /* 权限模块分组行：整行可点击折叠，箭头单独给反馈 */
+  tr.perm-group{cursor:pointer;user-select:none}
+  tr.perm-group>td{background:#f7f9fc;font-weight:650;color:var(--ink)}
+  tr.perm-group:hover>td{background:#eef3fb}
+  .pg-caret{display:inline-block;width:13px;color:var(--muted);font-size:10px;transition:color .15s}
+  tr.perm-group:hover .pg-caret{color:var(--primary)}
+
+  /* ===== 企业级中后台视觉（参考截图：内容占满 + 高密度 + 完整组件） ===== */
+  /* 后台内容占满主区，表格随窗口铺满 */
+  .page{max-width:none;margin:0;padding:20px 24px 36px}
+  /* 顶栏面包屑：管理后台 / 用户管理 */
+  .brand-crumb{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--muted)}
+  .brand-crumb #panelTitle{color:var(--ink);font-weight:650;font-size:14px}
+  .brand-crumb .sep{color:#c3cddd;font-size:12px}
+  /* 筛选条：白卡片 + 内联字段组 + 按钮组 */
+  .filter-bar{display:flex;align-items:flex-end;gap:12px;flex-wrap:wrap;background:#fff;border:1px solid var(--line);border-radius:12px;padding:13px 18px;margin-bottom:14px;box-shadow:var(--shadow-sm)}
+  .filter-item{display:flex;flex-direction:column;gap:5px}
+  .filter-item>label{font-size:11.5px;color:var(--muted);font-weight:500}
+  .filter-item input,.filter-item select{width:200px;padding:7px 10px;font-size:12.5px;border:1px solid #d9e0ec;border-radius:8px;background:#fff;color:var(--ink);outline:0;transition:all .15s}
+  .filter-item input:focus,.filter-item select:focus{border-color:var(--primary);box-shadow:0 0 0 3px rgba(59,110,245,.1)}
+  .filter-actions{display:flex;gap:8px;align-items:center;margin-left:auto}
+  /* 按钮变体：搜索蓝 / 重置白 / 导入橙 / 导出绿 */
+  .btn-search{border:1px solid var(--primary);background:var(--primary);color:#fff;font-weight:600}
+  .btn-search:hover:not(:disabled){background:#2f61e8;border-color:#2f61e8;color:#fff}
+  .btn-amber{border:1px solid #f59e0b;background:#f59e0b;color:#fff;font-weight:600}
+  .btn-amber:hover:not(:disabled){background:#e08c07;border-color:#e08c07;color:#fff}
+  .btn-green{border:1px solid #0e9f6e;background:#0e9f6e;color:#fff;font-weight:600}
+  .btn-green:hover:not(:disabled){background:#0b8a60;border-color:#0b8a60;color:#fff}
+  /* 开关控件：绿色开启 / 灰色关闭 */
+  .switch{position:relative;display:inline-block;width:38px;height:21px;flex:0 0 38px;vertical-align:middle}
+  .switch input{position:absolute;opacity:0;width:100%;height:100%;margin:0;cursor:pointer;z-index:1}
+  .switch .track{position:absolute;inset:0;background:#dfe5ee;border-radius:11px;transition:background .18s}
+  .switch .thumb{position:absolute;top:2px;left:2px;width:17px;height:17px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(16,28,54,.25);transition:left .18s}
+  .switch input:checked~.track{background:#0e9f6e}
+  .switch input:checked~.thumb{left:19px}
+  .switch input:disabled{cursor:not-allowed}
+  .switch input:disabled~.track{opacity:.45}
+  /* 角色彩色标签 */
+  .tag-role{display:inline-block;padding:1px 8px;border-radius:10px;font-size:10.5px;margin-right:4px;background:#eef2f8;color:var(--ink-2);line-height:1.8}
+  .tag-role.admin{background:#f3efff;color:#6d46cf}
+  .tag-role.analyst{background:var(--primary-soft);color:#25469b}
+  .tag-role.viewer{background:#f1f4f9;color:#5c6c8d}
+  .tag-role.water-dept{background:#e6f7f5;color:#0d8f83}
+  .tag-role.ops{background:#fef4e6;color:#c2760a}
+  /* 表格密度：表头 11.5 / 单元格 12.5，行高约 42px */
+  .data-table th{padding:9px 12px;font-size:11.5px;background:#f8fafc}
+  .data-table td{padding:9px 12px;font-size:12.5px}
+  .data-table .name{font-size:12.5px}
+  /* 用量明细：固定列宽 + 长文本单行截断，避免时间/数字被提问列挤成多行 */
+  .usage-detail{table-layout:fixed;width:100%}
+  .usage-detail th,.usage-detail td{padding:8px 10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .usage-detail .mono{font-variant-numeric:tabular-nums;font-feature-settings:"tnum"}
+  .usage-detail td.q{max-width:0;color:var(--ink-2)}
+  .usage-detail td:nth-child(4),.usage-detail td:nth-child(5){text-align:right;font-variant-numeric:tabular-nums}
+  .usage-detail .dim{color:var(--muted)}
+  /* 操作列：彩色文字链接 */
+  .op-btn{font-size:12px;padding:2px 5px}
+  .op-btn.warn{color:var(--warn)}
+  .op-btn.danger{color:var(--danger)}
+  /* 分页器 */
+  .pager{display:flex;align-items:center;gap:12px;padding:15px 16px 6px;font-size:12.5px;color:var(--muted);
+    border-top:1px solid var(--line);flex-wrap:wrap;background:#fff;position:sticky;bottom:0;z-index:5}
+  .pg-btn{min-width:35px;height:34px;padding:0 11px;border:1px solid var(--line);background:#fff;border-radius:7px;font-size:12.5px;color:var(--ink-2);transition:all .15s}
+  .pg-btn:hover:not(:disabled){border-color:var(--primary);color:var(--primary)}
+  .pg-btn.on{background:var(--primary);border-color:var(--primary);color:#fff;font-weight:600}
+  .pg-btn:disabled{opacity:.4}
+  .pager .pg-sep{color:#c3cddd;padding:0 3px}
+  .pager .pg-info{margin-left:auto;display:flex;align-items:center;gap:10px}
+  .pager input{width:56px;padding:6px 8px;font-size:12.5px;border:1px solid var(--line);border-radius:7px;text-align:center}
+  /* 概览页卡片区限宽，避免超宽屏把卡片拉得过散（列表/表格页保持铺满） */
+  /* 概览页已移除，相关的 .quick-cards / .stats 限宽规则一并删除 */
+  /* 复选项网格：等宽列对齐，标签不折行（新增/编辑账号弹框） */
+  .check-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(132px,1fr));gap:9px 12px;padding-top:4px}
+  .check-grid label{display:inline-flex;align-items:center;gap:7px;font-size:12.5px;white-space:nowrap;margin:0;color:var(--ink-2);cursor:pointer}
+  .check-grid input[type=checkbox]{width:15px;height:15px;min-width:15px;padding:0;margin:0;flex:0 0 15px;accent-color:var(--primary);cursor:pointer}
+  /* 账号状态与「角色 / 用户组」分块：虚线分隔，避免状态勾选被看成第五个角色 */
+  .status-field{border-top:1px dashed var(--line);padding-top:12px;margin-top:12px}
+  .status-field .field-check{font-size:12.5px;color:var(--ink-2);display:inline-flex;align-items:center;gap:7px;cursor:pointer}
+  /* 重置码是一次性凭证：字号要大到能当着用户面核对/口述，等宽字体防 0/O、1/l 混淆 */
+  .reset-code{font-family:ui-monospace,Consolas,monospace;font-size:26px;font-weight:700;letter-spacing:6px;
+    text-align:center;color:#25469b;background:#f4f8ff;border:1px dashed #b9cbff;border-radius:10px;padding:16px 10px}
+  /* 复制按钮贴在码框右上角，不挤占大字居中 */
+  .reset-code-wrap{position:relative}
+  .reset-code-wrap .copy-btn{position:absolute;right:8px;top:8px;font-size:11px;padding:3px 9px}
+  .rs-sub{font-size:11px;color:var(--muted);margin-top:3px;font-weight:400}
+  /* 侧栏待办角标 */
+  .admin-nav-item .nav-count{margin-left:auto;background:#e0245e;color:#fff;border-radius:9px;
+    font-size:10px;font-weight:700;padding:1px 6px;line-height:1.5}
+
+  /* ===== 个人中心（企业级：左侧身份卡 + 右侧分组信息，两栏栅格） =====
+     旧版是两张并排表格，信息密度低、视觉重心散，"账号信息"和"权限"各占半屏。
+     企业后台的通行做法是：身份固定在最左（头像/姓名/角色/状态/退出），
+     右侧按"账号信息 → 安全 → 权限"纵向分组，每张卡只讲一件事。 */
+  .pf-grid{display:grid;grid-template-columns:312px minmax(0,1fr);gap:16px;align-items:start}
+  .pf-id{background:#fff;border:1px solid var(--line);border-radius:14px;overflow:hidden;box-shadow:var(--shadow-sm);position:sticky;top:84px}
+  .pf-cover{height:82px;background:
+      radial-gradient(120px 60px at 82% 20%,rgba(91,139,255,.5),transparent 70%),
+      radial-gradient(90px 50px at 12% 90%,rgba(47,95,224,.45),transparent 70%),
+      linear-gradient(135deg,#16223c,#27447e);position:relative}
+  .pf-cover::after{content:'';position:absolute;left:0;right:0;bottom:-1px;height:22px;
+    background:radial-gradient(60px 18px at 20% 100%,#fff 0 12px,transparent 13px) repeat-x;
+    background-size:120px 22px;opacity:.12}
+  .pf-id-body{padding:0 20px 20px;margin-top:-40px;text-align:center;position:relative}
+  .pf-id-body .av-xl{border:3px solid #fff;box-shadow:0 8px 20px rgba(16,28,54,.18);margin:0 auto 12px}
+  .pf-name{font-size:16px;font-weight:680;color:var(--ink);letter-spacing:.2px}
+  .pf-account{font-size:12px;color:var(--muted);margin-top:3px;font-variant-numeric:tabular-nums}
+  .pf-tags{display:flex;flex-wrap:wrap;gap:5px;justify-content:center;margin-top:12px}
+  .pf-meta{margin-top:16px;border-top:1px solid #f1f4f9;padding-top:4px;text-align:left}
+  .pf-meta-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 0;font-size:12px;border-bottom:1px dashed #f3f5f9}
+  .pf-meta-row:last-child{border-bottom:0}
+  .pf-meta-row span{color:var(--muted)}
+  .pf-meta-row b{color:var(--ink);font-weight:600}
+  .pf-logout{width:100%;margin-top:14px;justify-content:center;color:var(--danger);border-color:#f8cfdc}
+  .pf-logout:hover:not(:disabled){background:#fdeef3;border-color:#f5bccd;color:var(--danger)}
+  .pf-main{display:flex;flex-direction:column;gap:16px;min-width:0}
+  .pf-main .card{margin-bottom:0}
+  .pf-hint{font-size:11.5px;color:var(--muted)}
+  /* 信息行：左标签右值，隔行浅底，扫读时不会串行 */
+  .info-rows{border:1px solid var(--line);border-radius:10px;overflow:hidden}
+  .info-row{display:flex;align-items:center;justify-content:space-between;gap:18px;padding:11px 15px;
+    font-size:12.5px;border-bottom:1px solid #f3f5f9}
+  .info-row:last-child{border-bottom:0}
+  .info-row:nth-child(odd){background:#fafbfe}
+  .ir-k{color:var(--muted);flex:0 0 auto}
+  .ir-v{color:var(--ink);font-weight:600;text-align:right;word-break:break-all}
+  /* 权限清单按模块分组：一行一个模块，右侧铺权限码，比一堆等宽小卡更好扫 */
+  .perm-mod{display:flex;gap:14px;padding:11px 0;border-bottom:1px dashed #eef1f6}
+  .perm-mod:last-child{border-bottom:0}
+  .perm-mod-name{flex:0 0 74px;color:var(--ink-2);font-size:11.5px;font-weight:650;padding-top:3px}
+  .perm-chips{display:flex;flex-wrap:wrap;gap:6px;min-width:0}
+  /* chip 里放的是中文权限名，用等宽字体会显得松散；代码只放在 title 里备查 */
+  .perm-chip{background:#f6f8fc;border:1px solid var(--line);border-radius:6px;padding:2px 8px;
+    font-size:11.5px;color:var(--ink-2);letter-spacing:.2px}
+  .perm-chip b{font-family:inherit;color:var(--primary);font-weight:600}
+  @media(max-width:1080px){
+    .pf-grid{grid-template-columns:1fr}
+    .pf-id{position:static}
+  }
+  /* 分片预览：树状层级靠缩进 + 左侧引导线表达，不用折叠面板那套重控件 */
+  .chunk-modal .modal-box{max-width:820px}
+  /* 模型设置面板（原 models.html 内联样式） */
+  .row{display:flex;gap:12px;flex-wrap:wrap}
+  .row .field{flex:1;min-width:150px}
+  #activeBox .active-item{margin-bottom:16px}
+  #activeBox .active-label{font-size:11.5px;color:var(--muted);margin-bottom:4px}
+  #activeBox .active-name{font-size:15px;font-weight:650;color:var(--ink)}
+  #activeBox .active-divider{border-top:1px solid var(--line);margin:16px 0}
+  .msg.ok,.msg.err{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
+  .msg-close{flex:0 0 16px;width:16px;height:16px;line-height:14px;text-align:center;border:0;
+    border-radius:4px;background:transparent;color:inherit;font-size:14px;cursor:pointer;padding:0;opacity:.75}
+  .msg-close:hover{opacity:1;background:rgba(0,0,0,.06)}
+  .model-ops{display:flex;gap:6px;flex-wrap:nowrap;align-items:center;white-space:nowrap}
+  .model-ops .btn{white-space:nowrap;flex:0 0 auto}

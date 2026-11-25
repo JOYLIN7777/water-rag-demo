@@ -8,6 +8,7 @@ import SearchPage from './pages/SearchPage'
 import TreePage from './pages/TreePage'
 import ManagePage from './pages/ManagePage'
 import IndexPage from './pages/IndexPage'
+import AdminLayout from './layouts/AdminLayout'
 import Shell from './layouts/Shell'
 import { useAuthStore } from './store/auth'
 import { isLoggedIn } from './api/auth'
@@ -41,11 +42,21 @@ export default function App() {
       <Route path="/profile.html" element={<WithShell><ProfilePage /></WithShell>} />
       <Route path="/search.html" element={<WithShell perm="search:use"><SearchPage /></WithShell>} />
       <Route path="/tree.html" element={<WithShell perm="tree:use"><TreePage /></WithShell>} />
-      {/* 未移植页：暂回退 static，做一页换一页 */}
       <Route path="/index.html" element={<WithShell perm="chat:use"><IndexPage /></WithShell>} />
       <Route path="/manage.html" element={<WithShell perm="doc:read"><ManagePage /></WithShell>} />
+      {/* 后台 9 个面板 */}
+      <Route path="/users.html" element={<WithShell><AdminLayout /></WithShell>} />
+      <Route path="/org.html" element={<WithShell><AdminLayout /></WithShell>} />
+      <Route path="/roles.html" element={<WithShell><AdminLayout /></WithShell>} />
+      <Route path="/perms.html" element={<WithShell><AdminLayout /></WithShell>} />
+      <Route path="/docs.html" element={<WithShell><AdminLayout /></WithShell>} />
+      <Route path="/models.html" element={<WithShell><AdminLayout /></WithShell>} />
+      <Route path="/usage.html" element={<WithShell><AdminLayout /></WithShell>} />
+      <Route path="/loginlogs.html" element={<WithShell><AdminLayout /></WithShell>} />
+      <Route path="/audit.html" element={<WithShell><AdminLayout /></WithShell>} />
+      <Route path="/admin.html" element={<WithShell><AdminLayout /></WithShell>} />
+      {/* 未移植页：暂回退 static */}
       <Route path="/forgot.html" element={<StaticFallback page="forgot.html" />} />
-      <Route path="/admin.html" element={<StaticFallback page="admin.html" />} />
       <Route path="*" element={<Navigate to="/index.html" replace />} />
     </Routes>
   )
