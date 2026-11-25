@@ -288,6 +288,7 @@
     openUploadPicker: openUploadPicker,
     /** 问答页上传：选完文件直接入库，不跳页面 */
     uploadFiles: uploadFiles,
+    askVisibility: askVisibility,
     /** 选文件夹批量上传：优先目录选择器，避免浏览器原生"上传到此网站"确认 */
     pickFolder: pickFolder,
     /** 分片树状预览（后台文档管理与知识库文档页共用） */
@@ -429,10 +430,49 @@
     const inProgress = !type && !/[✓✗]/.test(txt) && /正在解析|^\[\d+\/\d+\]/.test(txt);
     toast(text, type || '', inProgress ? 0 : 3000);
   }
-  // 上传时把页面上「含下级部门可见」勾选一起带给后端（各页面共用同一勾选框 id）
+  // 本次上传的可见范围选择（弹框确认后写入，appendVisibility 读取）
+  let visibilityChoice = false;
+  /** 上传前确认可见范围：没有页面勾选框时弹框让用户选；已有勾选框的页面沿用页面值 */
+  function askVisibility(files) {
+    visibilityChoice = false;   // 默认仅本部门+上级（最小可见）
+    const pageCheck = document.getElementById('includeSubtree');
+    if (pageCheck) return Promise.resolve(!!pageCheck.checked);   // 文档页已有勾选框，不重复弹
+    const n = files && files.length ? files.length : 0;
+    if (!n) return Promise.resolve(false);
+    return new Promise(resolve => {
+      // 单选：本部门（默认） / 含下级部门
+      const body = E('div', {}, [
+        E('p', { text: '已选择 ' + n + ' 个文件，请确认文档可见范围：', attrs: { style: 'margin:0 0 12px' } }),
+        E('label', { attrs: { style: 'display:flex;gap:8px;align-items:flex-start;margin-bottom:10px;cursor:pointer' } }, [
+          E('input', { attrs: { type: 'radio', name: 'visScope', value: 'self', checked: true } }),
+          E('span', {}, [
+            E('b', { text: '仅本部门 + 上级' }),
+            E('div', { text: '只有本部门及上级组织能看到、检索到这些文档', attrs: { style: 'font-size:11.5px;color:var(--muted)' } })
+          ])
+        ]),
+        E('label', { attrs: { style: 'display:flex;gap:8px;align-items:flex-start;cursor:pointer' } }, [
+          E('input', { attrs: { type: 'radio', name: 'visScope', value: 'subtree' } }),
+          E('span', {}, [
+            E('b', { text: '含下级部门可见' }),
+            E('div', { text: '本部门及其下级组织都能看到、检索到这些文档', attrs: { style: 'font-size:11.5px;color:var(--muted)' } })
+          ])
+        ])
+      ]);
+      openModal({
+        title: '文档可见范围', okText: '确认上传', cancelText: '取消',
+        body: body,
+        onOk: close => {
+          const picked = document.querySelector('#appModal input[name="visScope"]:checked');
+          visibilityChoice = !!(picked && picked.value === 'subtree');
+          close(); resolve(visibilityChoice);
+        },
+        onCancel: () => resolve(null)   // null = 用户取消，不上传
+      });
+    });
+  }
+  // 上传时把「含下级部门可见」带给后端：弹框选择优先，其次页面勾选框
   function appendVisibility(fd) {
-    const sub = document.getElementById('includeSubtree');
-    if (sub && sub.checked) fd.append('includeSubtree', 'true');
+    if (visibilityChoice) fd.append('includeSubtree', 'true');
   }
   async function uploadOne(file) {
     if (!file) return;
@@ -627,6 +667,9 @@
           '<span class="pick-tip">取消勾选不需要的文件' + (bad ? '，' + bad + ' 个已自动排除' : '') + '</span>' +
         '</div>' +
         '<div class="pick-list" id="pickList">' + items.map(pickerRow).join('') + '</div>' +
+        '<label class="pick-scope" title="勾选后，本部门及其下级组织都能检索到这些文档">' +
+          '<input type="checkbox" id="pickIncludeSubtree"> 含下级部门可见（默认仅本部门 + 上级）' +
+        '</label>' +
         '<div class="pick-bar" id="pickBar"><i></i></div>' +
         '<div class="pick-done-tip" id="pickDone"></div>',
       onOk: async function () {
@@ -689,6 +732,9 @@
       .filter(function (r) { return r.querySelector('.pick-cb').checked; });
     if (!rows.length) { modalError('请至少勾选一个文件'); return false; }
     clearModalError();
+    // 文件夹选择弹框里勾选的可见范围，写入公共选择供 ingestOne 使用
+    const sub = document.getElementById('pickIncludeSubtree');
+    visibilityChoice = !!(sub && sub.checked);
     const job = { running: true, total: rows.length, done: 0, fail: 0, token: pickState };
     uploadJob = job;
     const okBtn = document.querySelector('#appModal .btn-ok');
@@ -774,6 +820,9 @@
       uploadMsg('✗ 没有支持的文档格式（共 ' + items.length + ' 个文件跳过）', 'err');
       return;
     }
+    // 选完文件先确认可见范围（问答页/无勾选框的页面弹框；文档页沿用已有勾选框）
+    const decision = await askVisibility(valid.map(x => x.file));
+    if (decision === null) return;   // 用户取消，不上传
     let ok = 0;
     for (let i = 0; i < valid.length; i++) {
       const f = valid[i].file;
@@ -1301,8 +1350,13 @@
 
   // ---------- 全局自定义弹框（替代浏览器原生 confirm/prompt） ----------
   let modalState = null;
-  function closeModal() {
+  function closeModal(canceled) {
     const mask = document.getElementById('appModal');
+    const state = modalState;
+    // 取消（×/取消按钮/遮罩/Esc）时回调业务方，如上传前确认弹框要终止流程
+    if (canceled && state && typeof state.onCancel === 'function') {
+      try { state.onCancel(); } catch (e) { console.error(e); }
+    }
     // 上传还在跑：关窗口不等于中断。不说这一句，用户会以为白传了、再传一遍。
     if (uploadJob && uploadJob.running && mask && mask.querySelector('#pickList')) {
       toast('已转到后台继续解析，跑完会提示', 'ok');
@@ -1313,7 +1367,7 @@
     modalState = null;
     document.removeEventListener('keydown', onModalKey);
   }
-  function onModalKey(e) { if (e.key === 'Escape') closeModal(); }
+  function onModalKey(e) { if (e.key === 'Escape') closeModal(true); }
   /**
    * 打开弹框。opts: { title, body(HTML), okText, cancelText, onOk(closeFn), danger }
    * onOk 返回 false 时不关闭，便于表单校验失败时保留弹框。
@@ -1365,10 +1419,10 @@
       if ((e.deltaY < 0 && atTop) || (e.deltaY > 0 && atBottom)) e.preventDefault();
     };
     modalState = opts;
-    mask.querySelector('.modal-close').onclick = closeModal;
+    mask.querySelector('.modal-close').onclick = () => closeModal(true);
     const cancelBtn = mask.querySelector('.btn-cancel');
-    if (cancelBtn) cancelBtn.onclick = closeModal;
-    mask.onclick = e => { if (e.target === mask) closeModal(); };
+    if (cancelBtn) cancelBtn.onclick = () => closeModal(true);
+    mask.onclick = e => { if (e.target === mask) closeModal(true); };
     mask.querySelector('.btn-ok').onclick = async () => {
       if (typeof opts.onOk !== 'function') { closeModal(); return; }
       let keepOpen = false;
