@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>个人中心 · 水利知识库</title>
+<link rel="icon" type="image/svg+xml" href="assets/logo.svg">
+<link rel="stylesheet" href="assets/app.css">
+<style>
+  .profile-head{display:flex;align-items:center;gap:18px;padding:4px 2px 22px}
+  .profile-avatar{width:68px;height:68px;border-radius:18px;flex:0 0 68px;background:linear-gradient(135deg,var(--primary-hi),var(--primary));color:#fff;display:flex;align-items:center;justify-content:center;font-size:30px;font-weight:700;box-shadow:0 8px 22px rgba(59,110,245,.3)}
+  .profile-name{font-size:20px;font-weight:680;color:var(--ink)}
+  .profile-sub{font-size:12.5px;color:var(--muted);margin-top:5px}
+  .info-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px}
+  .info-cell{background:#f8fafc;border:1px solid var(--line);border-radius:9px;padding:12px 14px}
+  .info-cell .k{font-size:10.5px;color:var(--muted);margin-bottom:5px}
+  .info-cell .v{font-size:13.5px;color:var(--ink);font-weight:600;word-break:break-all}
+  .token-bar{height:6px;border-radius:3px;background:#eef2f8;overflow:hidden;margin-top:8px}
+  .token-bar i{display:block;height:100%;background:linear-gradient(90deg,var(--ok),#5bd0a4);border-radius:3px;transition:width .3s}
+  .err{min-height:20px;font-size:12px;color:var(--danger);margin-top:4px}
+  .ok{min-height:20px;font-size:12px;color:var(--ok);margin-top:4px}
+</style>
+</head>
+<body>
+<div class="layout" id="sidebarHost">
+<main class="main">
+  <header class="topbar">
+    <div class="topbar-left"><div class="topbar-title">个人中心</div><span class="topbar-sub">账号与安全</span></div>
+    <span id="adminEntrySlot" class="admin-slot"></span>
+  </header>
+
+  <div class="page">
+    <div class="page-head">
+      <h1 class="page-title">个人中心</h1>
+      <p class="page-desc">查看账号信息与登录状态，并可修改登录密码。</p>
+    </div>
+
+    <div class="profile-head">
+      <div class="profile-avatar" id="pAvatar">演</div>
+      <div><div class="profile-name" id="pName">加载中…</div>
+        <div class="profile-sub" id="pSub">—</div></div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h3>账号信息</h3></div>
+      <div class="info-grid" id="pInfo">加载中…</div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h3>登录状态</h3><button class="btn btn-sm" onclick="Shell.logout()">退出登录</button></div>
+      <div class="sub">登录有效期内无需重复登录，到期前系统会自动续期；退出后本次登录立即失效。</div>
+      <div class="info-grid" id="pToken">加载中…</div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h3>账号安全</h3></div>
+      <div class="sub">修改后下次登录请使用新密码。密码经过加密存储，系统不会保存明文。</div>
+      <button class="btn btn-primary" type="button" onclick="openPwdModal()">修改密码</button>
+    </div>
+  </div>
+</main>
+</div>
+
+<script src="assets/auth.js"></script>
+<script src="assets/ui.js"></script>
+<script src="assets/app.js"></script>
+<script src="assets/crypto.js"></script>
+<script>
+const E=window.UI.el;
+function htmlNodes(html){
+  const body=new DOMParser().parseFromString('<body>'+String(html||'')+'</body>','text/html').documentElement.querySelector('body');
+  return body?Array.from(body.childNodes):[];
+}
+
+function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+const tag=(t,c)=>'<span class="tag '+c+'">'+esc(t)+'</span>';
+
+// 从 JWT payload 解析 exp（仅用于展示，服务端仍会独立验签）
+function parseJwt(tok){try{return JSON.parse(atob(tok.split('.')[1].replace(/-/g,'+').replace(/_/g,'/')))}catch(e){return null}}
+
+async function loadProfile(){
+  try{
+    // 先取组织名字典：组织名存在服务端，管理员改名后这里要显示新名字而不是裸标识
+    if(window.Shell&&Shell.loadOrgLabels)await Shell.loadOrgLabels();
+    const r=await fetch('/api/auth/me');
+    if(r.status===401){WrkAuth.goLogin();return}
+    const j=await r.json();
+    const name=j.displayName||j.user;
+    document.getElementById('pName').textContent=name;
+    document.getElementById('pAvatar').textContent=(name||'演').slice(0,1);
+    const gl=(window.Shell&&Shell.groupLabel)||(x=>x);
+    const tl=(window.Shell&&Shell.tenantLabel)||(x=>x);
+    document.getElementById('pSub').textContent=tl(j.tenant)+' · '+((j.groups||[]).map(gl).join('、')||'普通用户');
+    const cell=(k,v)=>E('div',{className:'info-cell'},[E('div',{className:'k',text:k}),
+      E('div',{className:'v'},v instanceof Node?v:document.createTextNode(String(v)))]);
+    document.getElementById('pInfo').replaceChildren(
+      cell('登录账号',j.user),
+      cell('角色',j.groups&&j.groups.length?j.groups.map(gl).join('、'):'—'),
+      cell('所属组织',tl(j.tenant)),
+      cell('登录方式',htmlNodes(tag('账号密码','info'))[0]||document.createTextNode('账号密码'))
+    );
+
+    // 令牌有效期：从本地 access token 解析 exp，展示剩余时间与进度条
+    const tok=WrkAuth.getAccess();const c=tok?parseJwt(tok):null;
+    if(c&&c.exp){
+      const remain=Math.max(0,c.exp-Math.floor(Date.now()/1000));
+      const iat=c.iat||(c.exp-remain),total=Math.max(1,c.exp-iat),pct=Math.min(100,Math.round(remain/total*100));
+      const mm=Math.floor(remain/60),ss=remain%60;
+      document.getElementById('pToken').replaceChildren(
+        E('div',{className:'info-cell',attrs:{style:'grid-column:1/-1'}},[
+          E('div',{className:'k',text:'本次登录剩余时间'}),
+          E('div',{className:'v',text:mm+' 分 '+String(ss).padStart(2,'0')+' 秒'}),
+          E('div',{className:'token-bar'},E('i',{attrs:{style:'width:'+pct+'%'}})),
+          E('div',{className:'k',text:'到期前会自动续期，无需重新登录',attrs:{style:'margin-top:8px'}})]));
+    }else{
+      document.getElementById('pToken').replaceChildren(E('div',{className:'info-cell',attrs:{style:'grid-column:1/-1'}},E('div',{className:'v',text:'未获取到令牌信息'})));
+    }
+  }catch(e){document.getElementById('pInfo').replaceChildren(E('div',{className:'empty',text:'加载失败'}))}
+}
+
+// 点击「修改密码」才弹出全局自定义弹框，表单只在弹框内存在
+function openPwdModal(){
+  const body=
+    '<div class="field"><label for="oldPwd">当前密码</label>'+
+      '<input id="oldPwd" type="password" autocomplete="current-password" placeholder="请输入当前密码"></div>'+
+    '<div class="field"><label for="newPwd">新密码</label>'+
+      '<input id="newPwd" type="password" autocomplete="new-password" placeholder="至少 8 位"></div>'+
+    '<div class="field"><label for="newPwd2">确认新密码</label>'+
+      '<input id="newPwd2" type="password" autocomplete="new-password" placeholder="再次输入新密码"></div>'+
+    '<div id="pwMsg" style="min-height:20px;font-size:12px;margin-top:4px"></div>';
+  Shell.modal({
+    title:'修改密码', body:body, okText:'确认修改',
+    onOk:async function(){
+      const msg=document.getElementById('pwMsg');
+      const oldPwd=document.getElementById('oldPwd').value;
+      const newPwd=document.getElementById('newPwd').value;
+      const newPwd2=document.getElementById('newPwd2').value;
+      msg.className='';msg.textContent='';
+      if(!oldPwd){msg.className='err';msg.textContent='请输入当前密码';return false}
+      if(newPwd!==newPwd2){msg.className='err';msg.textContent='两次输入的新密码不一致';return false}
+      if(newPwd.length<8){msg.className='err';msg.textContent='新密码长度至少 8 位';return false}
+      const btn=document.querySelector('#appModal .btn-ok');
+      if(btn){btn.disabled=true;btn.textContent='提交中…'}
+      try{
+        const r=await fetch('/api/auth/change-password',{
+          method:'POST',headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({oldPassword:await PwdCrypto.encrypt(oldPwd),
+            newPassword:await PwdCrypto.encrypt(newPwd),encrypted:true})
+        });
+        const j=await r.json();
+        if(!r.ok){msg.className='err';msg.textContent=j.message||('修改失败（HTTP '+r.status+'）');return false}
+        appToast('密码已修改，下次登录请使用新密码','ok');
+        return true;
+      }catch(err){msg.className='err';msg.textContent='网络异常：'+err.message;return false}
+      finally{if(btn){btn.disabled=false;btn.textContent='确认修改'}}
+    }
+  });
+}
+
+initShell('profile');
+loadProfile();
+</script>
+</body>
+</html>

@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>知识库文档管理 · 水利知识库</title>
+<link rel="icon" type="image/svg+xml" href="assets/logo.svg">
+<link rel="stylesheet" href="assets/app.css">
+<style>
+  /* 上传卡片：左侧拖拽主区 + 右侧说明，状态条默认隐藏不占空白 */
+  .upload-card{display:flex;gap:18px;align-items:stretch;background:#fff;border:1px solid var(--line);border-radius:var(--radius);padding:18px 20px;margin-bottom:18px;box-shadow:var(--shadow-sm)}
+  .dropzone{flex:1.6;border:1.6px dashed #b9cbff;border-radius:12px;padding:22px 18px;text-align:center;cursor:pointer;transition:all .2s;background:#fbfcff;color:var(--ink-2);display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:132px}
+  .dropzone:hover,.dropzone.dragging{border-color:var(--primary);background:var(--primary-soft)}
+  .dz-icon{width:42px;height:42px;border-radius:12px;background:var(--primary-soft);color:var(--primary);display:flex;align-items:center;justify-content:center;font-size:22px;margin-bottom:10px}
+  .dropzone:hover .dz-icon{background:#fff}
+  .dz-title{font-size:13.5px;font-weight:600;color:var(--ink)}
+  .dz-sub{font-size:11.5px;color:var(--muted);margin-top:5px}
+  .upload-side{flex:1;display:flex;flex-direction:column;justify-content:center;gap:11px;min-width:0}
+  .upload-side h4{margin:0;font-size:13px;color:var(--ink);font-weight:650}
+  .fmt-list{display:flex;flex-wrap:wrap;gap:5px}
+  .fmt{border:1px solid var(--line);background:#f7f9fc;color:var(--ink-2);border-radius:6px;padding:2px 7px;font-size:10.5px;line-height:1.6}
+  .fmt-groups{display:flex;flex-direction:column;gap:9px;max-height:210px;overflow-y:auto;padding-right:4px}
+  .fmt-group-title{font-size:10px;color:var(--muted);letter-spacing:.4px;margin-bottom:4px}
+  .fmt-total{font-size:11px;color:var(--primary);font-weight:600}
+  .folder-btn{border:1px solid #d6e4ff;background:var(--primary-soft);color:#25469b;border-radius:8px;padding:9px 12px;font-size:12px;font-weight:600;transition:all .15s;text-align:center}
+  .folder-btn:hover{background:#dbe8ff;border-color:#b9cbff}
+  .folder-row{display:flex;gap:6px}
+  .folder-row .folder-btn{flex:1}
+  .folder-row .folder-other{flex:0 0 auto;padding:9px 11px;font-size:14px}
+  .upload-msg{margin:0 0 16px;background:#f7f9fc;border:1px solid var(--line);color:var(--ink-2)}
+  .toolbar{display:flex;gap:12px;margin-bottom:14px;align-items:center;flex-wrap:wrap}
+  .search{max-width:320px}
+  .doc-name{max-width:380px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600;color:var(--ink)}
+  /* 部门可见范围徽标：本部门/含下级/来自上级 三态，浅色底细边不抢眼 */
+  .scope{display:inline-flex;align-items:center;gap:4px;border:1px solid var(--line);border-radius:20px;padding:1px 8px;font-size:10.5px;color:var(--ink-2);background:#f7f9fc;white-space:nowrap}
+  .scope.sub{border-color:#cfe3d6;background:#f2f9f4;color:#2f7a4d}
+  .scope.from{border-color:#dbe6ff;background:#f3f7ff;color:#3a5fb0}
+  /* 分页控件：放到卡片底部并吸底，按钮之间留出可点击的间距 */
+  .pager{display:flex;gap:11px;align-items:center;justify-content:flex-end;margin-top:18px;padding:14px 2px 4px;
+    border-top:1px solid var(--line);background:#fff;position:sticky;bottom:0;z-index:5;font-size:12.5px;color:var(--ink-2)}
+  .pager button{border:1px solid var(--line);background:#fff;border-radius:7px;padding:7px 13px;min-width:34px;min-height:34px;
+    cursor:pointer;color:var(--ink-2);font-size:12.5px;line-height:1.2}
+  .pager button:hover:not(:disabled){border-color:var(--primary);color:var(--primary)}
+  .pager button:disabled{opacity:.45;cursor:not-allowed}
+  .pager .cur{background:var(--primary);border-color:var(--primary);color:#fff}
+  .pager input{width:56px;padding:6px 8px;margin:0 5px;font-size:12.5px;border:1px solid var(--line);border-radius:7px;text-align:center}
+</style>
+</head>
+<body>
+<div class="layout" id="sidebarHost">
+<main class="main">
+  <header class="topbar">
+    <div class="topbar-left"><div class="topbar-title">知识库文档管理</div><span class="topbar-sub">/ 文档</span></div>
+    <span id="adminEntrySlot" class="admin-slot"></span>
+  </header>
+
+  <div class="page">
+    <div class="page-head">
+      <h1 class="page-title">知识库文档管理</h1>
+      <p class="page-desc">上传、查看与删除知识库文档。上传后系统会自动解析，稍等片刻即可开始提问。</p>
+    </div>
+
+    <div class="stats">
+      <div class="stat-card"><div class="stat-num" id="statDocs">-</div><div class="stat-label">已入库文档数</div></div>
+      <div class="stat-card"><div class="stat-num" id="statChunks">-</div><div class="stat-label">切片总数</div></div>
+      <div class="stat-card"><div class="stat-num" id="statLatest" style="font-size:15px;line-height:1.9">-</div><div class="stat-label">最近更新时间</div></div>
+    </div>
+
+    <div class="upload-card">
+      <div class="dropzone" id="dropzone">
+        <div class="dz-icon">⇪</div>
+        <div class="dz-title">点击选择，或将文件拖拽到此处</div>
+        <div class="dz-sub">解析后自动切片并写入检索库，支持多格式</div>
+      </div>
+      <div class="upload-side">
+        <h4>支持格式 <span class="fmt-total" id="fmtTotal">加载中…</span></h4>
+        <div class="fmt-groups" id="fmtGroups"></div>
+        <div class="folder-row">
+          <button class="folder-btn" data-perm="doc:write_batch" onclick="Shell.pickFolder()" title="同一页面内重复点击会直接读取上次那个文件夹，不再弹授权">📁 选择文件夹批量上传</button>
+          <button class="folder-btn folder-other" id="folderOther" data-perm="doc:write_batch" style="display:none" onclick="Shell.pickFolder(true)" title="换一个文件夹（会重新弹一次读取授权）">↻</button>
+        </div>
+        <div class="hint" id="folderHint" style="margin:0">单个文件最大 500MB，文件夹上传会自动遍历支持的类型。</div>
+      </div>
+      <input type="file" id="fileInput" hidden>
+      <input type="file" id="folderInput" webkitdirectory multiple hidden>
+    </div>
+
+    <div class="upload-msg" id="uploadMsg" style="display:none"></div>
+
+    <div class="toolbar">
+      <input class="search" id="search" type="text" placeholder="按文件名过滤…">
+      <span class="hint" style="margin:0" id="docCount"></span>
+    </div>
+
+    <div class="table-card">
+      <div class="scroll"><table>
+        <thead><tr><th style="width:42%">文件名</th><th style="width:130px">所属部门</th><th>切片数</th><th>最近上传时间</th><th style="width:100px">操作</th></tr></thead>
+        <tbody id="docTbody"><tr><td colspan="5" class="empty">加载中…</td></tr></tbody>
+      </table></div>
+      <div class="pager" id="pager" style="display:none"></div>
+    </div>
+  </div>
+</main>
+</div>
+
+<script src="assets/auth.js"></script>
+<script src="assets/ui.js"></script>
+<script src="assets/app.js"></script>
+<script>
+const E=window.UI.el;
+// 存量渲染器产出 HTML 字符串，统一用 DOMParser 解析为节点再挂载（不直接写 innerHTML）
+function htmlNodes(html){
+  const body=new DOMParser().parseFromString('<body>'+String(html||'')+'</body>','text/html').documentElement.querySelector('body');
+  return body?Array.from(body.childNodes):[];
+}
+let docs=[];
+function escapeHtml(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+// 后端返回的扩展名按用途分组展示，避免只显示 6 个让用户误以为支持得少
+const FMT_GROUPS=[
+  {name:'文档',exts:['pdf','doc','docx','rtf','odt','epub','msg','eml','ppt','pptx','odp']},
+  {name:'表格',exts:['xls','xlsx','csv','tsv','ods']},
+  {name:'文本与标记',exts:['txt','md','markdown','json','xml','yaml','yml','ini','properties','log','sql','geojson','topojson']},
+  {name:'代码',exts:['java','js','ts','py','css','htm','html']}
+];
+async function loadFormats(){
+  try{
+    const j=await (await fetch('/api/docs/formats')).json();
+    const all=j.extensions||[];
+    document.getElementById('fmtTotal').textContent='共 '+all.length+' 种';
+    const used=new Set();
+    const html=FMT_GROUPS.map(g=>{
+      const list=g.exts.filter(e=>all.includes(e));
+      list.forEach(e=>used.add(e));
+      if(!list.length)return '';
+      return '<div><div class="fmt-group-title">'+g.name+'</div><div class="fmt-list">'+
+        list.map(e=>'<span class="fmt">'+e.toUpperCase()+'</span>').join('')+'</div></div>';
+    }).join('');
+    const rest=all.filter(e=>!used.has(e));
+    const extra=rest.length?'<div><div class="fmt-group-title">其他</div><div class="fmt-list">'+
+      rest.map(e=>'<span class="fmt">'+e.toUpperCase()+'</span>').join('')+'</div></div>':'';
+    const host=document.getElementById('fmtGroups');
+    host.replaceChildren(...htmlNodes(html+extra));
+  }catch(e){document.getElementById('fmtTotal').textContent='加载失败'}
+}
+// 后端时间是带纳秒的 ISO 字符串，JS Date 解析不了，截到毫秒
+function fmtTime(s){
+  if(!s)return '-';
+  const d=new Date(String(s).replace(/(\.\d{3})\d+/,'$1'));
+  return isNaN(d)?s:d.toLocaleString('zh-CN',{hour12:false});
+}
+
+async function loadDocs(){
+  const tbody=document.getElementById('docTbody');
+  try{
+    const j=await (await fetch('/api/docs/list')).json();
+    // 401/403/500 时后端返回 {code,message} 对象而不是数组，直接 filter 会抛
+    // "docs.filter is not a function"——先把类型守住，把后端的话原样亮给用户
+    if(!Array.isArray(j))throw new Error(j&&j.message?j.message:'登录状态已失效，请重新登录后再试');
+    // ES composite 聚合按（部门,文件名）字典序返回，这里按上传时间倒序（最新在前）再分页
+    docs=j.slice().sort((a,b)=>String(b.uploadedAt||'').localeCompare(String(a.uploadedAt||'')));
+    try{await Shell.loadOrgLabels()}catch(e){} // 部门徽标要显示组织名而不是 org-key
+    render();
+    document.getElementById('statDocs').textContent=docs.length;
+    document.getElementById('statChunks').textContent=docs.reduce((a,d)=>a+Number(d.chunks),0);
+    const latest=docs.map(d=>d.uploadedAt||'').sort().pop();
+    document.getElementById('statLatest').textContent=latest?fmtTime(latest):'-';
+    document.getElementById('docCount').textContent='共 '+docs.length+' 份文档';
+  }catch(e){tbody.replaceChildren(UI.createEmptyRow({text:'加载失败：'+e.message,colspan:5}))}
+}
+
+// ---------- 分页：每页 10 条，搜索/删除/上传后都回到第 1 页（搜索结果实时过滤联动） ----------
+const PAGE_SIZE=10;
+let pageCur=1;
+
+// 部门徽标：显示归属部门 + 可见范围三态（本部门 / 含下级 / 来自上级）
+// "来自上级"的判定需要知道当前账号的部门与祖先链，这里简化为：
+// 文档部门≠我的部门 → 可见来源是上级下发或下级默认可见，由 afterDot 文案区分
+function scopeBadge(d,myOrg){
+  const t=d.tenantId||'default';
+  if(!myOrg||t===myOrg){
+    return d.visibleSubtree
+      ?'<span class="scope sub" title="本部门上传，且已勾选含下级部门下发">'+escapeHtml(Shell.tenantLabel(t))+' · 含下级</span>'
+      :'<span class="scope" title="本部门上传：本部门与上级可见">本部门</span>';
+  }
+  return '<span class="scope from" title="上级部门下发或下级部门上传（上级默认可见）">来自 '+escapeHtml(Shell.tenantLabel(t))+'</span>';
+}
+
+function render(){
+  const kw=document.getElementById('search').value.trim().toLowerCase();
+  const list=docs.filter(d=>!kw||d.fileName.toLowerCase().includes(kw));
+  const tbody=document.getElementById('docTbody');
+  const pager=document.getElementById('pager');
+  const totalPages=Math.max(1,Math.ceil(list.length/PAGE_SIZE));
+  if(pageCur>totalPages)pageCur=totalPages;
+  const myOrg=(Shell.getCurrentUser()||{}).tenant||'';
+  if(!list.length){
+    tbody.replaceChildren(UI.createEmptyRow({text:kw?'无匹配文档':(window.__docCanWrite?'知识库暂无文档，先上传一份吧':'知识库暂无文档'),colspan:5}));
+    pager.style.display='none';return;
+  }
+  const start=(pageCur-1)*PAGE_SIZE;
+  const slice=list.slice(start,start+PAGE_SIZE);
+  tbody.replaceChildren();
+  slice.forEach(d=>{
+    const tr=document.createElement('tr');
+    const nameCell=E('td',{className:'doc-name',title:d.fileName,text:d.fileName});
+    const scopeCell=E('td');scopeCell.append(...htmlNodes(scopeBadge(d,myOrg)));
+    tr.append(nameCell,scopeCell,
+      E('td',{},UI.createTag(d.chunks+' 片')),
+      E('td',{text:fmtTime(d.uploadedAt)}),
+      E('td',{},
+        E('button',{className:'btn btn-sm btn-chunks',type:'button',text:'查看分片',dataset:{perm:'doc:chunks'}}),
+        ...(window.__docCanDelete?[E('button',{className:'btn btn-sm btn-danger',type:'button',text:'删除',
+          dataset:{perm:'doc:delete'},attrs:{style:'margin-left:6px'}})]:[])
+      ));
+    tr.querySelector('.btn-chunks').onclick=()=>Shell.showChunks(d.fileName);
+    const del=tr.querySelector('.btn-danger');if(del)del.onclick=()=>delDoc(d);
+    tbody.appendChild(tr);
+  });
+  // 分页控件：最多显示 5 个页码 + 首尾页
+  const nums=[];
+  for(let p=1;p<=totalPages;p++){
+    if(p===1||p===totalPages||Math.abs(p-pageCur)<=1)nums.push(p);
+    else if(nums[nums.length-1]!=='…')nums.push('…');
+  }
+  pager.style.display='flex';
+  const pagerNodes=[E('span',{text:'共 '+list.length+' 份 · 第 '+pageCur+'/'+totalPages+' 页'}),
+    E('button',{type:'button',text:'«',dataset:{go:'1'},disabled:pageCur<=1}),
+    E('button',{type:'button',text:'‹',dataset:{go:String(pageCur-1)},disabled:pageCur<=1}),
+    ...nums.map(p=>p==='…'?E('span',{text:'…',attrs:{style:'padding:0 2px'}}):
+      E('button',{type:'button',text:String(p),className:p===pageCur?'cur':'',dataset:{go:String(p)}})),
+    E('button',{type:'button',text:'›',dataset:{go:String(pageCur+1)},disabled:pageCur>=totalPages}),
+    E('button',{type:'button',text:'»',dataset:{go:String(totalPages)},disabled:pageCur>=totalPages})];
+  const jumpInput=E('input',{attrs:{type:'number',min:'1',max:String(totalPages),value:String(pageCur),
+    id:'pageJump',style:'width:46px;padding:4px 6px;font-size:12px;border:1px solid var(--line);border-radius:6px;text-align:center'}});
+  pagerNodes.push(E('span',{attrs:{style:'display:inline-flex;align-items:center;gap:4px;margin-left:8px'}},[
+    document.createTextNode('跳至 '),jumpInput,document.createTextNode(' 页')]));
+  pager.replaceChildren(...pagerNodes);
+  pager.querySelectorAll('button[data-go]').forEach(b=>{
+    b.onclick=()=>{pageCur=Number(b.dataset.go);render()};
+  });
+  // 指定跳页：回车触发，超范围自动夹到 1..totalPages
+  const jump=document.getElementById('pageJump');
+  if(jump)jump.onkeydown=e=>{
+    if(e.key!=='Enter')return;
+    let p=parseInt(jump.value,10);
+    if(!p||p<1)p=1; if(p>totalPages)p=totalPages;
+    pageCur=p;render();
+  };
+}
+document.getElementById('search').addEventListener('input',()=>{pageCur=1;render()});
+
+async function delDoc(d){
+  if(!confirm('确定从知识库删除「'+d.fileName+'」（'+d.chunks+' 个切片）吗？\n删除后相关内容将无法再被问答引用。'))return;
+  showMsg('','正在删除 '+d.fileName+' ...');
+  try{
+    const q='?fileName='+encodeURIComponent(d.fileName)+(d.tenantId?'&tenantId='+encodeURIComponent(d.tenantId):'');
+    const r=await fetch('/api/docs'+q,{method:'DELETE'});
+    const j=await r.json();
+    if(!r.ok||j.deletedChunks===undefined)throw new Error(j.message||('删除失败（HTTP '+r.status+'）'));
+    showMsg('ok','✓ 已删除「'+d.fileName+'」（'+j.deletedChunks+' 个切片）');
+    appToast('文档已删除','ok');
+    loadDocs();
+  }catch(e){showMsg('err','✗ 删除失败：'+e.message)}
+}
+
+// 顺序上传一批文件（多个文件 / 整个文件夹），逐个给状态反馈，避免并发打爆后端解析
+async function uploadFiles(files){
+  const list=Array.from(files||[]);
+  if(!list.length)return;
+  // 选完文件统一弹框确认可见范围，取消则不上传
+  const decision=await (window.Shell&&Shell.askVisibility?Shell.askVisibility(list):Promise.resolve(false));
+  if(decision===null)return;
+  let ok=0,fail=0,totalChunks=0;
+  for(let i=0;i<list.length;i++){
+    const file=list[i];
+    showMsg('','['+(i+1)+'/'+list.length+'] 正在解析 '+file.name+' …');
+    const fd=new FormData();fd.append('file',file);
+    if(decision)fd.append('includeSubtree','true');
+    const started=Date.now();
+    try{
+      const r=await fetch('/api/docs/upload',{method:'POST',body:fd});
+      const j=await r.json();
+      if(!r.ok||j.chunks===undefined)throw new Error(j.message||('上传失败（HTTP '+r.status+'）'));
+      ok++;totalChunks+=j.chunks;
+      const secs=((Date.now()-started)/1000).toFixed(1);
+      showMsg('','['+(i+1)+'/'+list.length+'] ✓ '+file.name+'：'+j.chunks+' 片（'+j.chars+' 字，'+secs+' 秒）');
+    }catch(e){fail++;showMsg('err','['+(i+1)+'/'+list.length+'] ✗ '+file.name+'：'+e.message)}
+  }
+  showMsg(fail?'err':'ok','✓ 完成：成功 '+ok+' 份 / 失败 '+fail+' 份，共 '+totalChunks+' 个切片，已可提问');
+  appToast(fail?('完成，'+fail+' 份失败'):(ok+' 份文档已入库'),fail?'err':'ok');
+  loadDocs();
+}
+function showMsg(type,text){
+  const el=document.getElementById('uploadMsg');
+  el.className='upload-msg'+(type?' '+type:'');el.style.display='block';el.textContent=text;
+}
+
+const dz=document.getElementById('dropzone');
+dz.onclick=()=>document.getElementById('fileInput').click();
+dz.ondragover=e=>{e.preventDefault();dz.classList.add('dragging')};
+dz.ondragleave=e=>{e.preventDefault();dz.classList.remove('dragging')};
+dz.ondrop=e=>{
+  e.preventDefault();dz.classList.remove('dragging');
+  const fs=e.dataTransfer.files;
+  // 一次拖多份先列清单让人挑；只拖一份直接传
+  if(fs&&fs.length>1)Shell.openUploadPicker(fs);else uploadFiles(fs);
+};
+document.getElementById('fileInput').onchange=e=>{uploadFiles(e.target.files);e.target.value=''};
+// 选文件夹：先列清单，勾掉不要的再传
+document.getElementById('folderInput').onchange=e=>{Shell.openUploadPicker(e.target.files);e.target.value=''};
+// 公共上传组件传完会广播 docs:updated，页面据此刷新清单
+document.addEventListener('docs:updated',loadDocs);
+
+initShell('manage');
+loadDocs();
+loadFormats();
+// 页面级权限守卫：菜单权限页没勾「知识库文档」的账号，直接敲 URL 也进不来。
+// 侧栏隐藏入口只是第一道门，这里必须再拦一次——不拦的话权限配置形同虚设。
+(async function guardPerm(){
+  if(window.Shell&&Shell.permsReady)await Shell.permsReady();
+  // 页面能进 ≠ 能写：上传/删除按细粒度权限分别收敛（后端也会再拦一次）
+  window.__docCanWrite=!!(window.Shell&&Shell.hasPermission&&Shell.hasPermission('doc:write'));
+  window.__docCanDelete=!!(window.Shell&&Shell.hasPermission&&Shell.hasPermission('doc:delete'));
+  const uploadCard=document.querySelector('.upload-card');
+  if(uploadCard&&!window.__docCanWrite)uploadCard.style.display='none';
+  loadDocs();
+  if(!(window.Shell&&Shell.hasPermission&&Shell.hasPermission('doc:read'))){
+    const main=document.querySelector('main')||document.body;
+    Array.from(main.children).forEach(el=>{if(!el.classList.contains('topbar'))el.style.display='none'});
+    // 顶栏面包屑由公共组件注入在 topbar 内部，不属于 main 直属子元素——这里单独摘掉，
+    // 并恢复原本的页面标题，避免无权限页残留导航（截图里的红框）
+    const nav=main.querySelector('.topbar-nav-left');if(nav)nav.style.display='none';
+    const ttl=main.querySelector('.topbar-title');if(ttl)ttl.style.display='';
+    const sub=main.querySelector('.topbar-sub');if(sub)sub.style.display='';
+    const bar=document.createElement('div');
+    bar.className='card';bar.style.cssText='margin:auto;max-width:520px;padding:36px;text-align:center';
+    bar.replaceChildren(
+      E('div',{text:'🔒',attrs:{style:'font-size:34px;margin-bottom:12px'}}),
+      E('div',{text:'没有使用权限',attrs:{style:'font-size:15px;font-weight:650;margin-bottom:8px'}}),
+      E('div',{attrs:{style:'font-size:13px;color:#6b7a99;line-height:1.7'}},[
+        document.createTextNode('当前账号未被授予「知识库文档」的使用权限。'),E('br'),
+        document.createTextNode('如需使用，请联系管理员在「菜单权限」中为你的角色勾选该功能。')]),
+      E('a',{text:'← 返回智能问答',attrs:{href:'index.html',style:'display:inline-block;margin-top:18px;color:var(--primary,#3b6ef5);text-decoration:none;font-size:13px'}}));
+    main.insertBefore(bar,main.firstChild);
+  }
+})();
+
+// 问答页「上传文档」跳过来时，直接把上传区带到眼前
+if(location.hash==='#upload')setTimeout(()=>{
+  const row=document.querySelector('.folder-row');
+  if(!row)return;
+  row.scrollIntoView({behavior:'smooth',block:'center'});
+  const b=row.querySelector('.folder-btn[data-perm]');
+  if(b&&getComputedStyle(b).display!=='none'){b.focus();b.style.outline='2px solid var(--primary)';setTimeout(()=>b.style.outline='',2200)}
+},1000);
+</script>
+</body>
+</html>

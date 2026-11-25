@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>混合检索实验 · 水利知识库</title>
+<link rel="icon" type="image/svg+xml" href="assets/logo.svg">
+<link rel="stylesheet" href="assets/app.css">
+<style>
+  .querybar{display:flex;gap:10px;margin-bottom:16px}
+  .querybar input{flex:1}
+  .idbar{background:#fff;border:1px solid var(--line);border-radius:var(--radius);padding:13px 16px;margin-bottom:18px;display:flex;gap:16px;align-items:center;flex-wrap:wrap;font-size:12.5px;box-shadow:var(--shadow-sm)}
+  .idbar label{color:var(--muted);white-space:nowrap}
+  .idbar input[type=text]{width:150px;padding:7px 10px}
+  .cols{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+  .col{background:#fff;border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;box-shadow:var(--shadow-sm);display:flex;flex-direction:column}
+  .col h3{margin:0;padding:14px 16px;font-size:13px;background:#f7f9fc;border-bottom:1px solid var(--line);color:var(--ink)}
+  .col.hybrid h3{background:var(--primary-soft);color:#25469b}
+  .hits{flex:1;max-height:560px;overflow-y:auto}
+  .hit{padding:13px 16px;border-bottom:1px solid #f1f4f9;font-size:12.5px;line-height:1.65}
+  .hit:last-child{border-bottom:0}
+  .hit .meta{font-size:11px;color:var(--muted);margin-bottom:6px;display:flex;justify-content:space-between;gap:8px}
+  .hit .score{color:var(--primary);font-weight:650;white-space:nowrap}
+  .hit .text{color:var(--ink-2)}
+  @media(max-width:980px){.cols{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="layout" id="sidebarHost">
+<main class="main">
+  <header class="topbar">
+    <div class="topbar-left"><div class="topbar-title">检索对比</div><span class="topbar-sub">找到更准确的答案</span></div>
+    <span id="adminEntrySlot" class="admin-slot"></span>
+  </header>
+
+  <div class="page">
+    <div class="page-head">
+      <h1 class="page-title">检索对比</h1>
+      <p class="page-desc">同一个问题用不同方式检索，看看哪种结果更符合你的需要。</p>
+    </div>
+
+    <div class="intro">
+      关键词检索擅长精确匹配的数值与术语，语义检索擅长意思相近的说法，系统会把两种方式的结果合并排序，得到更全面的答案。
+      检索范围会自动按你的账号权限过滤，你只能看到有权访问的内容。
+    </div>
+
+    <div class="querybar">
+      <input id="q" type="text" placeholder="输入问题，如：汛限水位是多少？" value="汛限水位是多少？">
+      <button class="primary-btn" data-perm="search:use" onclick="run()">检索对比</button>
+    </div>
+
+    <div class="cols">
+      <div class="col"><h3>① 关键词检索</h3><div id="bm25" class="hits"><div class="empty">等待检索…</div></div></div>
+      <div class="col"><h3>② 语义检索</h3><div id="knn" class="hits"><div class="empty">等待检索…</div></div></div>
+      <div class="col hybrid"><h3>③ 智能融合（推荐）</h3><div id="hybrid" class="hits"><div class="empty">等待检索…</div></div></div>
+    </div>
+  </div>
+</main>
+</div>
+
+<script src="assets/auth.js"></script>
+<script src="assets/ui.js"></script>
+<script src="assets/app.js"></script>
+<script>
+const E=window.UI.el;
+function htmlNodes(html){
+  const body=new DOMParser().parseFromString('<body>'+String(html||'')+'</body>','text/html').documentElement.querySelector('body');
+  return body?Array.from(body.childNodes):[];
+}
+
+function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+function headers(){
+  const u=(window.WrkAuth&&WrkAuth.getUser())||null;
+  return u?{'X-User':u.user||'','X-Groups':(u.groups||[]).join(',')}:{};
+}
+function render(id,hits,label){
+  const el=document.getElementById(id);
+  if(!hits||!hits.length){el.replaceChildren(E('div',{className:'empty',text:'暂无匹配结果'}));return}
+  el.replaceChildren(...hits.map(h=>E('div',{className:'hit'},[
+    E('div',{className:'meta'},[
+      E('span',{text:h.file+' · 第'+(Number(h.chunk)+1)+'段'}),
+      E('span',{className:'score',text:label+' '+(h.score||0).toFixed(4)})]),
+    E('div',{className:'text',text:h.text})
+  ])));
+}
+async function run(){
+  const q=document.getElementById('q').value.trim();if(!q)return;
+  ['bm25','knn','hybrid'].forEach(id=>document.getElementById(id).replaceChildren(E('div',{className:'empty',text:'检索中…'})));
+  try{
+    const r=await fetch('/api/search/compare?q='+encodeURIComponent(q),{headers:headers()});
+    const j=await r.json();if(!r.ok)throw new Error(j.message||('HTTP '+r.status));
+    render('bm25',j.bm25,'关键词');render('knn',j.knn,'语义');render('hybrid',j.hybrid,'融合');
+  }catch(e){['bm25','knn','hybrid'].forEach(id=>document.getElementById(id).replaceChildren(E('div',{className:'empty',text:'失败：'+e.message})))}
+}
+document.getElementById('q').addEventListener('keydown',e=>{if(e.key==='Enter')run()});
+initShell('settings');
+// 页面级权限守卫：菜单权限页没勾「检索对比」的账号，直接敲 URL 也进不来。
+// 隐藏入口只是第一道门，这里必须再拦一次——不拦的话权限配置形同虚设。
+(async function guardPerm(){
+  if(window.Shell&&Shell.permsReady)await Shell.permsReady();
+  if(!(window.Shell&&Shell.hasPermission&&Shell.hasPermission('search:use'))){
+    const main=document.querySelector('main')||document.body;
+    Array.from(main.children).forEach(el=>{if(!el.classList.contains('topbar'))el.style.display='none'});
+    // 顶栏面包屑由公共组件注入在 topbar 内部，不属于 main 直属子元素——这里单独摘掉，
+    // 并恢复原本的页面标题，避免无权限页残留导航（截图里的红框）
+    const nav=main.querySelector('.topbar-nav-left');if(nav)nav.style.display='none';
+    const ttl=main.querySelector('.topbar-title');if(ttl)ttl.style.display='';
+    const sub=main.querySelector('.topbar-sub');if(sub)sub.style.display='';
+    const bar=document.createElement('div');
+    bar.className='card';bar.style.cssText='margin:auto;max-width:520px;padding:36px;text-align:center';
+    bar.replaceChildren(
+      E('div',{text:'🔒',attrs:{style:'font-size:34px;margin-bottom:12px'}}),
+      E('div',{text:'没有使用权限',attrs:{style:'font-size:15px;font-weight:650;margin-bottom:8px'}}),
+      E('div',{attrs:{style:'font-size:13px;color:#6b7a99;line-height:1.7'}},[
+        document.createTextNode('当前账号未被授予「检索对比」的使用权限。'),E('br'),
+        document.createTextNode('如需使用，请联系管理员在「菜单权限」中为你的角色勾选该功能。')]),
+      E('a',{text:'← 返回智能问答',attrs:{href:'index.html',style:'display:inline-block;margin-top:18px;color:var(--primary,#3b6ef5);text-decoration:none;font-size:13px'}})
+    );
+    main.insertBefore(bar,main.firstChild);
+  }
+})();
+
+</script>
+</body>
+</html>

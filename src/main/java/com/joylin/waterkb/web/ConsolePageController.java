@@ -3,38 +3,33 @@ package com.joylin.waterkb.web;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.io.IOException;
 
 /**
- * Vue SPA 路由回退。
+ * 后台各功能的独立页面路由。
  *
- * <p>前端迁移到 Vue 3 + Vite 后，所有页面路径（/login.html、/users.html、
- * /admin.html/users.html 等）都由 Vue Router 在浏览器端解析。这里把这些路径
- * 统一回退到同一份 index.html，避免出现 404 或静态页与 Vue 页混杂。</p>
+ * <p>此前用户管理/菜单权限/日志等都挤在 admin.html?panel=xxx，地址栏看不出页面，
+ * 菜单权限目录也就没法按"真实页面"配置。这里给每个功能一个独立 .html 路径，
+ * 内容仍由同一份 admin.html 渲染（避免复制几千行脚本导致多套页面不一致），
+ * 页面里根据 location.pathname 激活对应面板。</p>
  */
 @RestController
 public class ConsolePageController {
 
-    /** 旧 static 版的独立页面路径 + Vue 版嵌套路径，统一回退到 SPA 入口 */
-    @RequestMapping(value = {
-            "/login.html", "/index.html",
+    private static final String[] PAGES = {
             "/users.html", "/org.html", "/roles.html", "/perms.html",
-            "/docs.html", "/models.html", "/usage.html", "/loginlogs.html", "/audit.html",
-            "/manage.html", "/search.html", "/tree.html", "/settings.html", "/profile.html",
-            "/forgot.html",
-            "/admin.html", "/admin.html/users.html", "/admin.html/org.html",
-            "/admin.html/roles.html", "/admin.html/perms.html", "/admin.html/docs.html",
-            "/admin.html/models.html", "/admin.html/usage.html",
-            "/admin.html/loginlogs.html", "/admin.html/audit.html"
-    })
-    public ResponseEntity<byte[]> spaFallback() throws IOException {
-        ClassPathResource resource = new ClassPathResource("static/index.html");
-        if (!resource.exists()) {
-            return ResponseEntity.notFound().build();
-        }
+            "/docs.html", "/models.html", "/usage.html", "/loginlogs.html", "/audit.html"
+    };
+
+    @RequestMapping(value = {"/users.html", "/org.html", "/roles.html", "/perms.html",
+            "/docs.html", "/models.html", "/usage.html", "/loginlogs.html", "/audit.html"}, method = RequestMethod.GET)
+    public ResponseEntity<byte[]> consolePage() throws IOException {
+        ClassPathResource resource = new ClassPathResource("static/admin.html");
         return ResponseEntity.ok()
                 .header("Cache-Control", "no-store")
                 .contentType(MediaType.valueOf("text/html;charset=UTF-8"))

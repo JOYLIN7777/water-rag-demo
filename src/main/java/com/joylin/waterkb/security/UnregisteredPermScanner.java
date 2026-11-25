@@ -24,8 +24,9 @@ import java.util.regex.Pattern;
 /**
  * 扫描"代码里已经在用、但权限树里还没建"的权限码。
  *
- * <p>来源三类：① 旧 static 页的 data-perm（兼容存量）；② Vue 组件里的
- * auth.has('xxx') 调用；③ Controller 上的 @RequirePermission 注解。</p>
+ * <p>用户在新增权限弹窗里只能选这些码：选完立刻能控制前端按钮/后端接口，
+ * 不会出现建了一个漂亮但没人用的权限码。来源两类：
+ * ① 静态页与脚本里的 data-perm="xxx"；② Controller 上的 @RequirePermission("xxx")。</p>
  */
 @Service
 public class UnregisteredPermScanner {
@@ -33,7 +34,6 @@ public class UnregisteredPermScanner {
     private static final Logger log = LoggerFactory.getLogger(UnregisteredPermScanner.class);
     private static final Pattern HTML_PERM = Pattern.compile("data-perm=\"([a-z][a-z0-9_.:-]*)\"");
     private static final Pattern JS_PERM = Pattern.compile("data-perm:\\s*['\"]([a-z][a-z0-9_.:-]*)['\"]");
-    private static final Pattern VUE_PERM = Pattern.compile("has\\(['\"]([a-z][a-z0-9_.:-]*)['\"]\\)");
     private static final Pattern CODE = Pattern.compile("^[a-z][a-z0-9_.-]*:[a-z][a-z0-9_.-]*$");
 
     private final JdbcTemplate jdbc;
@@ -45,28 +45,24 @@ public class UnregisteredPermScanner {
         this.mapping = mapping;
     }
 
-    /** 收集所有来源：code → 来源位置列表 */
-    private Map<String, List<String>> collectSources() {
-        Map<String, List<String>> out = new LinkedHashMap<>();
-        // 旧 static 页（兼容残留）
-        scanResources("classpath*:static/**/*.html", HTML_PERM, out);
-        scanResources("classpath*:static/assets/*.js", JS_PERM, out);
-        // Vue 源码（不在 jar 里，从文件系统扫）
-        scanFileSystem("frontend/src", VUE_PERM, out);
-        scanAnnotations(out);
-        return out;
-    }
-
     /** 代码里所有在用的权限码（含已注册），用于校验手工填写的码是否真的会生效 */
     public Set<String> allUsedCodes() {
+        Map<String, List<String>> sources = new LinkedHashMap<>();
+        scanResources("classpath*:static/**/*.html", HTML_PERM, sources);
+        scanResources("classpath*:static/assets/*.js", JS_PERM, sources);
+        scanAnnotations(sources);
         Set<String> out = new TreeSet<>();
-        collectSources().keySet().forEach(code -> { if (CODE.matcher(code).matches()) out.add(code); });
+        sources.keySet().forEach(code -> { if (CODE.matcher(code).matches()) out.add(code); });
         return out;
     }
 
-    /** code → 来源描述（多个来源合并），只返回未注册的 */
+    /** code → 来源描述（多个来源合并） */
     public List<Map<String, Object>> scan() {
-        Map<String, List<String>> sources = collectSources();
+        Map<String, List<String>> sources = new LinkedHashMap<>();
+        scanResources("classpath*:static/**/*.html", HTML_PERM, sources);
+        scanResources("classpath*:static/assets/*.js", JS_PERM, sources);
+        scanAnnotations(sources);
+
         Set<String> registered;
         try {
             registered = new TreeSet<>(jdbc.queryForList(
@@ -75,6 +71,7 @@ public class UnregisteredPermScanner {
             log.warn("已注册权限码读取失败，跳过扫描：{}", e.getMessage());
             return List.of();
         }
+
         List<Map<String, Object>> out = new ArrayList<>();
         sources.forEach((code, where) -> {
             if (!CODE.matcher(code).matches() || registered.contains(code)) return;
@@ -100,52 +97,34 @@ public class UnregisteredPermScanner {
                     while ((line = reader.readLine()) != null) {
                         lineNo++;
                         Matcher m = re.matcher(line);
-                        while (m.find()) out.computeIfAbsent(m.group(1), k -> new ArrayList<>()).add(file + ":" + lineNo);
+                        while (m.find()) {
+                            String code = m.group(1);
+                            out.computeIfAbsent(code, k -> new ArrayList<>()).add(file + ":" + lineNo);
+                        }
                     }
                 }
             }
         } catch (Exception e) {
-            log.debug("静态资源扫描跳过 {}: {}", pattern, e.getMessage());
+            log.warn("静态资源权限扫描失败 pattern={}: {}", pattern, e.getMessage());
         }
     }
 
-    private void scanFileSystem(String root, Pattern re, Map<String, List<String>> out) {
-        java.io.File dir = new java.io.File(root);
-        if (!dir.isDirectory()) return;
-        java.nio.file.Path base = dir.toPath();
-        try (java.util.stream.Stream<java.nio.file.Path> files = java.nio.file.Files.walk(base)) {
-            files.filter(f -> f.toString().endsWith(".vue") || f.toString().endsWith(".ts")).forEach(f -> {
-                String rel = base.relativize(f).toString().replace('\\', '/');
-                try {
-                    int lineNo = 0;
-                    for (String line : java.nio.file.Files.readAllLines(f, StandardCharsets.UTF_8)) {
-                        lineNo++;
-                        Matcher m = re.matcher(line);
-                        while (m.find()) {
-                            out.computeIfAbsent(m.group(1), k -> new ArrayList<>()).add("frontend/" + rel + ":" + lineNo);
-                        }
-                    }
-                } catch (Exception ignored) { /* 单文件失败不影响整体 */ }
-            });
-        } catch (Exception e) {
-            log.debug("Vue 源码扫描跳过：{}", e.getMessage());
-        }
-    }
-
+    /** 通过反射读 Controller 上的 @RequirePermission，只收真正会拦截请求的权限码 */
     private void scanAnnotations(Map<String, List<String>> out) {
         try {
             mapping.getHandlerMethods().forEach((info, handler) -> {
                 Class<?> clazz = handler.getBeanType();
                 String name = clazz.getSimpleName();
+                java.lang.reflect.Method method = handler.getMethod();
                 RequirePermission classAnno = clazz.getAnnotation(RequirePermission.class);
                 if (classAnno != null) {
                     for (String code : classAnno.value())
                         out.computeIfAbsent(code, k -> new ArrayList<>()).add(name + "（类级）");
                 }
-                RequirePermission anno = handler.getMethod().getAnnotation(RequirePermission.class);
+                RequirePermission anno = method.getAnnotation(RequirePermission.class);
                 if (anno != null) {
                     for (String code : anno.value())
-                        out.computeIfAbsent(code, k -> new ArrayList<>()).add(name + "." + handler.getMethod().getName() + "()");
+                        out.computeIfAbsent(code, k -> new ArrayList<>()).add(name + "." + method.getName() + "()");
                 }
             });
         } catch (Exception e) {
@@ -153,6 +132,7 @@ public class UnregisteredPermScanner {
         }
     }
 
+    /** 从权限码猜一个中文名，用户可改 */
     private String suggestName(String code) {
         String action = code.substring(code.indexOf(':') + 1);
         Map<String, String> cn = Map.ofEntries(

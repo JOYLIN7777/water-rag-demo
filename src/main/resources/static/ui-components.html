@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>UI 组件库 · 自测页</title>
+<link rel="stylesheet" href="app.css">
+<script src="assets/ui.js"></script>
+<style>
+  body{padding:32px;background:#f6f8fc}
+  .demo-wrap{max-width:1000px;margin:0 auto}
+  .demo-card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:22px;margin-bottom:18px;box-shadow:var(--shadow-sm)}
+  .demo-card h2{font-size:15px;margin:0 0 16px;color:var(--ink)}
+  .demo-row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+  .demo-code{font-family:Consolas,monospace;font-size:11px;color:var(--muted);background:#f6f8fc;padding:8px 10px;border-radius:6px;margin-top:12px;white-space:pre-wrap}
+</style>
+</head>
+<body>
+<div class="demo-wrap">
+  <h1>UI 组件库自测页</h1>
+  <p style="color:var(--muted);font-size:13px">所有组件返回 DOM 节点，零依赖 ES 模块。此页验证组件渲染与调用方式。</p>
+
+  <div class="demo-card"><h2>createButton · 按钮</h2><div class="demo-row" id="dButton"></div>
+    <div class="demo-code">createButton({ label:'主要操作', variant:'primary', onClick:()=>... })</div></div>
+
+  <div class="demo-card"><h2>createSelect / createInput / createField · 表单</h2><div id="dField"></div>
+    <div class="demo-code">createField({ label:'类型', control:createSelect({ options:[...] }) })</div></div>
+
+  <div class="demo-card"><h2>createTag · 标签</h2><div class="demo-row" id="dTag"></div></div>
+
+  <div class="demo-card"><h2>createTable · 表格（含空态）</h2><div id="dTable"></div><div id="dTableEmpty" style="margin-top:12px"></div></div>
+
+  <div class="demo-card"><h2>createPager · 分页</h2><div id="dPager"></div></div>
+
+  <div class="demo-card"><h2>createAvatar · 头像</h2><div class="demo-row" id="dAvatar"></div></div>
+
+  <div class="demo-card"><h2>createToast · 提示</h2><div class="demo-row" id="dToast"></div></div>
+</div>
+
+<script>
+const { createButton, createSelect, createInput, createField, createTag,
+  createEmptyRow, createTable, createPager, createToast, createAvatar } = window.UI;
+
+// 按钮
+document.getElementById('dButton').append(
+  createButton({ label: '默认按钮', onClick: () => createToast('点击了默认按钮') }),
+  createButton({ label: '主要操作', variant: 'primary', icon: '✓', onClick: () => createToast({ message: '主要操作成功', type: 'ok' }) }),
+  createButton({ label: '危险操作', variant: 'danger', size: 'sm', onClick: () => createToast({ message: '危险操作', type: 'err' }) }),
+  createButton({ label: '禁用', disabled: true })
+);
+
+// 表单
+document.getElementById('dField').append(
+  createField({ label: '模型类型', control: createSelect({ options: [{value:'CHAT',label:'CHAT 对话'},{value:'EMB',label:'EMBEDDING 向量'}], value:'CHAT', onChange: v => createToast('选中：'+v) }) }),
+  createField({ label: '名称', control: createInput({ placeholder: '请输入名称' }), hint: '这是辅助说明文字' })
+);
+
+// 标签
+document.getElementById('dTag').append(
+  createTag('默认'), createTag({ text: '使用中', variant: 'ok' }),
+  createTag({ text: '待命', variant: 'warn' }), createTag({ text: '已禁用', variant: 'off' }),
+  createTag({ text: '错误', variant: 'no' })
+);
+
+// 表格
+document.getElementById('dTable').append(createTable({
+  columns: [{title:'名称'},{title:'类型'},{title:'状态'}],
+  rows: [{name:'qwen-plus',type:'CHAT',active:true},{name:'bge-m3',type:'EMBEDDING',active:false}],
+  renderRow: (r) => {
+    const tr = document.createElement('tr');
+    [r.name, r.type, ''].forEach((v,i) => { const td=document.createElement('td'); td.textContent=v; tr.append(td); });
+    tr.lastChild.append(createTag({ text: r.active?'使用中':'已禁用', variant: r.active?'ok':'off' }));
+    return tr;
+  }
+}));
+document.getElementById('dTableEmpty').append(createTable({
+  columns: [{title:'名称'},{title:'状态'}], rows: [], emptyText: '暂无数据'
+}));
+
+// 分页
+document.getElementById('dPager').append(createPager({
+  page: 2, size: 10, total: 55, onGo: p => createToast('跳转到第 '+p+' 页')
+}));
+
+// 头像
+document.getElementById('dAvatar').append(
+  createAvatar({ name: '管理员', size: 'md' }), createAvatar({ name: 'LIAO', size: 'lg' })
+);
+
+// Toast 触发
+const toastBtn = createButton({ label: '显示提示', variant: 'primary', onClick: () => createToast({ message: '这是一条组件提示', type: 'ok' }) });
+document.getElementById('dToast').append(toastBtn);
+
+window.__uiDemoReady = true;
+</script>
+</body>
+</html>

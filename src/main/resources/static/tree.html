@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>会话树 · 水利知识库</title>
+<link rel="icon" type="image/svg+xml" href="assets/logo.svg">
+<link rel="stylesheet" href="assets/app.css">
+<style>
+  .toolbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;background:#fff;border:1px solid var(--line);border-radius:var(--radius);padding:13px 16px;margin-bottom:18px;box-shadow:var(--shadow-sm)}
+  .toolbar label{font-size:12.5px;color:var(--muted)}
+  .toolbar input[type=text]{padding:8px 11px;min-width:200px}
+  .toolbar #stat{margin-left:auto;font-size:11.5px;color:var(--muted)}
+  .layout2{display:grid;grid-template-columns:1fr 340px;gap:18px;align-items:start}
+  .legend{font-size:11px;color:var(--muted);margin-top:14px;line-height:1.9}
+  .legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:5px;vertical-align:-1px}
+  .node{position:relative;padding:10px 13px 10px 15px;margin:7px 0 7px var(--indent,0px);border:1px solid var(--line);border-radius:9px;background:#fff;cursor:pointer;transition:all .15s}
+  .node:hover{border-color:#b9cbff;background:#fafcff}
+  .node.user{background:#f5f9ff;border-left:3px solid #60a5fa}
+  .node.assistant{border-left:3px solid var(--violet)}
+  .node.head{box-shadow:0 0 0 2px rgba(59,110,245,.2);border-color:var(--primary)}
+  .node.selected{box-shadow:0 0 0 2px rgba(124,92,214,.35);border-color:var(--violet)}
+  .node-head{display:flex;align-items:center;gap:8px;font-size:11.5px;color:var(--muted);margin-bottom:5px;flex-wrap:wrap}
+  .role-tag{font-weight:650;color:#25469b}
+  .node.assistant .role-tag{color:var(--violet)}
+  .head-tag{background:var(--primary);color:#fff;border-radius:9px;padding:1px 7px;font-size:10px}
+  .branch-tag{background:#fef3c7;color:#92400e;border-radius:9px;padding:1px 7px;font-size:10px}
+  .node-text{font-size:12.5px;line-height:1.6;color:var(--ink-2);white-space:pre-wrap;word-break:break-word;max-height:66px;overflow:hidden}
+  .node-actions{display:flex;gap:6px;margin-top:8px;opacity:0;transition:opacity .15s}
+  .node:hover .node-actions{opacity:1}
+  .ask-box textarea{width:100%;min-height:80px;resize:vertical}
+  .ask-box .row{display:flex;align-items:center;justify-content:space-between;margin-top:10px;gap:8px}
+  #msg{display:none}
+  @media(max-width:980px){.layout2{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="layout" id="sidebarHost">
+<main class="main">
+  <header class="topbar">
+    <div class="topbar-left"><div class="topbar-title">会话结构</div><span class="topbar-sub">消息树与分支</span></div>
+    <span id="adminEntrySlot" class="admin-slot"></span>
+  </header>
+
+  <div class="page">
+    <div class="page-head">
+      <h1 class="page-title">会话结构</h1>
+      <p class="page-desc">从任意一条回答继续追问，或回到之前的问题重新提问，原来的记录都会保留。</p>
+    </div>
+
+    <div class="intro">
+      回到之前的回答重新提问时，原来的问答记录不会丢失，而是保留为另一条路线。切换路线后，系统会沿当前这条路线继续回答，不会混入其他路线的内容。
+    </div>
+
+    <div class="toolbar">
+      <label>会话ID</label><input type="text" id="sid" placeholder="从问答页复制会话ID">
+      <button class="btn" onclick="load()">加载会话树</button>
+      <button class="btn" onclick="location.reload()">刷新</button>
+      <span id="stat"></span>
+    </div>
+
+    <div class="layout2">
+      <div class="card">
+        <div class="card-head"><h3>消息分支图</h3></div>
+        <div class="msg" id="msg"></div>
+        <div id="tree"><div class="empty">输入会话ID后加载</div></div>
+        <div class="legend">
+          <i style="background:#60a5fa"></i>用户消息　<i style="background:var(--violet)"></i>助手回答　
+          <i style="background:var(--primary)"></i>当前位置（head）　<i style="background:#fcd34d"></i>命名分支起点
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-head"><h3>从选中节点继续提问</h3></div>
+        <div class="ask-box">
+          <textarea id="q" placeholder="输入问题，将从树下选中的节点分叉…"></textarea>
+          <div class="row">
+            <span class="hint" id="selHint">当前位置：尚未加载</span>
+            <button class="btn btn-primary" data-perm="chat:use" onclick="ask()">发送并分叉</button>
+          </div>
+        </div>
+        <div class="legend">点击树中节点可选中它；再点「发送并分叉」，新回答会挂在该节点下，原分支不受影响。若只想切换当前位置而不发消息，点节点上的「回到这里」。</div>
+        <div style="border-top:1px solid var(--line);margin-top:16px;padding-top:16px">
+          <div class="card-head"><h3 style="font-size:13px">命名分支</h3></div>
+          <div style="display:flex;gap:8px;margin-bottom:8px">
+            <input type="text" id="branchName" placeholder="分支名，如：换一种方案" style="flex:1">
+            <button class="btn" data-perm="tree:use" onclick="forkBranch()">标记</button>
+          </div>
+          <div id="branchList" class="hint"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</main>
+</div>
+
+<script src="assets/auth.js"></script>
+<script src="assets/ui.js"></script>
+<script src="assets/app.js"></script>
+<script>
+const E=window.UI.el;
+function htmlNodes(html){
+  const body=new DOMParser().parseFromString('<body>'+String(html||'')+'</body>','text/html').documentElement.querySelector('body');
+  return body?Array.from(body.childNodes):[];
+}
+
+let treeData=null,selectedId=null;
+function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+function sid(){return document.getElementById('sid').value.trim()}
+function tip(text,ok){const el=document.getElementById('msg');el.textContent=text;el.className='msg '+(ok?'ok':'err')}
+function childrenOf(nodes,parent){return nodes.filter(n=>n.parentId===parent)}
+
+function buildTree(nodes,parentId,depth,out){
+  childrenOf(nodes,parentId).forEach(n=>{
+    const isHead=n.id===treeData.head;
+    const indent=depth*22;
+    const branch=n.branch?'<span class="branch-tag">'+esc(n.branch)+'</span>':'';
+    const text=n.content.replace(/\n/g,' ');
+    out.push('<div class="node '+n.role+(isHead?' head':'')+(n.id===selectedId?' selected':'')+'" style="--indent:'+indent+'px" onclick="selectNode(\''+n.id+'\')">'+
+      '<div class="node-head"><span class="role-tag">'+(n.role==='user'?'用户':'助手')+'</span>'+
+      (isHead?'<span class="head-tag">当前</span>':'')+branch+
+      '<span style="margin-left:auto">'+esc(n.ts?n.ts.slice(11,19):'')+'</span></div>'+
+      '<div class="node-text">'+esc(text.length>150?text.slice(0,150)+'…':text)+'</div>'+
+      '<div class="node-actions">'+
+        '<button class="btn btn-sm" onclick="event.stopPropagation();rewind(\''+n.id+'\')">回到这里</button>'+
+      '</div></div>');
+    buildTree(nodes,n.id,depth+1,out);
+  });
+}
+function renderTree(){
+  if(!treeData||!treeData.nodes.length){document.getElementById('tree').replaceChildren(E('div',{className:'empty',text:'该会话还没有消息'}));return}
+  const out=[];buildTree(treeData.nodes,'root',0,out);
+  document.getElementById('tree').replaceChildren(...out.flatMap(htmlNodes));
+  document.getElementById('stat').textContent=treeData.nodes.length+' 个节点 · '+Object.keys(treeData.branches||{}).length+' 个命名分支';
+  const bl=document.getElementById('branchList');
+  const entries=Object.entries(treeData.branches||{});
+  bl.replaceChildren(...(entries.length?entries.flatMap(([name,id],i)=>
+    i?[E('br'),document.createTextNode(name+'（'+id.slice(0,8)+'）')]:[document.createTextNode(name+'（'+id.slice(0,8)+'）')])
+    :[document.createTextNode('（暂无命名分支）')]));
+  const hint=selectedId?('选中节点：'+selectedId.slice(0,8)+(selectedId===treeData.head?'（当前）':'')):('当前位置：'+(treeData.head?treeData.head.slice(0,8):'根'));
+  document.getElementById('selHint').textContent=hint;
+}
+function selectNode(id){selectedId=id;renderTree()}
+async function load(){
+  const s=sid();if(!s){tip('请先填写会话ID',false);return}
+  try{
+    const r=await fetch('/api/chat/tree?sessionId='+encodeURIComponent(s));
+    treeData=await r.json();selectedId=treeData.head||null;renderTree();tip('已加载',true);
+  }catch(e){tip('加载失败：'+e.message,false)}
+}
+async function rewind(id){
+  try{
+    const r=await fetch('/api/chat/rewind?sessionId='+encodeURIComponent(sid())+'&nodeId='+encodeURIComponent(id),{method:'POST'});
+    const j=await r.json();if(!r.ok)throw new Error(j.error||'HTTP '+r.status);
+    selectedId=id;await load();appToast('已回到该节点','ok');
+  }catch(e){tip('回退失败：'+e.message,false)}
+}
+async function forkBranch(){
+  const name=document.getElementById('branchName').value.trim();
+  if(!selectedId){tip('请先在树中选中一个节点',false);return}
+  if(!name){tip('请填写分支名',false);return}
+  try{
+    const r=await fetch('/api/chat/fork?sessionId='+encodeURIComponent(sid())+'&nodeId='+encodeURIComponent(selectedId)+'&name='+encodeURIComponent(name),{method:'POST'});
+    const j=await r.json();if(!r.ok)throw new Error(j.error||'HTTP '+r.status);
+    document.getElementById('branchName').value='';await load();appToast('分支已标记','ok');
+  }catch(e){tip('新建分支失败：'+e.message,false)}
+}
+async function ask(){
+  const q=document.getElementById('q').value.trim();
+  if(!q){tip('请输入问题',false);return}
+  if(!sid()){tip('请先填写会话ID',false);return}
+  try{
+    const body={sessionId:sid(),question:q,parentId:selectedId||null};
+    const r=await fetch('/api/chat/stream',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+    if(!r.ok)throw new Error('HTTP '+r.status);
+    await r.text();
+    document.getElementById('q').value='';await load();appToast('已生成，新节点挂到选中节点下','ok');
+  }catch(e){tip('提问失败：'+e.message,false)}
+}
+// 带 ?sid= 进来就直接加载：问答页顶部的"还有其它分支"提示会链到这里，
+// 用户点进来是要看分支的，不是来填一遍会话ID的
+const u=new URLSearchParams(location.search).get('sid');
+if(u){document.getElementById('sid').value=u;load();}
+initShell('settings');
+// 页面级权限守卫：菜单权限页没勾「问答分支」的账号，直接敲 URL 也进不来
+(async function guardPerm(){
+  if(window.Shell&&Shell.permsReady)await Shell.permsReady();
+  if(!(window.Shell&&Shell.hasPermission&&Shell.hasPermission('tree:use'))){
+    const main=document.querySelector('main')||document.body;
+    Array.from(main.children).forEach(el=>{if(!el.classList.contains('topbar'))el.style.display='none'});
+    // 顶栏面包屑由公共组件注入在 topbar 内部，不属于 main 直属子元素——这里单独摘掉，
+    // 并恢复原本的页面标题，避免无权限页残留导航（截图里的红框）
+    const nav=main.querySelector('.topbar-nav-left');if(nav)nav.style.display='none';
+    const ttl=main.querySelector('.topbar-title');if(ttl)ttl.style.display='';
+    const sub=main.querySelector('.topbar-sub');if(sub)sub.style.display='';
+    const bar=document.createElement('div');
+    bar.className='card';bar.style.cssText='margin:auto;max-width:520px;padding:36px;text-align:center';
+    bar.replaceChildren(
+      E('div',{text:'🔒',attrs:{style:'font-size:34px;margin-bottom:12px'}}),
+      E('div',{text:'没有使用权限',attrs:{style:'font-size:15px;font-weight:650;margin-bottom:8px'}}),
+      E('div',{attrs:{style:'font-size:13px;color:#6b7a99;line-height:1.7'}},[
+        document.createTextNode('当前账号未被授予「问答分支」的使用权限。'),E('br'),
+        document.createTextNode('如需使用，请联系管理员在「菜单权限」中为你的角色勾选该功能。')]),
+      E('a',{text:'← 返回智能问答',attrs:{href:'index.html',style:'display:inline-block;margin-top:18px;color:var(--primary,#3b6ef5);text-decoration:none;font-size:13px'}}));
+    main.insertBefore(bar,main.firstChild);
+  }
+})();
+</script>
+</body>
+</html>

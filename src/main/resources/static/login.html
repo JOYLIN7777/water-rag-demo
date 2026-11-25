@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>登录 · 水利知识库智能问答系统</title>
+<link rel="icon" type="image/svg+xml" href="assets/logo.svg">
+<link rel="stylesheet" href="assets/app.css">
+<style>
+  *{box-sizing:border-box}
+  html,body{height:100%;margin:0}
+  body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+       background:var(--bg);color:var(--ink);display:flex;align-items:center;justify-content:center;
+       -webkit-font-smoothing:antialiased}
+  .login-wrap{width:100%;max-width:960px;display:grid;grid-template-columns:1fr 1fr;gap:0;
+       background:#fff;border:1px solid var(--line);border-radius:18px;overflow:hidden;box-shadow:0 24px 70px rgba(16,28,54,.14);margin:24px}
+  /* 左侧品牌区 */
+  .login-brand{background:linear-gradient(160deg,var(--navy) 0%,var(--navy-2) 55%,#1d2c4a 100%);
+       color:#fff;padding:52px 42px;display:flex;flex-direction:column;position:relative;overflow:hidden}
+  .login-brand::after{content:'';position:absolute;right:-70px;bottom:-70px;width:260px;height:260px;border-radius:50%;
+       background:radial-gradient(circle,rgba(59,110,245,.45),transparent 68%)}
+  .lb-mark{width:52px;height:52px;border-radius:14px;background:linear-gradient(135deg,var(--primary-hi),var(--primary));
+       display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:700;box-shadow:0 8px 22px rgba(59,110,245,.5)}
+  .lb-title{font-size:24px;font-weight:680;margin-top:26px;letter-spacing:.4px}
+  .lb-sub{font-size:13px;color:#9fb0d0;margin-top:10px;line-height:1.8;max-width:300px}
+  .lb-features{margin-top:auto;position:relative;z-index:1;display:flex;flex-direction:column;gap:14px}
+  .lb-feature{display:flex;align-items:center;gap:11px;font-size:12.5px;color:#c8d3e8}
+  .lb-feature .tick{width:20px;height:20px;border-radius:50%;background:rgba(59,110,245,.28);
+       color:#9fc0ff;display:flex;align-items:center;justify-content:center;font-size:11px;flex:0 0 20px}
+  .lb-foot{font-size:10px;color:#5f6f8f;margin-top:32px;position:relative;z-index:1}
+  /* 右侧表单区 */
+  .login-form{padding:52px 46px;display:flex;flex-direction:column}
+  .lf-title{font-size:20px;font-weight:680;margin:0 0 6px}
+  .lf-desc{font-size:12.5px;color:var(--muted);margin:0 0 30px}
+  .field{margin-bottom:18px}
+  .field label{display:block;font-size:12px;color:var(--ink-2);margin-bottom:7px;font-weight:600}
+  .field input{width:100%;padding:11px 13px;border:1px solid #d9e0ec;border-radius:9px;font-size:13.5px;
+       outline:0;transition:all .15s;background:#fff}
+  .field input:focus{border-color:var(--primary);box-shadow:0 0 0 3px rgba(59,110,245,.12)}
+  .pw-wrap{position:relative}
+  .pw-wrap input{padding-right:44px}
+  .pw-eye{position:absolute;right:6px;top:50%;transform:translateY(-50%);border:0;background:transparent;
+       color:var(--muted);font-size:12px;padding:6px 9px;border-radius:6px}
+  .pw-eye:hover{color:var(--primary);background:var(--primary-soft)}
+  .row-between{display:flex;align-items:center;justify-content:space-between;margin-bottom:22px}
+  .checkbox{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--ink-2);cursor:pointer;user-select:none}
+  .checkbox input{width:15px;height:15px;accent-color:var(--primary);cursor:pointer}
+  .link{font-size:12px;color:var(--primary);cursor:pointer;text-decoration:none}
+  .link:hover{text-decoration:underline}
+  .login-btn{width:100%;padding:12px;border:0;border-radius:9px;background:linear-gradient(135deg,var(--primary-hi),var(--primary));
+       color:#fff;font-size:14px;font-weight:650;letter-spacing:.5px;box-shadow:0 6px 16px rgba(59,110,245,.32);
+       transition:all .18s;display:flex;align-items:center;justify-content:center;gap:8px}
+  .login-btn:hover:not(:disabled){transform:translateY(-1px);box-shadow:0 9px 22px rgba(59,110,245,.4)}
+  .login-btn:disabled{opacity:.6}
+  .err-box{margin-bottom:16px;padding:10px 13px;border-radius:8px;background:#fdeef3;color:#b91c4a;
+       font-size:12px;border:1px solid #f8cfdc;display:none}
+  .err-box.show{display:block}
+  .demo-box{margin-top:26px;padding:13px 15px;background:#f7f9fc;border:1px dashed #d9e0ec;border-radius:9px}
+  .demo-title{font-size:11px;color:var(--muted);margin-bottom:9px;letter-spacing:.3px}
+  .demo-row{display:flex;align-items:center;gap:8px;font-size:11.5px;color:var(--ink-2);padding:4px 0}
+  .demo-row code{font-family:ui-monospace,Consolas,monospace;color:#25469b;background:var(--primary-soft);
+       padding:1px 6px;border-radius:5px}
+  .demo-row button{margin-left:auto;border:1px solid var(--line);background:#fff;color:var(--primary);
+       font-size:11px;padding:3px 9px;border-radius:6px}
+  .demo-row button:hover{background:var(--primary-soft);border-color:#b9cbff}
+  @media(max-width:760px){
+    .login-wrap{grid-template-columns:1fr;margin:14px}
+    .login-brand{padding:30px 28px}
+    .lb-features,.lb-foot{display:none}
+    .lb-title{margin-top:16px;font-size:20px}
+    .login-form{padding:30px 26px}
+  }
+</style>
+</head>
+<body>
+<div class="login-wrap">
+  <div class="login-brand">
+    <div class="lb-mark">水</div>
+    <div class="lb-title">水利知识库</div>
+    <div class="lb-sub">面向水利规程、调度文档的专业知识库智能问答系统</div>
+    <div class="lb-features">
+      <div class="lb-feature"><span class="tick">✓</span>基于规程文档的智能问答，回答标注原文出处</div>
+      <div class="lb-feature"><span class="tick">✓</span>支持规程、报告、表格等多种格式资料</div>
+      <div class="lb-feature"><span class="tick">✓</span>多轮追问与分支回溯，思路不丢失</div>
+      <div class="lb-feature"><span class="tick">✓</span>数据按账号与部门隔离，安全可控</div>
+    </div>
+    <div class="lb-foot">让知识更好用 · 水利知识库</div>
+  </div>
+
+  <div class="login-form">
+    <h1 class="lf-title">欢迎登录</h1>
+    <p class="lf-desc">请使用您的账号登录以访问知识库工作台</p>
+
+    <div class="err-box" id="errBox"></div>
+
+    <form id="loginForm" autocomplete="on">
+      <div class="field">
+        <label for="username">用户名</label>
+        <input id="username" name="username" type="text" placeholder="请输入用户名" autocomplete="username" required>
+      </div>
+      <div class="field">
+        <label for="password">密码</label>
+        <div class="pw-wrap">
+          <input id="password" name="password" type="password" placeholder="请输入密码" autocomplete="current-password" required>
+          <button type="button" class="pw-eye" id="pwEye" title="显示/隐藏密码">显示</button>
+        </div>
+      </div>
+      <div class="row-between">
+        <label class="checkbox"><input type="checkbox" id="remember">记住用户名</label>
+        <a class="link" href="forgot.html" title="通过管理员审批重置密码">忘记密码？</a>
+      </div>
+      <button class="login-btn" type="submit" id="loginBtn">登 录</button>
+    </form>
+
+    <div class="demo-box">
+      <div class="demo-title">演示账号（点击填入）</div>
+      <div class="demo-row"><code>admin / Admin@123456</code><span>系统管理员</span>
+        <button type="button" onclick="fill('admin','Admin@123456')">填入</button></div>
+      <div class="demo-row"><code>analyst / Analyst@123456</code><span>水利分析员</span>
+        <button type="button" onclick="fill('analyst','Analyst@123456')">填入</button></div>
+    </div>
+  </div>
+</div>
+
+<script src="assets/crypto.js"></script>
+<script>
+var KEY_REMEMBER='wrk_remember_user', KEY_ACCESS='wrk_access_token',
+    KEY_REFRESH='wrk_refresh_token', KEY_USER='wrk_user_info';
+function fill(u,p){document.getElementById('username').value=u;document.getElementById('password').value=p}
+
+// 回填上次记住的用户名
+try{
+  var remembered=localStorage.getItem(KEY_REMEMBER);
+  if(remembered){document.getElementById('username').value=remembered;document.getElementById('remember').checked=true}
+}catch(e){}
+
+document.getElementById('pwEye').onclick=function(){
+  var p=document.getElementById('password');
+  var show=p.type==='password';p.type=show?'text':'password';this.textContent=show?'隐藏':'显示';
+};
+function showErr(msg){
+  var b=document.getElementById('errBox');b.textContent=msg;b.classList.add('show');
+}
+
+// 登录落地页：完全按服务端下发的菜单动态决定，不写死任何路由。
+// 菜单顺序由权限目录维护（问答类在前、后台类在后），第一个 allowed=true 的就是落地页。
+// 新增菜单/改顺序只改权限目录，登录页无需改动。接口失败时落个人中心（不信任客户端 groups）。
+async function pickLandingPage(){
+  try{
+    var r=await fetch('/api/auth/permissions',{
+      headers:{Authorization:'Bearer '+(sessionStorage.getItem(KEY_ACCESS)||'')}
+    });
+    if(r.ok){
+      var j=await r.json();
+      var menus=j.menus||[];
+      for(var i=0;i<menus.length;i++){
+        var m=menus[i];
+        if(!m.allowed)continue;
+        var href=String(m.href||'').replace(/^\//,'');
+        if(!href||href==='profile.html')continue;   // 个人中心兜底，不作为首选
+        return href;
+      }
+    }
+  }catch(e){}
+  return 'profile.html';
+}
+
+document.getElementById('loginForm').addEventListener('submit',async function(e){
+  e.preventDefault();
+  var btn=document.getElementById('loginBtn');
+  var u=document.getElementById('username').value.trim();
+  var p=document.getElementById('password').value;
+  if(!u||!p){showErr('请输入用户名和密码');return}
+  document.getElementById('errBox').classList.remove('show');
+  btn.disabled=true;btn.textContent='登录中…';
+  try{
+    var r=await fetch('/api/auth/login',{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({username:u,password:await PwdCrypto.encrypt(p),encrypted:true})
+    });
+    var j=await r.json();
+    if(!r.ok){showErr(j.message||('登录失败（HTTP '+r.status+'）'));return}
+    // 存 token 到 sessionStorage（关闭标签即失效，降低 XSS 持久化风险）
+    sessionStorage.setItem(KEY_ACCESS,j.accessToken);
+    sessionStorage.setItem(KEY_REFRESH,j.refreshToken);
+    sessionStorage.setItem(KEY_USER,JSON.stringify({
+      user:j.user,displayName:j.displayName,groups:j.groups,tenant:j.tenant
+    }));
+    try{
+      if(document.getElementById('remember').checked)localStorage.setItem(KEY_REMEMBER,u);
+      else localStorage.removeItem(KEY_REMEMBER);
+    }catch(e){}
+    // 按本次登录账号的权限落地，不沿用上一个账号停留的页面（避免"串号"），
+    // 也不把没问答权限的账号硬塞进问答页。
+    location.href=await pickLandingPage();
+  }catch(err){showErr('网络异常，请稍后重试：'+err.message)}
+  finally{btn.disabled=false;btn.textContent='登 录'}
+});
+</script>
+</body>
+</html>
