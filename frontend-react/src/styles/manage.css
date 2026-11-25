@@ -1,0 +1,37 @@
+  /* 上传卡片：左侧拖拽主区 + 右侧说明，状态条默认隐藏不占空白 */
+  .upload-card{display:flex;gap:18px;align-items:stretch;background:#fff;border:1px solid var(--line);border-radius:var(--radius);padding:18px 20px;margin-bottom:18px;box-shadow:var(--shadow-sm)}
+  .dropzone{flex:1.6;border:1.6px dashed #b9cbff;border-radius:12px;padding:22px 18px;text-align:center;cursor:pointer;transition:all .2s;background:#fbfcff;color:var(--ink-2);display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:132px}
+  .dropzone:hover,.dropzone.dragging{border-color:var(--primary);background:var(--primary-soft)}
+  .dz-icon{width:42px;height:42px;border-radius:12px;background:var(--primary-soft);color:var(--primary);display:flex;align-items:center;justify-content:center;font-size:22px;margin-bottom:10px}
+  .dropzone:hover .dz-icon{background:#fff}
+  .dz-title{font-size:13.5px;font-weight:600;color:var(--ink)}
+  .dz-sub{font-size:11.5px;color:var(--muted);margin-top:5px}
+  .upload-side{flex:1;display:flex;flex-direction:column;justify-content:center;gap:11px;min-width:0}
+  .upload-side h4{margin:0;font-size:13px;color:var(--ink);font-weight:650}
+  .fmt-list{display:flex;flex-wrap:wrap;gap:5px}
+  .fmt{border:1px solid var(--line);background:#f7f9fc;color:var(--ink-2);border-radius:6px;padding:2px 7px;font-size:10.5px;line-height:1.6}
+  .fmt-groups{display:flex;flex-direction:column;gap:9px;max-height:210px;overflow-y:auto;padding-right:4px}
+  .fmt-group-title{font-size:10px;color:var(--muted);letter-spacing:.4px;margin-bottom:4px}
+  .fmt-total{font-size:11px;color:var(--primary);font-weight:600}
+  .folder-btn{border:1px solid #d6e4ff;background:var(--primary-soft);color:#25469b;border-radius:8px;padding:9px 12px;font-size:12px;font-weight:600;transition:all .15s;text-align:center}
+  .folder-btn:hover{background:#dbe8ff;border-color:#b9cbff}
+  .folder-row{display:flex;gap:6px}
+  .folder-row .folder-btn{flex:1}
+  .folder-row .folder-other{flex:0 0 auto;padding:9px 11px;font-size:14px}
+  .upload-msg{margin:0 0 16px;background:#f7f9fc;border:1px solid var(--line);color:var(--ink-2)}
+  .toolbar{display:flex;gap:12px;margin-bottom:14px;align-items:center;flex-wrap:wrap}
+  .search{max-width:320px}
+  .doc-name{max-width:380px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600;color:var(--ink)}
+  /* 部门可见范围徽标：本部门/含下级/来自上级 三态，浅色底细边不抢眼 */
+  .scope{display:inline-flex;align-items:center;gap:4px;border:1px solid var(--line);border-radius:20px;padding:1px 8px;font-size:10.5px;color:var(--ink-2);background:#f7f9fc;white-space:nowrap}
+  .scope.sub{border-color:#cfe3d6;background:#f2f9f4;color:#2f7a4d}
+  .scope.from{border-color:#dbe6ff;background:#f3f7ff;color:#3a5fb0}
+  /* 分页控件：放到卡片底部并吸底，按钮之间留出可点击的间距 */
+  .pager{display:flex;gap:11px;align-items:center;justify-content:flex-end;margin-top:18px;padding:14px 2px 4px;
+    border-top:1px solid var(--line);background:#fff;position:sticky;bottom:0;z-index:5;font-size:12.5px;color:var(--ink-2)}
+  .pager button{border:1px solid var(--line);background:#fff;border-radius:7px;padding:7px 13px;min-width:34px;min-height:34px;
+    cursor:pointer;color:var(--ink-2);font-size:12.5px;line-height:1.2}
+  .pager button:hover:not(:disabled){border-color:var(--primary);color:var(--primary)}
+  .pager button:disabled{opacity:.45;cursor:not-allowed}
+  .pager .cur{background:var(--primary);border-color:var(--primary);color:#fff}
+  .pager input{width:56px;padding:6px 8px;margin:0 5px;font-size:12.5px;border:1px solid var(--line);border-radius:7px;text-align:center}
