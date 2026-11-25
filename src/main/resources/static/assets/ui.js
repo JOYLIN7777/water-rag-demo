@@ -196,7 +196,7 @@ function createTag(o = {}) {
   const opt = typeof o === 'string' ? { text: o } : o;
   const cls = ['tag'];
   if (opt.variant && opt.variant !== 'default') cls.push(opt.variant);
-  return el('span', { className: cls.join(' '), text: opt.text || '' });
+  return el('span', { className: cls.join(' '), text: opt.text || '', title: opt.title });
 }
 
 // ============ 数据展示 ============

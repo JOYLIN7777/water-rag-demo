@@ -828,16 +828,20 @@ function msgCollectAll(){
     const pending=x.status==='PENDING';
     if(!pending&&x.expiresAt&&x.expiresAt<=now)return;
     const st=pending
-      ?'<span class="tag warn">待审批</span>'
-      :'<span class="tag info">已发码 · 待使用</span>'+(x.expiresAt?' · '+tsLocal(x.expiresAt)+' 前有效':'');
+      ? UI.createTag({text:'待审批',variant:'warn'})
+      : UI.createTag({text:'已发码 · 待使用',variant:'info'});
+    if(!pending&&x.expiresAt)st.append(document.createTextNode(' · '+tsLocal(x.expiresAt)+' 前有效'));
+    const sub=E('div',{className:'msg-sub'},[document.createTextNode(tsLocal(x.requestedAt)+' · 来源 '+(x.requestIp||'—')+' · '),st]);
+    const ops=pending
+      ? [E('button',{className:'btn btn-sm btn-primary',type:'button',text:'批准并发码',
+          dataset:{perm:'user:write'},on:{click:()=>approveReset(x.id)}}),
+         E('button',{className:'btn btn-sm',type:'button',text:'驳回',
+          dataset:{perm:'user:write'},on:{click:()=>rejectReset(x.id)}})]
+      : [E('span',{className:'msg-sub',text:'由 '+(x.approvedBy||'—')+' 发放'})];
     out.push({
       kind:'reset',id:x.id,ts:x.requestedAt||0,pending:pending,
-      title:'「'+esc(userLabel(x.username,x.displayName))+'」申请重置密码',
-      sub:tsLocal(x.requestedAt)+' · 来源 '+esc(x.requestIp||'—')+' · '+st,
-      ops:pending
-        ?'<button class="btn btn-sm btn-primary" data-perm="user:write" onclick="approveReset('+x.id+')">批准并发码</button>'+
-         '<button class="btn btn-sm" data-perm="user:write" onclick="rejectReset('+x.id+')">驳回</button>'
-        :'<span class="msg-sub">由 '+esc(x.approvedBy||'—')+' 发放</span>'
+      title:'「'+userLabel(x.username,x.displayName)+'」申请重置密码',
+      subNode:sub, opsNodes:ops
     });
   });
   // 来源二（预留）：系统公告 / 账号变更 / 证书到期 —— 往 out 里 push 同结构即可
@@ -856,25 +860,26 @@ function renderMsgCenter(){
   if(old)old.remove();
   // 弹框开着时原地刷新列表（不然批完一条，列表还是旧数据）
   const host=$('msgList');
-  if(host)host.innerHTML=msgRowsHtml();
+  if(host)host.replaceChildren(...msgRowsHtml());
 }
 // 兼容旧调用点（loadUsersData 等处还按这个名字调）
 function renderPasswordResets(){ renderMsgCenter(); }
 
 function msgRowsHtml(){
   const rows=msgCollectAll();
-  if(!rows.length){
-    return '<div class="empty-inline">暂无待办</div>';
-  }
-  return rows.map(x=>'<div class="msg-row" data-kind="'+esc(x.kind)+'"><div class="msg-main">'+
-      '<div class="msg-title">'+x.title+'</div>'+
-      '<div class="msg-sub">'+x.sub+'</div>'+
-      '</div><div class="msg-ops">'+x.ops+'</div></div>').join('');
+  if(!rows.length)return [E('div',{className:'empty-inline',text:'暂无待办'})];
+  return rows.map(x=>E('div',{className:'msg-row',dataset:{kind:x.kind}},[
+    E('div',{className:'msg-main'},[
+      E('div',{className:'msg-title',text:x.title}),
+      x.subNode||E('div',{className:'msg-sub',text:x.sub||''})
+    ]),
+    E('div',{className:'msg-ops'},x.opsNodes||[])
+  ]));
 }
 function openMsgCenter(){
-  Shell.modal({title:'消息中心',okText:'关闭',cancelText:'',
-    body:'<div class="form-note">待办都在这里，处理完就会消失。</div>'+
-      '<div id="msgList">'+msgRowsHtml()+'</div>'});
+  const list=E('div',{id:'msgList'},msgRowsHtml());
+  const body=E('div',{},[E('div',{className:'form-note',text:'待办都在这里，处理完就会消失。'}),list]);
+  Shell.modal({title:'消息中心',okText:'关闭',cancelText:'',body:body});
 }
 async function approveReset(id){
   try{
@@ -925,7 +930,10 @@ async function rejectReset(id){
   }catch(e){appToast(e.message,'err')}
 }
 
-function roleTags(groups){return (groups||[]).map(g=>'<span class="tag-role '+esc(g)+'">'+esc(gl(g))+'</span>').join('')||'—'}
+function roleTags(groups){
+  const list=(groups||[]).map(g=>E('span',{className:'tag-role '+g,text:gl(g)}));
+  return list.length?list:[document.createTextNode('—')];
+}
 
 // 加载权限节点目录（持久化在 perm_node 表）
 async function loadPerms(){
@@ -1004,32 +1012,39 @@ function renderOrgTreeInto(hostId,activeKey,onPick,addMode){
   const host=$(hostId);if(!host)return;
   const isUser=addMode==='user';
   const total=(DB.users||[]).length;
-  let h='<div class="tree-node'+(activeKey===''?' active':'')+'" data-k="">'+
-    '<span class="caret ghost"></span><span class="tn">全部组织</span><span class="cnt">'+total+'</span></div>';
+  const treeNodes=[];
+  const treeNode=(key,name,depth,active,totalCount,kids,folded)=>{
+    const node=E('div',{className:'tree-node'+(active?' active':''),dataset:{k:key},
+      attrs:{style:'padding-left:'+(10+depth*13)+'px'}});
+    node.append(E('span',{className:'caret'+(kids.length?'':' ghost'),
+      dataset:kids.length?{toggle:key}:{},text:kids.length?(folded?'▸':'▾'):''}));
+    node.append(E('span',{className:'tn',title:key,text:name}));
+    if(totalCount!==undefined)node.append(E('span',{className:'cnt',text:String(totalCount)}));
+    if(!isUser&&key){
+      const acts=E('span',{className:'tree-acts'});
+      [['add','在此组织下新建子组织','＋'],['edit','编辑：改名 / 调整上级','✎'],['del','删除组织','×']].forEach(([act,title,label])=>{
+        acts.append(E('button',{type:'button',text:label,dataset:{act,k:key},title,attrs:{'data-perm':'user:write'}}));
+      });
+      node.append(acts);
+    }
+    return node;
+  };
+  treeNodes.push(treeNode('','全部组织',0,activeKey==='',total,[],false));
   const walk=(parent,depth)=>{
     orgChildren(parent).forEach(o=>{
       const kids=orgChildren(o.key);
       const folded=!!orgFolded[o.key];
-      const pad=10+depth*13;
-      h+='<div class="tree-node'+(activeKey===o.key?' active':'')+'" data-k="'+esc(o.key)+'" style="padding-left:'+pad+'px">'+
-        '<span class="caret'+(kids.length?'':' ghost')+'" data-toggle="'+(kids.length?esc(o.key):'')+'">'+
-          (kids.length?(folded?'▸':'▾'):'')+'</span>'+
-        '<span class="tn" title="'+esc(o.key)+'">'+esc(o.name)+'</span>'+
-        (isUser?'':'<span class="tree-acts">'+
-          '<button data-perm="user:write" data-act="add" data-k="'+esc(o.key)+'" title="在此组织下新建子组织">＋</button>'+
-          '<button data-perm="user:write" data-act="edit" data-k="'+esc(o.key)+'" title="编辑：改名 / 调整上级">✎</button>'+
-          '<button data-perm="user:write" data-act="del" data-k="'+esc(o.key)+'" title="删除组织">×</button>'+
-        '</span>')+'</div>';
+      treeNodes.push(treeNode(o.key,o.name,depth,activeKey===o.key,undefined,kids,folded));
       if(kids.length&&!folded)walk(o.key,depth+1);
     });
   };
   walk('',0);
-  host.innerHTML=h;
-  host.querySelectorAll('.tree-node').forEach(n=>{
+  host.replaceChildren(...treeNodes);
+  // 事件绑定改为直接挂节点（不再靠全局 querySelectorAll）
+  treeNodes.forEach(n=>{
     n.onclick=e=>{
       if(e.target.closest('.tree-acts'))return;
       const tg=e.target.dataset?e.target.dataset.toggle:undefined;
-      // 点三角：只折叠/展开，不改变选中项
       if(tg){e.stopPropagation();orgFolded[tg]=!orgFolded[tg];renderOrgTreeInto(hostId,activeKey,onPick,addMode);return}
       onPick(n.dataset.k||'');
     };
@@ -1095,7 +1110,7 @@ function renderUserTable(page){
       on:{click:()=>showUser(gi)}}));
     nameCell.append(inline);tr.append(nameCell);
     tr.append(E('td',{text:u.displayName||''}));
-    const roleCell=td(4);roleCell.innerHTML=roleTags(u.groups);tr.append(roleCell); // roleTags 存量字符串
+    const roleCell=td(4);roleCell.append(...roleTags(u.groups));tr.append(roleCell);
     tr.append(E('td',{text:tl(u.tenant)}));
     // 状态列
     const stCell=td(5);
@@ -1143,27 +1158,29 @@ function renderPager(id,total,page,size,fn){
   const host=$(id);if(!host)return;
   const pages=Math.max(1,Math.ceil(total/size));
   if(page>pages)page=pages;
-  const html=['<span>共 '+total+' 条</span>','<span style="color:#c3cddd">|</span>','<span>每页 '+size+' 条</span>'];
-  const btn=(p,label,extra,dis)=>'<button class="pg-btn'+(extra||'')+'"'+(dis?' disabled':'')+' onclick="'+fn+'('+p+')">'+label+'</button>';
-  html.push(btn(1,'首页','',page<=1));
-  html.push(btn(page-1,'上一页','',page<=1));
+  const nodes=[E('span',{text:'共 '+total+' 条'}),E('span',{attrs:{style:'color:#c3cddd'},text:'|'}),
+    E('span',{text:'每页 '+size+' 条'})];
+  const pgBtn=(p,label,on,dis)=>E('button',{className:'pg-btn'+(on?' on':''),type:'button',text:label,
+    disabled:!!dis,on:{click:()=>{if(!dis)window[fn](p)}}});
+  nodes.push(pgBtn(1,'首页','',page<=1),pgBtn(page-1,'上一页','',page<=1));
   const win=new Set([1,pages]);
   for(let p=Math.max(1,page-2);p<=Math.min(pages,page+2);p++)win.add(p);
   let prev=0;
   [...win].sort((a,b)=>a-b).forEach(p=>{
-    if(prev&&p-prev>1)html.push('<span class="pg-sep">…</span>');
-    html.push(btn(p,String(p),p===page?' on':''));
+    if(prev&&p-prev>1)nodes.push(E('span',{className:'pg-sep',text:'…'}));
+    nodes.push(pgBtn(p,String(p),p===page));
     prev=p;
   });
-  html.push(btn(page+1,'下一页','',page>=pages));
-  html.push(btn(pages,'末页','',page>=pages));
+  nodes.push(pgBtn(page+1,'下一页','',page>=pages),pgBtn(pages,'末页','',page>=pages));
   // 指定跳页：输入框回车或点「跳转」，超范围自动夹到 1..pages
-  html.push('<span class="pg-info">第 '+page+' / '+pages+' 页 · 跳至 '+
-    '<input type="number" min="1" max="'+pages+'" value="'+page+'" id="'+id+'Jump" aria-label="跳转到页码">'+
-    '<button class="pg-btn" onclick="pagerJump(\''+id+'\',\''+fn+'\','+pages+')">跳转</button></span>');
-  host.innerHTML=html.join('');
-  const inp=document.getElementById(id+'Jump');
-  if(inp)inp.onkeydown=e=>{if(e.key==='Enter')pagerJump(id,fn,pages)};
+  const jumpInput=E('input',{attrs:{type:'number',min:'1',max:String(pages),value:String(page),
+    id:id+'Jump','aria-label':'跳转到页码'}});
+  jumpInput.addEventListener('keydown',e=>{if(e.key==='Enter')pagerJump(id,fn,pages)});
+  nodes.push(E('span',{className:'pg-info'},[
+    document.createTextNode('第 '+page+' / '+pages+' 页 · 跳至 '),jumpInput,
+    E('button',{className:'pg-btn',type:'button',text:'跳转',on:{click:()=>pagerJump(id,fn,pages)}})
+  ]));
+  host.replaceChildren(...nodes);
 }
 function pagerJump(id,fn,pages){
   const inp=document.getElementById(id+'Jump');if(!inp)return;
@@ -1223,14 +1240,15 @@ $('uRole')&&($('uRole').onchange=()=>renderUserTable(1));
 
 function showUser(i){
   const u=($('uTable')._rows||[])[i];if(!u)return;
-  Shell.modal({title:'账号详情',okText:'关闭',cancelText:'',body:
-    '<table class="kv-table"><tbody>'+
-    '<tr><td>账号</td><td>'+esc(u.username)+'</td></tr>'+
-    '<tr><td>显示名</td><td>'+esc(u.displayName)+'</td></tr>'+
-    '<tr><td>角色 / 组</td><td>'+roleTags(u.groups)+'</td></tr>'+
-    '<tr><td>所属组织</td><td>'+esc(tl(u.tenant))+'</td></tr>'+
-    '<tr><td>状态</td><td>'+(u.enabled?'正常':'停用')+'</td></tr>'+
-    '</tbody></table><div class="hint">密码以加盐哈希存储，任何接口都不返回密码原文或哈希。</div>'});
+  const kv=(k,v)=>E('tr',{},[E('td',{text:k}),E('td',{},v instanceof Node?v:document.createTextNode(String(v)))]);
+  const roleCell=E('td');roleCell.append(...roleTags(u.groups));
+  const table=E('table',{className:'kv-table'},E('tbody',{},[
+    kv('账号',u.username), kv('显示名',u.displayName),
+    E('tr',{},[E('td',{text:'角色 / 组'}),roleCell]),
+    kv('所属组织',tl(u.tenant)), kv('状态',u.enabled?'正常':'停用')
+  ]));
+  const body=E('div',{},[table,E('div',{className:'hint',text:'密码以加盐哈希存储，任何接口都不返回密码原文或哈希。'})]);
+  Shell.modal({title:'账号详情',okText:'关闭',cancelText:'',body:body});
 }
 
 async function apiWrite(path,opts){
@@ -1451,20 +1469,25 @@ function renderOrgTable(){
   };
   walk('',0,0);
   const list=kw?rows.filter(r=>r.o.name.toLowerCase().includes(kw)||String(r.o.key).toLowerCase().includes(kw)):rows;
-  const ops=o=>
-    '<button class="op-btn" data-perm="user:write" onclick="orgCreate(\''+esc(o.key)+'\')">＋子部门</button>'+
-    '<button class="op-btn" data-perm="user:write" onclick="orgEdit(\''+esc(o.key)+'\')">编辑</button>'+
-    '<button class="op-btn danger" data-perm="user:write" onclick="orgDelete(\''+esc(o.key)+'\')">删除</button>';
+  const opsNode=o=>[
+    E('button',{className:'op-btn',type:'button',text:'＋子部门',dataset:{perm:'user:write'},on:{click:()=>orgCreate(o.key)}}),
+    E('button',{className:'op-btn',type:'button',text:'编辑',dataset:{perm:'user:write'},on:{click:()=>orgEdit(o.key)}}),
+    E('button',{className:'op-btn danger',type:'button',text:'删除',dataset:{perm:'user:write'},on:{click:()=>orgDelete(o.key)}})
+  ];
   const host=document.getElementById('oTable');
   if(!host)return;
-  host.innerHTML=list.length?list.map((r,i)=>{
+  const otrs=list.map(r=>{
     const o=r.o;
-    return '<tr><td><span class="org-node" style="padding-left:'+(r.d*22)+'px">'+
-      '<span class="org-caret'+(r.kids?'':' leaf')+'" data-toggle="'+esc(o.key)+'">'+(r.kids?(orgFolded[o.key]?'▸':'▾'):'▸')+'</span>'+
-      '<span class="org-ic">⌘</span><span>'+esc(o.name)+'</span></span></td>'+
-      '<td>'+esc(o.key)+'</td><td>'+r.idx+'</td><td><span class="tag ok">正常</span></td>'+
-      '<td>'+ops(o)+'</td></tr>';
-  }).join(''):'<tr><td colspan="5" class="empty-inline">没有匹配的组织</td></tr>';
+    const nameCell=E('td');
+    const node=E('span',{className:'org-node',attrs:{style:'padding-left:'+(r.d*22)+'px'}});
+    node.append(E('span',{className:'org-caret'+(r.kids?'':' leaf'),dataset:{toggle:o.key},
+      text:r.kids?(orgFolded[o.key]?'▸':'▾'):'▸'}),
+      E('span',{className:'org-ic',text:'⌘'}),document.createTextNode(o.name));
+    nameCell.append(node);
+    return E('tr',{},[nameCell,E('td',{text:o.key}),E('td',{text:String(r.idx)}),
+      E('td',{},UI.createTag({text:'正常',variant:'ok'})),E('td',{},opsNode(o))]);
+  });
+  host.replaceChildren(...(otrs.length?otrs:[UI.createEmptyRow({text:'没有匹配的组织',colspan:5,inline:true})]));
   host.querySelectorAll('.org-caret[data-toggle]').forEach(c=>{
     c.onclick=e=>{e.stopPropagation();const k=c.getAttribute('data-toggle');orgFolded[k]=!orgFolded[k];renderOrgTable()};
   });
@@ -1476,16 +1499,27 @@ function renderOrgMembers(){
   const key=orgSel.key;
   const list=key?DB.users.filter(u=>(u.tenant||'default')===key):DB.users.slice();
   const host=$('oMemberTable');if(!host)return;
-  host.innerHTML=list.length?list.map((u,i)=>
-    '<tr><td class="row-idx">'+(i+1)+'</td>'+
-    '<td><span style="display:inline-flex;align-items:center;gap:8px">'+
-      (window.Shell?Shell.avatar(u.displayName||u.username,'sm'):'')+
-      '<a class="name" href="javascript:void(0)" style="color:var(--primary);text-decoration:none" onclick="editUserByName(\''+esc(u.username)+'\')">'+esc(u.username)+'</a></span></td>'+
-    '<td>'+esc(u.displayName)+'</td><td>'+roleTags(u.groups)+'</td>'+
-    '<td>'+(u.enabled?'<span class="tag ok">正常</span>':'<span class="tag off">停用</span>')+'</td>'+
-    '<td><button class="op-btn" data-perm="user:write" onclick="editUserByName(\''+esc(u.username)+'\')">编辑</button>'+
-    '<button class="op-btn warn" data-perm="user:write" onclick="resetPwdByName(\''+esc(u.username)+'\')">重置密码</button></td></tr>').join('')
-    :'<tr><td colspan="6" class="empty-inline">'+(key?'该组织还没有直属成员':'还没有账号')+'</td></tr>';
+  const trs=list.map((u,i)=>{
+    const tr=E('tr');
+    tr.append(E('td',{className:'row-idx',text:String(i+1)}));
+    const nameCell=E('td');
+    const inline=E('span',{attrs:{style:'display:inline-flex;align-items:center;gap:8px'}});
+    if(window.Shell)inline.append(Shell.avatar(u.displayName||u.username,'sm'));
+    inline.append(E('a',{className:'name',text:u.username,
+      attrs:{href:'javascript:void(0)',style:'color:var(--primary);text-decoration:none'},
+      on:{click:()=>editUserByName(u.username)}}));
+    nameCell.append(inline);tr.append(nameCell);
+    tr.append(E('td',{text:u.displayName||''}));
+    const roleCell=E('td');roleCell.append(...roleTags(u.groups));tr.append(roleCell);
+    tr.append(E('td',{},UI.createTag({text:u.enabled?'正常':'停用',variant:u.enabled?'ok':'off'})));
+    tr.append(E('td',{},
+      E('button',{className:'op-btn',type:'button',text:'编辑',dataset:{perm:'user:write'},on:{click:()=>editUserByName(u.username)}}),
+      E('button',{className:'op-btn warn',type:'button',text:'重置密码',dataset:{perm:'user:write'},on:{click:()=>resetPwdByName(u.username)}})
+    ));
+    return tr;
+  });
+  host.replaceChildren(...(trs.length?trs:[UI.createEmptyRow({
+    text:key?'该组织还没有直属成员':'还没有账号',colspan:6,inline:true})]));
 }
 
 /** 含下级的成员清单（弹框） */
@@ -1493,11 +1527,20 @@ function orgMemberList(key){
   const o=orgByKey(key);if(!o)return;
   const set=orgSubtree(key);
   const list=DB.users.filter(u=>set.has(u.tenant||'default'));
-  Shell.modal({title:o.name+' · 全部成员（含下级）',okText:'关闭',cancelText:'',body:
-    '<div class="form-note">共 '+list.length+' 人，来自 '+set.size+' 个组织节点。</div>'+
-    (list.length?list.map(u=>'<div class="perm-pill" style="margin-bottom:6px"><b>'+esc(u.displayName)+'</b>'+esc(u.username)+
-      ' · <span style="color:var(--muted)">'+esc(orgLabel(u.tenant||'default'))+'</span> · '+roleTags(u.groups)+'</div>').join(''):
-      '<div class="empty-inline">暂无成员</div>')});
+  const pills=list.map(u=>{
+    const pill=E('div',{className:'perm-pill',attrs:{style:'margin-bottom:6px'}},[
+      E('b',{text:u.displayName}), document.createTextNode(u.username+' · '),
+      E('span',{text:orgLabel(u.tenant||'default'),attrs:{style:'color:var(--muted)'}}),
+      document.createTextNode(' · ')
+    ]);
+    pill.append(...roleTags(u.groups));
+    return pill;
+  });
+  const body=E('div',{},[
+    E('div',{className:'form-note',text:'共 '+list.length+' 人，来自 '+set.size+' 个组织节点。'}),
+    ...(pills.length?pills:[E('div',{className:'empty-inline',text:'暂无成员'})])
+  ]);
+  Shell.modal({title:o.name+' · 全部成员（含下级）',okText:'关闭',cancelText:'',body:body});
 }
 
 // ---------- 组织的增 / 改 / 删 ----------
@@ -1696,16 +1739,25 @@ function toggleOrgTree(){
 function renderRoleTable(){
   const kw=($('rKw').value||'').trim().toLowerCase();
   const list=DB.roles.filter(r=>!kw||(r.role+' '+gl(r.role)).toLowerCase().includes(kw));
-  $('rTable').innerHTML=list.length?list.map((r,i)=>{
+  const rtrs=list.map((r,i)=>{
     const perms=r.permissions||[];
     const scope=perms.includes('admin:access')?'全部组织':'本组织';
-    return '<tr><td class="row-idx">'+(i+1)+'</td><td class="name">'+esc(gl(r.role))+'</td>'+
-      '<td class="mono" style="font-size:11px">'+esc(r.role)+'</td><td>'+esc(scope)+'</td>'+
-      '<td>'+perms.length+'</td><td>'+perms.slice(0,3).map(p=>'<span class="tag">'+esc(p)+'</span>').join(' ')+(perms.length>3?' <span class="tag off">+'+(perms.length-3)+'</span>':'')+'</td>'+
-      '<td><button class="op-btn" data-perm="role:read" onclick="showRolePerms('+i+')">查看</button>'+
-      (r.role==='admin'?'':'<button class="op-btn" data-perm="role:read" onclick="editRolePerms('+i+')">编辑权限</button>'+
-      '<button class="op-btn danger" data-perm="role:read" onclick="delRole('+i+')">删除</button>')+'</td></tr>';
-  }).join(''):'<tr><td colspan="7" class="empty-inline">没有匹配的角色</td></tr>';
+    const tagCell=E('td');
+    perms.slice(0,3).forEach(p=>{tagCell.append(UI.createTag(p));tagCell.append(document.createTextNode(' '))});
+    if(perms.length>3)tagCell.append(UI.createTag({text:'+'+(perms.length-3),variant:'off'}));
+    const opCell=E('td',{},E('button',{className:'op-btn',type:'button',text:'查看',
+      dataset:{perm:'role:read'},on:{click:()=>showRolePerms(i)}}));
+    if(r.role!=='admin')opCell.append(
+      E('button',{className:'op-btn',type:'button',text:'编辑权限',dataset:{perm:'role:read'},on:{click:()=>editRolePerms(i)}}),
+      E('button',{className:'op-btn danger',type:'button',text:'删除',dataset:{perm:'role:read'},on:{click:()=>delRole(i)}}));
+    return E('tr',{},[
+      E('td',{className:'row-idx',text:String(i+1)}),
+      E('td',{className:'name',text:gl(r.role)}),
+      E('td',{className:'mono',text:r.role,attrs:{style:'font-size:11px'}}),
+      E('td',{text:scope}), E('td',{text:String(perms.length)}), tagCell, opCell
+    ]);
+  });
+  $('rTable').replaceChildren(...(rtrs.length?rtrs:[UI.createEmptyRow({text:'没有匹配的角色',colspan:7,inline:true})]));
   $('rTable')._rows=list;
 }
 $('rKw')&&($('rKw').oninput=renderRoleTable);
@@ -1941,24 +1993,29 @@ function renderPermQuick(){
   const host=$('permQuickHost');if(!host)return;
   const parent=$('fPParent')?$('fPParent').value:'';
   const prefix=permPrefix(parent);
-  let html='';
+  const nodes=[];
   const used=UNUSED_PERM_CODES.filter(x=>!prefix||String(x.code).startsWith(prefix));
   if(used.length){
-    const items=used.map(x=>{
-      const src=(x.sources||[]).join('、').replace(/"/g,'&quot;').replace(/</g,'&lt;');
-      return '<button type="button" class="unused-code-btn" data-code="'+esc(x.code)+'" data-name="'+esc(x.name||x.code)+'" '+
-        'title="来源：'+src+'" onclick="fillPermCode(this.dataset.code,this.dataset.name)">'+
-        esc(x.name||x.code)+' <span class="mono">'+esc(x.code)+'</span></button>';
-    }).join('');
-    html+='<div class="perm-quick-row"><span class="perm-quick-label">代码在用、尚未注册（点击立即生效）</span><div class="type-quick">'+items+'</div></div>';
+    const items=used.map(x=>E('button',{className:'unused-code-btn',type:'button',
+      dataset:{code:x.code,name:x.name||x.code},title:'来源：'+(x.sources||[]).join('、'),
+      on:{click:()=>fillPermCode(x.code,x.name||x.code)}},[
+      document.createTextNode((x.name||x.code)+' '),E('span',{className:'mono',text:x.code})
+    ]));
+    nodes.push(E('div',{className:'perm-quick-row'},[
+      E('span',{className:'perm-quick-label',text:'代码在用、尚未注册（点击立即生效）'}),
+      E('div',{className:'type-quick'},items)
+    ]));
   }
   if(prefix){
     const acts=COMMON_ACTIONS.filter(([a])=>!USED_PERM_CODES.has(prefix+a)&&!DB.perms.some(x=>x.code===prefix+a));
-    const btns=acts.map(([a,label])=>'<button type="button" onclick="fillPermAction(\''+a+'\',\''+label+'\')">'+label+'</button>').join('');
-    html+='<div class="perm-quick-row"><span class="perm-quick-label">常用动作（按 '+esc(prefix)+' 自动生成新码）</span><div class="type-quick">'+btns+'</div></div>';
+    nodes.push(E('div',{className:'perm-quick-row'},[
+      E('span',{className:'perm-quick-label',text:'常用动作（按 '+prefix+' 自动生成新码）'}),
+      E('div',{className:'type-quick'},acts.map(([a,label])=>
+        E('button',{type:'button',text:label,on:{click:()=>fillPermAction(a,label)}})))
+    ]));
   }
-  html+='<div class="form-hint">也可直接在下方自己写权限码；若代码里尚未使用，会提示暂时不生效。</div>';
-  host.innerHTML=html;
+  nodes.push(E('div',{className:'form-hint',text:'也可直接在下方自己写权限码；若代码里尚未使用，会提示暂时不生效。'}));
+  host.replaceChildren(...nodes);
 }
 function fillPermAction(action,label){
   const parent=$('fPParent')?$('fPParent').value:'';
@@ -2146,18 +2203,22 @@ async function loadDocs(page){
     if(DOC_PAGE.page>pages)DOC_PAGE.page=pages;
     const start=(DOC_PAGE.page-1)*DOC_PAGE.size;
     const slice=list.slice(start,start+DOC_PAGE.size);
-    $('dList').innerHTML=slice.map((d,i)=>{
-      // 与「知识库文档」页同步：显示归属部门 + 可见范围（下发/仅本部门）
-      const org=esc(window.Shell?Shell.tenantLabel(d.tenantId||'default'):(d.tenantId||'default'));
+    const dtrs=slice.map((d,i)=>{
+      const org=window.Shell?Shell.tenantLabel(d.tenantId||'default'):(d.tenantId||'default');
       const scope=d.visibleSubtree?org+' · 含下级':org+' · 仅本部门+上级';
       const gi=start+i;   // 操作按钮用全局索引，分页后仍指向正确文档
-      return '<tr><td class="name">'+esc(d.fileName)+'</td>'+
-        '<td><span class="tag" title="文档归属部门与可见范围">'+scope+'</span></td>'+
-        '<td>'+num(d.chunks)+'</td><td>'+esc(d.ownerUser||'—')+'</td>'+
-        '<td>'+esc(String(d.uploadedAt||'').slice(0,19))+'</td>'+
-        '<td><button class="op-btn" data-perm="doc:chunks" onclick="showChunks('+gi+')">查看分片</button>'+
-        '<button class="btn btn-sm btn-danger" data-perm="doc:delete" style="margin-left:8px" onclick="delDocAt('+gi+')">删除</button></td></tr>';
-    }).join('')||'<tr><td colspan="6" class="empty">知识库暂无文档</td></tr>';
+      return E('tr',{},[
+        E('td',{className:'name',text:d.fileName}),
+        E('td',{},UI.createTag({text:scope,title:'文档归属部门与可见范围'})),
+        E('td',{text:num(d.chunks)}), E('td',{text:d.ownerUser||'—'}),
+        E('td',{text:String(d.uploadedAt||'').slice(0,19)}),
+        E('td',{},
+          E('button',{className:'op-btn',type:'button',text:'查看分片',dataset:{perm:'doc:chunks'},on:{click:()=>showChunks(gi)}}),
+          E('button',{className:'btn btn-sm btn-danger',type:'button',text:'删除',dataset:{perm:'doc:delete'},
+            attrs:{style:'margin-left:8px'},on:{click:()=>delDocAt(gi)}}))
+      ]);
+    });
+    $('dList').replaceChildren(...(dtrs.length?dtrs:[UI.createEmptyRow({text:'知识库暂无文档',colspan:6})]));
     renderPager('dPager',total,DOC_PAGE.page,DOC_PAGE.size,'loadDocs');
   }catch(e){console.error(e)}
 }
@@ -2467,8 +2528,7 @@ function openProfile(){
   $('pfAvatar').replaceChildren(Shell.avatar(name,'xl'));
   $('pfName').textContent=name;
   $('pfAccount').textContent='@'+(u.user||'—');
-  if(roles.length){ $('pfRoles').innerHTML=roleTags(roles); }  // roleTags 存量返回字符串，待其调用方一并迁移
-  else $('pfRoles').replaceChildren(UI.createTag({text:'未分配角色',variant:'off'}));
+  $('pfRoles').replaceChildren(...(roles.length?roleTags(roles):[UI.createTag({text:'未分配角色',variant:'off'})]));
   $('pfTenant').textContent=tl(tenant);
   $('pfStatus').replaceChildren(E('span',{
     attrs:{style:enabled?'color:var(--ok)':'color:var(--danger)'}, text:enabled?'正常':'已停用'
@@ -2482,11 +2542,12 @@ function openProfile(){
     const row=E('div',{className:'info-row'},[E('span',{className:'ir-k',text:k}),E('span',{className:'ir-v'})]);
     const cell=row.lastChild;
     if(v instanceof Node)cell.append(v);
-    else cell.innerHTML=String(v);   // roleTags 存量返回字符串
+    else if(Array.isArray(v))cell.append(...v);   // roleTags 返回节点数组
+    else cell.append(document.createTextNode(String(v)));
     return row;
   };
   const statusTagNode=enabled?UI.createTag({text:'正常',variant:'ok'}):UI.createTag({text:'已停用',variant:'off'});
-  const rolesNode=roles.length?roleTags(roles):'<span class="tag off">未分配</span>';
+  const rolesNode=roles.length?roleTags(roles):[UI.createTag({text:'未分配',variant:'off'})];
   $('pfInfo').replaceChildren(
     infoRow('登录账号',u.user||'—'), infoRow('显示名称',name), infoRow('所属组织',tl(tenant)),
     infoRow('角色 / 用户组',rolesNode), infoRow('账号状态',statusTagNode),
