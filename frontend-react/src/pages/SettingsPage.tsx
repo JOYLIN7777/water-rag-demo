@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { useAuthStore } from '@/store/auth'
 import { Icon } from '@/components/Icon'
 import '@/styles/settings.css'
+import TopbarNav from '@/components/TopbarNav'
 
 /** ShellSettings（与 app.js 一致），只显示有权限的 */
 const SETTINGS = [
@@ -19,7 +20,7 @@ export default function SettingsPage() {
   return (
     <>
       <header className="topbar">
-        <div className="topbar-left"><div className="topbar-title">设置</div><span className="topbar-sub">更多功能</span></div>
+        <div className="topbar-left"><TopbarNav /><div className="topbar-title">设置</div><span className="topbar-sub">更多功能</span></div>
       </header>
       <div className="page">
         <div className="page-head">

@@ -8,6 +8,7 @@ import { useChatStore } from '@/store/chat'
 import { useNavigate } from 'react-router-dom'
 import { Avatar } from '@/components/Avatar'
 import '@/styles/profile.css'
+import TopbarNav from '@/components/TopbarNav'
 
 interface MeResponse {
   user: string
@@ -118,7 +119,7 @@ export default function ProfilePage() {
   return (
     <>
       <header className="topbar">
-        <div className="topbar-left"><div className="topbar-title">个人中心</div><span className="topbar-sub">账号与安全</span></div>
+        <div className="topbar-left"><TopbarNav /><div className="topbar-title">个人中心</div><span className="topbar-sub">账号与安全</span></div>
       </header>
       <div className="page">
         <div className="page-head">

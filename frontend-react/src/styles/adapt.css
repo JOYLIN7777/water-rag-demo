@@ -22,3 +22,63 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC'
 .ant-modal-wrap { display: flex; align-items: center; justify-content: center; }
 .ant-modal { top: 0 !important; padding: 0 !important; margin: auto !important; }
 .ant-modal-confirm .ant-modal-body { padding: 24px !important; }
+
+/* 顶栏导航：有面包屑时隐藏重复标题（对齐旧版 renderTopbarNav） */
+.topbar-left:has(.topbar-nav-left) .topbar-title,
+.topbar-left:has(.topbar-nav-left) .topbar-sub { display: none; }
+
+/* ===== 弹框样式对齐旧版自绘 modal（legacy.css 的 .modal-box 视觉） ===== */
+.ant-modal {
+  width: min(460px, 92vw) !important;
+  max-width: min(460px, 92vw) !important;
+  padding: 0 !important;
+  border-radius: 14px !important;
+  box-shadow: 0 24px 70px rgba(10,20,45,.3) !important;
+  overflow: hidden;
+  animation: modalIn .18s ease-out;
+}
+.ant-modal-content {
+  border-radius: 14px !important;
+  box-shadow: none !important;
+  max-height: 88vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.ant-modal-header {
+  padding: 18px 22px !important;
+  border-bottom: 1px solid var(--line) !important;
+  background: #fff !important;
+  border-radius: 0 !important;
+}
+.ant-modal-title { font-size: 15px !important; font-weight: 680 !important; color: var(--ink) !important; line-height: 1.35 !important; }
+.ant-modal-close { top: 14px !important; right: 14px !important; }
+.ant-modal-close-x { color: var(--muted) !important; font-size: 16px !important; width: 32px !important; height: 32px !important; line-height: 32px !important; }
+.ant-modal-body {
+  padding: 20px 22px !important;
+  font-size: 13px !important;
+  color: var(--ink-2) !important;
+  line-height: 1.7 !important;
+  overflow-y: auto;
+  min-height: 0;
+}
+.ant-modal-footer {
+  padding: 14px 22px 18px !important;
+  border-top: 1px solid var(--line) !important;
+  background: #fbfcfe !important;
+  border-radius: 0 !important;
+}
+.ant-modal-footer .ant-btn { border-radius: 8px !important; height: 34px !important; font-size: 12.5px !important; }
+/* 确认弹框：旧版是标题粗体 + 副提示灰色，AntD 默认文字偏小 */
+.ant-modal-confirm .ant-modal-confirm-title { font-size: 15px !important; font-weight: 680 !important; color: var(--ink) !important; }
+.ant-modal-confirm .ant-modal-confirm-content { font-size: 13px !important; color: var(--ink-2) !important; margin-left: 0 !important; }
+.ant-modal-confirm-body .ant-modal-confirm-title { display: block !important; }
+.ant-modal-confirm-body > .anticon { font-size: 20px !important; margin-right: 12px !important; }
+
+/* 内容区可滚动（旧版 .page 自带，React 里被页面级 CSS 覆盖过） */
+.main > .page {
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+}

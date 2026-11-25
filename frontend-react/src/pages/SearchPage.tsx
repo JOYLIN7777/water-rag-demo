@@ -5,6 +5,7 @@ import { getUser } from '@/api/auth'
 import { useAuthStore } from '@/store/auth'
 import { AppError } from '@/types'
 import '@/styles/search.css'
+import TopbarNav from '@/components/TopbarNav'
 
 interface Hit { file: string; chunk: number; score: number; text: string }
 type CompareResult = { bm25?: Hit[]; knn?: Hit[]; hybrid?: Hit[] }
@@ -39,7 +40,7 @@ export default function SearchPage() {
     return (
       <>
         <header className="topbar">
-          <div className="topbar-left"><div className="topbar-title">检索对比</div><span className="topbar-sub">找到更准确的答案</span></div>
+          <div className="topbar-left"><TopbarNav /><div className="topbar-title">检索对比</div><span className="topbar-sub">找到更准确的答案</span></div>
         </header>
         <div className="page">
           <div className="card" style={{ margin: 'auto', maxWidth: 520, padding: 36, textAlign: 'center' }}>
@@ -78,7 +79,7 @@ export default function SearchPage() {
   return (
     <>
       <header className="topbar">
-        <div className="topbar-left"><div className="topbar-title">检索对比</div><span className="topbar-sub">找到更准确的答案</span></div>
+        <div className="topbar-left"><TopbarNav /><div className="topbar-title">检索对比</div><span className="topbar-sub">找到更准确的答案</span></div>
       </header>
       <div className="page">
         <div className="page-head">

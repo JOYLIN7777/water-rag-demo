@@ -86,7 +86,7 @@ export const authApi = {
 
 export const chatApi = {
   sessions: () => http.get<import('@/types').SessionItem[]>('/api/chat/sessions'),
-  history: (id: string) => http.get<Array<{ role: string; content: string; sources?: unknown[] }>>(
+  history: (id: string) => http.get<Array<{ role: string; content: string; sources?: unknown[]; usage?: Record<string, any>; id?: string; parentId?: string }>>(
     `/api/chat/history?sessionId=${encodeURIComponent(id)}`),
   createSession: (sessionId: string, title = '') =>
     http.post('/api/chat/sessions', { sessionId, title }),

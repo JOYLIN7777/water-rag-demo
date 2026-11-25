@@ -78,13 +78,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
   },
 
   newSession: () => {
+    // 空会话只作为"当前编辑态"，不进历史列表、不落后端——与旧版一致：提问后才生成会话
     const id = `session-${Date.now()}`
-    set(s => ({
-      sessions: [{ id, title: '', updatedAt: Date.now() }, ...s.sessions],
-      currentId: id, messages: []
-    }))
-    get().saveLocal()
-    void chatApi.createSession(id).catch(() => {})
+    set({ currentId: id, messages: [] })
     return id
   },
 
@@ -94,7 +90,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
       const list = await chatApi.history(id)
       const msgs: ChatMessageExt[] = (list || []).map((m, i) => ({
         role: m.role === 'assistant' ? 'assistant' : 'user',
-        content: m.content || '', sources: m.sources, id: `${id}-${i}`
+        content: m.content || '', sources: m.sources,
+        usage: (m as any).usage || undefined,
+        nodeId: (m as any).id, parentId: (m as any).parentId,
+        id: `${id}-${i}`
       }))
       set(s => ({ messages: msgs, bySession: { ...s.bySession, [id]: msgs } }))
       get().cacheMessages(id, msgs)

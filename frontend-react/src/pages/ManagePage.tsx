@@ -6,6 +6,7 @@ import { uploadDocument } from '@/api'
 import { getUser } from '@/api/auth'
 import { useAuthStore } from '@/store/auth'
 import '@/styles/manage.css'
+import TopbarNav from '@/components/TopbarNav'
 
 interface DocItem {
   fileName: string
@@ -160,7 +161,7 @@ export default function ManagePage() {
   return (
     <>
       <header className="topbar">
-        <div className="topbar-left"><div className="topbar-title">知识库文档管理</div><span className="topbar-sub">/ 文档</span></div>
+        <div className="topbar-left"><TopbarNav /><div className="topbar-title">知识库文档管理</div><span className="topbar-sub">/ 文档</span></div>
       </header>
       <div className="page">
         <div className="page-head">
