@@ -418,14 +418,16 @@
   const JUNK_FILES = new Set(['desktop.ini', 'thumbs.db', '.ds_store', '~$temp.hta']);
   const isJunkFile = name => name.startsWith('.') || JUNK_FILES.has(name.toLowerCase());
 
+  /**
+   * 上传进度/结果提示：统一走右下角 toast。
+   * 早期版本写在问答框下方的 uploadArea 里，进度刷屏且挤占输入区；
+   * 现在只保留右下角浮层，连续更新会不断刷新存活时间，完成后自然消失。
+   */
   function uploadMsg(text, type) {
-    const el = document.getElementById('uploadMsg');
-    if (!el) return;
-    const area = document.getElementById('uploadArea');
-    if (area) area.classList.add('open');
-    el.className = 'upload-msg show' + (type ? ' ' + type : '');
-    el.style.display = 'block';
-    if (text !== undefined) el.textContent = text;
+    // 纯进度（正在解析/第N个）常驻不消失；成功/失败结果 3 秒后自动消失
+    const txt = String(text || '');
+    const inProgress = !type && !/[✓✗]/.test(txt) && /正在解析|^\[\d+\/\d+\]/.test(txt);
+    toast(text, type || '', inProgress ? 0 : 3000);
   }
   // 上传时把页面上「含下级部门可见」勾选一起带给后端（各页面共用同一勾选框 id）
   function appendVisibility(fd) {
@@ -772,7 +774,6 @@
       uploadMsg('✗ 没有支持的文档格式（共 ' + items.length + ' 个文件跳过）', 'err');
       return;
     }
-    const area = document.getElementById('uploadArea'); if (area) area.classList.add('open');
     let ok = 0;
     for (let i = 0; i < valid.length; i++) {
       const f = valid[i].file;
@@ -1266,13 +1267,14 @@
   /** 老入口保留：管理后台以前单独往侧栏塞状态条，现在统一走右下角胶囊 */
   function injectAdminHealth() { ensureHealthPill(); }
 
-  function toast(msg, type) {
+  function toast(msg, type, duration) {
     let t = document.getElementById('appToast');
     if (!t) { t = document.createElement('div'); t.id = 'appToast'; t.className = 'toast'; document.body.appendChild(t); }
     t.textContent = msg;
     t.className = 'toast show' + (type ? ' ' + type : '');
     clearTimeout(t._timer);
-    t._timer = setTimeout(() => t.classList.remove('show'), 2600);
+    // duration=0 表示常驻（上传解析等长耗时任务），直到下一次 toast 覆盖或手动关闭
+    if (duration !== 0) t._timer = setTimeout(() => t.classList.remove('show'), Number(duration) || 2600);
   }
 
   // ---------- 弹框内的错误横幅 ----------
