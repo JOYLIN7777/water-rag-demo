@@ -405,8 +405,9 @@ public class AdminController {
         return Map.of("message", "权限节点已删除", "code", code);
     }
 
-    /** 登录日志：从审计里按登录相关动作过滤（含成功与失败） */
+    /** 登录日志：从审计里按登录相关动作过滤（含成功与失败）。审计员凭 loginlog:read 可读 */
     @GetMapping("/login-logs")
+    @RequirePermission(Permission.LOGINLOG_READ)
     public List<Map<String, Object>> loginLogs(@RequestParam(required = false, defaultValue = "100") int limit) {
         String tenant = UserContext.get().tenantId();
         List<Map<String, Object>> out = new ArrayList<>(audit.loginLogs(tenant, Math.min(Math.max(limit, 1), 500)));
