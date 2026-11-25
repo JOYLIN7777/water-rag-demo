@@ -1,23 +1,41 @@
-/** 会话状态：历史会话 + 当前消息，按账号隔离 */
+/** 问答会话状态：多会话消息隔离，对齐旧版 storeOf(id)/cacheMessages */
 import { create } from 'zustand'
 import { chatApi } from '@/api'
 import { scopedKey } from './auth'
 import type { SessionItem, ChatMessage } from '@/types'
 
+export interface ChatMessageExt extends ChatMessage {
+  nodeId?: string
+  parentId?: string
+  branch?: boolean
+  branchSeal?: boolean
+  usage?: Record<string, any> & { durationMs?: number }
+}
+
 function loadLocal(): SessionItem[] {
   try { return JSON.parse(localStorage.getItem(scopedKey('sessions')) || '[]') as SessionItem[] }
+  catch { return [] }
+}
+function loadMessages(id: string): ChatMessageExt[] {
+  try { return JSON.parse(localStorage.getItem(scopedKey('msgs:' + id)) || '[]') as ChatMessageExt[] }
   catch { return [] }
 }
 
 interface ChatState {
   sessions: SessionItem[]
   currentId: string
-  messages: ChatMessage[]
+  messages: ChatMessageExt[]          // 当前会话消息（视图）
+  bySession: Record<string, ChatMessageExt[]> // 多会话缓存
+  busyIds: Set<string>
   sending: boolean
+  suggestions: string[]
   syncSessions: () => Promise<void>
   newSession: () => string
   switchSession: (id: string) => Promise<void>
   removeSession: (id: string) => void
+  touchSession: (id: string, title: string, fullQ: string) => void
+  cacheMessages: (id: string, msgs: ChatMessageExt[]) => void
+  loadSuggestions: () => Promise<void>
   saveLocal: () => void
   reset: () => void
 }
@@ -26,31 +44,40 @@ export const useChatStore = create<ChatState>((set, get) => ({
   sessions: loadLocal(),
   currentId: '',
   messages: [],
+  bySession: {},
+  busyIds: new Set(),
   sending: false,
+  suggestions: [],
 
   saveLocal: () => {
     try { localStorage.setItem(scopedKey('sessions'), JSON.stringify(get().sessions)) }
     catch { /* 隐私模式 */ }
   },
 
+  cacheMessages: (id, msgs) => {
+    set(s => ({ bySession: { ...s.bySession, [id]: msgs } }))
+    try { localStorage.setItem(scopedKey('msgs:' + id), JSON.stringify(msgs)) }
+    catch { /* 同上 */ }
+  },
+
   syncSessions: async () => {
     try {
       const list = await chatApi.sessions()
-      // 用服务端会话为准，合并本地未上送的新会话
-      const local = get().sessions
-      const ids = new Set(list.map(s => s.id))
-      const merged = [...list, ...local.filter(s => !ids.has(s.id))]
-      set({ sessions: merged })
-      get().saveLocal()
-    } catch { /* 服务端不可用用本地 */ }
+      if (list?.length) {
+        const local = get().sessions
+        const ids = new Set(list.map(s => s.id))
+        const merged = [...list, ...local.filter(s => !ids.has(s.id))]
+        set({ sessions: merged })
+        get().saveLocal()
+      }
+    } catch { /* 用本地缓存 */ }
   },
 
   newSession: () => {
     const id = `session-${Date.now()}`
     set(s => ({
       sessions: [{ id, title: '', updatedAt: Date.now() }, ...s.sessions],
-      currentId: id,
-      messages: []
+      currentId: id, messages: []
     }))
     get().saveLocal()
     void chatApi.createSession(id).catch(() => {})
@@ -58,25 +85,50 @@ export const useChatStore = create<ChatState>((set, get) => ({
   },
 
   switchSession: async (id: string) => {
-    set({ currentId: id, sending: false })
+    set({ currentId: id, messages: get().bySession[id] || loadMessages(id) })
     try {
       const list = await chatApi.history(id)
-      set({ messages: (list || []).map((m, i) => ({
+      const msgs: ChatMessageExt[] = (list || []).map((m, i) => ({
         role: m.role === 'assistant' ? 'assistant' : 'user',
         content: m.content || '', sources: m.sources, id: `${id}-${i}`
-      })) })
-    } catch { set({ messages: [] }) }
+      }))
+      set(s => ({ messages: msgs, bySession: { ...s.bySession, [id]: msgs } }))
+      get().cacheMessages(id, msgs)
+    } catch { /* 用缓存 */ }
   },
 
   removeSession: (id: string) => {
     set(s => {
       const sessions = s.sessions.filter(x => x.id !== id)
       const next = s.currentId === id ? (sessions[0]?.id || '') : s.currentId
-      return { sessions, currentId: next, messages: s.currentId === id ? [] : s.messages }
+      const bySession = { ...s.bySession }; delete bySession[id]
+      return { sessions, currentId: next, messages: next === s.currentId ? (bySession[next] || []) : s.messages, bySession }
     })
     get().saveLocal()
     void chatApi.clearSession(id).catch(() => {})
   },
 
-  reset: () => set({ sessions: [], currentId: '', messages: [], sending: false })
+  touchSession: (id, title, fullQ) => {
+    set(s => {
+      const exists = s.sessions.some(x => x.id === id)
+      const sessions = exists
+        ? s.sessions.map(x => x.id === id && !x.title ? { ...x, title, updatedAt: Date.now() } : x)
+        : [{ id, title, updatedAt: Date.now() }, ...s.sessions]
+      return { sessions }
+    })
+    get().saveLocal()
+    void chatApi.createSession(id, title).catch(() => {})
+  },
+
+  loadSuggestions: async () => {
+    const defaults = ['云溪水库的汛限水位是多少？', '闸门开启有哪些操作原则？']
+    try {
+      const list = await chatApi.suggestions()
+      set({ suggestions: Array.isArray(list) && list.length ? list.slice(0, 4) : defaults })
+    } catch { set({ suggestions: defaults }) }
+  },
+
+  reset: () => {
+    set({ sessions: [], currentId: '', messages: [], bySession: {}, busyIds: new Set(), sending: false })
+  }
 }))

@@ -7,6 +7,7 @@ import ProfilePage from './pages/ProfilePage'
 import SearchPage from './pages/SearchPage'
 import TreePage from './pages/TreePage'
 import ManagePage from './pages/ManagePage'
+import IndexPage from './pages/IndexPage'
 import Shell from './layouts/Shell'
 import { useAuthStore } from './store/auth'
 import { isLoggedIn } from './api/auth'
@@ -41,7 +42,7 @@ export default function App() {
       <Route path="/search.html" element={<WithShell perm="search:use"><SearchPage /></WithShell>} />
       <Route path="/tree.html" element={<WithShell perm="tree:use"><TreePage /></WithShell>} />
       {/* 未移植页：暂回退 static，做一页换一页 */}
-      <Route path="/index.html" element={<StaticFallback page="index.html" />} />
+      <Route path="/index.html" element={<WithShell perm="chat:use"><IndexPage /></WithShell>} />
       <Route path="/manage.html" element={<WithShell perm="doc:read"><ManagePage /></WithShell>} />
       <Route path="/forgot.html" element={<StaticFallback page="forgot.html" />} />
       <Route path="/admin.html" element={<StaticFallback page="admin.html" />} />
