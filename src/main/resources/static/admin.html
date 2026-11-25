@@ -2233,6 +2233,8 @@ async function loadDocs(page){
       ]);
     });
     $('dList').replaceChildren(...(dtrs.length?dtrs:[UI.createEmptyRow({text:'知识库暂无文档',colspan:6})]));
+    // 表格是异步渲染的，新增的 data-perm 按钮要主动收敛一次，避免权限加载时序导致隐藏/显示错位
+    if(window.Shell&&Shell.applyPermControls)Shell.applyPermControls($('dList'));
     renderPager('dPager',total,DOC_PAGE.page,DOC_PAGE.size,'loadDocs');
   }catch(e){console.error(e)}
 }

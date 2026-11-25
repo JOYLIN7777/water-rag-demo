@@ -20,9 +20,13 @@
 // ============ 内部工具 ============
 
 /** 创建元素并设置属性；文本一律走 textContent，杜绝 XSS */
-function el(tag, opts = {}, children = []) {
+function el(tag, opts = {}, ...childrenArgs) {
   if (typeof tag !== 'string' || !tag) throw new TypeError('[UI] el: tag 必须是非空字符串');
   const node = document.createElement(tag);
+  // 兼容两种调用：el(tag,opts,[c1,c2]) 与 el(tag,opts,c1,c2)；也兼容 el(tag,[c1,c2])
+  if (Array.isArray(opts) && childrenArgs.length === 0) { childrenArgs = [opts]; opts = {}; }
+  const children = childrenArgs.length === 1 && Array.isArray(childrenArgs[0])
+    ? childrenArgs[0] : childrenArgs;
   if (opts.className) node.className = String(opts.className);
   if (opts.text !== undefined && opts.text !== null) node.textContent = String(opts.text);
   if (opts.id) node.id = String(opts.id);
