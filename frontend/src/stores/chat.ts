@@ -31,7 +31,7 @@ export const useChatStore = defineStore('chat', () => {
 
   function newSession(): string {
     const id = `session-${Date.now()}`
-    sessions.value.unshift({ id, title: '' })
+    sessions.value.unshift({ id, title: '', updatedAt: Date.now() })
     saveLocal()
     currentId.value = id
     messages.value = []

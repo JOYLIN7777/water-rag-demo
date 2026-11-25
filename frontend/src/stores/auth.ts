@@ -33,13 +33,15 @@ export const useAuthStore = defineStore('auth', () => {
       allPermissions.value = j.allPermissions || []
       menus.value = j.menus || []
       navGroups.value = j.navGroups || []
-      if (user.value) {
+      // 直接用权限接口返回值构造用户，不能依赖旧 user 是否存在
+      if (j.user) {
         user.value = {
-          ...user.value,
-          user: j.user || user.value.user,
-          groups: j.groups || user.value.groups,
-          tenant: j.tenant || user.value.tenant,
-          admin: !!j.admin
+          user: j.user,
+          displayName: j.displayName || user.value?.displayName || j.user,
+          groups: j.groups || user.value?.groups || [],
+          tenant: j.tenant || user.value?.tenant || 'default',
+          admin: !!j.admin,
+          anonymous: !!j.anonymous
         }
       }
       loaded.value = true

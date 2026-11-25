@@ -48,6 +48,7 @@ export interface PermissionNode {
 
 export interface PermissionsResponse {
   user: string
+  displayName?: string
   groups: string[]
   tenant: string
   permissions: string[]

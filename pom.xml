@@ -161,7 +161,7 @@
                 <executions>
                     <execution>
                         <id>clean-stale-static</id>
-                        <phase>generate-resources</phase>
+                        <phase>initialize</phase>
                         <goals><goal>run</goal></goals>
                         <configuration>
                             <target>
