@@ -3,6 +3,7 @@ import { useEffect } from 'react'
 import { Routes, Route, Navigate, useNavigate } from 'react-router-dom'
 import LoginPage from './pages/LoginPage'
 import SettingsPage from './pages/SettingsPage'
+import ProfilePage from './pages/ProfilePage'
 import Shell from './layouts/Shell'
 import { useAuthStore } from './store/auth'
 import { isLoggedIn } from './api/auth'
@@ -33,9 +34,9 @@ export default function App() {
       <Route path="/" element={<Navigate to="/index.html" replace />} />
       {/* 已移植页 */}
       <Route path="/settings.html" element={<WithShell><SettingsPage /></WithShell>} />
+      <Route path="/profile.html" element={<WithShell><ProfilePage /></WithShell>} />
       {/* 未移植页：暂回退 static，做一页换一页 */}
       <Route path="/index.html" element={<StaticFallback page="index.html" />} />
-      <Route path="/profile.html" element={<StaticFallback page="profile.html" />} />
       <Route path="/manage.html" element={<StaticFallback page="manage.html" />} />
       <Route path="/search.html" element={<StaticFallback page="search.html" />} />
       <Route path="/tree.html" element={<StaticFallback page="tree.html" />} />
