@@ -34,7 +34,8 @@ public class RolePermissions {
     /** 分析员内置默认：日常问答与文档操作，可看用量，但不能改模型、看审计、进管理后台 */
     private static final Set<String> ANALYST = Set.of(
             Permission.CHAT_USE, Permission.DOC_READ, Permission.DOC_WRITE,
-            Permission.DOC_DELETE, Permission.SEARCH_USE, Permission.TREE_USE,
+            Permission.DOC_WRITE_CHAT, Permission.DOC_WRITE_BATCH, Permission.DOC_WRITE_ADMIN,
+            Permission.DOC_DELETE, Permission.DOC_CHUNKS, Permission.SEARCH_USE, Permission.TREE_USE,
             Permission.USAGE_READ);
 
     /** 只读用户内置默认：只能问答、看文档、做检索对比，不能上传或删除 */

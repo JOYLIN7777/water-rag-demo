@@ -4,7 +4,7 @@
     {"code":"workbench:root","name":"工作台","type":"directory","module":"工作台","desc":"问答侧栏：问答、文档与检索","parent":"","route":"","order":10},
     {"code":"chat:use","name":"智能问答","type":"menu","module":"工作台","desc":"进入智能问答页","parent":"workbench:root","route":"/index.html","order":11},
     {"code":"doc:read","name":"知识库文档","type":"menu","module":"工作台","desc":"查看知识库文档列表","parent":"workbench:root","route":"/manage.html","order":12},
-    {"code":"doc:write","name":"上传文档（父权限）","type":"btn","module":"工作台","desc":"上传接口兜底权限","parent":"doc:read","route":"","order":121},
+    {"code":"doc:write","name":"上传接口权限（仅后端校验）","type":"btn","module":"工作台","desc":"后端 /api/docs/upload 接口校验用；不控制前端按钮显隐","parent":"doc:read","route":"","order":121},
     {"code":"doc:write_chat","name":"问答框上传","type":"btn","module":"工作台","desc":"问答框上传文档","parent":"chat:use","route":"","order":111},
     {"code":"doc:write_batch","name":"批量上传","type":"btn","module":"工作台","desc":"选择文件夹批量上传","parent":"doc:read","route":"","order":125},
     {"code":"doc:write_admin","name":"后台上传","type":"btn","module":"系统管理","desc":"后台文档管理上传","parent":"admin:docs","route":"","order":2211},

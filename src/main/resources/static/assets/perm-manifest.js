@@ -15,7 +15,7 @@
         { code: 'doc:write_chat', name: '问答框上传', type: 'btn', order: 111 }
       ]},
       { code: 'doc:read', name: '知识库文档', type: 'menu', order: 12, routePath: '/manage.html', children: [
-        { code: 'doc:write', name: '上传文档（父权限）', type: 'btn', order: 121 },
+        { code: 'doc:write', name: '上传接口权限（仅后端校验）', type: 'btn', order: 121 },
         { code: 'doc:write_batch', name: '批量上传', type: 'btn', order: 125 },
         { code: 'doc:delete', name: '删除文档', type: 'btn', order: 122 },
         { code: 'doc:chunks', name: '查看分片', type: 'btn', order: 123 }

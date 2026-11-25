@@ -1030,11 +1030,8 @@
   let ownedPermissions = new Set();
   let permsLoaded = false;
   function hasPermission(code) {
-    if (ownedPermissions.has(code)) return true;
-    // 细分上传权限继承父码 doc:write：老角色只勾了父码也照常看到三处上传入口，
-    // 需要单独管控时再给角色配细分码（父码不自动替细分码放行反向不成立）
-    if (typeof code === 'string' && code.startsWith('doc:write_') && ownedPermissions.has('doc:write')) return true;
-    return false;
+    // 严格按角色勾选判定：细分上传码与父码互不继承，没勾就不显示
+    return ownedPermissions.has(code);
   }
   // 权限清单的加载 promise：功能页守卫要等它回来再判定，否则拿空集合会把有权限的人也拦住
   let permsReady = null;
