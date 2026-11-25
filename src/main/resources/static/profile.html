@@ -66,6 +66,12 @@
 <script src="assets/app.js"></script>
 <script src="assets/crypto.js"></script>
 <script>
+const E=window.UI.el;
+function htmlNodes(html){
+  const body=new DOMParser().parseFromString('<body>'+String(html||'')+'</body>','text/html').documentElement.querySelector('body');
+  return body?Array.from(body.childNodes):[];
+}
+
 function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 const tag=(t,c)=>'<span class="tag '+c+'">'+esc(t)+'</span>';
 
@@ -85,11 +91,14 @@ async function loadProfile(){
     const gl=(window.Shell&&Shell.groupLabel)||(x=>x);
     const tl=(window.Shell&&Shell.tenantLabel)||(x=>x);
     document.getElementById('pSub').textContent=tl(j.tenant)+' · '+((j.groups||[]).map(gl).join('、')||'普通用户');
-    document.getElementById('pInfo').innerHTML=
-      '<div class="info-cell"><div class="k">登录账号</div><div class="v">'+esc(j.user)+'</div></div>'+
-      '<div class="info-cell"><div class="k">角色</div><div class="v">'+(j.groups&&j.groups.length?j.groups.map(g=>esc(gl(g))).join('、'):'—')+'</div></div>'+
-      '<div class="info-cell"><div class="k">所属组织</div><div class="v">'+esc(tl(j.tenant))+'</div></div>'+
-      '<div class="info-cell"><div class="k">登录方式</div><div class="v">'+tag('账号密码','info')+'</div></div>';
+    const cell=(k,v)=>E('div',{className:'info-cell'},[E('div',{className:'k',text:k}),
+      E('div',{className:'v'},v instanceof Node?v:document.createTextNode(String(v)))]);
+    document.getElementById('pInfo').replaceChildren(
+      cell('登录账号',j.user),
+      cell('角色',j.groups&&j.groups.length?j.groups.map(gl).join('、'):'—'),
+      cell('所属组织',tl(j.tenant)),
+      cell('登录方式',htmlNodes(tag('账号密码','info'))[0]||document.createTextNode('账号密码'))
+    );
 
     // 令牌有效期：从本地 access token 解析 exp，展示剩余时间与进度条
     const tok=WrkAuth.getAccess();const c=tok?parseJwt(tok):null;
@@ -97,15 +106,16 @@ async function loadProfile(){
       const remain=Math.max(0,c.exp-Math.floor(Date.now()/1000));
       const iat=c.iat||(c.exp-remain),total=Math.max(1,c.exp-iat),pct=Math.min(100,Math.round(remain/total*100));
       const mm=Math.floor(remain/60),ss=remain%60;
-      document.getElementById('pToken').innerHTML=
-        '<div class="info-cell" style="grid-column:1/-1"><div class="k">本次登录剩余时间</div>'+
-        '<div class="v">'+mm+' 分 '+String(ss).padStart(2,'0')+' 秒</div>'+
-        '<div class="token-bar"><i style="width:'+pct+'%"></i></div>'+
-        '<div class="k" style="margin-top:8px">到期前会自动续期，无需重新登录</div></div>';
+      document.getElementById('pToken').replaceChildren(
+        E('div',{className:'info-cell',attrs:{style:'grid-column:1/-1'}},[
+          E('div',{className:'k',text:'本次登录剩余时间'}),
+          E('div',{className:'v',text:mm+' 分 '+String(ss).padStart(2,'0')+' 秒'}),
+          E('div',{className:'token-bar'},E('i',{attrs:{style:'width:'+pct+'%'}})),
+          E('div',{className:'k',text:'到期前会自动续期，无需重新登录',attrs:{style:'margin-top:8px'}})]));
     }else{
-      document.getElementById('pToken').innerHTML='<div class="info-cell" style="grid-column:1/-1"><div class="v">未获取到令牌信息</div></div>';
+      document.getElementById('pToken').replaceChildren(E('div',{className:'info-cell',attrs:{style:'grid-column:1/-1'}},E('div',{className:'v',text:'未获取到令牌信息'})));
     }
-  }catch(e){document.getElementById('pInfo').innerHTML='<div class="empty">加载失败</div>'}
+  }catch(e){document.getElementById('pInfo').replaceChildren(E('div',{className:'empty',text:'加载失败'}))}
 }
 
 // 点击「修改密码」才弹出全局自定义弹框，表单只在弹框内存在

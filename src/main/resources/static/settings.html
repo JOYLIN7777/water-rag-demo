@@ -46,6 +46,12 @@
 <script src="assets/ui.js"></script>
 <script src="assets/app.js"></script>
 <script>
+const E=window.UI.el;
+function htmlNodes(html){
+  const body=new DOMParser().parseFromString('<body>'+String(html||'')+'</body>','text/html').documentElement.querySelector('body');
+  return body?Array.from(body.childNodes):[];
+}
+
 function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 const ICONS={
   search:'<circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>',
@@ -64,13 +70,14 @@ async function renderSettings(){
     if(s.perm&&window.Shell&&Shell.hasPermission)return Shell.hasPermission(s.perm);
     return true;
   });
-  document.getElementById('settingGrid').innerHTML=visible.length?visible.map(s=>
-    '<a class="setting-card" href="'+s.href+'">'+
-      '<span class="setting-icon">'+icon(s.icon)+'</span>'+
-      '<span class="setting-text"><span class="setting-name">'+esc(s.label)+'</span>'+
-      '<span class="setting-desc">'+esc(s.desc)+'</span>'+
-      '<span class="setting-go">进入功能</span></span></a>').join('')
-    :'<div class="card"><div class="empty-inline">当前账号暂无可使用的设置项</div></div>';
+  document.getElementById('settingGrid').replaceChildren(...(visible.length?visible.map(s=>{
+    const card=E('a',{className:'setting-card',attrs:{href:s.href}});
+    const ic=E('span',{className:'setting-icon'});ic.append(...htmlNodes(icon(s.icon)));
+    card.append(ic,E('span',{className:'setting-text'},[
+      E('span',{className:'setting-name',text:s.label}),E('span',{className:'setting-desc',text:s.desc}),
+      E('span',{className:'setting-go',text:'进入功能'})]));
+    return card;
+  }):[E('div',{className:'card'},E('div',{className:'empty-inline',text:'当前账号暂无可使用的设置项'}))]));
 }
 
 initShell('settings');

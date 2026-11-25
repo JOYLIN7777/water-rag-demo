@@ -111,6 +111,12 @@
 <script src="assets/ui.js"></script>
 <script src="assets/app.js"></script>
 <script>
+const E=window.UI.el;
+// 存量渲染器产出 HTML 字符串，统一用 DOMParser 解析为节点再挂载（不直接写 innerHTML）
+function htmlNodes(html){
+  const body=new DOMParser().parseFromString('<body>'+String(html||'')+'</body>','text/html').documentElement.querySelector('body');
+  return body?Array.from(body.childNodes):[];
+}
 let docs=[];
 function escapeHtml(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 // 后端返回的扩展名按用途分组展示，避免只显示 6 个让用户误以为支持得少
@@ -136,7 +142,8 @@ async function loadFormats(){
     const rest=all.filter(e=>!used.has(e));
     const extra=rest.length?'<div><div class="fmt-group-title">其他</div><div class="fmt-list">'+
       rest.map(e=>'<span class="fmt">'+e.toUpperCase()+'</span>').join('')+'</div></div>':'';
-    document.getElementById('fmtGroups').innerHTML=html+extra;
+    const host=document.getElementById('fmtGroups');
+    host.replaceChildren(...htmlNodes(html+extra));
   }catch(e){document.getElementById('fmtTotal').textContent='加载失败'}
 }
 // 后端时间是带纳秒的 ISO 字符串，JS Date 解析不了，截到毫秒
@@ -162,7 +169,7 @@ async function loadDocs(){
     const latest=docs.map(d=>d.uploadedAt||'').sort().pop();
     document.getElementById('statLatest').textContent=latest?fmtTime(latest):'-';
     document.getElementById('docCount').textContent='共 '+docs.length+' 份文档';
-  }catch(e){tbody.innerHTML='<tr><td colspan="5" class="empty">加载失败：'+escapeHtml(e.message)+'</td></tr>'}
+  }catch(e){tbody.replaceChildren(UI.createEmptyRow({text:'加载失败：'+e.message,colspan:5}))}
 }
 
 // ---------- 分页：每页 10 条，搜索/删除/上传后都回到第 1 页（搜索结果实时过滤联动） ----------
@@ -191,19 +198,24 @@ function render(){
   if(pageCur>totalPages)pageCur=totalPages;
   const myOrg=(Shell.getCurrentUser()||{}).tenant||'';
   if(!list.length){
-    tbody.innerHTML='<tr><td colspan="5" class="empty">'+(kw?'无匹配文档':(window.__docCanWrite?'知识库暂无文档，先上传一份吧':'知识库暂无文档'))+'</td></tr>';
+    tbody.replaceChildren(UI.createEmptyRow({text:kw?'无匹配文档':(window.__docCanWrite?'知识库暂无文档，先上传一份吧':'知识库暂无文档'),colspan:5}));
     pager.style.display='none';return;
   }
   const start=(pageCur-1)*PAGE_SIZE;
   const slice=list.slice(start,start+PAGE_SIZE);
-  tbody.innerHTML='';
+  tbody.replaceChildren();
   slice.forEach(d=>{
     const tr=document.createElement('tr');
-    tr.innerHTML='<td class="doc-name" title="'+escapeHtml(d.fileName)+'">'+escapeHtml(d.fileName)+'</td>'+
-      '<td>'+scopeBadge(d,myOrg)+'</td>'+
-      '<td><span class="tag">'+d.chunks+' 片</span></td><td>'+fmtTime(d.uploadedAt)+'</td>'+
-      '<td><button class="btn btn-sm btn-chunks" data-perm="doc:chunks">查看分片</button>'+
-      (window.__docCanDelete?'<button class="btn btn-sm btn-danger" data-perm="doc:delete" style="margin-left:6px">删除</button>':'')+'</td>';
+    const nameCell=E('td',{className:'doc-name',title:d.fileName,text:d.fileName});
+    const scopeCell=E('td');scopeCell.append(...htmlNodes(scopeBadge(d,myOrg)));
+    tr.append(nameCell,scopeCell,
+      E('td',{},UI.createTag(d.chunks+' 片')),
+      E('td',{text:fmtTime(d.uploadedAt)}),
+      E('td',{},
+        E('button',{className:'btn btn-sm btn-chunks',type:'button',text:'查看分片',dataset:{perm:'doc:chunks'}}),
+        ...(window.__docCanDelete?[E('button',{className:'btn btn-sm btn-danger',type:'button',text:'删除',
+          dataset:{perm:'doc:delete'},attrs:{style:'margin-left:6px'}})]:[])
+      ));
     tr.querySelector('.btn-chunks').onclick=()=>Shell.showChunks(d.fileName);
     const del=tr.querySelector('.btn-danger');if(del)del.onclick=()=>delDoc(d);
     tbody.appendChild(tr);
@@ -215,17 +227,18 @@ function render(){
     else if(nums[nums.length-1]!=='…')nums.push('…');
   }
   pager.style.display='flex';
-  pager.innerHTML='<span>共 '+list.length+' 份 · 第 '+pageCur+'/'+totalPages+' 页</span>'+
-    '<button '+(pageCur<=1?'disabled':'')+' data-go="1">«</button>'+
-    '<button '+(pageCur<=1?'disabled':'')+' data-go="'+(pageCur-1)+'">‹</button>'+
-    nums.map(p=>p==='…'?'<span style="padding:0 2px">…</span>':
-      '<button class="'+(p===pageCur?'cur':'')+'" data-go="'+p+'">'+p+'</button>').join('')+
-    '<button '+(pageCur>=totalPages?'disabled':'')+' data-go="'+(pageCur+1)+'">›</button>'+
-    '<button '+(pageCur>=totalPages?'disabled':'')+' data-go="'+totalPages+'">»</button>'+
-    '<span style="display:inline-flex;align-items:center;gap:4px;margin-left:8px">跳至 '+
-    '<input type="number" min="1" max="'+totalPages+'" value="'+pageCur+'" id="pageJump" '+
-    'style="width:46px;padding:4px 6px;font-size:12px;border:1px solid var(--line);border-radius:6px;text-align:center">'+
-    ' 页</span>';
+  const pagerNodes=[E('span',{text:'共 '+list.length+' 份 · 第 '+pageCur+'/'+totalPages+' 页'}),
+    E('button',{type:'button',text:'«',dataset:{go:'1'},disabled:pageCur<=1}),
+    E('button',{type:'button',text:'‹',dataset:{go:String(pageCur-1)},disabled:pageCur<=1}),
+    ...nums.map(p=>p==='…'?E('span',{text:'…',attrs:{style:'padding:0 2px'}}):
+      E('button',{type:'button',text:String(p),className:p===pageCur?'cur':'',dataset:{go:String(p)}})),
+    E('button',{type:'button',text:'›',dataset:{go:String(pageCur+1)},disabled:pageCur>=totalPages}),
+    E('button',{type:'button',text:'»',dataset:{go:String(totalPages)},disabled:pageCur>=totalPages})];
+  const jumpInput=E('input',{attrs:{type:'number',min:'1',max:String(totalPages),value:String(pageCur),
+    id:'pageJump',style:'width:46px;padding:4px 6px;font-size:12px;border:1px solid var(--line);border-radius:6px;text-align:center'}});
+  pagerNodes.push(E('span',{attrs:{style:'display:inline-flex;align-items:center;gap:4px;margin-left:8px'}},[
+    document.createTextNode('跳至 '),jumpInput,document.createTextNode(' 页')]));
+  pager.replaceChildren(...pagerNodes);
   pager.querySelectorAll('button[data-go]').forEach(b=>{
     b.onclick=()=>{pageCur=Number(b.dataset.go);render()};
   });
@@ -324,10 +337,13 @@ loadFormats();
     const sub=main.querySelector('.topbar-sub');if(sub)sub.style.display='';
     const bar=document.createElement('div');
     bar.className='card';bar.style.cssText='margin:auto;max-width:520px;padding:36px;text-align:center';
-    bar.innerHTML='<div style="font-size:34px;margin-bottom:12px">🔒</div>'+
-      '<div style="font-size:15px;font-weight:650;margin-bottom:8px">没有使用权限</div>'+
-      '<div style="font-size:13px;color:#6b7a99;line-height:1.7">当前账号未被授予「知识库文档」的使用权限。<br>如需使用，请联系管理员在「菜单权限」中为你的角色勾选该功能。</div>'+
-      '<a href="index.html" style="display:inline-block;margin-top:18px;color:var(--primary,#3b6ef5);text-decoration:none;font-size:13px">← 返回智能问答</a>';
+    bar.replaceChildren(
+      E('div',{text:'🔒',attrs:{style:'font-size:34px;margin-bottom:12px'}}),
+      E('div',{text:'没有使用权限',attrs:{style:'font-size:15px;font-weight:650;margin-bottom:8px'}}),
+      E('div',{attrs:{style:'font-size:13px;color:#6b7a99;line-height:1.7'}},[
+        document.createTextNode('当前账号未被授予「知识库文档」的使用权限。'),E('br'),
+        document.createTextNode('如需使用，请联系管理员在「菜单权限」中为你的角色勾选该功能。')]),
+      E('a',{text:'← 返回智能问答',attrs:{href:'index.html',style:'display:inline-block;margin-top:18px;color:var(--primary,#3b6ef5);text-decoration:none;font-size:13px'}}));
     main.insertBefore(bar,main.firstChild);
   }
 })();

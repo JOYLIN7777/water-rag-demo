@@ -97,6 +97,12 @@
 <script src="assets/ui.js"></script>
 <script src="assets/app.js"></script>
 <script>
+const E=window.UI.el;
+function htmlNodes(html){
+  const body=new DOMParser().parseFromString('<body>'+String(html||'')+'</body>','text/html').documentElement.querySelector('body');
+  return body?Array.from(body.childNodes):[];
+}
+
 let treeData=null,selectedId=null;
 function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 function sid(){return document.getElementById('sid').value.trim()}
@@ -121,13 +127,15 @@ function buildTree(nodes,parentId,depth,out){
   });
 }
 function renderTree(){
-  if(!treeData||!treeData.nodes.length){document.getElementById('tree').innerHTML='<div class="empty">该会话还没有消息</div>';return}
+  if(!treeData||!treeData.nodes.length){document.getElementById('tree').replaceChildren(E('div',{className:'empty',text:'该会话还没有消息'}));return}
   const out=[];buildTree(treeData.nodes,'root',0,out);
-  document.getElementById('tree').innerHTML=out.join('');
+  document.getElementById('tree').replaceChildren(...out.flatMap(htmlNodes));
   document.getElementById('stat').textContent=treeData.nodes.length+' 个节点 · '+Object.keys(treeData.branches||{}).length+' 个命名分支';
   const bl=document.getElementById('branchList');
   const entries=Object.entries(treeData.branches||{});
-  bl.innerHTML=entries.length?entries.map(([name,id])=>esc(name)+'（'+esc(id.slice(0,8))+'）').join('<br>'):'（暂无命名分支）';
+  bl.replaceChildren(...(entries.length?entries.flatMap(([name,id],i)=>
+    i?[E('br'),document.createTextNode(name+'（'+id.slice(0,8)+'）')]:[document.createTextNode(name+'（'+id.slice(0,8)+'）')])
+    :[document.createTextNode('（暂无命名分支）')]));
   const hint=selectedId?('选中节点：'+selectedId.slice(0,8)+(selectedId===treeData.head?'（当前）':'')):('当前位置：'+(treeData.head?treeData.head.slice(0,8):'根'));
   document.getElementById('selHint').textContent=hint;
 }
@@ -186,10 +194,13 @@ initShell('settings');
     const sub=main.querySelector('.topbar-sub');if(sub)sub.style.display='';
     const bar=document.createElement('div');
     bar.className='card';bar.style.cssText='margin:auto;max-width:520px;padding:36px;text-align:center';
-    bar.innerHTML='<div style="font-size:34px;margin-bottom:12px">🔒</div>'+
-      '<div style="font-size:15px;font-weight:650;margin-bottom:8px">没有使用权限</div>'+
-      '<div style="font-size:13px;color:#6b7a99;line-height:1.7">当前账号未被授予「问答分支」的使用权限。<br>如需使用，请联系管理员在「菜单权限」中为你的角色勾选该功能。</div>'+
-      '<a href="index.html" style="display:inline-block;margin-top:18px;color:var(--primary,#3b6ef5);text-decoration:none;font-size:13px">← 返回智能问答</a>';
+    bar.replaceChildren(
+      E('div',{text:'🔒',attrs:{style:'font-size:34px;margin-bottom:12px'}}),
+      E('div',{text:'没有使用权限',attrs:{style:'font-size:15px;font-weight:650;margin-bottom:8px'}}),
+      E('div',{attrs:{style:'font-size:13px;color:#6b7a99;line-height:1.7'}},[
+        document.createTextNode('当前账号未被授予「问答分支」的使用权限。'),E('br'),
+        document.createTextNode('如需使用，请联系管理员在「菜单权限」中为你的角色勾选该功能。')]),
+      E('a',{text:'← 返回智能问答',attrs:{href:'index.html',style:'display:inline-block;margin-top:18px;color:var(--primary,#3b6ef5);text-decoration:none;font-size:13px'}}));
     main.insertBefore(bar,main.firstChild);
   }
 })();

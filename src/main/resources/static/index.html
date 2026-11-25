@@ -247,6 +247,13 @@
 <script src="assets/ui.js"></script>
 <script src="assets/app.js"></script>
 <script>
+const E=window.UI.el;
+// 富文本渲染器（msgHtml/renderMarkdown/usageInner）产出 HTML 字符串，
+// 统一走 DOMParser 解析成节点再挂载，避免直接给 innerHTML 赋值。
+function htmlNodes(html){
+  const frag=new DOMParser().parseFromString('<body>'+String(html||'')+'</body>','text/html').documentElement.querySelector('body');
+  return frag?Array.from(frag.childNodes):[];
+}
 let sessions=[],currentId='',messages=[];
 // ===== 多会话并发生成与终止 =====
 // 忙碌状态按会话隔离：A 会话在跑时切到 B 照样提问，两个回答并行推进。
@@ -261,7 +268,9 @@ function syncSendBtn(){
   const busy=isBusy(currentId);
   btn.dataset.busy=busy?'1':'';
   btn.classList.toggle('stop',busy);
-  btn.innerHTML=busy?'<span class="stop-ico"></span>停止生成':'发送 <span style="opacity:.75">↵</span>';
+  btn.replaceChildren(...(busy
+    ? [E('span',{className:'stop-ico'}),document.createTextNode('停止生成')]
+    : [document.createTextNode('发送 '),E('span',{text:'↵',attrs:{style:'opacity:.75'}})]));
 }
 function sendOrStop(){if(isBusy(currentId))stopGenerate();else send()}
 function stopGenerate(){
@@ -394,11 +403,12 @@ function switchSession(id){
 async function refreshBranchNote(id){
   const el=document.getElementById('branchNote');
   if(!el)return;
-  el.style.display='none';el.innerHTML='';
+  el.style.display='none';el.replaceChildren();
   // 服务端没有历史、画面显示的是本机缓存：这条提示比"另有分支"更要紧，先报它
   if(missingHistoryId===id){
-    el.innerHTML='<span>ⓘ</span><span>服务端没有这个会话的消息记录，下面显示的是本机缓存；'+
-      '继续提问会从这一轮起重建立对话树（旧记录不会再回到服务端）</span>';
+    el.replaceChildren(E('span',{text:'ⓘ'}),E('span',{
+      text:'服务端没有这个会话的消息记录，下面显示的是本机缓存；继续提问会从这一轮起重建立对话树（旧记录不会再回到服务端）'
+    }));
     el.style.display='';
     return;
   }
@@ -420,17 +430,22 @@ async function refreshBranchNote(id){
     const lastUser=allUsers.length?allUsers[allUsers.length-1]:null;
     const lastAnswer=lastUser?nodes.find(n=>n&&n.role==='assistant'&&n.parentId===lastUser.id):null;
     const atLatest=!!(lastUser&&chain.has(lastUser.id));
-    el.innerHTML='<span>⑃</span><span>这条会话还有 <b>'+items.length+'</b> 条历史提问，点开可查看当时的回答</span>'+
-      '<a id="branchToggle">查看 →</a>'+
-      (atLatest?'':'<a class="branch-back" id="branchBack">回到最新 →</a>')+
-      '<div class="branch-list" id="branchList">'+
-        '<div class="branch-lead">选一条查看当时的完整对话</div>'+
-        items.map((it,i)=>
-          '<div class="branch-item"><div class="bi-tag">历史提问 '+(i+1)+'</div>'+
-          '<div class="bi-q">问：'+escapeHtml(String(it.q.content||'').slice(0,160))+'</div>'+
-          '<div class="bi-a"><b>答：</b>'+(it.a?escapeHtml(String(it.a.content||'').slice(0,110)):'当时没有回答')+'</div>'+
-          '<button onclick="switchBranch(\''+escapeHtml((it.a&&it.a.id)||it.q.id)+'\')">查看这次对话 →</button></div>').join('')+
-      '</div>';
+    const tip=E('span',{},[document.createTextNode('这条会话还有 '),E('b',{text:String(items.length)}),
+      document.createTextNode(' 条历史提问，点开可查看当时的回答')]);
+    const branchList=E('div',{className:'branch-list',id:'branchList'},
+      E('div',{className:'branch-lead',text:'选一条查看当时的完整对话'}));
+    items.forEach((it,i)=>{
+      const bid=(it.a&&it.a.id)||it.q.id;
+      branchList.append(E('div',{className:'branch-item'},[
+        E('div',{className:'bi-tag',text:'历史提问 '+(i+1)}),
+        E('div',{className:'bi-q',text:'问：'+String(it.q.content||'').slice(0,160)}),
+        E('div',{className:'bi-a'},[E('b',{text:'答：'}),document.createTextNode(
+          it.a?String(it.a.content||'').slice(0,110):'当时没有回答')]),
+        E('button',{type:'button',text:'查看这次对话 →',on:{click:()=>switchBranch(bid)}})
+      ]));
+    });
+    el.replaceChildren(E('span',{text:'⑃'}),tip,E('a',{id:'branchToggle',text:'查看 →'}),
+      ...(atLatest?[]:[E('a',{className:'branch-back',id:'branchBack',text:'回到最新 →'})]),branchList);
     el.style.display='';
     const list=document.getElementById('branchList');
     document.getElementById('branchToggle').onclick=function(){
@@ -651,7 +666,7 @@ function renderMessages(){
   const has=messages.length>0;
   welcome.style.display=has?'none':'block';
   box.style.display=has?'block':'none';
-  box.innerHTML=has?messages.map(msgHtml).join(''):'';
+  box.replaceChildren(...(has?messages.flatMap(msgHtml).flatMap(htmlNodes):[]));
   // 引用区在重建后也要填充（用 dataset 去重，不会重复写）
   if(has)messages.forEach((m,i)=>{
     if(m.role==='assistant'){
@@ -698,10 +713,9 @@ async function loadSuggestions(){
     if(r.ok)list=await r.json();
   }catch(e){}
   if(!Array.isArray(list)||!list.length){list=defaults;if(tip)tip.textContent='点击示例可填入输入框，改完再发送'}
-  if(box)box.innerHTML=list.slice(0,4).map(q=>{
-    const t=String(q).replace(/"/g,'&quot;').replace(/</g,'&lt;');
-    return '<button class="quick-item" onclick="fillAsk(this.textContent)">'+t+'</button>';
-  }).join('');
+  if(box)box.replaceChildren(...list.slice(0,4).map(q=>
+    E('button',{className:'quick-item',type:'button',text:String(q),
+      on:{click:()=>fillAsk(q)}})));
 }
 loadSuggestions();
 
@@ -817,20 +831,27 @@ function patchCites(card,m,i){
   if(zone.dataset.g===gkey)return;        // 分组没变化就不重绘，避免闪烁
   zone.dataset.g=gkey;
   const cnt=card.querySelector('.ai-cite-count');
-  if(!src.length){zone.innerHTML='';if(cnt)cnt.style.display='none';return}
+  if(!src.length){zone.replaceChildren();if(cnt)cnt.style.display='none';return}
   if(cnt){cnt.style.display='';cnt.textContent='▤ '+groups.size+' 篇'}
   let num=0;
   const chips=[],previews=[];
   groups.forEach((segs,name)=>{
     const g=++num;
-    chips.push('<span class="cite-chip" onclick="toggleCite('+i+','+g+')" title="展开该文档的 '+segs.length+' 个引用片段">'+
-      '<span class="cite-num">'+g+'</span><span class="cite-file">'+escapeHtml(name)+'</span>'+
-      (segs.length>1?'<span class="cite-multi">'+segs.length+'段</span>':'')+'</span>');
-    const list=segs.map(s=>'<div class="cite-seg"><span class="cite-seg-no">第'+(Number(s.chunkIndex)+1)+'段</span>'+
-      escapeHtml(s.preview||'')+'</div>').join('');
-    previews.push('<div class="cite-preview" id="cite-p-'+i+'-'+g+'">'+list+'</div>');
+    const chip=E('span',{className:'cite-chip',title:'展开该文档的 '+segs.length+' 个引用片段',
+      on:{click:()=>toggleCite(i,g)}},[
+      E('span',{className:'cite-num',text:String(g)}),
+      E('span',{className:'cite-file',text:name})
+    ]);
+    if(segs.length>1)chip.append(E('span',{className:'cite-multi',text:segs.length+'段'}));
+    chips.push(chip);
+    const list=E('div',{className:'cite-preview',id:'cite-p-'+i+'-'+g});
+    segs.forEach(s=>list.append(E('div',{className:'cite-seg'},[
+      E('span',{className:'cite-seg-no',text:'第'+(Number(s.chunkIndex)+1)+'段'}),
+      document.createTextNode(s.preview||'')
+    ])));
+    previews.push(list);
   });
-  zone.innerHTML='<div class="cite-row">'+chips.join('')+'</div>'+previews.join('');
+  zone.replaceChildren(E('div',{className:'cite-row'},chips),...previews);
 }
 // 流式增量：只更新最后一条 AI 卡片的正文与引用，【绝不重建整列】，因此不会闪。
 function patchStreaming(){
@@ -839,7 +860,7 @@ function patchStreaming(){
   const m=messages[messages.length-1];
   if(!card||!m||m.role!=='assistant')return;
   const body=card.querySelector('.ai-card-body');
-  if(body)body.innerHTML=renderMarkdown(m.content)+'<span class="cursor"></span>';
+  if(body)body.replaceChildren(...htmlNodes(renderMarkdown(m.content)),E('span',{className:'cursor'}));
   patchCites(card,m,messages.length-1);
 }
 // 回答结束：只做收尾节点修改，不重建 DOM
@@ -856,7 +877,7 @@ function finalizeCard(){
   const m=messages[messages.length-1];
   const us=card.querySelector('.ai-usage');
   if(us){
-    if(m&&m.usage){us.innerHTML=usageInner(m.usage);us.title=usageTip(m.usage);us.style.display=''}
+    if(m&&m.usage){us.replaceChildren(...htmlNodes(usageInner(m.usage)));us.title=usageTip(m.usage);us.style.display=''}
     else{us.style.display='none'}
   }
 }
@@ -1054,9 +1075,15 @@ initShell('index');       // 渲染全站统一侧栏 + 服务探活 + 触发一
   const composer=main.querySelector('.composer-wrap');if(composer)composer.style.display='none';
   const bar=document.createElement('div');
   bar.className='card';bar.style.cssText='margin:auto;max-width:520px;padding:36px;text-align:center';
-  bar.innerHTML='<div style="font-size:34px;margin-bottom:12px">🔒</div>'+
-    '<div style="font-size:15px;font-weight:650;margin-bottom:8px">没有使用权限</div>'+
-    '<div style="font-size:13px;color:#6b7a99;line-height:1.7">当前账号未被授予「智能问答」的使用权限。<br>如需使用，请联系管理员为你的角色勾选该功能。</div>';
+  bar.replaceChildren(
+    E('div',{text:'🔒',attrs:{style:'font-size:34px;margin-bottom:12px'}}),
+    E('div',{text:'没有使用权限',attrs:{style:'font-size:15px;font-weight:650;margin-bottom:8px'}}),
+    E('div',{attrs:{style:'font-size:13px;color:#6b7a99;line-height:1.7'}},[
+      document.createTextNode('当前账号未被授予「智能问答」的使用权限。'),
+      E('br'),
+      document.createTextNode('如需使用，请联系管理员为你的角色勾选该功能。')
+    ])
+  );
   main.appendChild(bar);
 })();
 // 先等清单（最多 1.5 秒），再初始化会话；网络慢就直接用本地缓存往下走

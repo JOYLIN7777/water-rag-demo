@@ -62,6 +62,12 @@
 <script src="assets/ui.js"></script>
 <script src="assets/app.js"></script>
 <script>
+const E=window.UI.el;
+function htmlNodes(html){
+  const body=new DOMParser().parseFromString('<body>'+String(html||'')+'</body>','text/html').documentElement.querySelector('body');
+  return body?Array.from(body.childNodes):[];
+}
+
 function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 function headers(){
   const u=(window.WrkAuth&&WrkAuth.getUser())||null;
@@ -69,17 +75,22 @@ function headers(){
 }
 function render(id,hits,label){
   const el=document.getElementById(id);
-  if(!hits||!hits.length){el.innerHTML='<div class="empty">暂无匹配结果</div>';return}
-  el.innerHTML=hits.map(h=>'<div class="hit"><div class="meta"><span>'+esc(h.file)+' · 第'+(Number(h.chunk)+1)+'段</span><span class="score">'+label+' '+(h.score||0).toFixed(4)+'</span></div><div class="text">'+esc(h.text)+'</div></div>').join('');
+  if(!hits||!hits.length){el.replaceChildren(E('div',{className:'empty',text:'暂无匹配结果'}));return}
+  el.replaceChildren(...hits.map(h=>E('div',{className:'hit'},[
+    E('div',{className:'meta'},[
+      E('span',{text:h.file+' · 第'+(Number(h.chunk)+1)+'段'}),
+      E('span',{className:'score',text:label+' '+(h.score||0).toFixed(4)})]),
+    E('div',{className:'text',text:h.text})
+  ])));
 }
 async function run(){
   const q=document.getElementById('q').value.trim();if(!q)return;
-  ['bm25','knn','hybrid'].forEach(id=>document.getElementById(id).innerHTML='<div class="empty">检索中…</div>');
+  ['bm25','knn','hybrid'].forEach(id=>document.getElementById(id).replaceChildren(E('div',{className:'empty',text:'检索中…'})));
   try{
     const r=await fetch('/api/search/compare?q='+encodeURIComponent(q),{headers:headers()});
     const j=await r.json();if(!r.ok)throw new Error(j.message||('HTTP '+r.status));
     render('bm25',j.bm25,'关键词');render('knn',j.knn,'语义');render('hybrid',j.hybrid,'融合');
-  }catch(e){['bm25','knn','hybrid'].forEach(id=>document.getElementById(id).innerHTML='<div class="empty">失败：'+esc(e.message)+'</div>')}
+  }catch(e){['bm25','knn','hybrid'].forEach(id=>document.getElementById(id).replaceChildren(E('div',{className:'empty',text:'失败：'+e.message})))}
 }
 document.getElementById('q').addEventListener('keydown',e=>{if(e.key==='Enter')run()});
 initShell('settings');
@@ -97,10 +108,14 @@ initShell('settings');
     const sub=main.querySelector('.topbar-sub');if(sub)sub.style.display='';
     const bar=document.createElement('div');
     bar.className='card';bar.style.cssText='margin:auto;max-width:520px;padding:36px;text-align:center';
-    bar.innerHTML='<div style="font-size:34px;margin-bottom:12px">🔒</div>'+
-      '<div style="font-size:15px;font-weight:650;margin-bottom:8px">没有使用权限</div>'+
-      '<div style="font-size:13px;color:#6b7a99;line-height:1.7">当前账号未被授予「检索对比」的使用权限。<br>如需使用，请联系管理员在「菜单权限」中为你的角色勾选该功能。</div>'+
-      '<a href="index.html" style="display:inline-block;margin-top:18px;color:var(--primary,#3b6ef5);text-decoration:none;font-size:13px">← 返回智能问答</a>';
+    bar.replaceChildren(
+      E('div',{text:'🔒',attrs:{style:'font-size:34px;margin-bottom:12px'}}),
+      E('div',{text:'没有使用权限',attrs:{style:'font-size:15px;font-weight:650;margin-bottom:8px'}}),
+      E('div',{attrs:{style:'font-size:13px;color:#6b7a99;line-height:1.7'}},[
+        document.createTextNode('当前账号未被授予「检索对比」的使用权限。'),E('br'),
+        document.createTextNode('如需使用，请联系管理员在「菜单权限」中为你的角色勾选该功能。')]),
+      E('a',{text:'← 返回智能问答',attrs:{href:'index.html',style:'display:inline-block;margin-top:18px;color:var(--primary,#3b6ef5);text-decoration:none;font-size:13px'}})
+    );
     main.insertBefore(bar,main.firstChild);
   }
 })();
