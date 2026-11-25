@@ -79,7 +79,24 @@
     } catch (e) { return false; }
   }
 
-  const svg = name => '<svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">' + (ICONS[name] || '') + '</svg>';
+  /** 导航图标：返回 SVG DOM 节点（不再是 HTML 字符串，直接 append 即可） */
+  const svg = name => {
+    const node = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    node.setAttribute('class', 'nav-icon');
+    node.setAttribute('viewBox', '0 0 24 24');
+    node.setAttribute('fill', 'none');
+    node.setAttribute('stroke', 'currentColor');
+    node.setAttribute('stroke-width', '1.8');
+    node.setAttribute('stroke-linecap', 'round');
+    node.setAttribute('stroke-linejoin', 'round');
+    node.innerHTML = ICONS[name] || '';   // 内置静态路径常量，非用户输入
+    return node;
+  };
+  const htmlNodes = html => {
+    const body = new DOMParser().parseFromString('<body>' + String(html || '') + '</body>', 'text/html')
+      .documentElement.querySelector('body');
+    return body ? Array.from(body.childNodes) : [];
+  };
   const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c =>
     ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
@@ -98,12 +115,16 @@
     for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
     return h;
   }
+  /** 自动生成头像：返回 DOM 节点（不再是 HTML 字符串） */
   function avatar(name, size) {
     const n = String(name == null || name === '' ? '?' : name).trim();
     const ch = n.slice(0, 1).toUpperCase();
     const pair = AV_PALETTE[hashHue(n) % AV_PALETTE.length];
-    return '<span class="av av-' + (size || 'md') + '" style="background:linear-gradient(135deg,' + pair[0] + ',' + pair[1] + ')">' +
-      esc(ch) + '</span>';
+    const node = document.createElement('span');
+    node.className = 'av av-' + (size || 'md');
+    node.style.background = 'linear-gradient(135deg,' + pair[0] + ',' + pair[1] + ')';
+    node.textContent = ch;
+    return node;
   }
 
 
@@ -1285,6 +1306,8 @@
       toast('已转到后台继续解析，跑完会提示', 'ok');
     }
     if (mask) { mask.classList.remove('show'); mask.replaceChildren(); }
+    // 弹框关闭才恢复页面滚动（打开时锁住，避免滚轮穿透到背后页面）
+    document.body.classList.remove('modal-open');
     modalState = null;
     document.removeEventListener('keydown', onModalKey);
   }
@@ -1331,6 +1354,14 @@
       bodyNode, foot
     ]));
     mask.classList.add('show');
+    document.body.classList.add('modal-open');   // 锁背景滚动；关闭时由 closeModal 解锁
+    mask.onwheel = e => {
+      // 内容滚到顶/底后不让滚动继续传给 body
+      const body = mask.querySelector('.modal-body');
+      if (!body) { e.preventDefault(); return; }
+      const atTop = body.scrollTop <= 0, atBottom = body.scrollTop + body.clientHeight >= body.scrollHeight - 1;
+      if ((e.deltaY < 0 && atTop) || (e.deltaY > 0 && atBottom)) e.preventDefault();
+    };
     modalState = opts;
     mask.querySelector('.modal-close').onclick = closeModal;
     const cancelBtn = mask.querySelector('.btn-cancel');
