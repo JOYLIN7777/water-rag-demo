@@ -344,7 +344,10 @@
   try{
     if(sessionStorage.getItem('consoleNavPending')){
       var m=document.createElement('div');m.id='consoleNavMask';m.className='console-nav-mask';
-      m.innerHTML='<div class="console-nav-spinner"></div><span>正在打开页面…</span>';
+      // 首屏脚本早于组件库加载，此处用原生 DOM 构造（不依赖 UI）
+      var spin=document.createElement('div');spin.className='console-nav-spinner';
+      var tip=document.createElement('span');tip.textContent='正在打开页面…';
+      m.append(spin,tip);
       (document.body||document.documentElement).appendChild(m);
       // 兜底：任何异常都不能让用户永远卡在遮罩上
       setTimeout(function(){var x=document.getElementById('consoleNavMask');if(x)x.remove()},3000);
@@ -648,6 +651,8 @@
 <script src="assets/crypto.js"></script>
 <script>
 const $=id=>document.getElementById(id);
+// UI 组件库（assets/ui.js 先于本脚本加载）：节点构造统一走 E，禁止拼接用户数据
+const E=window.UI.el;
 function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 // 角色显示名以角色定义（后端下发的 name）为准，内置回落 Shell 映射，
 // 避免用户管理里冒出角色定义页根本没有的「运维人员」等历史硬编码
@@ -726,7 +731,7 @@ async function loadUsersData(){
     await loadOrgs();
     fillRoleFilter();
     renderUserTree();renderUserTable();renderOrgTree();renderOrgTable();renderOrgMembers();renderOrgHead();
-  }catch(e){$('uTable').innerHTML='<tr><td colspan="7" class="empty">加载失败：'+esc(e.message)+'</td></tr>'}
+  }catch(e){$('uTable').replaceChildren(UI.createEmptyRow({ text:'加载失败：'+e.message, colspan:7 }))}
   loadPasswordResets();
 }
 
@@ -1380,19 +1385,23 @@ function renderOrgHead(){
   const key=orgSel.key;
   // 面包屑每一级都能点回去（最后一级是当前位置，不再链接）
   const path=key?orgPathKeys(key):[];
-  $('oPath').innerHTML=path.length
-    ? path.map((k,i)=>'<a class="'+(i===path.length-1?'cur':'')+'" '+
-        (i===path.length-1?'':'onclick="orgPick(\''+esc(k)+'\')"')+'>'+esc(orgLabel(k))+'</a>').join('<span>/</span>')
-    : '<a class="cur">全部组织</a>';
-  const stats=[];
+  const nodes=[];
+  path.forEach((k,i)=>{
+    const last=i===path.length-1;
+    const a=E('a',{ className:last?'cur':'', text:orgLabel(k),
+      on: last?{}:{click:()=>orgPick(k)} });
+    nodes.push(a);
+    if(!last)nodes.push(E('span',{text:'/'}));
+  });
+  $('oPath').replaceChildren(...(nodes.length?nodes:[E('a',{className:'cur',text:'全部组织'})]));
+  const statNodes=[];
+  const stat=(label,value)=>E('span',{},[document.createTextNode(label+' '),E('b',{text:String(value)})]);
   if(key){
-    stats.push('标识 <b>'+esc(key)+'</b>');
-    stats.push('下级组织 <b>'+orgChildren(key).length+'</b>');
+    statNodes.push(stat('标识',key),stat('下级组织',orgChildren(key).length));
   }else{
-    stats.push('共 <b>'+(DB.orgs||[]).length+'</b> 个组织');
-    stats.push('顶层 <b>'+orgChildren('').length+'</b> 个');
+    statNodes.push(stat('共',(DB.orgs||[]).length+' 个组织'),stat('顶层',orgChildren('').length+' 个'));
   }
-  $('oStats').innerHTML=stats.join('　·　');
+  $('oStats').replaceChildren(...statNodes.flatMap((n,i)=>i?[document.createTextNode('　·　'),n]:[n]));
   const eb=$('oEditBtn');if(eb)eb.disabled=!key;
 }
 
