@@ -1412,10 +1412,17 @@
     mask.classList.add('show');
     document.body.classList.add('modal-open');   // 锁背景滚动；关闭时由 closeModal 解锁
     mask.onwheel = e => {
-      // 内容滚到顶/底后不让滚动继续传给 body
-      const body = mask.querySelector('.modal-body');
-      if (!body) { e.preventDefault(); return; }
-      const atTop = body.scrollTop <= 0, atBottom = body.scrollTop + body.clientHeight >= body.scrollHeight - 1;
+      // 找鼠标所在位置最近的真实可滚动祖先（可能是 .modal-body，也可能是内部 .perm-tree 等）
+      // 只有该容器已经滚到边界才阻止默认行为，否则会让弹框内部完全无法滚动。
+      let node = e.target instanceof Node ? e.target : null;
+      let scroller = null;
+      while (node && node !== mask) {
+        if (node.scrollHeight > node.clientHeight + 1) { scroller = node; break; }
+        node = node.parentElement;
+      }
+      if (!scroller) { e.preventDefault(); return; }  // 弹框内容本身不滚时，别滚到背景页
+      const atTop = scroller.scrollTop <= 0;
+      const atBottom = scroller.scrollTop + scroller.clientHeight >= scroller.scrollHeight - 1;
       if ((e.deltaY < 0 && atTop) || (e.deltaY > 0 && atBottom)) e.preventDefault();
     };
     modalState = opts;
