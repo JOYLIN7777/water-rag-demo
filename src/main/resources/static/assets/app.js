@@ -5,6 +5,10 @@
    首页问答逻辑通过 Shell.onSessionChange 钩子感知会话切换。
    =================================================================== */
 (function (global) {
+  // UI 组件库（assets/ui.js 先于本脚本同步加载）：所有节点构造走 UI.el，禁止 innerHTML 拼接用户数据
+  const UI = global.UI;
+  if (!UI) throw new Error('[Shell] 缺少 assets/ui.js，请先引入 UI 组件库');
+  const E = UI.el;
   // ---------- 图标 ----------
   const ICONS = {
     chat: '<path d="M21 11.5a8.4 8.4 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.4 8.4 0 0 1-3.8-.9L3 21l1.9-5.7a8.4 8.4 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.4 8.4 0 0 1 3.8-.9h.5a8.5 8.5 0 0 1 8 8v.5z"/>',
@@ -232,10 +236,11 @@
     if (!href || document.getElementById('consoleNavMask')) return;
     // 标记带到新文档：旧页面的遮罩会随文档销毁，新页面必须在 head 第一帧自己盖住白屏
     try { sessionStorage.setItem('consoleNavPending', href); } catch (e) { }
-    const mask = document.createElement('div');
+    const mask = E('div', { className: 'console-nav-mask' }, [
+      E('div', { className: 'console-nav-spinner' }),
+      E('span', { text: '正在打开页面…' })
+    ]);
     mask.id = 'consoleNavMask';
-    mask.className = 'console-nav-mask';
-    mask.innerHTML = '<div class="console-nav-spinner"></div><span>正在打开页面…</span>';
     document.body.appendChild(mask);
     requestAnimationFrame(function () {
       setTimeout(function () { location.href = href; }, 90);
@@ -362,19 +367,26 @@
     const el = document.getElementById('sessionList');
     if (!el) return;
     const list = loadSessions().slice().sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
-    if (!list.length) { el.innerHTML = '<div class="session-empty">暂无会话，点击上方新建</div>'; return; }
-    el.innerHTML = list.map(s => {
+    if (!list.length) {
+      el.replaceChildren(E('div', { className: 'session-empty', text: '暂无会话，点击上方新建' }));
+      return;
+    }
+    const items = list.map(s => {
       const short = String(s.id || '').startsWith('session-') ? s.id.slice(8, 14) : String(s.id || '').slice(0, 8);
-      return '<div class="session-item' + (s.id === currentSessionId ? ' active' : '') + '" data-sid="' + esc(s.id) + '" title="' + esc(s.title || '') + '">' +
-        '<span class="session-name">' + esc(s.title || ('会话 ' + short)) + '</span>' +
-        '<span class="session-time">' + esc(fmtTime(s.updatedAt)) + '</span>' +
-        '<button class="session-delete" title="删除会话">×</button></div>';
-    }).join('');
-    el.querySelectorAll('.session-item').forEach(item => {
-      const id = item.getAttribute('data-sid');
-      item.onclick = () => pickSession(id);
-      item.querySelector('.session-delete').onclick = ev => removeSession(id, ev);
+      const item = E('div', {
+        className: 'session-item' + (s.id === currentSessionId ? ' active' : ''),
+        dataset: { sid: String(s.id || '') }, title: s.title || ''
+      }, [
+        E('span', { className: 'session-name', text: s.title || ('会话 ' + short) }),
+        E('span', { className: 'session-time', text: fmtTime(s.updatedAt) }),
+        E('button', { className: 'session-delete', type: 'button', title: '删除会话', text: '×' })
+      ]);
+      item.addEventListener('click', () => pickSession(String(s.id || '')));
+      const del = item.querySelector('.session-delete');
+      del.addEventListener('click', ev => { ev.stopPropagation(); removeSession(String(s.id || ''), ev); });
+      return item;
     });
+    el.replaceChildren(...items);
   }
 
   // ---------- 上传折叠区 ----------
@@ -708,9 +720,13 @@
     const dt = document.getElementById('pickDone');
     if (dt && job.token === pickState) {
       dt.className = 'pick-done-tip show';
-      dt.innerHTML = (done ? '✓ ' : '') + '完成：成功 <b>' + done + '</b> 个' +
-        (fail ? '，失败 <b style="color:var(--danger)">' + fail + '</b> 个（鼠标悬停可看原因）' : '') +
-        (done ? '。文档已入库，现在可以提问了。' : '。没有文档入库，请按失败原因处理后重试。');
+      dt.replaceChildren(
+        document.createTextNode((done ? '✓ ' : '') + '完成：成功 '),
+        E('b', { text: String(done) }),
+        document.createTextNode(' 个' + (fail ? '，失败 ' : '')),
+        ...(fail ? [E('b', { className: 'danger-text', text: String(fail) }), document.createTextNode(' 个（鼠标悬停可看原因）')] : []),
+        document.createTextNode(done ? '。文档已入库，现在可以提问了。' : '。没有文档入库，请按失败原因处理后重试。')
+      );
       if (okBtn) { okBtn.disabled = false; okBtn.textContent = '完成'; }
       if (cancelBtn) cancelBtn.disabled = false;
       const t2 = document.querySelector('#appModal .modal-title');
@@ -778,30 +794,40 @@
   function renderChunkTree(fileName, chunks, err, totalCount, truncated) {
     const box = document.querySelector('#appModal .modal-body');
     if (!box) return;
-    if (err) { box.innerHTML = '<div class="chunk-empty">加载失败：' + esc(err) + '</div>'; return; }
-    if (!chunks || !chunks.length) { box.innerHTML = '<div class="chunk-empty">这份文档还没有可预览的分片</div>'; return; }
+    if (err) { box.replaceChildren(E('div', { className: 'chunk-empty', text: '加载失败：' + err })); return; }
+    if (!chunks || !chunks.length) { box.replaceChildren(E('div', { className: 'chunk-empty', text: '这份文档还没有可预览的分片' })); return; }
     const total = chunks.reduce(function (s, c) { return s + String(c.content || '').length; }, 0);
     const realTotal = totalCount || chunks.length;
-    box.innerHTML = '<div class="chunk-tree">' +
-      '<div class="chunk-root"><span class="cf-name" title="' + esc(fileName) + '">' + esc(fileName) + '</span>' +
-      '<span class="tag">共 ' + realTotal + ' 片</span><span class="tag off">已显示 ' + chunks.length + ' 片 · ' + total.toLocaleString('zh-CN') + ' 字</span>' +
-      '<button class="btn btn-sm chunk-all" style="margin-left:auto">全部展开</button></div>' +
-      (truncated ? '<div class="chunk-empty" style="padding:10px 14px">文档过大，仅显示前 ' + chunks.length + ' 片；检索仍覆盖全文。</div>' : '') +
-      chunks.map(function (c, k) {
-        const txt = String(c.content || '');
-        const open = k === 0;
-        const long = txt.length > 240;
-        return '<div class="chunk-item' + (open ? ' open' : '') + '">' +
-          '<div class="chunk-head">' +
-            '<span class="chunk-caret">' + (open ? '▾' : '▸') + '</span>' +
-            '<span class="chunk-no">第 ' + (Number(c.chunkIndex || 0) + 1) + ' 片</span>' +
-            '<span class="chunk-preview">' + esc(txt.slice(0, 90).replace(/\s+/g, ' ')) + '</span>' +
-            '<span class="chunk-len">' + txt.length + ' 字</span>' +
-          '</div>' +
-          '<div class="chunk-body">' + esc(txt) + '</div>' +
-          (long ? '<button type="button" class="chunk-more" data-len="' + txt.length + '">展开全文（' + txt.length + ' 字）</button>' : '') +
-          '</div>';
-      }).join('') + '</div>';
+    const root = E('div', { className: 'chunk-tree' });
+    root.append(E('div', { className: 'chunk-root' }, [
+      E('span', { className: 'cf-name', title: String(fileName || ''), text: String(fileName || '') }),
+      UI.createTag('共 ' + realTotal + ' 片'),
+      UI.createTag({ text: '已显示 ' + chunks.length + ' 片 · ' + total.toLocaleString('zh-CN') + ' 字', variant: 'off' }),
+      E('button', { className: 'btn btn-sm chunk-all', type: 'button', text: '全部展开', attrs: { style: 'margin-left:auto' } })
+    ]));
+    if (truncated) {
+      root.append(E('div', { className: 'chunk-empty', attrs: { style: 'padding:10px 14px' },
+        text: '文档过大，仅显示前 ' + chunks.length + ' 片；检索仍覆盖全文。' }));
+    }
+    chunks.forEach(function (c, k) {
+      const txt = String(c.content || '');
+      const open = k === 0;
+      const long = txt.length > 240;
+      const item = E('div', { className: 'chunk-item' + (open ? ' open' : '') });
+      item.append(E('div', { className: 'chunk-head' }, [
+        E('span', { className: 'chunk-caret', text: open ? '▾' : '▸' }),
+        E('span', { className: 'chunk-no', text: '第 ' + (Number(c.chunkIndex || 0) + 1) + ' 片' }),
+        E('span', { className: 'chunk-preview', text: txt.slice(0, 90).replace(/\s+/g, ' ') }),
+        E('span', { className: 'chunk-len', text: txt.length + ' 字' })
+      ]));
+      item.append(E('div', { className: 'chunk-body', text: txt }));
+      if (long) {
+        item.append(E('button', { className: 'chunk-more', type: 'button', dataset: { len: String(txt.length) },
+          text: '展开全文（' + txt.length + ' 字）' }));
+      }
+      root.append(item);
+    });
+    box.replaceChildren(root);
     // 事件用 addEventListener 绑定而不是内联 onclick：这些函数在 IIFE 内部，挂不到 window 上
     box.querySelectorAll('.chunk-head').forEach(function (h) {
       h.onclick = function () {
@@ -893,13 +919,17 @@
     const tenant = u ? u.tenant : 'default';
     const box = document.getElementById('sidebarUserBlock');
     if (!box) return;
-    box.innerHTML =
-      '<a class="user-avatar" href="profile.html" title="个人中心">' + avatar(name, 'md') + '</a>' +
-      '<a class="user-meta" href="profile.html" title="个人中心">' +
-        '<div class="user-name">' + esc(name) + '</div>' +
-        '<div class="user-tenant">' + esc(tenantLabel(tenant)) + '</div></a>' +
-      '<a class="user-icon-btn" href="settings.html" title="设置">' + svg('settings') + '</a>' +
-      '<button class="user-logout" title="退出登录" onclick="Shell.logout()">⏻</button>';
+    const avatarLink = E('a', { className: 'user-avatar', attrs: { href: 'profile.html', title: '个人中心' } });
+    avatarLink.append(avatar(name, 'md'));
+    const meta = E('a', { className: 'user-meta', attrs: { href: 'profile.html', title: '个人中心' } }, [
+      E('div', { className: 'user-name', text: name }),
+      E('div', { className: 'user-tenant', text: tenantLabel(tenant) })
+    ]);
+    const settings = E('a', { className: 'user-icon-btn', attrs: { href: 'settings.html', title: '设置' } });
+    settings.append(svg('settings'));
+    const logout = E('button', { className: 'user-logout', type: 'button', title: '退出登录', text: '⏻',
+      on: { click: () => confirmLogout() } });
+    box.replaceChildren(avatarLink, meta, settings, logout);
   }
 
   /** 退出登录：一步点了就走太容易误触（这个按钮紧挨着设置），必须二次确认 */
@@ -933,24 +963,32 @@
       : NAV.filter(n => (!n.groups.length || isAdmin || n.groups.some(g => groups.indexOf(g) >= 0))
         // 权限码过滤：权限清单已加载时直接不渲染，避免"先闪现再摘除"
         && (!n.perm || ownedPermissions.size === 0 || hasPermission(n.perm)));
-    const items = visible.map(n =>
-      '<a class="nav-item' + (n.key === active ? ' active' : '') + '" href="' + n.href + '" title="' + n.label + '">' +
-      svg(n.icon) + '<span>' + n.label + '</span></a>'
-    ).join('');
-    const aside = document.createElement('div');
-    aside.innerHTML =
-      '<aside class="sidebar">' +
-        '<div class="brand"><div class="brand-mark has-logo"><img class="brand-logo" src="assets/logo.svg" alt="水利知识库"></div>' +
-          '<div><div class="brand-title">水利知识库</div><div class="brand-sub">RAG 智能问答系统</div></div></div>' +
-        '<div class="section-label" style="margin-top:0">工作台</div>' +
-        '<nav class="nav-list">' + items + '</nav>' +
-        '<button class="new-chat" onclick="Shell.newSession()">＋ 新建会话</button>' +
-        '<div class="section-label">历史会话</div>' +
-        '<div class="session-list" id="sessionList"></div>' +
-        '<div class="user-block" id="sidebarUserBlock"></div>' +
-        '<div class="sidebar-footer">水利知识库 · 让知识更好用</div>' +
-      '</aside>';
-    host.insertBefore(aside.firstElementChild, host.firstChild);
+    const nav = E('nav', { className: 'nav-list' });
+    visible.forEach(n => {
+      const link = E('a', { className: 'nav-item' + (n.key === active ? ' active' : ''),
+        attrs: { href: n.href, title: n.label } });
+      link.append(svg(n.icon), E('span', { text: n.label }));
+      nav.append(link);
+    });
+    const brand = E('div', { className: 'brand' });
+    const mark = E('div', { className: 'brand-mark has-logo' });
+    mark.append(E('img', { className: 'brand-logo', attrs: { src: 'assets/logo.svg', alt: '水利知识库' } }));
+    brand.append(mark, E('div', {}, [
+      E('div', { className: 'brand-title', text: '水利知识库' }),
+      E('div', { className: 'brand-sub', text: 'RAG 智能问答系统' })
+    ]));
+    const aside = E('aside', { className: 'sidebar' }, [
+      brand,
+      E('div', { className: 'section-label', attrs: { style: 'margin-top:0' }, text: '工作台' }),
+      nav,
+      E('button', { className: 'new-chat', type: 'button', text: '＋ 新建会话',
+        on: { click: () => newSession() } }),
+      E('div', { className: 'section-label', text: '历史会话' }),
+      E('div', { className: 'session-list', id: 'sessionList' }),
+      E('div', { className: 'user-block', id: 'sidebarUserBlock' }),
+      E('div', { className: 'sidebar-footer', text: '水利知识库 · 让知识更好用' })
+    ]);
+    host.insertBefore(aside, host.firstChild);
 
     // 暴露给内联 onclick 使用
     global.Shell.newSession = newSession;
@@ -986,42 +1024,56 @@
     const items = serverMenus.length
       ? serverMenus.filter(m => m.allowed && !/^(index|manage|search|tree|profile)\.html$/.test(m.href)).map(itemOf)
       : ADMIN_NAV.map(n => Object.assign({}, n, { group: '' }));
-    const linkHtml = (n) => '<a class="admin-nav-item' + (n.key === active ? ' active' : '') + '"' +
-      ' href="' + n.href + '" data-panel="' + n.key + '" data-perm="' + n.perm + '" title="' + n.label + '">' +
-      '<span class="ic">' + n.icon + '</span>' + n.label + '</a>';
-    let navHtml;
+    const linkNode = (n) => {
+      const a = E('a', { className: 'admin-nav-item' + (n.key === active ? ' active' : ''),
+        dataset: { panel: n.key, perm: n.perm }, attrs: { href: n.href, title: n.label } }, [
+        E('span', { className: 'ic', text: n.icon }), document.createTextNode(n.label)
+      ]);
+      return a;
+    };
+    const groupNode = (label, list) => E('div', { className: 'admin-nav-group' }, [
+      E('div', { className: 'section-label', attrs: { style: 'margin:14px 0 6px' }, text: label }),
+      ...list.map(linkNode)
+    ]);
+    let navNodes;
     if (serverGroups.length) {
-      navHtml = serverGroups.map(g =>
-        '<div class="admin-nav-group"><div class="section-label" style="margin:14px 0 6px">' + g.name + '</div>' +
-        items.filter(n => n.group === g.code).map(linkHtml).join('') + '</div>'
-      ).join('');
+      navNodes = serverGroups.map(g => groupNode(g.name, items.filter(n => n.group === g.code)));
       const grouped = new Set(serverGroups.map(g => g.code));
       const rest = items.filter(n => !grouped.has(n.group));
-      if (rest.length) navHtml += '<div class="admin-nav-group">' + rest.map(linkHtml).join('') + '</div>';
+      if (rest.length) navNodes.push(E('div', { className: 'admin-nav-group' }, rest.map(linkNode)));
     } else {
-      navHtml = ADMIN_GROUPS.map(g => '<div class="admin-nav-group">' +
-        '<div class="section-label" style="margin:14px 0 6px">' + g.label + '</div>' +
-        g.keys.map(k => { const n = items.find(x => x.key === k); return n ? linkHtml(n) : ''; }).join('') +
-        '</div>').join('');
+      navNodes = ADMIN_GROUPS.map(g => groupNode(g.label,
+        g.keys.map(k => items.find(x => x.key === k)).filter(Boolean)));
     }
-    const aside = document.createElement('div');
-    aside.innerHTML =
-      '<aside class="admin-sidebar">' +
-        '<div class="brand"><div class="brand-mark has-logo"><img class="brand-logo" src="assets/logo.svg" alt=""></div>' +
-          '<div><div class="brand-title">管理后台</div><div class="brand-sub">水利知识库</div></div></div>' +
-        navHtml +
-        '<div class="admin-back"><a class="admin-nav-item" href="index.html"><span class="ic">⌂</span>返回问答</a>' +
-        '<div class="user-block" id="adminUserBlock"></div></div>' +
-      '</aside>';
-    host.insertBefore(aside.firstElementChild, host.firstChild);
+    const brand = E('div', { className: 'brand' });
+    const mark = E('div', { className: 'brand-mark has-logo' });
+    mark.append(E('img', { className: 'brand-logo', attrs: { src: 'assets/logo.svg', alt: '' } }));
+    brand.append(mark, E('div', {}, [
+      E('div', { className: 'brand-title', text: '管理后台' }),
+      E('div', { className: 'brand-sub', text: '水利知识库' })
+    ]));
+    const back = E('div', { className: 'admin-back' });
+    const backLink = E('a', { className: 'admin-nav-item', attrs: { href: 'index.html' } }, [
+      E('span', { className: 'ic', text: '⌂' }), document.createTextNode('返回问答')
+    ]);
+    back.append(backLink, E('div', { className: 'user-block', id: 'adminUserBlock' }));
+    const aside = E('aside', { className: 'admin-sidebar' }, [brand, ...navNodes, back]);
+    host.insertBefore(aside, host.firstChild);
     renderAdminEntry();
     const u = global.WrkAuth && global.WrkAuth.getUser() || {};
     const box = document.getElementById('adminUserBlock');
-    if (box) box.innerHTML =
-      '<a class="user-avatar" href="profile.html" title="个人中心">' + avatar(u.displayName || u.user || '管', 'md') + '</a>' +
-      '<a class="user-meta" href="profile.html" title="个人中心"><div class="user-name">' + esc(u.displayName || u.user || '管') + '</div>' +
-      '<div class="user-tenant">' + esc(tenantLabel(u.tenant)) + '</div></a>' +
-      '<button class="user-logout" title="退出登录" onclick="Shell.logout()">⏻</button>';
+    if (box) {
+      const av = E('a', { className: 'user-avatar', attrs: { href: 'profile.html', title: '个人中心' } });
+      av.append(avatar(u.displayName || u.user || '管', 'md'));
+      box.replaceChildren(av,
+        E('a', { className: 'user-meta', attrs: { href: 'profile.html', title: '个人中心' } }, [
+          E('div', { className: 'user-name', text: u.displayName || u.user || '管' }),
+          E('div', { className: 'user-tenant', text: tenantLabel(u.tenant) })
+        ]),
+        E('button', { className: 'user-logout', type: 'button', title: '退出登录', text: '⏻',
+          on: { click: () => confirmLogout() } })
+      );
+    }
     bindSidebarEvents();
   }
 
@@ -1142,8 +1194,12 @@
       .test(location.pathname);
     const slot = document.getElementById('adminEntrySlot');
     if (slot) {
-      slot.innerHTML = (target && !inAdmin)
-        ? '<a class="admin-entry-btn" href="' + target + '" title="进入管理后台" onclick="Shell.navWithMask(\'' + target + '\')">⚙ 管理后台</a>' : '';
+      if (target && !inAdmin) {
+        slot.replaceChildren(E('a', {
+          className: 'admin-entry-btn', attrs: { href: target, title: '进入管理后台' },
+          text: '⚙ 管理后台', on: { click: e => { e.preventDefault(); navWithMask(target); } }
+        }));
+      } else slot.replaceChildren();
     }
   }
 
@@ -1161,7 +1217,7 @@
         p.dataset.baseClass = (p.className || 'status-pill').replace(/\boff\b/g, '').trim() || 'status-pill';
       }
       p.className = p.dataset.baseClass + (healthy ? '' : ' off');
-      p.innerHTML = '<span class="status-dot"></span>' + (healthy ? '服务正常' : '服务不可用');
+      p.replaceChildren(E('span', { className: 'status-dot' }), document.createTextNode(healthy ? '服务正常' : '服务不可用'));
     });
   }
 
@@ -1179,7 +1235,7 @@
       el.id = 'svcPill';
       el.setAttribute('data-status-pill', '');
       el.title = '知识库检索服务状态（每 30 秒自动重试）';
-      el.innerHTML = '<span class="status-dot"></span>检测中…';
+      el.replaceChildren(E('span', { className: 'status-dot' }), document.createTextNode('检测中…'));
       document.body.appendChild(el);
     }
     // 基础类固定为 svc-pill；healthy/off 由 checkHealth 每次重算，不在这里叠加
@@ -1205,8 +1261,10 @@
     const el = document.getElementById('modalAlert');
     if (!el) { toast(msg || '操作失败', 'err'); return; }
     // 每次显示都重建内容，保证关闭按钮的事件不丢
-    el.innerHTML = '<span class="modal-alert-text">' + esc(msg || '操作失败') + '</span>' +
-      '<button type="button" class="modal-alert-close" title="关闭提示" aria-label="关闭提示">×</button>';
+    el.replaceChildren(
+      E('span', { className: 'modal-alert-text', text: msg || '操作失败' }),
+      E('button', { className: 'modal-alert-close', type: 'button', title: '关闭提示', attrs: { 'aria-label': '关闭提示' }, text: '×' })
+    );
     const btn = el.querySelector('.modal-alert-close');
     if (btn) btn.onclick = clearModalError;
     el.classList.add('show');
@@ -1215,7 +1273,7 @@
   }
   function clearModalError() {
     const el = document.getElementById('modalAlert');
-    if (el) { el.classList.remove('show'); el.innerHTML = ''; }
+    if (el) { el.classList.remove('show'); el.replaceChildren(); }
   }
 
   // ---------- 全局自定义弹框（替代浏览器原生 confirm/prompt） ----------
@@ -1226,7 +1284,7 @@
     if (uploadJob && uploadJob.running && mask && mask.querySelector('#pickList')) {
       toast('已转到后台继续解析，跑完会提示', 'ok');
     }
-    if (mask) { mask.classList.remove('show'); mask.innerHTML = ''; }
+    if (mask) { mask.classList.remove('show'); mask.replaceChildren(); }
     modalState = null;
     document.removeEventListener('keydown', onModalKey);
   }
@@ -1249,22 +1307,29 @@
     }
     // 宽度三档：默认（460，表单/提示）、md（560，列表类）、wide（680，矩阵/树）
     const sizeCls = opts.wide ? ' modal-wide' : (opts.size === 'md' ? ' modal-md' : '');
-    mask.innerHTML =
-      '<div class="modal-box' + sizeCls + '" role="dialog" aria-modal="true">' +
-        '<div class="modal-head' + (opts.danger ? ' danger' : '') + '"><div class="modal-title-wrap">' +
-          '<div class="modal-title">' + (opts.danger ? '<span style="margin-right:6px">⚠</span>' : '') +
-            esc(opts.title || '提示') + '</div>' +
-          '<div class="modal-subtitle" id="modalSubtitle"></div>' +
-        '</div>' +
-        '<button class="modal-close" title="关闭">×</button></div>' +
-        '<div class="modal-alert" id="modalAlert" role="alert"></div>' +
-        '<div class="modal-body">' + (opts.body || '') + '</div>' +
-        '<div class="modal-foot">' +
-          (showCancel ? '<button class="btn btn-cancel">' + esc(opts.cancelText || '取消') + '</button>' : '') +
-          '<button class="btn ' + (opts.danger ? 'btn-danger' : 'btn-primary') + ' btn-ok">' +
-            esc(opts.okText || '确定') + '</button>' +
-        '</div>' +
-      '</div>';
+    const titleNode = E('div', { className: 'modal-title' });
+    if (opts.danger) titleNode.append(E('span', { attrs: { style: 'margin-right:6px' }, text: '⚠' }));
+    titleNode.append(document.createTextNode(opts.title || '提示'));
+    const head = E('div', { className: 'modal-head' + (opts.danger ? ' danger' : '') }, [
+      E('div', { className: 'modal-title-wrap' }, [
+        titleNode, E('div', { className: 'modal-subtitle', id: 'modalSubtitle' })
+      ]),
+      E('button', { className: 'modal-close', type: 'button', title: '关闭', text: '×' })
+    ]);
+    const bodyNode = E('div', { className: 'modal-body' });
+    // body 兼容：DOM 节点直接挂；字符串按富文本处理（存量大量传 HTML 模板，逐步迁移中）
+    if (opts.body instanceof Node) bodyNode.append(opts.body);
+    else if (opts.body) bodyNode.innerHTML = String(opts.body);
+    const foot = E('div', { className: 'modal-foot' });
+    if (showCancel) foot.append(E('button', { className: 'btn btn-cancel', type: 'button', text: opts.cancelText || '取消' }));
+    foot.append(E('button', { className: 'btn ' + (opts.danger ? 'btn-danger' : 'btn-primary') + ' btn-ok',
+      type: 'button', text: opts.okText || '确定' }));
+    mask.replaceChildren(E('div', { className: 'modal-box' + sizeCls,
+      attrs: { role: 'dialog', 'aria-modal': 'true' } }, [
+      head,
+      E('div', { className: 'modal-alert', id: 'modalAlert', attrs: { role: 'alert' } }),
+      bodyNode, foot
+    ]));
     mask.classList.add('show');
     modalState = opts;
     mask.querySelector('.modal-close').onclick = closeModal;

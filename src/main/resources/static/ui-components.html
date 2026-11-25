@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>UI 组件库 · 自测页</title>
 <link rel="stylesheet" href="app.css">
+<script src="assets/ui.js"></script>
 <style>
   body{padding:32px;background:#f6f8fc}
   .demo-wrap{max-width:1000px;margin:0 auto}
@@ -36,11 +37,9 @@
   <div class="demo-card"><h2>createToast · 提示</h2><div class="demo-row" id="dToast"></div></div>
 </div>
 
-<script type="module">
-import {
-  createButton, createSelect, createInput, createField, createTag,
-  createEmptyRow, createTable, createPager, createToast, createAvatar
-} from '/assets/ui.js';
+<script>
+const { createButton, createSelect, createInput, createField, createTag,
+  createEmptyRow, createTable, createPager, createToast, createAvatar } = window.UI;
 
 // 按钮
 document.getElementById('dButton').append(

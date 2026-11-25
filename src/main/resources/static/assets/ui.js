@@ -15,6 +15,8 @@
  *   </script>
  */
 
+(function (global) {
+
 // ============ 内部工具 ============
 
 /** 创建元素并设置属性；文本一律走 textContent，杜绝 XSS */
@@ -83,7 +85,7 @@ function allowed(perm) {
  * @param {string} [o.title] 原生 tooltip
  * @returns {HTMLButtonElement|Text} DOM 节点；无权限时返回空文本节点
  */
-export function createButton(o = {}) {
+function createButton(o = {}) {
   if (!o || typeof o.label !== 'string') throw new TypeError('[UI] createButton: label 必填');
   if (!allowed(o.perm)) return document.createTextNode('');
   const cls = ['btn'];
@@ -109,7 +111,7 @@ export function createButton(o = {}) {
  * @param {boolean} [o.disabled] 是否禁用
  * @returns {HTMLSelectElement}
  */
-export function createSelect(o = {}) {
+function createSelect(o = {}) {
   if (!Array.isArray(o.options)) throw new TypeError('[UI] createSelect: options 必须是数组');
   const select = el('select', {
     id: o.id || uid('select'), disabled: o.disabled,
@@ -144,7 +146,7 @@ export function createSelect(o = {}) {
  * @param {Function} [o.onInput] input 事件
  * @returns {HTMLInputElement}
  */
-export function createInput(o = {}) {
+function createInput(o = {}) {
   const input = el('input', {
     id: o.id || uid('input'), type: o.type || 'text',
     attrs: {
@@ -168,7 +170,7 @@ export function createInput(o = {}) {
  * @param {string} [o.className] 附加 class
  * @returns {HTMLDivElement}
  */
-export function createField(o = {}) {
+function createField(o = {}) {
   if (!o || !o.control || !(o.control instanceof Node)) {
     throw new TypeError('[UI] createField: control 必须是 DOM 节点');
   }
@@ -190,7 +192,7 @@ export function createField(o = {}) {
  * @param {'default'|'ok'|'warn'|'no'|'info'|'emb'} [o.variant] 样式
  * @returns {HTMLSpanElement}
  */
-export function createTag(o = {}) {
+function createTag(o = {}) {
   const opt = typeof o === 'string' ? { text: o } : o;
   const cls = ['tag'];
   if (opt.variant && opt.variant !== 'default') cls.push(opt.variant);
@@ -206,7 +208,7 @@ export function createTag(o = {}) {
  * @param {number} [o.colspan] 跨列数，默认 1
  * @returns {HTMLTableRowElement}
  */
-export function createEmptyRow(o = {}) {
+function createEmptyRow(o = {}) {
   const opt = typeof o === 'string' ? { text: o } : o;
   const td = el('td', {
     className: 'empty' + (opt.inline ? ' empty-inline' : ''),
@@ -226,7 +228,7 @@ export function createEmptyRow(o = {}) {
  * @param {string} [o.className] 附加 class
  * @returns {HTMLTableElement}
  */
-export function createTable(o = {}) {
+function createTable(o = {}) {
   if (!Array.isArray(o.columns)) {
     throw new TypeError('[UI] createTable: columns 必须是数组');
   }
@@ -263,7 +265,7 @@ export function createTable(o = {}) {
  * @param {Function} o.onGo 页码变化回调 (page) => void
  * @returns {HTMLElement}
  */
-export function createPager(o = {}) {
+function createPager(o = {}) {
   const page = Math.max(1, Number(o.page) || 1);
   const size = Math.max(1, Number(o.size) || 10);
   const total = Math.max(0, Number(o.total) || 0);
@@ -297,7 +299,7 @@ export function createPager(o = {}) {
  * @param {number} [o.duration] 存活毫秒，默认 2600
  * @returns {HTMLElement} 提示节点
  */
-export function createToast(o = {}) {
+function createToast(o = {}) {
   const opt = typeof o === 'string' ? { message: o } : o;
   let node = document.getElementById('appToast');
   if (!node) {
@@ -319,7 +321,7 @@ export function createToast(o = {}) {
  * @param {string} [o.cancelText] 取消按钮文案，默认“取消”
  * @returns {Promise<boolean>}
  */
-export function createConfirm(o = {}) {
+function createConfirm(o = {}) {
   const opt = typeof o === 'string' ? { message: o } : o;
   return new Promise(resolve => {
     const shell = globalThis.Shell;
@@ -343,7 +345,7 @@ export function createConfirm(o = {}) {
  * @param {'sm'|'md'|'lg'} [o.size] 尺寸
  * @returns {HTMLElement}
  */
-export function createAvatar(o = {}) {
+function createAvatar(o = {}) {
   const opt = typeof o === 'string' ? { name: o } : o;
   const name = String(opt.name || '?');
   const initials = name.slice(0, 1).toUpperCase();
@@ -356,11 +358,19 @@ export function createAvatar(o = {}) {
 
 // ============ 统一导出 ============
 
-export const UI = {
+const UI = {
   el, uid,
   createButton, createSelect, createInput, createField, createTag,
   createEmptyRow, createTable, createPager,
   createToast, createConfirm, createAvatar
 };
 
-export default UI;
+
+
+/**
+ * 兼容桥接：ES 模块加载后挂到 window.UI，供传统 <script>（非 module）调用。
+ * 组件实现本身仍是标准 ES 模块；存量页面引入 ui-bridge.js 即可用 UI.createXxx()，
+ * 无需把全部页面改成 module 脚本。新代码推荐直接 import。
+ */
+global.UI = Object.assign(global.UI || {}, UI);
+})(window);
