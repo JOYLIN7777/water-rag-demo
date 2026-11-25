@@ -2217,15 +2217,18 @@ async function loadLoginLogs(page){
     if(LOGINLOG_PAGE.page>pages)LOGINLOG_PAGE.page=pages;
     const start=(LOGINLOG_PAGE.page-1)*LOGINLOG_PAGE.size;
     const slice=list.slice(start,start+LOGINLOG_PAGE.size);
-    $('lList').innerHTML=slice.map(l=>
-      '<tr><td>'+tsLocal(l.ts)+'</td><td class="name">'+esc(l.user_id)+'</td>'+
-      '<td>'+esc(actionCn(l.action))+'</td><td>'+statusTag(l.status)+'</td>'+
-      '<td>'+resultCn(l.result,l.status)+'</td>'+
-      '<td>'+(l.duration_ms!=null?esc(l.duration_ms)+' ms':'—')+'</td>'+
-      '<td class="mono" style="font-size:11.5px;display:table-cell">'+esc(l.ip||'—')+'</td></tr>'
-    ).join('')||'<tr><td colspan="7" class="empty">暂无登录记录</td></tr>';
+    const lrows=slice.map(l=>E('tr',{},[
+      E('td',{text:tsLocal(l.ts)}),
+      E('td',{className:'name',text:l.user_id||''}),
+      E('td',{text:actionCn(l.action)}),
+      E('td',{},UI.createTag({text:String(l.status),variant:Number(l.status)>=400?'no':'ok'})),
+      E('td',{text:resultCn(l.result,l.status)}),
+      E('td',{text:l.duration_ms!=null?l.duration_ms+' ms':'—'}),
+      E('td',{className:'mono',attrs:{style:'font-size:11.5px;display:table-cell'},text:l.ip||'—'})
+    ]));
+    $('lList').replaceChildren(...(lrows.length?lrows:[UI.createEmptyRow({text:'暂无登录记录',colspan:7})]));
     renderPager('lPager',list.length,LOGINLOG_PAGE.page,LOGINLOG_PAGE.size,'loadLoginLogs');
-  }catch(e){$('lList').innerHTML='<tr><td colspan="7" class="empty">加载失败：'+esc(e.message)+'</td></tr>'}
+  }catch(e){$('lList').replaceChildren(UI.createEmptyRow({text:'加载失败：'+e.message,colspan:7}))}
 }
 
 // 后端记录的是接口路径与英文结果码，界面统一转中文
@@ -2371,25 +2374,32 @@ async function openUsageRecords(scope){
   if(!box)return;
   const sum=rows.reduce((s,r)=>s+(r.totalTokens||0),0);
   const noQ=rows.filter(r=>!String(r.question||'').trim()).length;
-  const head='<div class="usage-sum"><span>共 <b>'+rows.length+'</b> 次调用</span>'+
-    '<span>合计 <b>'+num(sum)+'</b> tokens</span>'+
-    (rows.length>=500?'<span class="hint">仅显示最近 500 条</span>':'')+
-    (noQ?'<span class="hint">'+noQ+' 条为升级前的历史调用，当时未保存提问</span>':'')+'</div>';
-  box.innerHTML=head+(rows.length?
-    '<div class="table-wrap" style="max-height:60vh"><table class="data-table usage-detail"><thead><tr>'+
-      '<th style="width:132px">时间</th><th>提问</th><th style="width:112px">模型</th>'+
-      '<th style="width:92px">Token</th><th style="width:70px">耗时</th><th style="width:92px">账号</th>'+
-    '</tr></thead><tbody>'+
-    rows.map(r=>{
+  const stat=(label,value)=>E('span',{},[document.createTextNode(label+' '),E('b',{text:String(value)})]);
+  const head=E('div',{className:'usage-sum'},[
+    stat('共',rows.length+' 次调用'), stat('合计',num(sum)+' tokens'),
+    ...(rows.length>=500?[E('span',{className:'hint',text:'仅显示最近 500 条'})]:[]),
+    ...(noQ?[E('span',{className:'hint',text:noQ+' 条为升级前的历史调用，当时未保存提问'})]:[])
+  ]);
+  if(!rows.length){ box.replaceChildren(head,E('div',{className:'empty-inline',text:label+'还没有调用记录'})); return; }
+  const table=UI.createTable({
+    columns:[{title:'时间',className:'mono'},{title:'提问'},{title:'模型'},
+      {title:'Token'},{title:'耗时'},{title:'账号'}],
+    rows:rows,
+    renderRow:r=>{
       const q=String(r.question||'').trim();
-      return '<tr><td class="mono">'+tsLocal(r.ts)+'</td>'+
-        '<td class="q" title="'+esc(q)+'">'+(q?esc(q.length>46?q.slice(0,46)+'…':q):'<span class="dim">—</span>')+'</td>'+
-        '<td class="mono" style="font-size:11px">'+esc(r.model||'—')+'</td>'+
-        '<td title="输入 '+num(r.promptTokens)+' / 输出 '+num(r.completionTokens)+'">'+num(r.totalTokens)+'</td>'+
-        '<td>'+((r.durationMs||0)/1000).toFixed(1)+'s</td>'+
-        '<td>'+esc(r.user||'—')+'</td></tr>';
-    }).join('')+'</tbody></table></div>'
-    :'<div class="empty-inline">'+label+'还没有调用记录</div>');
+      const tr=E('tr');
+      tr.append(E('td',{className:'mono',text:tsLocal(r.ts)}));
+      tr.append(E('td',{className:q?'q':'q dim',title:q,text:q?(q.length>46?q.slice(0,46)+'…':q):'—'}));
+      tr.append(E('td',{className:'mono',text:r.model||'—',attrs:{style:'font-size:11px'}}));
+      tr.append(E('td',{text:num(r.totalTokens),title:'输入 '+num(r.promptTokens)+' / 输出 '+num(r.completionTokens)}));
+      tr.append(E('td',{text:((r.durationMs||0)/1000).toFixed(1)+'s'}));
+      tr.append(E('td',{text:r.user||'—'}));
+      return tr;
+    }
+  });
+  const wrap=E('div',{className:'table-wrap',attrs:{style:'max-height:60vh'}});
+  wrap.append(table);
+  box.replaceChildren(head,wrap);
 }
 
 const AUDIT_PAGE={page:1,size:15};
@@ -2402,10 +2412,13 @@ async function loadAudit(page){
     if(AUDIT_PAGE.page>pages)AUDIT_PAGE.page=pages;
     const start=(AUDIT_PAGE.page-1)*AUDIT_PAGE.size;
     const slice=list.slice(start,start+AUDIT_PAGE.size);
-    $('aList').innerHTML=slice.map(l=>
-      '<tr><td>'+tsLocal(l.ts)+'</td><td>'+esc(l.user_id)+'</td><td>'+esc(l.action)+'</td>'+
-      '<td>'+statusTag(l.status)+'</td><td>'+esc(l.duration_ms||l.duration||'—')+'</td><td>'+esc(resultCn(l.result,l.status))+'</td></tr>'
-    ).join('')||'<tr><td colspan="6" class="empty">暂无记录</td></tr>';
+    const arows=slice.map(l=>E('tr',{},[
+      E('td',{text:tsLocal(l.ts)}), E('td',{text:l.user_id||''}), E('td',{text:l.action||''}),
+      E('td',{},UI.createTag({text:String(l.status),variant:Number(l.status)>=400?'no':'ok'})),
+      E('td',{text:String(l.duration_ms||l.duration||'—')}),
+      E('td',{text:resultCn(l.result,l.status)})
+    ]));
+    $('aList').replaceChildren(...(arows.length?arows:[UI.createEmptyRow({text:'暂无记录',colspan:6})]));
     renderPager('aPager',list.length,AUDIT_PAGE.page,AUDIT_PAGE.size,'loadAudit');
   }catch(e){console.error(e)}
 }
