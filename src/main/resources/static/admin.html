@@ -2252,31 +2252,49 @@ async function loadModels(){
     models=await api('/api/models');
     const tb=$('tbody');
     if(!tb)return;
-    if(!models.length){tb.innerHTML='<tr><td colspan="5" class="empty">暂无配置</td></tr>';renderActive();return}
-    tb.innerHTML=models.map(m=>
-      '<tr><td><span class="name">'+esc(m.name)+'</span><br><span class="tag '+(m.type==='EMBEDDING'?'emb':'')+'">'+esc(m.type)+'</span>'+
-      (m.dimensions?' <span class="tag">'+m.dimensions+'维</span>':'')+'</td>'+
-      '<td><span class="mono">'+esc(m.baseUrl)+'</span><span class="mono">'+esc(m.model)+'</span></td>'+
-      '<td><span class="mono">'+esc(m.apiKey)+'</span></td>'+
-      '<td><span class="tag '+(m.active?'active':'off')+'">'+(m.active?'使用中':(m.enabled?'待命':'已禁用'))+'</span></td>'+
-      '<td><div class="model-ops">'+
-      (m.active?'<button class="btn btn-sm" disabled>已激活</button>':'<button class="btn btn-sm" data-perm="model:write" onclick="activateModelNew('+m.id+')">激活</button>')+
-      '<button class="btn btn-sm" data-perm="model:write" onclick="testModelNew('+m.id+',this)">测试</button>'+
-      '<button class="btn btn-sm btn-danger" data-perm="model:write" onclick="delModelNew('+m.id+')"'+(m.active?' disabled':'')+'>删除</button>'+
-      '</div></td></tr>').join('');
+    if(!models.length){tb.replaceChildren(UI.createEmptyRow({text:'暂无配置',colspan:5}));renderActive();return}
+    tb.replaceChildren(...models.map(m=>{
+      const tr=E('tr');
+      const nameCell=E('td');
+      nameCell.append(E('span',{className:'name',text:m.name}),E('br'),
+        UI.createTag({text:m.type,variant:m.type==='EMBEDDING'?'emb':''}));
+      if(m.dimensions)nameCell.append(document.createTextNode(' '),UI.createTag({text:m.dimensions+'维'}));
+      tr.append(nameCell);
+      const urlCell=E('td');
+      urlCell.append(E('span',{className:'mono',text:m.baseUrl}),E('span',{className:'mono',text:m.model}));
+      tr.append(urlCell);
+      tr.append(E('td',{},E('span',{className:'mono',text:m.apiKey})));
+      tr.append(E('td',{},UI.createTag({text:m.active?'使用中':(m.enabled?'待命':'已禁用'),
+        variant:m.active?'active':'off'})));
+      const op=E('td',{},E('div',{className:'model-ops'}));
+      const ops=op.firstChild;
+      if(m.active)ops.append(E('button',{className:'btn btn-sm',type:'button',text:'已激活',disabled:true}));
+      else ops.append(E('button',{className:'btn btn-sm',type:'button',text:'激活',dataset:{perm:'model:write'},
+        on:{click:()=>activateModelNew(m.id)}}));
+      const testBtn=E('button',{className:'btn btn-sm',type:'button',text:'测试',dataset:{perm:'model:write'}});
+      testBtn.addEventListener('click',()=>testModelNew(m.id,testBtn));
+      ops.append(testBtn,
+        E('button',{className:'btn btn-sm btn-danger',type:'button',text:'删除',dataset:{perm:'model:write'},
+          disabled:m.active,on:{click:()=>delModelNew(m.id)}}));
+      tr.append(op);
+      return tr;
+    }));
     renderActive();
-  }catch(e){$('tbody').innerHTML='<tr><td colspan="5" class="empty">加载失败：'+esc(e.message)+'</td></tr>'}
+  }catch(e){tb.replaceChildren(UI.createEmptyRow({text:'加载失败：'+e.message,colspan:5}))}
 }
 function renderActive(){
   const box=$('activeBox');if(!box)return;
   const chat=models.find(m=>m.type==='CHAT'&&m.active),emb=models.find(m=>m.type==='EMBEDDING'&&m.active);
-  box.innerHTML='<div class="active-item"><div class="active-label">对话模型（CHAT）</div>'+
-    '<div class="active-name">'+esc(chat?chat.name:'未配置')+'</div>'+
-    '<span class="mono">'+(chat?esc(chat.model):'—')+'</span></div>'+
-    '<div class="active-divider"></div>'+
-    '<div><div class="active-label">向量模型（EMBEDDING）</div>'+
-    '<div class="active-name">'+esc(emb?emb.name:'未配置')+'</div>'+
-    '<span class="mono">'+(emb?esc(emb.model+' · '+emb.dimensions+'维'):'—')+'</span></div>';
+  const activeItem=(label,cfg,subFn)=>E('div',{className:'active-item'},[
+    E('div',{className:'active-label',text:label}),
+    E('div',{className:'active-name',text:cfg?cfg.name:'未配置'}),
+    E('span',{className:'mono',text:cfg?subFn(cfg):'—'})
+  ]);
+  box.replaceChildren(
+    activeItem('对话模型（CHAT）',chat,m=>m.model),
+    E('div',{className:'active-divider'}),
+    activeItem('向量模型（EMBEDDING）',emb,m=>m.model+' · '+m.dimensions+'维')
+  );
 }
 $('fType')&&($('fType').onchange=e=>{const d=$('dimField');if(d)d.style.display=e.target.value==='EMBEDDING'?'block':'none'});
 async function createModel(){
@@ -2284,7 +2302,7 @@ async function createModel(){
   const body={name:$('fName').value.trim(),type,baseUrl:$('fUrl').value.trim(),model:$('fModel').value.trim(),
     apiKey:$('fKey').value.trim(),dimensions:type==='EMBEDDING'?Number($('fDim').value):null,enabled:true,active:false};
   try{
-    await apiWrite('/api/models',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+    const r=await apiWrite('/api/models',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
     ['fName','fUrl','fModel','fKey','fDim'].forEach(id=>{const el=$(id);if(el)el.value=''});
     appToast(r.message||'配置已添加','ok');loadModels();
   }catch(e){appToast('添加失败：'+e.message,'err')}
