@@ -7,6 +7,7 @@ import { useChatStore } from '@/stores/chat'
 import { useAuthStore } from '@/stores/auth'
 import { chatApi, docApi, streamChat, uploadDocument } from '@/api'
 import type { StreamEvent } from '@/api'
+import '@/styles/chat.css'
 
 const chat = useChatStore()
 const auth = useAuthStore()
@@ -141,27 +142,43 @@ async function doUpload() {
         </div>
       </div>
       <div v-else class="messages">
-        <div v-for="(m, i) in chat.messages" :key="i" class="msg" :class="m.role">
-          <template v-if="m.role === 'user'"><div class="bubble user">{{ m.content }}</div></template>
+        <div v-for="(m, i) in chat.messages" :key="i" class="msg-group" :class="m.role">
+          <template v-if="m.role === 'user'">
+            <div class="msg-user">{{ m.content }}</div>
+          </template>
           <template v-else>
-            <div class="bubble ai" v-html="renderMarkdown(m.content)"></div>
-            <span v-if="m.streaming" class="cursor">▌</span>
-            <div v-if="m.sources?.length" class="sources">
-              <span v-for="(s, k) in m.sources as any[]" :key="k" class="source-chip">{{ s.fileName || s.file || '引用' }} · 第{{ (s.chunkIndex ?? 0) + 1 }}段</span>
+            <div class="ai-card">
+              <div class="ai-card-head">
+                <span class="ai-card-mark">◈</span><span class="ai-card-name">知识库问答</span>
+              </div>
+              <div class="ai-card-body" v-html="renderMarkdown(m.content)"></div>
+              <div v-if="m.sources?.length" class="cite-zone">
+                <div class="cite-row">
+                  <span v-for="(s, k) in m.sources as any[]" :key="k" class="cite-chip">
+                    <span class="cite-num">{{ k + 1 }}</span>
+                    <span class="cite-file">{{ s.fileName || s.file || '引用' }}</span>
+                  </span>
+                </div>
+              </div>
             </div>
           </template>
         </div>
       </div>
     </div>
 
-    <div v-if="error" class="error-tip">{{ error }}</div>
-    <div class="composer">
-      <el-input v-model="question" type="textarea" :rows="2" placeholder="输入你的问题，Enter 发送，Shift+Enter 换行"
-        resize="none" @keydown="onKeydown" />
-      <div class="composer-bar">
-        <el-button v-if="auth.has('doc:write_chat')" text size="small" @click="uploadVisible = true">⇪ 上传文档</el-button>
-        <el-button type="primary" :loading="chat.sending" @click="send()">发送 ↵</el-button>
+    <div class="composer-wrap">
+      <div v-if="error" class="error-bar show">{{ error }}</div>
+      <div class="composer">
+        <textarea v-model="question" rows="1" placeholder="输入你的问题，Enter 发送，Shift+Enter 换行"
+          @keydown="onKeydown"></textarea>
+        <div class="composer-bar">
+          <span class="composer-tool" title="基于知识库检索作答"><span style="color:var(--primary)">◈</span> 知识库问答</span>
+          <button v-if="auth.has('doc:write_chat')" class="composer-tool" type="button"
+            @click="uploadVisible = true" title="上传文档到知识库">⇪ 上传文档</button>
+          <button class="send-btn" type="button" @click="send()">发送 <span style="opacity:.75">↵</span></button>
+        </div>
       </div>
+      <div class="composer-tip">回答基于知识库生成，关键数据请以正式规程为准</div>
     </div>
 
     <el-dialog v-model="uploadVisible" title="上传文档" width="460px">
@@ -175,26 +192,9 @@ async function doUpload() {
 </template>
 
 <style scoped>
-.chat-page { display: flex; flex-direction: column; flex: 1; min-height: 0; height: 100%; padding: 0; overflow: hidden; }
+/* 视觉样式全部来自旧版 chat.css；这里只做 SPA 视口高度适配 */
+.chat-page { display: flex; flex-direction: column; flex: 1; min-height: 0; height: 100%; overflow: hidden; }
 .chat-page .topbar { flex: 0 0 auto; }
-.scroll-area { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 26px max(26px, calc((100% - 860px) / 2)); }
-.composer { flex: 0 0 auto; padding: 12px max(26px, calc((100% - 860px) / 2)) 18px; background: #fff; border-top: 1px solid var(--line); box-shadow: 0 -2px 12px rgba(16,28,54,.04); }
-.welcome { max-width: 640px; margin: 8vh auto 0; text-align: center; }
-.welcome-mark { width: 58px; height: 58px; border-radius: 16px; margin: 0 auto 18px; background: linear-gradient(135deg, var(--primary-hi), var(--primary)); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 26px; font-weight: 700; }
-.welcome h1 { font-size: 24px; margin: 0 0 8px; }
-.welcome p { color: var(--muted); font-size: 13px; }
-.quick-list { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-top: 24px; }
-.quick-item { border: 1px solid var(--line); background: #fff; border-radius: 18px; padding: 7px 14px; font-size: 12px; cursor: pointer; color: var(--ink-2); }
-.quick-item:hover { border-color: var(--primary); color: var(--primary); }
-.messages { max-width: 860px; margin: 0 auto; }
-.msg { margin-bottom: 18px; }
-.bubble { padding: 12px 16px; border-radius: 12px; line-height: 1.7; }
-.bubble.user { background: var(--primary); color: #fff; margin-left: auto; max-width: 76%; }
-.bubble.ai { background: #fff; border: 1px solid var(--line); max-width: 92%; }
-.cursor { color: var(--primary); animation: blink 1s infinite; }
-@keyframes blink { 50% { opacity: 0 } }
-.sources { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
-.source-chip { font-size: 10.5px; background: var(--primary-soft); color: #25469b; padding: 2px 8px; border-radius: 10px; }
-.error-tip { color: var(--danger); font-size: 12px; padding: 0 26px 8px; }
-.composer-bar { display: flex; justify-content: space-between; align-items: center; margin-top: 8px; }
+.chat-page .scroll-area { flex: 1 1 auto; min-height: 0; }
+.chat-page .composer-wrap { flex: 0 0 auto; }
 </style>

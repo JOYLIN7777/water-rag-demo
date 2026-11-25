@@ -1,0 +1,185 @@
+  :root{
+    --navy:#111c33;--navy-2:#18253f;--navy-3:#22304d;
+    --primary:#3b6ef5;--primary-hi:#5b8bff;--primary-soft:#eaf1ff;
+    --ink:#1b2436;--ink-2:#475569;--muted:#8a95a8;--line:#e7ebf2;
+    --bg:#f5f7fb;--white:#fff;--ok:#0e9f6e;--danger:#e0245e;
+    --shadow-sm:0 1px 3px rgba(16,28,54,.06);
+    --shadow-md:0 8px 24px rgba(16,28,54,.08);
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;color:var(--ink);background:var(--bg);font-size:14px;-webkit-font-smoothing:antialiased}
+  button,input,textarea{font-family:inherit}
+  button{cursor:pointer}
+  button:disabled{cursor:not-allowed;opacity:.55}
+
+  /* ============ 布局 ============ */
+  .layout{display:flex;height:100vh;overflow:hidden}
+
+  /* ============ 主区 ============ */
+  .main{flex:1;display:flex;flex-direction:column;min-width:0;background:var(--bg)}
+  .topbar{height:64px;flex:0 0 64px;background:rgba(255,255,255,.92);backdrop-filter:blur(10px);border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;padding:0 28px;box-shadow:var(--shadow-sm)}
+  .topbar-left{display:flex;align-items:center;gap:11px}
+  .topbar-title{font-size:15px;font-weight:650;color:var(--ink)}
+  .status-pill{display:inline-flex;align-items:center;gap:6px;font-size:11px;color:var(--ok);background:#e8f8f1;border:1px solid #c6ecd9;padding:4px 10px;border-radius:20px;font-weight:500}
+  .status-dot{width:6px;height:6px;border-radius:50%;background:var(--ok);box-shadow:0 0 0 3px rgba(14,159,110,.15)}
+  .status-pill.off{color:var(--danger);background:#fdeef3;border-color:#f8cfdc}
+  .status-pill.off .status-dot{background:var(--danger);box-shadow:0 0 0 3px rgba(224,36,94,.14)}
+  .topbar-nav{display:flex;align-items:center;gap:7px}
+  .text-btn{border:1px solid var(--line);background:#fff;color:var(--ink-2);padding:7px 12px;border-radius:8px;font-size:12px;transition:all .15s;text-decoration:none;display:inline-block;line-height:1.3;white-space:nowrap}
+  .text-btn:hover{border-color:#b9cbff;color:var(--primary);background:var(--primary-soft)}
+  .nav-link{line-height:1.3}
+
+  /* 不做平滑滚动/入场动画：流式输出时反复触发会造成肉眼可见的抖动 */
+  .scroll-area{flex:1;overflow-y:auto;padding:32px 6% 24px}
+  .welcome{max-width:760px;margin:8vh auto 0;text-align:center}
+  .welcome-mark{width:62px;height:62px;border-radius:17px;background:linear-gradient(135deg,var(--primary-hi),var(--primary));color:#fff;font-size:26px;font-weight:700;display:flex;align-items:center;justify-content:center;margin:0 auto 20px;box-shadow:0 10px 28px rgba(59,110,245,.3)}
+  /* 欢迎区用项目图标（水滴水波）代替一个"水"字：字标在不同字号下重心会飘 */
+  .welcome-mark.has-logo{background:none;box-shadow:none;padding:0}
+  .welcome-mark.has-logo .brand-logo{width:62px;height:62px;border-radius:17px;box-shadow:0 10px 28px rgba(59,110,245,.28)}
+  .quick-tip{font-size:11px;color:var(--muted);margin-top:14px;letter-spacing:.2px}
+  .welcome h1{font-size:23px;color:var(--ink);margin:0 0 11px;font-weight:680;letter-spacing:.3px}
+  .welcome p{font-size:13.5px;color:var(--ink-2);line-height:1.8;margin:0 auto 30px;max-width:560px}
+  .quick-list{display:grid;grid-template-columns:1fr 1fr;gap:11px;max-width:660px;margin:0 auto}
+  .quick-item{border:1px solid var(--line);background:#fff;border-radius:11px;padding:14px 16px;font-size:13px;color:var(--ink-2);text-align:left;box-shadow:var(--shadow-sm);transition:all .18s;line-height:1.5}
+  .quick-item:hover{border-color:#b9cbff;background:var(--primary-soft);color:var(--primary);transform:translateY(-2px);box-shadow:0 6px 18px rgba(59,110,245,.12)}
+  .quick-item::before{content:'✦';color:var(--primary);margin-right:8px;font-size:11px}
+
+  /* ============ 消息区（WorkBuddy 式：对话列居中限宽，不做全铺满） ============ */
+  .messages{max-width:880px;margin:0 auto}
+  .msg-group{margin-bottom:32px}
+  .msg-group.user{display:flex;justify-content:flex-end}
+  /* ===== 分支（从这里再问）===== */
+  /* 分叉分隔条：跨整行的一条淡虚线，告诉用户"下面这段是从上面某一轮分出来的" */
+  .branch-seal{max-width:880px;margin:0 auto 14px;display:flex;align-items:center;gap:10px;color:#7c8aa5;font-size:11px;letter-spacing:.2px}
+  .branch-seal::before,.branch-seal::after{content:'';flex:1;height:1px;background:repeating-linear-gradient(90deg,#dbe2ee 0 6px,transparent 6px 11px)}
+  .branch-seal span{white-space:nowrap;border:1px solid #e2e9f5;background:#f7faff;border-radius:20px;padding:3px 11px}
+  /* 回答卡片上的「分支」小标签：说明这条回答不是接着上一轮，而是另起一条 */
+  .branch-chip{font-size:10px;color:#3568d4;background:#eaf1ff;border:1px solid #d3e0fa;border-radius:5px;padding:1px 6px;font-weight:600;letter-spacing:.2px}
+  /* 待分叉的那一轮整组描边，点完「从这里再问」能一眼看出新回答会接到哪儿 */
+  .msg-group.branch-origin .user-bubble{box-shadow:0 0 0 2px rgba(59,110,245,.22)}
+  .msg-group.branch-origin .ai-card{box-shadow:0 0 0 2px rgba(59,110,245,.22)}
+  /* 顶部提示条：会话里还有别的分支没显示时挂一条，避免"切回来记录少了"的错觉 */
+  .branch-note{max-width:880px;margin:0 auto 16px;padding:9px 14px;border:1px solid #dbe6fb;background:#f6f9ff;border-radius:9px;
+    font-size:12px;color:#4b5c78;line-height:1.6;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .branch-note b{color:#2f5fe0}
+  .branch-note a{margin-left:auto;color:#3b6ef5;text-decoration:none;white-space:nowrap;font-size:11.5px;cursor:pointer}
+  .branch-note a:hover{text-decoration:underline}
+  /* 历史提问清单：时间线样式，每条是一段"问+当时回答"，点一下就能看完整对话 */
+  .branch-list{display:none;flex:0 0 100%;margin-top:12px;border-top:1px solid #dbe6fb;padding:12px 0 2px 18px;position:relative}
+  .branch-list.open{display:block}
+  .branch-list::before{content:'';position:absolute;left:5px;top:20px;bottom:12px;width:1px;background:#dbe6fb}
+  .branch-lead{flex:0 0 100%;font-size:11.5px;color:var(--muted);margin:0 0 10px}
+  .branch-item{position:relative;border:1px solid #dbe6fb;border-radius:8px;background:#fff;padding:10px 12px;margin-bottom:9px}
+  .branch-item::before{content:'';position:absolute;left:-16px;top:15px;width:7px;height:7px;border-radius:50%;background:#6b8be8;box-shadow:0 0 0 3px #eef3ff}
+  .branch-item .bi-tag{font-size:10.5px;color:var(--muted);font-weight:600;letter-spacing:.2px}
+  .branch-item .bi-q{font-size:12px;color:var(--ink);font-weight:600;line-height:1.6;margin-top:2px}
+  .branch-item .bi-a{font-size:11.5px;color:var(--ink-2);line-height:1.6;margin-top:4px;max-height:38px;overflow:hidden}
+  .branch-item .bi-a b{color:#4b5c78;font-weight:600}
+  .branch-item button{margin-top:8px;border:1px solid #c9d9ff;background:#f2f6ff;color:#315ec9;border-radius:6px;padding:4px 11px;font-size:11px;cursor:pointer}
+  .branch-item button:hover{background:#e3ecff}
+  .branch-note .branch-back{color:#3b6ef5;cursor:pointer;font-size:11.5px;text-decoration:none;margin-left:12px;white-space:nowrap}
+  /* 用户气泡：宽度有上限，超宽屏不拉成横幅，保持对话气泡形态 */
+  .user-bubble{max-width:min(78%,760px);background:var(--primary-soft);color:#1e3a8a;border:1px solid #d6e4ff;border-radius:14px 14px 4px 14px;padding:12px 18px;font-size:14px;line-height:1.7;white-space:pre-wrap;box-shadow:var(--shadow-sm)}
+  /* 回答卡片：占满主区，内部三层（标题栏/正文/引用）用底色与分隔线分层；
+     正文限舒适行宽靠左排版——宽屏长文一行可读性优先，右侧留白是排版呼吸空间 */
+  .ai-card{background:#fff;border:1px solid var(--line);border-left:3px solid var(--primary);border-radius:12px;box-shadow:var(--shadow-sm);overflow:hidden}
+  .ai-card-head{display:flex;align-items:center;gap:9px;padding:11px 18px;background:#fbfcfe;border-bottom:1px solid #f1f4f9;font-size:11.5px;color:var(--muted)}
+  .ai-badge{width:22px;height:22px;border-radius:7px;background:linear-gradient(135deg,var(--primary-hi),var(--primary));color:#fff;display:flex;align-items:center;justify-content:center;font-size:10.5px;font-weight:700;flex:0 0 22px}
+  .ai-card-name{font-weight:650;color:var(--ink-2);letter-spacing:.2px}
+  .ai-state{margin-left:6px}
+  .ai-card-actions{margin-left:auto;display:flex;align-items:center;gap:6px}
+  /* 操作按钮常显：低对比极简图标在浅底上近乎隐形，用户会以为"要 hover 才出来" */
+  .icon-btn{border:1px solid #e6eaf1;background:#fff;color:#6b7789;height:24px;padding:0 8px;border-radius:6px;font-size:12px;line-height:1;transition:all .15s;display:inline-flex;align-items:center;justify-content:center;white-space:nowrap}
+  .icon-btn:hover{border-color:#b9cbff;background:var(--primary-soft);color:var(--primary)}
+  /* 本次调用的消耗：单次问答的 token 与耗时，属于"响应元数据"，放标题栏右侧最合适；
+     数字用 tabular-nums 对齐，连续问答时纵向扫视不会跳动 */
+  .ai-usage{display:inline-flex;align-items:center;gap:4px;height:24px;padding:0 8px;margin-right:2px;
+    border:1px solid #e8edf6;border-radius:6px;background:#f5f8fd;color:#7a8699;
+    font-size:10.5px;font-weight:500;letter-spacing:.1px;font-variant-numeric:tabular-nums;
+    white-space:nowrap;cursor:default;transition:all .15s}
+  .ai-usage:hover{background:#eef4ff;border-color:#d3e0fa;color:#3b6ef5}
+  .ai-usage b{font-weight:700;color:#475569}
+  .ai-usage:hover b{color:#2f5fe0}
+  .ai-usage .ai-usage-sep{color:#c3cddd;font-weight:400}
+  /* 引用计数是"▤ N 篇"文字按钮，必须自适应宽度且不换行 */
+  .ai-cite-count{font-size:11px;letter-spacing:.2px}
+  .ai-card-body{padding:16px 22px 18px;font-size:14px;line-height:1.85;color:var(--ink)}
+  /* 引用区：按文档去重后的角标行，与正文用细分隔线 + 淡底色区分 */
+  .cite-zone:not(:empty){border-top:1px solid #f1f4f9;padding:13px 22px 15px;background:#fafbfe}
+  .cite-row{display:flex;flex-wrap:wrap;gap:7px}
+  .cite-chip{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);background:#fff;color:var(--ink-2);border-radius:7px;padding:5px 9px;font-size:11.5px;cursor:pointer;transition:all .15s;max-width:300px}
+  .cite-chip:hover{background:var(--primary-soft);border-color:#b9cbff;color:#25469b}
+  .cite-num{background:var(--primary);color:#fff;border-radius:5px;padding:1px 6px;font-size:10px;font-weight:700;flex:0 0 auto}
+  .cite-file{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .cite-multi{flex:0 0 auto;font-size:10px;color:#8a95a8;background:#f1f4f9;border-radius:9px;padding:1px 6px}
+  .cite-preview{border:1px solid var(--line);margin-top:10px;padding:6px 12px;background:#fff;border-radius:8px;font-size:12px;color:var(--ink-2);line-height:1.7;display:none}
+  .cite-seg{padding:8px 0;border-bottom:1px dashed #eef1f6}
+  .cite-seg:last-child{border-bottom:0}
+  .cite-seg-no{display:inline-block;font-size:10.5px;color:#3568d4;background:#e8f0ff;border-radius:8px;padding:1px 7px;margin-right:8px}
+  .cite-preview.open{display:block}
+  .cursor{display:inline-block;width:7px;height:15px;background:var(--primary);vertical-align:text-bottom;margin-left:2px;animation:blink 1s steps(2) infinite}
+  @keyframes blink{50%{opacity:0}}
+
+  /* ============ 输入区（WorkBuddy 式：与对话列同宽居中 + 底部工具栏） ============ */
+  .composer-wrap{flex:0 0 auto;padding:14px 6% 16px;background:linear-gradient(transparent,var(--bg) 18%)}
+  .error-bar{max-width:880px;margin:0 auto 9px;padding:9px 13px;border-radius:8px;background:#fdeef3;color:#b91c4a;font-size:12.5px;border:1px solid #f8cfdc;box-shadow:var(--shadow-sm)}
+  .composer{max-width:880px;margin:0 auto;background:#fff;border:1px solid #d9e0ec;border-radius:16px;box-shadow:var(--shadow-md);transition:all .18s;padding:15px 17px 11px}
+  /* 引用条：「从这里再问」把那一轮的问题挂在这里，输入框留给新问题 */
+  .quote-bar{display:flex;align-items:center;gap:8px;background:#f2f6ff;border:1px solid #dbe5ff;border-radius:9px;padding:6px 10px;margin-bottom:9px;font-size:12px}
+  .quote-tag{flex:0 0 auto;color:var(--primary);font-weight:650}
+  .quote-text{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#41506b}
+  .quote-x{border:0;background:transparent;color:#8a97b3;font-size:15px;cursor:pointer;padding:0 2px;line-height:1}
+  .quote-x:hover{color:#e05a6d}
+  .composer:focus-within{border-color:var(--primary);box-shadow:0 0 0 4px rgba(59,110,245,.1),var(--shadow-md)}
+  .composer textarea{width:100%;resize:none;border:0;outline:0;font-size:15px;line-height:1.65;max-height:160px;min-height:28px;color:var(--ink);background:transparent;display:block}
+  .composer-bar{display:flex;align-items:center;gap:8px;margin-top:11px;padding-top:10px;border-top:1px solid #f0f3f8}
+  .composer-tool{border:1px solid transparent;background:transparent;color:var(--muted);font-size:12px;padding:5px 9px;border-radius:7px;display:inline-flex;align-items:center;gap:5px;white-space:nowrap}
+  .composer-tool:hover{background:var(--primary-soft);color:var(--primary);border-color:#dbe5ff}
+  .send-btn{border:0;background:linear-gradient(135deg,var(--primary-hi),var(--primary));color:#fff;padding:8px 18px;border-radius:10px;font-size:12.5px;font-weight:600;transition:all .18s;box-shadow:0 3px 10px rgba(59,110,245,.28);display:flex;align-items:center;gap:6px;margin-left:auto}
+  .send-btn:hover:not(:disabled){transform:translateY(-1px);box-shadow:0 5px 16px rgba(59,110,245,.36)}
+  /* 生成中的停止态：白底细边 + 实心方块图标（WorkBuddy 同款克制风格），不再是一整块刺眼红 */
+  .send-btn.stop{background:#fff;border:1px solid #edc3cb;color:#b93c50;box-shadow:none;padding:7px 14px}
+  .send-btn.stop:hover{background:#fff5f6;border-color:#e69caa;transform:none;box-shadow:0 2px 8px rgba(224,90,109,.12)}
+  .send-btn.stop .stop-ico{display:inline-block;width:9px;height:9px;border-radius:2px;background:#c74457;flex:0 0 9px}
+  .composer-tip{text-align:center;font-size:10.5px;color:var(--muted);margin-top:9px;letter-spacing:.2px}
+  .upload-msg{max-width:660px;margin:8px auto 0;padding:8px 12px;border-radius:8px;font-size:12px;background:#eef4ff;color:#2457b8}
+  .upload-msg.err{background:#fdeef3;color:#b4232a}
+  .upload-msg.ok{background:#e8f7f1;color:#0d8f62}
+
+  /* ============ Markdown 正文 ============ */
+  .md-body p{margin:0 0 10px}.md-body p:last-child{margin-bottom:0}
+  .md-body h1,.md-body h2,.md-body h3,.md-body h4{color:var(--ink);margin:14px 0 8px;line-height:1.4}
+  .md-body h1{font-size:18px}.md-body h2{font-size:16px}.md-body h3{font-size:14.5px}
+  .md-body ul,.md-body ol{margin:5px 0 7px;padding-left:22px}
+  .md-body li{margin:2px 0}
+  .md-body code{background:#eef2f8;padding:1px 5px;border-radius:4px;font-size:.9em;color:#b02a5b}
+  .md-body table{border-collapse:collapse;margin:11px 0;font-size:.92em;max-width:100%;display:block;overflow-x:auto}
+  .md-body th,.md-body td{border:1px solid #dbe2ee;padding:6px 11px;text-align:left}
+  .md-body th{background:#f2f5fa;font-weight:650}
+  .md-body hr{border:0;border-top:1px solid var(--line);margin:13px 0}
+  .md-body pre{background:#111c33;color:#dbe4f5;padding:13px 15px;border-radius:9px;overflow-x:auto}
+  .md-body pre code{background:transparent;padding:0;color:inherit}
+
+  /* Toast 通知 */
+  /* 右下角提示条：浅色卡片 + 左侧状态色条 + 状态圆点，跟主题同族，
+     不再用大色块——提示是辅助信息，不该比正文还抢眼 */
+  .toast{position:fixed;right:24px;bottom:24px;display:flex;align-items:flex-start;gap:9px;background:#fff;border:1px solid #e2e9f4;border-left:3px solid var(--primary);color:#2b3a55;padding:11px 16px 11px 12px;border-radius:10px;font-size:12.5px;box-shadow:0 8px 28px rgba(30,50,90,.16);z-index:99;opacity:0;transform:translateY(12px);transition:all .25s;pointer-events:none;max-width:340px;line-height:1.5}
+  .toast.show{opacity:1;transform:none}
+  .toast::before{flex:0 0 16px;width:16px;height:16px;border-radius:50%;background:var(--primary);color:#fff;font-size:10px;line-height:16px;text-align:center;font-weight:700;content:'i';margin-top:1px}
+  .toast.ok{border-left-color:#2f9e6e}
+  .toast.ok::before{content:'✓';background:#2f9e6e}
+  .toast.err{border-left-color:#d6455c}
+  .toast.err::before{content:'!';background:#d6455c}
+
+  ::-webkit-scrollbar{width:8px;height:8px}
+  ::-webkit-scrollbar-thumb{background:#cfd7e5;border-radius:4px}
+  ::-webkit-scrollbar-thumb:hover{background:#b6c1d4}
+  ::-webkit-scrollbar-track{background:transparent}
+  .sidebar ::-webkit-scrollbar-thumb{background:#3b4b6b}
+
+  @media(max-width:980px){
+    .sidebar{width:230px;flex-basis:230px}
+    .topbar-nav .text-btn{padding:6px 9px;font-size:11px}
+    .quick-list{grid-template-columns:1fr}
+  }

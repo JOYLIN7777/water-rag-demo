@@ -5,6 +5,9 @@ import 'element-plus/dist/index.css'
 import * as ElementPlusIconsVue from '@element-plus/icons-vue'
 import App from './App.vue'
 import { router } from './router'
+// 1:1 还原旧版设计系统（原 static/assets/app.css 完整保留）
+import './styles/legacy.css'
+// Vue/Element Plus 适配层（只做桥接，不覆盖旧版视觉）
 import './styles/main.css'
 
 const app = createApp(App)
