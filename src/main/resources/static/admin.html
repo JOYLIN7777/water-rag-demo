@@ -1866,30 +1866,40 @@ function renderPermTable(){
   DB.perms.filter(x=>!x.parentCode).forEach(x=>{if(!roots.includes(x))roots.push(x)});
   // 挂不到任何根上的（父节点不存在）也提到根层，避免节点看不见
   DB.perms.forEach(x=>{if(x.parentCode&&!byParent[x.parentCode]&&!roots.includes(x))roots.push(x)});
-  let html='',total=0;
+  const trs=[];let total=0;
   const nodeRow=(x,depth)=>{
     total++;
     const folded=PERM_FOLDED.has(x.code);
     const kids=(byParent[x.code]||[]).filter(match);
-    const indent=16+depth*20;
-    const caret=kids.length?'<span class="pg-caret" data-fold="'+esc(x.code)+'" style="cursor:pointer">'+(folded?'▸':'▾')+'</span>':'<span class="pg-caret"></span>';
     const typ=x.nodeType||'menu';
-    const ops=(typ==='btn'?'':'<button class="op-btn" data-perm="perm:read" onclick="createPerm(\''+esc(x.code)+'\')" title="在此层级下新增子项">＋子项</button>')+
-      '<button class="op-btn" data-perm="perm:read" onclick="showPermRoles(\''+esc(x.code)+'\')">查看角色</button>'+
-      '<button class="op-btn" data-perm="perm:read" onclick="editPerm(\''+esc(x.code)+'\')">编辑</button>'+
-      (x.builtin?'':'<button class="op-btn" style="color:#c0392b" data-perm="perm:read" onclick="delPerm(\''+esc(x.code)+'\')">删除</button>');
-    html+='<tr data-code="'+esc(x.code)+'"><td style="padding-left:'+indent+'px" class="name perm-name '+LV(typ)+'">'+
-      caret+'<span class="pn-ico">'+(TYPE_ICON[typ]||'▤')+'</span>'+esc(x.name)+
-      (x.builtin?'':' <span class="tag">自定义</span>')+'</td>'+
-      '<td><span class="node-type '+LV(typ)+'">'+(TYPE_CN[typ]||'功能菜单')+'</span></td>'+
-      '<td class="mono" style="font-size:11px">'+esc(x.code)+'</td>'+
-      '<td class="mono" style="font-size:11px;color:var(--muted)">'+esc(x.routePath||'—')+'</td>'+
-      '<td>'+esc(x.orderNum||0)+'</td>'+
-      '<td>'+ops+'</td></tr>';
+    const tr=E('tr',{dataset:{code:x.code}});
+    // 名称列：折叠箭头 + 图标 + 名称（+自定义标记）
+    const nameCell=E('td',{className:'name perm-name '+LV(typ),attrs:{style:'padding-left:'+(16+depth*20)+'px'}});
+    if(kids.length)nameCell.append(E('span',{className:'pg-caret',dataset:{fold:x.code},
+      text:folded?'▸':'▾',attrs:{style:'cursor:pointer'}}));
+    else nameCell.append(E('span',{className:'pg-caret'}));
+    nameCell.append(E('span',{className:'pn-ico',text:TYPE_ICON[typ]||'▤'}),
+      document.createTextNode(x.name));
+    if(!x.builtin)nameCell.append(document.createTextNode(' '),UI.createTag({text:'自定义'}));
+    tr.append(nameCell);
+    tr.append(E('td',{},E('span',{className:'node-type '+LV(typ),text:TYPE_CN[typ]||'功能菜单'})));
+    tr.append(E('td',{className:'mono',text:x.code,attrs:{style:'font-size:11px'}}));
+    tr.append(E('td',{className:'mono',text:x.routePath||'—',attrs:{style:'font-size:11px;color:var(--muted)'}}));
+    tr.append(E('td',{text:String(x.orderNum||0)}));
+    const opCell=E('td');
+    const op=(label,fn,style,title)=>E('button',{className:'op-btn',type:'button',text:label,
+      dataset:{perm:'perm:read'},title:title||'',attrs:style?{style}:{},on:{click:fn}});
+    if(typ!=='btn')opCell.append(op('＋子项',()=>createPerm(x.code),'','在此层级下新增子项'),op('查看角色',()=>showPermRoles(x.code),''));
+    else opCell.append(op('查看角色',()=>showPermRoles(x.code),''));
+    opCell.append(op('编辑',()=>editPerm(x.code),''));
+    if(!x.builtin)opCell.append(op('删除',()=>delPerm(x.code),'color:#c0392b'));
+    tr.append(opCell);
+    trs.push(tr);
     if(!folded)kids.forEach(k=>nodeRow(k,depth+1));
   };
   roots.filter(match).forEach(r=>nodeRow(r,0));
-  $('pTable').innerHTML=html||'<tr><td colspan="6" class="empty-inline">'+(DB.perms.length?'没有匹配的权限节点':'暂无权限节点')+'</td></tr>';
+  $('pTable').replaceChildren(...(trs.length?trs:[UI.createEmptyRow({
+    text:DB.perms.length?'没有匹配的权限节点':'暂无权限节点',colspan:6,inline:true})]));
   $('pTable')._total=total;
   $('pTable').querySelectorAll('[data-fold]').forEach(el=>{
     el.onclick=()=>{
@@ -2338,9 +2348,11 @@ async function loadUsage(){
     const cards=$('uStats').querySelectorAll('.stat-num');
     cards[0].textContent=num(t.todayRequests);cards[1].textContent=num(t.todayTokens);
     cards[2].textContent=num(t.monthRequests);cards[3].textContent=num(t.monthTokens);
-    $('uUsage').innerHTML=(j.models||[]).map(m=>
-      '<tr><td class="name">'+esc(m.model)+'</td><td>'+num(m.requests)+'</td><td>'+num(m.inputTokens)+'</td><td>'+num(m.outputTokens)+'</td></tr>'
-    ).join('')||'<tr><td colspan="4" class="empty">所选时间范围暂无调用记录</td></tr>';
+    const urows=(j.models||[]).map(m=>E('tr',{},[
+      E('td',{className:'name',text:m.model}), E('td',{text:num(m.requests)}),
+      E('td',{text:num(m.inputTokens)}), E('td',{text:num(m.outputTokens)})
+    ]));
+    $('uUsage').replaceChildren(...(urows.length?urows:[UI.createEmptyRow({text:'所选时间范围暂无调用记录',colspan:4})]));
     $('uUsageHint').textContent=j.hint||'';
     // 只有本地记录才有逐条明细（官方接口只给汇总），没有就别给可点的假入口
     const drillable=!!j.localDrill;
@@ -2366,7 +2378,7 @@ async function openUsageRecords(scope){
     j=await api('/api/usage/records?scope='+encodeURIComponent(scope)+'&limit=500');
   }catch(e){
     const box=document.querySelector('#appModal .modal-body');
-    if(box)box.innerHTML='<div class="empty-inline">明细读取失败：'+esc(e.message)+'</div>';
+    if(box)box.replaceChildren(E('div',{className:'empty-inline',text:'明细读取失败：'+e.message}));
     return;
   }
   const rows=j.records||[];
@@ -2466,16 +2478,21 @@ function openProfile(){
   $('pfPermTotal').textContent=permCount+' 项';
 
   const isAdmin=roles.indexOf('admin')>=0;
-  const row=(k,v)=>'<div class="info-row"><span class="ir-k">'+k+'</span><span class="ir-v">'+v+'</span></div>';
-  $('pfInfo').innerHTML=
-    row('登录账号',esc(u.user||'—'))+
-    row('显示名称',esc(name))+
-    row('所属组织',esc(tl(tenant)))+
-    row('角色 / 用户组',roles.length?roleTags(roles):'<span class="tag off">未分配</span>')+
-    row('账号状态',enabled?'<span class="tag ok">正常</span>':'<span class="tag off">已停用</span>')+
-    row('数据范围',isAdmin?'全部组织（租户内）':'本组织 · 按角色可见')+
-    row('权限数量',permCount+' 项')+
-    row('认证方式','JWT · 访问令牌 30 分钟自动续期');
+  const infoRow=(k,v)=>{
+    const row=E('div',{className:'info-row'},[E('span',{className:'ir-k',text:k}),E('span',{className:'ir-v'})]);
+    const cell=row.lastChild;
+    if(v instanceof Node)cell.append(v);
+    else cell.innerHTML=String(v);   // roleTags 存量返回字符串
+    return row;
+  };
+  const statusTagNode=enabled?UI.createTag({text:'正常',variant:'ok'}):UI.createTag({text:'已停用',variant:'off'});
+  const rolesNode=roles.length?roleTags(roles):'<span class="tag off">未分配</span>';
+  $('pfInfo').replaceChildren(
+    infoRow('登录账号',u.user||'—'), infoRow('显示名称',name), infoRow('所属组织',tl(tenant)),
+    infoRow('角色 / 用户组',rolesNode), infoRow('账号状态',statusTagNode),
+    infoRow('数据范围',isAdmin?'全部组织（租户内）':'本组织 · 按角色可见'),
+    infoRow('权限数量',permCount+' 项'), infoRow('认证方式','JWT · 访问令牌 30 分钟自动续期')
+  );
 
   // 权限按模块分组：和「菜单权限」页同一套模块名，方便对照
   const groups={};
@@ -2485,11 +2502,11 @@ function openProfile(){
     (groups[mod]=groups[mod]||[]).push({code:code,name:hit?hit.name:code,desc:hit?(hit.description||''):''});
   });
   const mods=Object.keys(groups);
-  $('pfPerms').innerHTML=mods.length?mods.map(m=>
-    '<div class="perm-mod"><div class="perm-mod-name">'+esc(m)+'</div><div class="perm-chips">'+
-      groups[m].map(p=>'<span class="perm-chip" title="'+esc(p.code+(p.desc?' — '+p.desc:''))+'">'+esc(p.name)+'</span>').join('')+
-    '</div></div>').join('')
-    :'<div class="empty-inline">暂无权限</div>';
+  $('pfPerms').replaceChildren(...(mods.length?mods.map(m=>{
+    const chips=E('div',{className:'perm-chips'},groups[m].map(p=>
+      E('span',{className:'perm-chip',title:p.code+(p.desc?' — '+p.desc:''),text:p.name})));
+    return E('div',{className:'perm-mod'},[E('div',{className:'perm-mod-name',text:m}),chips]);
+  }):[E('div',{className:'empty-inline',text:'暂无权限'})]));
 
   // 个人中心无侧栏入口：直接切换面板并取消导航高亮
   document.querySelectorAll('.admin-nav-item[data-panel]').forEach(x=>x.classList.remove('active'));
