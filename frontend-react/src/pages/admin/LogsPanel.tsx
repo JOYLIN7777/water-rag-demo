@@ -12,6 +12,10 @@ interface LogRow {
 }
 
 const PAGE_SIZE = 15
+/** 首次只取最近 100 条：实测 500 条约 125KB / 0.8 秒，切页时明显卡一下；
+    需要更多时点「加载更多」按需追加，上限与后端一致 500 条。 */
+const INIT_LIMIT = 100
+const MAX_LIMIT = 500
 /** 后端记录的是接口路径与英文结果码，界面统一转中文 */
 const ACTION_CN: Record<string, string> = { '/api/auth/login': '账号登录', '/api/auth/refresh': '令牌刷新' }
 const RESULT_CN: Record<string, string> = {
@@ -35,6 +39,7 @@ function resultCn(r: string | undefined, status?: number) {
 export default function LogsPanel({ type }: { type: 'login' | 'audit' }) {
   const [rows, setRows] = useState<LogRow[]>([])
   const [page, setPage] = useState(1)
+  const [limit, setLimit] = useState(INIT_LIMIT)
   const [err, setErr] = useState('')
 
   const isLogin = type === 'login'
@@ -44,16 +49,21 @@ export default function LogsPanel({ type }: { type: 'login' | 'audit' }) {
   async function load() {
     try {
       if (isLogin) {
-        const j = await http.get<LogRow[]>('/api/admin/login-logs?limit=500')
+        const j = await http.get<LogRow[]>('/api/admin/login-logs?limit=' + limit)
         setRows(Array.isArray(j) ? j : ((j as any)?.logs || []))
       } else {
-        const j = await http.get<{ logs?: LogRow[] }>('/api/audit/logs?limit=500')
+        const j = await http.get<{ logs?: LogRow[] }>('/api/audit/logs?limit=' + limit)
         setRows(Array.isArray(j?.logs) ? j.logs : [])
       }
       setErr('')
     } catch (e: any) { setErr(e?.message || '加载失败'); setRows([]) }
   }
-  useEffect(() => { void load() /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [type])
+  useEffect(() => {
+    setPage(1)
+    void load()
+    // limit 变化 = 用户点「加载更多」，要按新条数重取
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [type, limit])
 
   async function exportCsv() {
     try {
@@ -114,6 +124,13 @@ export default function LogsPanel({ type }: { type: 'login' | 'audit' }) {
                   </tr>)}
             </tbody>
           </table>
+        </div>
+        <div className="logs-more">
+          {rows.length > 0 && <span className="hint" style={{ margin: 0 }}>当前显示最近 {rows.length} 条</span>}
+          {rows.length >= limit && limit < MAX_LIMIT &&
+            <button className="btn btn-sm" onClick={() => setLimit(x => Math.min(x + 200, MAX_LIMIT))}>
+              加载更多（最多 {MAX_LIMIT} 条）
+            </button>}
         </div>
         <Pager id={isLogin ? 'lPager' : 'aPager'} total={rows.length} page={page} size={PAGE_SIZE} onChange={setPage} />
       </div>

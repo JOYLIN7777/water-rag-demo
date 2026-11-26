@@ -67,7 +67,11 @@ export default function Shell({ children }: { children: React.ReactNode }) {
       void id
     }
   }
-  function pickSession(id: string) { void chat.switchSession(id) }
+  /** 从文档/设置页点击历史会话：先切会话，再回问答页，否则只改了状态看不到会话框 */
+  function pickSession(id: string) {
+    void chat.switchSession(id)
+    if (!location.pathname.includes('index.html')) navigate('/index.html')
+  }
   async function removeSession(id: string) {
     const s = chat.sessions.find(x => x.id === id)
     const ok = await new Promise<boolean>(resolve => {

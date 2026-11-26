@@ -38,8 +38,13 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC'
   border-radius: 14px !important;
   box-shadow: 0 24px 70px rgba(10,20,45,.3) !important;
   overflow: hidden;
-  animation: modalIn .18s ease-out;
+  /* 进入/退出统一交给 AntD 自带 zoom motion：之前这里额外挂了 modalIn，
+     同一元素两条 animation 抢同一个 transform/opacity，开关时会先跳一下再归位。
+     will-change 让合成层提前分配，避免首帧抖动。 */
+  will-change: transform, opacity;
+  backface-visibility: hidden;
 }
+.ant-modal-mask{transition:opacity .18s ease !important}
 .ant-modal-content {
   border-radius: 14px !important;
   box-shadow: none !important;

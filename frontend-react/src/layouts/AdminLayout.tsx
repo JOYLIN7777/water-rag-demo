@@ -94,7 +94,6 @@ export default function AdminLayout() {
       <header className="topbar">
         <div className="topbar-left">
           <div className="brand-crumb"><span>管理后台</span><span className="sep">/</span><span id="panelTitle">{title}</span></div>
-          <span className="topbar-sub">仅管理员可见</span>
         </div>
         <div className="topbar-right">
           <button className="msg-bell" data-perm="admin:access" onClick={() => setMsgOpen(true)} title="消息中心">

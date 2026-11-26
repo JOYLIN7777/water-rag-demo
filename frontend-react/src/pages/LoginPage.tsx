@@ -80,9 +80,12 @@ export default function LoginPage() {
           <div className="lb-mark">水</div>
           <h1 className="lb-title">水利知识库</h1>
           <p className="lb-sub">RAG 智能问答系统</p>
-          <div className="lb-feature"><span className="tick">✓</span>上传规程、报告与表格，构建专属知识库</div>
-          <div className="lb-feature"><span className="tick">✓</span>基于原文作答，每条回答都可溯源</div>
-          <div className="lb-feature"><span className="tick">✓</span>数据按账号与部门隔离，安全可控</div>
+          <div className="lb-features">
+            <div className="lb-features-title">平台能力</div>
+            <div className="lb-feature"><span className="tick">✓</span><span>上传规程、报告与表格，构建专属知识库</span></div>
+            <div className="lb-feature"><span className="tick">✓</span><span>基于原文作答，每条回答都可溯源</span></div>
+            <div className="lb-feature"><span className="tick">✓</span><span>数据按账号与部门隔离，安全可控</span></div>
+          </div>
           <div className="lb-foot">让知识更好用 · 水利知识库</div>
         </div>
 

@@ -13,12 +13,20 @@
   .lb-mark{width:52px;height:52px;border-radius:14px;background:linear-gradient(135deg,var(--primary-hi),var(--primary));
        display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:700;box-shadow:0 8px 22px rgba(59,110,245,.5)}
   .lb-title{font-size:24px;font-weight:680;margin-top:26px;letter-spacing:.4px}
-  .lb-sub{font-size:13px;color:#9fb0d0;margin-top:10px;line-height:1.8;max-width:300px}
-  .lb-features{margin-top:auto;position:relative;z-index:1;display:flex;flex-direction:column;gap:14px}
-  .lb-feature{display:flex;align-items:center;gap:11px;font-size:12.5px;color:#c8d3e8}
-  .lb-feature .tick{width:20px;height:20px;border-radius:50%;background:rgba(59,110,245,.28);
-       color:#9fc0ff;display:flex;align-items:center;justify-content:center;font-size:11px;flex:0 0 20px}
-  .lb-foot{font-size:10px;color:#5f6f8f;margin-top:32px;position:relative;z-index:1}
+  .lb-sub{font-size:13px;color:#9fb0d0;margin-top:10px;margin-bottom:30px;line-height:1.8;max-width:300px}
+  /* 平台能力区：整块推到品牌栏底部，与右侧表单底部齐平；
+     原来三条 feature 直接挂在 brand 上，margin-top:auto 没容器承接，
+     结果紧贴副标题挤成一团。 */
+  .lb-features{position:relative;z-index:1;margin-top:auto;padding-top:26px;
+       border-top:1px solid rgba(255,255,255,.12)}
+  .lb-features-title{font-size:10.5px;letter-spacing:1.6px;color:#7790bd;margin-bottom:16px}
+  .lb-feature{display:flex;align-items:flex-start;gap:12px;font-size:12.5px;line-height:1.7;
+       color:#d5deee;padding:10px 12px;border-radius:9px;margin-bottom:8px;
+       background:rgba(255,255,255,.045);border:1px solid rgba(255,255,255,.06)}
+  .lb-feature:last-child{margin-bottom:0}
+  .lb-feature .tick{width:19px;height:19px;border-radius:50%;background:rgba(59,110,245,.28);
+       color:#9fc0ff;display:flex;align-items:center;justify-content:center;font-size:11px;flex:0 0 19px;margin-top:2px}
+  .lb-foot{font-size:10px;color:#5f6f8f;margin-top:22px;position:relative;z-index:1}
   /* 右侧表单区 */
   .login-form{padding:52px 46px;display:flex;flex-direction:column}
   .lf-title{font-size:20px;font-weight:680;margin:0 0 6px}

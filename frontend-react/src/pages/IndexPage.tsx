@@ -6,6 +6,7 @@ import { message } from 'antd'
 import { useSearchParams } from 'react-router-dom'
 import { useChatStore, type ChatMessageExt } from '@/store/chat'
 import { useAuthStore } from '@/store/auth'
+import { tsLocal } from '@/lib/ui'
 import { streamChat, uploadDocument } from '@/api'
 import { Modal } from 'antd'
 import AdminEntry from '@/components/AdminEntry'
@@ -113,8 +114,9 @@ export default function IndexPage() {
     setBusy(ownerId, true)
 
     const store = chat.bySession[ownerId] || chat.messages
-    const um: ChatMessageExt = { role: 'user', content: query, sources: [] }
-    const ai: ChatMessageExt = { role: 'assistant', content: '', sources: [], streaming: true }
+    const at = Date.now()
+    const um: ChatMessageExt = { role: 'user', content: query, sources: [], ts: at }
+    const ai: ChatMessageExt = { role: 'assistant', content: '', sources: [], streaming: true, ts: at }
     const next = [...store, um, ai]
     chat.cacheMessages(ownerId, next)
     if (chat.currentId === ownerId) setForce(x => x + 1)
@@ -250,24 +252,30 @@ export default function IndexPage() {
             {msgs.map((m, i) => m.role === 'user' ? (
               <div className="msg-group user" key={i}>
                 {m.branchSeal && <div className="branch-seal"><span>↳ 接着这一轮换了个问法 · 以下为新分支（上面的原对话保留）</span></div>}
-                <div className="user-bubble">{m.content}</div>
+                <div className="user-ask">
+                  <div className="ask-meta"><span className="ask-time">{tsLocal(m.ts)}</span><span className="ask-hint">悬停查看完整问题</span></div>
+                  <div className="user-bubble" title={m.content}>
+                    <span className="q-brief">{String(m.content || '').length > 18 ? String(m.content).slice(0, 18) + '…' : m.content}</span>
+                    <span className="q-full">{m.content}</span>
+                  </div>
+                </div>
               </div>
             ) : (
               <div className="msg-group ai" key={i}>
-                <div className="ai-card">
-                  <div className="ai-card-head">
+                <div className={'ai-card' + (m.streaming ? ' streaming' : '')}>
+                  {!m.streaming && <div className="ai-card-head">
                     <span className="ai-badge">水</span><span className="ai-card-name">水利知识库助手</span>
                     {m.branch && <span className="branch-chip">分支</span>}
-                    <span className="ai-state" style={m.streaming ? { color: 'var(--primary)' } : undefined}>{m.streaming ? '生成中…' : ''}</span>
+                    <span className="ai-time">{tsLocal(m.ts)}</span>
                     <span className="ai-card-actions">
                       {m.usage && <span className="ai-usage" title={usageTip(m.usage)}>{usageInner(m.usage)}</span>}
                       {!!m.sources?.length && <button className="icon-btn ai-cite-count" title="引用片段">▤ {groupCites(m.sources).length} 篇</button>}
                       <button className="icon-btn" title="复制回答到剪贴板"
                         onClick={() => { void navigator.clipboard.writeText(m.content); message.success('回答已复制') }}>复制</button>
                     </span>
-                  </div>
+                  </div>}
                   <div className="ai-card-body" dangerouslySetInnerHTML={{ __html: renderMarkdown(m.content) + (m.streaming ? '<span class="cursor"></span>' : '') }} />
-                  <div className="cite-zone">
+                  {!m.streaming && <div className="cite-zone">
                     {!!m.sources?.length && <>
                       <div className="cite-row">
                         {groupCites(m.sources).map((g, k) => (
@@ -286,7 +294,7 @@ export default function IndexPage() {
                         </div>
                       ))}
                     </>}
-                  </div>
+                  </div>}
                 </div>
               </div>
             ))}

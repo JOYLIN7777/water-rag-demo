@@ -180,15 +180,20 @@ export default function UsersPanel() {
       for (const o of orgChildren(parent)) {
         const kids = orgChildren(o.key)
         const isFolded = folded.has(o.key)
-        out.push(<div key={o.key} className={`tree-node${orgKey === o.key ? ' active' : ''}`}
-          style={{ paddingLeft: 10 + depth * 13 }} onClick={() => { setOrgKey(o.key); setPage(1) }}>
+        out.push(<div key={o.key}
+          className={`tree-node tree-lv${Math.min(depth + 1, 3)}${orgKey === o.key ? ' active' : ''}`}
+          data-depth={depth} style={{ paddingLeft: 10 + depth * 16, ['--d' as string]: depth }}
+          onClick={() => { setOrgKey(o.key); setPage(1) }}>
           <span className={`caret${kids.length ? '' : ' ghost'}`}
             onClick={e => {
               if (!kids.length) return
               e.stopPropagation()
               setFolded(prev => { const s = new Set(prev); s.has(o.key) ? s.delete(o.key) : s.add(o.key); return s })
             }}>{kids.length ? (isFolded ? '▸' : '▾') : ''}</span>
-          <span className="tn" title={o.key}>{o.name}</span>
+          <span className="tn" title={orgPathKeys(o.key).join(' / ')}>
+            <span className="tree-tier">L{depth + 1}</span>{o.name}
+          </span>
+          {kids.length > 0 && <span className="cnt" title={`${kids.length} 个下级组织`}>{kids.length}</span>}
         </div>)
         if (!isFolded) walk(o.key, depth + 1)
       }
@@ -225,7 +230,7 @@ export default function UsersPanel() {
       {err && <div className="msg err show">{err}</div>}
       <div className="workbench" style={{ minHeight: 'auto' }}>
         <div className="tree-pane">
-          <div className="tree-head">组织架构（仅用于筛选）</div>
+          <div className="tree-head">组织架构</div>
           <div className={`tree-node${orgKey === '' ? ' active' : ''}`} style={{ paddingLeft: 10 }}
             onClick={() => { setOrgKey(''); setPage(1) }}>
             <span className="caret ghost" /><span className="tn">全部组织（{users.length}）</span>
@@ -257,7 +262,7 @@ export default function UsersPanel() {
                     <td>{(u.groups || []).map(g => <span className="tag-role" key={g}>{auth.groupLabel(g)}</span>)}</td>
                     <td>{orgCrumb(u.tenant || 'default')}</td>
                     <td>{isAdmin
-                      ? <><span className="tag ok">正常</span><span style={{ marginLeft: 8, fontSize: 11.5, color: 'var(--muted)' }}>系统管理员不可停用</span></>
+                      ? <><span className="tag ok">正常</span></>
                       : <><label className="switch" title={u.enabled === false ? '点击启用该账号' : '点击停用该账号'}>
                         <input type="checkbox" checked={u.enabled !== false} onChange={e => void toggleEnabled(u, e.target.checked)} />
                         <span className="track" /><span className="thumb" /></label>
@@ -324,7 +329,7 @@ export default function UsersPanel() {
         {!isNew && <div className="field status-field"><label>账号状态</label>
           <label className="field-check"><input type="checkbox" checked={form.enabled} disabled={self}
             onChange={e => setForm(f => ({ ...f, enabled: e.target.checked }))} />账号正常
-            {self && <span className="form-inline-note">（当前登录账号不可停用）</span>}</label>
+</label>
           <div className="form-hint">停用后该账号无法登录。</div></div>}
       </WbModal>
 

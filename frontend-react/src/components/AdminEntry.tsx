@@ -2,12 +2,13 @@
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useAuthStore } from '@/store/auth'
 
-/** 后台入口目标页：与旧版 renderAdminEntry 的 pages 顺序一致 */
+/** 后台入口目标页：只认真正的管理权限码。
+ *  原来把 usage:read 也列进去，审计员/分析员只因为能看用量统计，
+ *  就在问答页看到「管理后台」按钮，点进去侧栏几乎全是空白——属于越权露出入口。 */
 const ADMIN_PAGES: Array<[string, string]> = [
   ['admin:access', 'users.html'], ['user:read', 'users.html'], ['org:read', 'org.html'],
   ['role:read', 'roles.html'], ['perm:read', 'perms.html'], ['admin:docs', 'docs.html'],
-  ['model:read', 'models.html'], ['usage:read', 'usage.html'],
-  ['loginlog:read', 'loginlogs.html'], ['audit:read', 'audit.html']
+  ['model:read', 'models.html'], ['loginlog:read', 'loginlogs.html'], ['audit:read', 'audit.html']
 ]
 const ADMIN_PATHS = /admin\.html|admin-profile\.html|users\.html|org\.html|roles\.html|perms\.html|docs\.html|models\.html|usage\.html|loginlogs\.html|audit\.html/
 

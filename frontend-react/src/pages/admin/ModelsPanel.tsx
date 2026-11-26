@@ -1,6 +1,7 @@
 /** 后台-模型设置：DOM/class 与旧版 admin.html models 面板 1:1（新增表单 + 当前生效 + 列表三块） */
 import { useEffect, useState } from 'react'
 import { message } from 'antd'
+import WbModal from '@/components/WbModal'
 import { confirmDialog } from '@/lib/ui'
 import { http } from '@/api/http'
 import '@/styles/admin.css'
@@ -11,10 +12,13 @@ interface Model {
 }
 
 const EMPTY = { name: '', type: 'CHAT', baseUrl: '', model: '', apiKey: '', dimensions: '' }
+const EDIT_EMPTY = { ...EMPTY, enabled: true }
 
 export default function ModelsPanel() {
   const [models, setModels] = useState<Model[]>([])
   const [form, setForm] = useState({ ...EMPTY })
+  const [editing, setEditing] = useState<Model | null>(null)
+  const [editForm, setEditForm] = useState({ ...EDIT_EMPTY })
   const [err, setErr] = useState('')
   const [testing, setTesting] = useState<number | null>(null)
 
@@ -40,6 +44,36 @@ export default function ModelsPanel() {
       message.success(j?.message || '配置已添加')
       await load()
     } catch (e: any) { message.error('添加失败：' + (e?.message || '')) }
+  }
+
+  /** 列表行「编辑」：回填当前配置，Key 不回显明文（留空即保持原值） */
+  function openEdit(m: Model) {
+    setEditing(m)
+    setEditForm({
+      name: m.name, type: m.type, baseUrl: m.baseUrl, model: m.model,
+      apiKey: '', dimensions: m.dimensions ? String(m.dimensions) : '', enabled: m.enabled !== false
+    })
+  }
+
+  async function saveEdit() {
+    if (!editing) return
+    if (!editForm.name.trim() || !editForm.baseUrl.trim() || !editForm.model.trim()) {
+      message.error('名称、服务地址、模型名都要填写'); return
+    }
+    if (editForm.type === 'EMBEDDING' && !editForm.dimensions) {
+      message.error('EMBEDDING 配置必须填写向量维度'); return
+    }
+    try {
+      await http.put('/api/models/' + editing.id, {
+        name: editForm.name.trim(), type: editForm.type, baseUrl: editForm.baseUrl.trim(),
+        model: editForm.model.trim(), apiKey: editForm.apiKey.trim(),
+        dimensions: editForm.type === 'EMBEDDING' ? Number(editForm.dimensions) : null,
+        enabled: editForm.enabled
+      })
+      message.success('配置已更新')
+      setEditing(null)
+      await load()
+    } catch (e: any) { message.error('更新失败：' + (e?.message || '')) }
   }
 
   async function activate(id: number) {
@@ -137,7 +171,7 @@ export default function ModelsPanel() {
         <div className="scroll">
           <table className="data-table">
             <thead><tr>
-              <th>名称 / 类型</th><th>端点 / 模型</th><th>Key</th><th>状态</th><th style={{ width: 230 }}>操作</th>
+              <th>名称 / 类型</th><th>端点 / 模型</th><th>Key</th><th>状态</th><th style={{ width: 300 }}>操作</th>
             </tr></thead>
             <tbody>
               {models.length === 0
@@ -158,6 +192,7 @@ export default function ModelsPanel() {
                   </span></td>
                   <td>
                     <div className="model-ops">
+                      <button className="btn btn-sm" onClick={() => openEdit(m)}>编辑</button>
                       {m.active
                         ? <button className="btn btn-sm" disabled>已激活</button>
                         : <button className="btn btn-sm" onClick={() => void activate(m.id)}>激活</button>}
@@ -172,6 +207,41 @@ export default function ModelsPanel() {
           </table>
         </div>
       </div>
+
+      {/* 编辑模型配置：后端 PUT 已支持「Key 留空/脱敏串保持原值」 */}
+      <WbModal size="md" title={'编辑模型配置 · ' + (editing?.name || '')} open={!!editing}
+        okText="保存修改" cancelText="取消" onOk={() => void saveEdit()} onCancel={() => setEditing(null)}>
+        <div className="row">
+          <div className="field" style={{ flex: 2 }}><label>名称</label>
+            <input value={editForm.name} autoComplete="off"
+              onChange={e => setEditForm(f => ({ ...f, name: e.target.value }))} /></div>
+          <div className="field"><label>类型</label>
+            <select value={editForm.type} onChange={e => setEditForm(f => ({ ...f, type: e.target.value }))}>
+              <option value="CHAT">CHAT 对话</option><option value="EMBEDDING">EMBEDDING 向量</option>
+            </select></div>
+        </div>
+        <div className="field"><label>服务地址</label>
+          <input value={editForm.baseUrl} autoComplete="off"
+            onChange={e => setEditForm(f => ({ ...f, baseUrl: e.target.value }))} /></div>
+        <div className="row">
+          <div className="field"><label>模型名</label>
+            <input value={editForm.model} autoComplete="off"
+              onChange={e => setEditForm(f => ({ ...f, model: e.target.value }))} /></div>
+          <div className="field"><label>访问密钥</label>
+            <input type="password" autoComplete="new-password" value={editForm.apiKey}
+              placeholder="留空表示保持原值"
+              onChange={e => setEditForm(f => ({ ...f, apiKey: e.target.value }))} /></div>
+        </div>
+        {editForm.type === 'EMBEDDING' &&
+          <div className="field"><label>向量维度</label>
+            <input type="number" value={editForm.dimensions} placeholder="1024"
+              onChange={e => setEditForm(f => ({ ...f, dimensions: e.target.value }))} /></div>}
+        <div className="field status-field">
+          <label className="field-check"><input type="checkbox" checked={editForm.enabled}
+            onChange={e => setEditForm(f => ({ ...f, enabled: e.target.checked }))} />启用该配置</label>
+          <div className="form-hint">禁用后该配置不能被激活；正在使用的配置需先激活其他同类型模型。</div>
+        </div>
+      </WbModal>
     </>
   )
 }

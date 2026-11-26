@@ -72,6 +72,17 @@
   .tree-node .tn{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .tree-node .cnt{font-size:10px;color:var(--muted);background:#eef2f8;padding:1px 6px;border-radius:8px;flex:0 0 auto}
   .tree-node.active .cnt{background:#fff}
+  /* 用户管理组织树：层级靠缩进 + 层级徽标 + 逐层变浅的字色表达，
+     旧实现所有节点同色同级，展开后看不出父子关系 */
+  .tree-node.tree-lv1 .tn{font-weight:650;color:var(--ink)}
+  .tree-node.tree-lv2 .tn{color:#3b6ef5}
+  .tree-node.tree-lv3 .tn{color:#6b7a99}
+  .tree-node .tree-tier{font-size:9px;line-height:1;color:#8b9ab5;background:#eef2f8;
+    border-radius:3px;padding:2px 3px;margin-right:5px;font-weight:600;letter-spacing:.2px}
+  .tree-node.active .tree-tier{background:#fff;color:var(--primary)}
+  .tree-node[data-depth]{position:relative}
+  .tree-node[data-depth]:not([data-depth="0"])::before{content:'';position:absolute;
+    left:calc(2px + var(--d, 0) * 16px);top:0;bottom:0;border-left:1px dashed #d3ddec;pointer-events:none}
   .tree-children{padding-left:13px}
   .tree-children.collapsed{display:none}
   /* 树头部的「＋」与节点上的悬浮操作：组织支持任意层新增，操作入口必须贴着节点，
@@ -238,13 +249,20 @@
   .op-btn.warn{color:var(--warn)}
   .op-btn.danger{color:var(--danger)}
   /* 分页器 */
-  .pager{display:flex;align-items:center;gap:12px;padding:15px 16px 6px;font-size:12.5px;color:var(--muted);
-    border-top:1px solid var(--line);flex-wrap:wrap;background:#fff;position:sticky;bottom:0;z-index:5}
+  /* 分页条必须跟在表格后面参与正常文档流。旧版用 sticky bottom 吸附，
+     表格一滚动就压在最后几行上，看起来像"分页混进列表/行被遮住"。 */
+  .pager{display:flex;align-items:center;gap:12px;padding:12px 16px 14px;font-size:12.5px;color:var(--muted);
+    border-top:1px solid var(--line);flex-wrap:wrap;background:#fff;
+    /* manage.css 里也定义了 .pager 且带 sticky；这里必须显式覆盖，否则后加载的
+       无 position 声明不会抵消它，分页条仍会浮在日志表格最后几行上。 */
+    position:static;bottom:auto;z-index:auto}
   .pg-btn{min-width:35px;height:34px;padding:0 11px;border:1px solid var(--line);background:#fff;border-radius:7px;font-size:12.5px;color:var(--ink-2);transition:all .15s}
   .pg-btn:hover:not(:disabled){border-color:var(--primary);color:var(--primary)}
   .pg-btn.on{background:var(--primary);border-color:var(--primary);color:#fff;font-weight:600}
   .pg-btn:disabled{opacity:.4}
   .pager .pg-sep{color:#c3cddd;padding:0 3px}
+  /* 日志「加载更多」：默认只取 100 条，避免首次进入等 125KB 全量返回 */
+  .logs-more{display:flex;align-items:center;justify-content:flex-end;gap:12px;padding:10px 16px 0;font-size:11.5px;color:var(--muted)}
   .pager .pg-info{margin-left:auto;display:flex;align-items:center;gap:10px}
   .pager input{width:56px;padding:6px 8px;font-size:12.5px;border:1px solid var(--line);border-radius:7px;text-align:center}
   /* 概览页卡片区限宽，避免超宽屏把卡片拉得过散（列表/表格页保持铺满） */

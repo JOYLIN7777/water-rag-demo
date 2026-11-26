@@ -9,6 +9,8 @@ export interface ChatMessageExt extends ChatMessage {
   parentId?: string
   branch?: boolean
   branchSeal?: boolean
+  /** 问答时间（毫秒时间戳）：后端 history 的 ts 字段，本地新发消息用 Date.now() */
+  ts?: number
   usage?: Record<string, any> & { durationMs?: number }
 }
 
@@ -19,6 +21,18 @@ function loadLocal(): SessionItem[] {
 function loadMessages(id: string): ChatMessageExt[] {
   try { return JSON.parse(localStorage.getItem(scopedKey('msgs:' + id)) || '[]') as ChatMessageExt[] }
   catch { return [] }
+}
+
+/** 后端 history 返回的是 ISO 纳秒字符串（2026-11-26T10:56:55.233589571），
+ *  Number() 会变成 NaN、Date 也不认 9 位小数；统一截到毫秒再转时间戳。 */
+function normalizeTs(v: unknown): number | undefined {
+  if (v == null) return undefined
+  if (typeof v === 'number') return Number.isFinite(v) ? v : undefined
+  const s = String(v)
+  const m = s.match(/^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})\.(\d{1,9})(.*)$/)
+  const iso = m ? `${m[1]}.${m[2].slice(0, 3)}${m[3]}` : s
+  const t = Date.parse(iso)
+  return isNaN(t) ? undefined : t
 }
 
 interface ChatState {
@@ -93,6 +107,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
         content: m.content || '', sources: m.sources,
         usage: (m as any).usage || undefined,
         nodeId: (m as any).id, parentId: (m as any).parentId,
+        ts: normalizeTs((m as any).ts),
         id: `${id}-${i}`
       }))
       set(s => ({ messages: msgs, bySession: { ...s.bySession, [id]: msgs } }))
