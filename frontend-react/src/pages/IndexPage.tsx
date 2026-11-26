@@ -416,7 +416,8 @@ export default function IndexPage() {
                     {!!m.sources?.length && <>
                       <div className="cite-row">
                         {groupCites(m.sources).map((g, k) => (
-                          <span className="cite-chip" key={k} title={`展开该文档的 ${g.segs.length} 个引用片段`}
+                          <span className={'cite-chip' + (openCites[`${i}-${k}`] || activeCite.startsWith(`${i}-${k}-`) ? ' on' : '')}
+                            key={k} title={`展开该文档的 ${g.segs.length} 个引用片段`}
                             onClick={() => setOpenCites(s => ({ ...s, [`${i}-${k}`]: !s[`${i}-${k}`] }))}>
                             <span className="cite-num">{k + 1}</span><span className="cite-file">{g.name}</span>
                             {g.segs.length > 1 && <span className="cite-multi">{g.segs.length}段</span>}

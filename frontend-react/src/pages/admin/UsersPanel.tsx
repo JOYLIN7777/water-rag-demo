@@ -7,7 +7,6 @@ import { confirmDialog } from '@/lib/ui'
 import { http } from '@/api/http'
 import { adminApi } from '@/api'
 import { useAuthStore } from '@/store/auth'
-import { Avatar } from '@/components/Avatar'
 import '@/styles/admin.css'
 
 interface User { username: string; displayName?: string; groups?: string[]; tenant?: string; enabled?: boolean }
@@ -281,11 +280,8 @@ export default function UsersPanel() {
                   const isAdmin = (u.groups || []).includes('admin')
                   return <tr key={u.username}>
                     <td className="row-idx">{(curPage - 1) * PAGE_SIZE + i + 1}</td>
-                    <td><span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
-                      <Avatar name={u.displayName || u.username} size="sm" />
-                      <a className="name" href="javascript:void(0)" style={{ color: 'var(--primary)', textDecoration: 'none' }}
-                        onClick={() => openEdit(u)}>{u.username}</a>
-                    </span></td>
+                    <td><a className="name" href="javascript:void(0)" style={{ color: 'var(--primary)', textDecoration: 'none' }}
+                      onClick={() => openEdit(u)}>{u.username}</a></td>
                     <td>{u.displayName || ''}</td>
                     <td>{(u.groups || []).map(g => <span className={'tag-role role-' + g} key={g}>{auth.groupLabel(g)}</span>)}</td>
                     <td>{orgCrumb(u.tenant || 'default')}</td>

@@ -248,6 +248,12 @@ public class RagChatService {
                 });
     }
 
+    /** 当前账号可见的知识库文档（推荐问题用；沿用文档列表的租户/行级权限过滤） */
+    public List<Map<String, Object>> visibleDocuments() {
+        List<Map<String, Object>> docs = adminRepository.listDocuments();
+        return docs == null ? List.of() : docs;
+    }
+
     /** 本次使用的对话模型名（用量记录用）：按次指定优先，否则当前激活；取不到回落 unknown */
     private String activeChatModelName(Long modelId) {
         try {

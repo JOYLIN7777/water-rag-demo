@@ -397,3 +397,18 @@
   .msg-close:hover{opacity:1;background:rgba(0,0,0,.06)}
   .model-ops{display:flex;gap:6px;flex-wrap:nowrap;align-items:center;white-space:nowrap}
   .model-ops .btn{white-space:nowrap;flex:0 0 auto}
+  /* 角色详情弹框：摘要 + 分区，信息层级清楚 */
+  .role-detail{display:flex;flex-direction:column;gap:20px}
+  .role-detail-summary{display:flex;gap:12px;padding:14px 16px;background:#f7f9fc;border-radius:10px;flex-wrap:wrap}
+  .role-detail-summary>div{flex:1;min-width:130px;display:flex;flex-direction:column;gap:5px}
+  .role-detail-summary .k{font-size:11px;color:var(--muted)}
+  .role-detail-summary code,.role-detail-summary b{font-size:13.5px;color:var(--ink)}
+  .role-detail-section h4{font-size:13px;font-weight:650;color:var(--ink);margin:0 0 10px;
+    display:flex;align-items:center;gap:8px}
+  .role-detail-section h4 .tag{font-size:10.5px;font-weight:500}
+  .role-member-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:9px}
+  .role-member{display:flex;flex-direction:column;gap:4px;padding:9px 12px;border:1px solid var(--line);
+    border-radius:8px;background:#fff;overflow:hidden}
+  .role-member-name{font-size:12.5px;font-weight:600;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .role-member code{font-size:10.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .role-detail-empty{padding:14px;border:1px dashed var(--line);border-radius:8px;text-align:center}

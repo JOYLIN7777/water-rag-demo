@@ -84,7 +84,7 @@ export default function ProfilePanel() {
         <aside className="pf-id">
           <div className="pf-cover" />
           <div className="pf-id-body">
-            <Avatar name={name} size="xl" />
+            <Avatar name={name} size="xl" src={auth.user?.avatar} />
             <div className="pf-name">{name}</div>
             <div className="pf-account">@{me?.user || '—'}</div>
             <div className="pf-tags">{roleTags}</div>

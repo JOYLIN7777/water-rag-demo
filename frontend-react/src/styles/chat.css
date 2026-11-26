@@ -138,6 +138,10 @@
   .cite-row{display:flex;flex-wrap:wrap;gap:7px}
   .cite-chip{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);background:#fff;color:var(--ink-2);border-radius:7px;padding:5px 9px;font-size:11.5px;cursor:pointer;transition:all .15s;max-width:300px}
   .cite-chip:hover{background:var(--primary-soft);border-color:#b9cbff;color:#25469b}
+  /* 展开或点中片段后，文档角标保持选中态 */
+  .cite-chip.on{background:var(--primary);border-color:var(--primary);color:#fff;
+    box-shadow:0 2px 8px rgba(59,110,245,.24)}
+  .cite-chip.on .cite-num{background:rgba(255,255,255,.22);color:#fff}
   .cite-num{background:var(--primary);color:#fff;border-radius:5px;padding:1px 6px;font-size:10px;font-weight:700;flex:0 0 auto}
   .cite-file{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .cite-multi{flex:0 0 auto;font-size:10px;color:#8a95a8;background:#f1f4f9;border-radius:9px;padding:1px 6px}

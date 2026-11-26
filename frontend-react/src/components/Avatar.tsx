@@ -17,10 +17,11 @@ export function Avatar({ name, size = 'md', src }: { name: string; size?: 'sm' |
   const ch = n.slice(0, 1).toUpperCase()
   const pair = AV_PALETTE[hashHue(n) % AV_PALETTE.length]
   const style: CSSProperties = { background: `linear-gradient(135deg,${pair[0]},${pair[1]})` }
-  // 用户自定义头像：data URL 或预设头像标识，优先于首字母
+  // 用户自定义头像：上传图片(data URL) 或 预设 emoji，优先于首字母
   if (src && /^data:image\//.test(src)) {
     return <img className={`av av-${size} av-img`} src={src} alt={n} />
   }
+  if (src) return <span className={`av av-${size} av-emoji`} style={{ background: style.background }}>{src}</span>
   return <span className={`av av-${size}`} style={style}>{ch}</span>
 }
 

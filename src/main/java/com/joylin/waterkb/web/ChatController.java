@@ -87,7 +87,20 @@ public class ChatController {
      */
     @GetMapping("/suggestions")
     public List<String> suggestions(@RequestParam(required = false, defaultValue = "4") int limit) {
-        LinkedHashSet<String> asked = new LinkedHashSet<>();
+        // 新会话的推荐问题来自知识库文档，而不是上一轮提问的回放。
+        // 取当前账号可见文档的文件名生成可问的问题，让用户一进来就知道"这个库能问什么"。
+        LinkedHashSet<String> out = new LinkedHashSet<>();
+        try {
+            for (Map<String, Object> d : ragChatService.visibleDocuments()) {
+                String name = String.valueOf(d.getOrDefault("fileName", "")).trim();
+                if (name.isEmpty() || "null".equals(name)) continue;
+                String base = name.replaceAll("\\.[^.]+$", "").replaceAll("[_\\-]", " ").trim();
+                if (base.isEmpty()) continue;
+                out.add("《" + base + "》主要包含哪些内容？");
+                if (out.size() >= limit * 2) break;
+            }
+        } catch (Exception ignored) { }
+        // 文档不足时用历史真实提问补足，最后再回退默认示例（由前端处理）
         try {
             for (Map<String, Object> s : sessionStore.list()) {
                 String sid = String.valueOf(s.getOrDefault("id", ""));
@@ -95,15 +108,13 @@ public class ChatController {
                 for (Map<String, Object> m : treeStore.historyList(sid)) {
                     if (!"user".equals(String.valueOf(m.get("role")))) continue;
                     String q = String.valueOf(m.getOrDefault("content", "")).trim();
-                    if (q.length() >= 5 && q.length() <= 60) asked.add(q);
-                    if (asked.size() >= limit * 3) break;
+                    if (q.length() >= 5 && q.length() <= 60) out.add(q);
+                    if (out.size() >= limit * 3) break;
                 }
-                if (asked.size() >= limit * 3) break;
+                if (out.size() >= limit * 3) break;
             }
-        } catch (Exception e) {
-            // 推荐是辅助能力，异常时回退默认示例，不影响问答
-        }
-        return new ArrayList<>(asked).stream().limit(Math.max(1, Math.min(limit, 8))).toList();
+        } catch (Exception ignored) { }
+        return new ArrayList<>(out).stream().limit(Math.max(1, Math.min(limit, 8))).toList();
     }
 
     /**

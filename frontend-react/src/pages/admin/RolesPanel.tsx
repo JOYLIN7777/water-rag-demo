@@ -195,28 +195,37 @@ export default function RolesPanel() {
         </div>
       </WbModal>
 
-      {/* 权限明细 */}
-      <WbModal title={(viewing ? auth.groupLabel(viewing.role) : '') + ' · 权限明细'} open={!!viewing}
+      {/* 角色详情：基本信息 / 关联用户 / 权限明细分区，避免两堆卡片糊在一起 */}
+      <WbModal size="wide" title={(viewing ? auth.groupLabel(viewing.role) : '') + ' · 角色详情'} open={!!viewing}
         okText="关闭" cancelText={null} onOk={() => setViewing(null)} onCancel={() => setViewing(null)}>
-        {(() => {
-          const members = users.filter(u => (u.groups || []).includes(viewing?.role || ''))
-          return <div className="role-view-members">
-            <div className="form-hint" style={{ marginBottom: 8 }}>关联用户（{members.length} 人）</div>
-            <div className="perm-grid2">
-              {members.length
-                ? members.map(u => <div className="perm-pill" key={u.username}>
-                  <b>{u.displayName || u.username}</b>{u.username}
-                </div>)
-                : <div className="dim">暂无用户分配该角色</div>}
+        {viewing && (() => {
+          const members = users.filter(u => (u.groups || []).includes(viewing.role))
+          const ps = viewing.permissions || []
+          return <div className="role-detail">
+            <div className="role-detail-summary">
+              <div><span className="k">角色标识</span><code>{viewing.role}</code></div>
+              <div><span className="k">数据范围</span><span>{ps.includes('admin:access') ? '全部组织' : '本组织'}</span></div>
+              <div><span className="k">权限数</span><b>{ps.length}</b></div>
             </div>
-            <div className="form-hint" style={{ marginTop: 18, marginBottom: 8 }}>权限明细</div>
+            <div className="role-detail-section">
+              <h4>关联用户 <span className="tag">{members.length} 人</span></h4>
+              {members.length
+                ? <div className="role-member-grid">
+                  {members.map(u => <div className="role-member" key={u.username} title={u.username}>
+                    <span className="role-member-name">{u.displayName || u.username}</span>
+                    <code>{u.username}</code>
+                  </div>)}
+                </div>
+                : <div className="dim role-detail-empty">暂无用户分配该角色</div>}
+            </div>
+            <div className="role-detail-section">
+              <h4>权限明细 <span className="tag">{ps.length} 项</span></h4>
+              <div className="perm-grid2">
+                {ps.map(p => <div className="perm-pill" key={p}><b>{p}</b>{permDesc(p)}</div>)}
+              </div>
+            </div>
           </div>
         })()}
-        <div className="perm-grid2">
-          {(viewing?.permissions || []).map(p => <div className="perm-pill" key={p}>
-            <b>{p}</b>{permDesc(p)}
-          </div>)}
-        </div>
       </WbModal>
     </>
   )

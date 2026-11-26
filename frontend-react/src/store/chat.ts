@@ -130,11 +130,16 @@ export const useChatStore = create<ChatState>((set, get) => ({
   removeSession: (id: string) => {
     set(s => {
       const sessions = s.sessions.filter(x => x.id !== id)
-      const next = s.currentId === id ? (sessions[0]?.id || '') : s.currentId
+      const wasCurrent = s.currentId === id
+      const next = wasCurrent ? (sessions[0]?.id || '') : s.currentId
       const bySession = { ...s.bySession }; delete bySession[id]
-      return { sessions, currentId: next, messages: next === s.currentId ? (bySession[next] || []) : s.messages, bySession }
+      // 删掉当前会话必须把视图切到新会话的消息；之前写成 next === s.currentId，
+      // 删第一个会话时永远不成立，界面继续显示已删会话的内容。
+      return { sessions, currentId: next, messages: wasCurrent ? (bySession[next] || []) : s.messages, bySession }
     })
     get().saveLocal()
+    // 清掉本地消息缓存，避免下次进入又从 localStorage 读回已删会话
+    try { localStorage.removeItem(scopedKey('msgs:' + id)) } catch { /* 隐私模式 */ }
     void chatApi.clearSession(id).catch(() => {})
   },
 
