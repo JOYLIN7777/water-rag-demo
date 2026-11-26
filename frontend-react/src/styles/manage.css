@@ -26,6 +26,9 @@
   .scope{display:inline-flex;align-items:center;gap:4px;border:1px solid var(--line);border-radius:20px;padding:1px 8px;font-size:10.5px;color:var(--ink-2);background:#f7f9fc;white-space:nowrap}
   .scope.sub{border-color:#cfe3d6;background:#f2f9f4;color:#2f7a4d}
   .scope.from{border-color:#dbe6ff;background:#f3f7ff;color:#3a5fb0}
+  /* 文档列表操作列：两个按钮必须横排在同一行，列宽不够就加宽列而不是让按钮竖着堆 */
+  .doc-ops{display:inline-flex;align-items:center;gap:6px;flex-wrap:nowrap;white-space:nowrap}
+  .doc-ops .btn{flex:0 0 auto;white-space:nowrap}
   /* 分页控件：放到卡片底部并吸底，按钮之间留出可点击的间距 */
   .pager{display:flex;gap:11px;align-items:center;justify-content:flex-end;margin-top:18px;padding:14px 2px 4px;
     border-top:1px solid var(--line);background:#fff;position:sticky;bottom:0;z-index:5;font-size:12.5px;color:var(--ink-2)}

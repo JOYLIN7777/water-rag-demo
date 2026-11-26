@@ -52,6 +52,11 @@ public class AuditService {
                 """);
             jdbc.execute("CREATE INDEX IF NOT EXISTS idx_audit_tenant_ts ON audit_log(tenant_id, ts DESC)");
             jdbc.execute("CREATE INDEX IF NOT EXISTS idx_audit_user ON audit_log(user_id, ts DESC)");
+            // 登录日志只占审计表极小一部分（实测 165 万行里最近 100 条要过滤掉 159 万行，耗时约 1 秒）。
+            // 部分索引只为 login/refresh 建 tenant+ts 倒序，查询条件与这里的谓词完全一致，
+            // 规划器直接走这个几千行的小索引，不再全量倒扫业务日志。
+            jdbc.execute("CREATE INDEX IF NOT EXISTS idx_audit_login_ts ON audit_log(tenant_id, ts DESC) "
+                    + "WHERE action LIKE '%/api/auth/login%' OR action LIKE '%/api/auth/refresh%'");
             log.info("审计表 audit_log 已就绪");
         } catch (Exception e) {
             log.error("审计表初始化失败，审计功能不可用：{}", e.getMessage());

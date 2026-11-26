@@ -177,7 +177,9 @@ export default function UsersPanel() {
   function treeNodes() {
     const out: React.ReactNode[] = []
     const walk = (parent: string, depth: number) => {
-      for (const o of orgChildren(parent)) {
+      const siblings = orgChildren(parent)
+      siblings.forEach((o, idx) => {
+        const last = idx === siblings.length - 1
         const kids = orgChildren(o.key)
         const isFolded = folded.has(o.key)
         out.push(<div key={o.key}
@@ -190,13 +192,15 @@ export default function UsersPanel() {
               e.stopPropagation()
               setFolded(prev => { const s = new Set(prev); s.has(o.key) ? s.delete(o.key) : s.add(o.key); return s })
             }}>{kids.length ? (isFolded ? '▸' : '▾') : ''}</span>
+          {/* 树形引导线：同级最后一个用 └─，其余 ├─，一眼看清从「全部组织」分出的层级 */}
+          <span className="tree-branch">{last ? '└─' : '├─'}</span>
           <span className="tn" title={orgPathKeys(o.key).join(' / ')}>
             <span className="tree-tier">L{depth + 1}</span>{o.name}
           </span>
           {kids.length > 0 && <span className="cnt" title={`${kids.length} 个下级组织`}>{kids.length}</span>}
         </div>)
         if (!isFolded) walk(o.key, depth + 1)
-      }
+      })
     }
     walk('', 0)
     return out
@@ -233,7 +237,7 @@ export default function UsersPanel() {
           <div className="tree-head">组织架构</div>
           <div className={`tree-node${orgKey === '' ? ' active' : ''}`} style={{ paddingLeft: 10 }}
             onClick={() => { setOrgKey(''); setPage(1) }}>
-            <span className="caret ghost" /><span className="tn">全部组织（{users.length}）</span>
+            <span className="caret">▾</span><span className="tn">全部组织（{users.length}）</span>
           </div>
           <div id="uTree">{treeNodes()}</div>
         </div>
@@ -259,7 +263,7 @@ export default function UsersPanel() {
                         onClick={() => openEdit(u)}>{u.username}</a>
                     </span></td>
                     <td>{u.displayName || ''}</td>
-                    <td>{(u.groups || []).map(g => <span className="tag-role" key={g}>{auth.groupLabel(g)}</span>)}</td>
+                    <td>{(u.groups || []).map(g => <span className={'tag-role role-' + g} key={g}>{auth.groupLabel(g)}</span>)}</td>
                     <td>{orgCrumb(u.tenant || 'default')}</td>
                     <td>{isAdmin
                       ? <><span className="tag ok">正常</span></>

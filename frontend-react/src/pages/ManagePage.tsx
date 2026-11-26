@@ -211,7 +211,7 @@ export default function ManagePage() {
 
         <div className="table-card">
           <div className="scroll"><table>
-            <thead><tr><th style={{ width: '42%' }}>文件名</th><th style={{ width: 130 }}>所属部门</th><th>切片数</th><th>最近上传时间</th><th style={{ width: 100 }}>操作</th></tr></thead>
+            <thead><tr><th style={{ width: '38%' }}>文件名</th><th style={{ width: 130 }}>所属部门</th><th>切片数</th><th>最近上传时间</th><th style={{ width: 170 }}>操作</th></tr></thead>
             <tbody id="docTbody">
               {slice.length === 0
                 ? <tr><td colSpan={5} className="empty">{search ? '无匹配文档' : (auth.has('doc:write') ? '知识库暂无文档，先上传一份吧' : '知识库暂无文档')}</td></tr>
@@ -222,8 +222,10 @@ export default function ManagePage() {
                     <td><span className="tag">{d.chunks} 片</span></td>
                     <td>{fmtTime(d.uploadedAt)}</td>
                     <td>
-                      {auth.has('doc:chunks') && <button className="btn btn-sm btn-chunks" onClick={() => setChunkFile(d.fileName)}>查看分片</button>}
-                      {auth.has('doc:delete') && <button className="btn btn-sm btn-danger" style={{ marginLeft: 6 }} onClick={() => void removeDoc(d)}>删除</button>}
+                      <div className="doc-ops">
+                        {auth.has('doc:chunks') && <button className="btn btn-sm btn-chunks" onClick={() => setChunkFile(d.fileName)}>查看分片</button>}
+                        {auth.has('doc:delete') && <button className="btn btn-sm btn-danger" onClick={() => void removeDoc(d)}>删除</button>}
+                      </div>
                     </td>
                   </tr>
                 ))}

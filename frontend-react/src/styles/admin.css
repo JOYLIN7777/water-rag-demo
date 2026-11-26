@@ -77,6 +77,9 @@
   .tree-node.tree-lv1 .tn{font-weight:650;color:var(--ink)}
   .tree-node.tree-lv2 .tn{color:#3b6ef5}
   .tree-node.tree-lv3 .tn{color:#6b7a99}
+  .tree-branch{font-family:ui-monospace,Consolas,monospace;color:#a9b8cf;font-size:11px;
+    flex:0 0 auto;letter-spacing:-1px;margin-right:3px}
+  .tree-node.active .tree-branch{color:var(--primary)}
   .tree-node .tree-tier{font-size:9px;line-height:1;color:#8b9ab5;background:#eef2f8;
     border-radius:3px;padding:2px 3px;margin-right:5px;font-weight:600;letter-spacing:.2px}
   .tree-node.active .tree-tier{background:#fff;color:var(--primary)}
@@ -233,6 +236,13 @@
   .tag-role.viewer{background:#f1f4f9;color:#5c6c8d}
   .tag-role.water-dept{background:#e6f7f5;color:#0d8f83}
   .tag-role.ops{background:#fef4e6;color:#c2760a}
+  /* 用户列表的所属角色：按角色码上色，多角色账号扫一眼就能分清谁是什么角色 */
+  .tag-role.role-admin{background:#f3efff;color:#6d46cf;border:1px solid #e2d8ff}
+  .tag-role.role-analyst{background:#eaf1ff;color:#25469b;border:1px solid #d3e0fa}
+  .tag-role.role-water-dept{background:#e6f7f5;color:#0d7f75;border:1px solid #cbeae5}
+  .tag-role.role-viewer,.tag-role.role-user{background:#f1f4f9;color:#5c6c8d;border:1px solid #e2e8f2}
+  .tag-role.role-ops{background:#fef4e6;color:#a86508;border:1px solid #f6e0ba}
+  .tag-role.role-audit{background:#fdeef3;color:#b91c4a;border:1px solid #f8cfdc}
   /* 表格密度：表头 11.5 / 单元格 12.5，行高约 42px */
   .data-table th{padding:9px 12px;font-size:11.5px;background:#f8fafc}
   .data-table td{padding:9px 12px;font-size:12.5px}
@@ -268,9 +278,13 @@
   /* 概览页卡片区限宽，避免超宽屏把卡片拉得过散（列表/表格页保持铺满） */
   /* 概览页已移除，相关的 .quick-cards / .stats 限宽规则一并删除 */
   /* 复选项网格：等宽列对齐，标签不折行（新增/编辑账号弹框） */
-  .check-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(132px,1fr));gap:9px 12px;padding-top:4px}
-  .check-grid label{display:inline-flex;align-items:center;gap:7px;font-size:12.5px;white-space:nowrap;margin:0;color:var(--ink-2);cursor:pointer}
-  .check-grid input[type=checkbox]{width:15px;height:15px;min-width:15px;padding:0;margin:0;flex:0 0 15px;accent-color:var(--primary);cursor:pointer}
+  .check-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:13px 22px;padding:8px 2px 4px}
+  /* legacy.css 的 `.field label{font-size:11.5px}` 是后代选择器，会顺着 .field 命中
+     勾选网格里的 label；同权重且后加载，必须带 .field 提权才能生效。 */
+  .field .check-grid label{display:inline-flex;align-items:center;gap:10px;font-size:13.5px;line-height:1.6;
+    white-space:nowrap;margin:0;padding:5px 8px;border-radius:7px;color:var(--ink-2);cursor:pointer}
+  .field .check-grid label:hover{background:#f6f9fd}
+  .field .check-grid input[type=checkbox]{width:17px;height:17px;min-width:17px;padding:0;margin:0;flex:0 0 17px;accent-color:var(--primary);cursor:pointer}
   /* 账号状态与「角色 / 用户组」分块：虚线分隔，避免状态勾选被看成第五个角色 */
   .status-field{border-top:1px dashed var(--line);padding-top:12px;margin-top:12px}
   .status-field .field-check{font-size:12.5px;color:var(--ink-2);display:inline-flex;align-items:center;gap:7px;cursor:pointer}

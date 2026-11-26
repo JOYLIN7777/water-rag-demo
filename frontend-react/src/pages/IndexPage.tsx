@@ -14,8 +14,23 @@ import '@/styles/chat.css'
 
 interface CiteGroup { name: string; segs: Array<{ fileName?: string; chunkIndex?: number; preview?: string }> }
 
+/** 模型偶尔输出「###一、标题」「####1.小节」这类标题后不空格的 Markdown，
+ *  marked 会当普通文本原样渲染。这里只规范化行首标题，别动正文里的 #。 */
+function normalizeMarkdown(text: string): string {
+  return String(text || '').replace(/^([ \t]*)(#{1,6})[ \t\u3000]*(?=\S)/gm, '$1$2 ')
+}
+
 function renderMarkdown(text: string): string {
-  return DOMPurify.sanitize(marked.parse(text || '', { breaks: true }) as string)
+  return DOMPurify.sanitize(marked.parse(normalizeMarkdown(text), { breaks: true }) as string)
+}
+
+/** 气泡上方的时间只留时分，完整秒数放到 title 里备查 */
+function askTime(ts?: number): string {
+  const full = tsLocal(ts)
+  if (full === '—') return full
+  // tsLocal 是 "MM-DD HH:mm:ss"，取空格后的时分，不能用 slice(-5)（那会拿到分:秒）
+  const parts = full.split(' ')
+  return parts.length > 1 ? parts[1].slice(0, 5) : full
 }
 
 /** 千分位：与旧版 fmtInt 一致 */
@@ -28,7 +43,7 @@ function usageInner(u: Record<string, any>) {
   const sec = (u.durationMs || 0) / 1000
   const d = sec >= 10 ? Math.round(sec) + 's' : sec.toFixed(1) + 's'
   const total = u.totalTokens ?? (Number(u.promptTokens || 0) + Number(u.completionTokens || 0))
-  return <>本次 <b>{fmtInt(total)}</b> tokens<span className="ai-usage-sep">·</span>{d}</>
+  return <>本次消耗<b>{fmtInt(total)}</b> tokens，耗时{d}</>
 }
 
 function usageTip(u: Record<string, any>): string {
@@ -253,11 +268,8 @@ export default function IndexPage() {
               <div className="msg-group user" key={i}>
                 {m.branchSeal && <div className="branch-seal"><span>↳ 接着这一轮换了个问法 · 以下为新分支（上面的原对话保留）</span></div>}
                 <div className="user-ask">
-                  <div className="ask-meta"><span className="ask-time">{tsLocal(m.ts)}</span><span className="ask-hint">悬停查看完整问题</span></div>
-                  <div className="user-bubble" title={m.content}>
-                    <span className="q-brief">{String(m.content || '').length > 18 ? String(m.content).slice(0, 18) + '…' : m.content}</span>
-                    <span className="q-full">{m.content}</span>
-                  </div>
+                  <div className="ask-meta"><span className="ask-time" title={tsLocal(m.ts)}>{askTime(m.ts)}</span></div>
+                  <div className="user-bubble">{m.content}</div>
                 </div>
               </div>
             ) : (

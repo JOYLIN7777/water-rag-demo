@@ -81,19 +81,14 @@
   .branch-note .branch-back{color:#3b6ef5;cursor:pointer;font-size:11.5px;text-decoration:none;margin-left:12px;white-space:nowrap}
   /* 用户气泡：宽度有上限，超宽屏不拉成横幅，保持对话气泡形态 */
   .user-bubble{max-width:min(78%,760px);background:var(--primary-soft);color:#1e3a8a;border:1px solid #d6e4ff;border-radius:14px 14px 4px 14px;padding:12px 18px;font-size:14px;line-height:1.7;white-space:pre-wrap;box-shadow:var(--shadow-sm)}
-  /* 问答时间 + 提问折叠：问题默认只留短摘要，鼠标移到气泡上展开全文，
-     让一屏能看更多轮回答，长问题又不会丢信息。 */
+  /* 提问时间：只显示时分的小胶囊，秒数放 title；问题整句显示，不再折叠/悬停展开 */
   .user-ask{display:flex;flex-direction:column;align-items:flex-end;max-width:min(78%,760px)}
-  .ask-meta{display:flex;align-items:center;gap:10px;margin-bottom:5px;padding:0 3px;font-size:10.5px;color:#93a0b6}
-  .ask-time{font-variant-numeric:tabular-nums}
-  .ask-hint{opacity:.75}
-  .user-bubble .q-full{display:none}
-  .user-ask:hover .q-brief{display:none}
-  .user-ask:hover .q-full{display:inline}
-  .user-ask:hover .ask-hint{color:var(--primary);opacity:1}
+  .ask-meta{margin-bottom:5px;padding:0 4px;font-size:11px;color:#94a2b8}
+  .ask-time{font-variant-numeric:tabular-nums;background:#f1f5fa;border-radius:10px;padding:1px 9px}
+  .user-ask .user-bubble{max-width:100%;word-break:break-word}
   .ai-time{margin-left:6px;font-size:10.5px;color:#93a0b6;font-variant-numeric:tabular-nums}
-  /* 流式回答：先只给正文光标，卡片边框/工具条/引用区等回答结束再出现 */
-  .ai-card.streaming{border-style:dashed;border-left-color:#a9bff0;background:#fcfdff}
+  /* 流式回答：边框保持实线（虚线看着像卡片没加载完），回答结束后才出工具条 */
+  .ai-card.streaming{border-color:#dce5f8;border-left-color:var(--primary);background:#fcfdff}
   .ai-card.streaming .ai-card-body{min-height:56px}
   /* 回答卡片：占满主区，内部三层（标题栏/正文/引用）用底色与分隔线分层；
      正文限舒适行宽靠左排版——宽屏长文一行可读性优先，右侧留白是排版呼吸空间 */
