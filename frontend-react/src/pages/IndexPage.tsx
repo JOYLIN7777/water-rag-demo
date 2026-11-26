@@ -89,12 +89,18 @@ export default function IndexPage() {
     void (async () => {
       await chat.syncSessions()
       await chat.loadSuggestions()
+      // 读最新 store：挂载到 syncSessions 返回期间用户可能已经提问，
+      // 这时候再用旧闭包里的 currentId/会话列表去 switchSession 会把新消息冲掉。
+      const state = useChatStore.getState()
       const sid = params.get('sid')
-      if (sid && chat.sessions.some(s => s.id === sid)) await chat.switchSession(sid)
+      if (sid && state.sessions.some(s => s.id === sid)) await chat.switchSession(sid)
       else if (params.get('new') === '1') await chat.switchSession(chat.newSession())
-      // 先尊重当前选择：从「新建会话」进来时 currentId 已是空会话，不能再跳回第一条历史
-      else if (chat.currentId) await chat.switchSession(chat.currentId)
-      else if (chat.sessions.length) await chat.switchSession(chat.sessions[0].id)
+      else if (state.currentId) {
+        const cached = state.bySession[state.currentId]
+        // 已经写入本地消息说明用户正在这个会话提问，不能被历史覆盖
+        if (!cached || cached.length === 0) await chat.switchSession(state.currentId)
+      }
+      else if (state.sessions.length) await chat.switchSession(state.sessions[0].id)
       else await chat.switchSession(chat.newSession())
     })()
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -118,7 +124,8 @@ export default function IndexPage() {
 
   async function send(text?: string) {
     const query = (text ?? q).trim()
-    const ownerId = chat.currentId
+    // 页面刚挂载、初始化还没设 currentId 时先建空会话，避免消息挂到空 key 上被后续初始化冲掉
+    const ownerId = chat.currentId || chat.newSession()
     if (!query || chat.busyIds.has(ownerId)) return
     setQ('')
     setError('')

@@ -39,6 +39,7 @@ export default function ManagePage() {
   const fileInput = useRef<HTMLInputElement>(null)
   const folderInput = useRef<HTMLInputElement>(null)
   const [docs, setDocs] = useState<DocItem[]>([])
+  const [orgLabels, setOrgLabels] = useState<Record<string, string>>({})
   const [formats, setFormats] = useState<string[]>([])
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
@@ -66,6 +67,15 @@ export default function ManagePage() {
     void http.get<{ extensions: string[] }>('/api/docs/formats')
       .then(j => setFormats(j.extensions || []))
       .catch(() => showMsg('err', '格式列表加载失败'))
+    // 组织 key 要显示成中文名，不能把 org-xxxx 直接给用户看
+    void http.get<Array<{ key?: string; name?: string }>>('/api/orgs')
+      .then(list => {
+        const map: Record<string, string> = {}
+        for (const o of Array.isArray(list) ? list : []) {
+          if (o.key) map[o.key] = o.name || o.key
+        }
+        setOrgLabels(map)
+      }).catch(() => { /* 组织名取不到时仍显示 key，不影响文档列表 */ })
   }, [])
 
   const filtered = docs.filter(d => !search.trim() || d.fileName.toLowerCase().includes(search.trim().toLowerCase()))
@@ -86,14 +96,23 @@ export default function ManagePage() {
   const rest = actualExts.filter(e => !usedExts.has(e))
   if (rest.length) fmtGroups.push({ name: '其他', list: rest })
 
+  // 没有权限的功能整块不渲染，而不是显示一个空壳让人以为坏了
+  const canUpload = auth.has('doc:write') || auth.has('doc:write_batch')
+  const canBatch = auth.has('doc:write_batch')
+  const canChunk = auth.has('doc:chunks')
+  const canDelete = auth.has('doc:delete')
+  const canOps = canChunk || canDelete
+
+  const orgName = (k: string) => orgLabels[k] || k
+
   function scopeBadge(d: DocItem): React.ReactNode {
     const t = d.tenantId || 'default'
     if (!myOrg || t === myOrg) {
       return d.visibleSubtree
-        ? <span className="scope sub" title="本部门上传，且已勾选含下级部门下发">{myOrg} · 含下级</span>
+        ? <span className="scope sub" title="本部门上传，且已勾选含下级部门下发">{orgName(myOrg)} · 含下级</span>
         : <span className="scope" title="本部门上传：本部门与上级可见">本部门</span>
     }
-    return <span className="scope from" title="上级部门下发或下级部门上传（上级默认可见）">来自 {t}</span>
+    return <span className="scope from" title={`来自 ${orgName(t)}，上级部门下发或下级部门上传`}>来自 {orgName(t)}</span>
   }
 
   async function removeDoc(d: DocItem) {
@@ -173,7 +192,7 @@ export default function ManagePage() {
           </div>
         </div>
 
-        <div className="upload-card">
+        {canUpload && <div className="upload-card">
           <div className={`dropzone${dragging ? ' dragging' : ''}`}
             onClick={() => fileInput.current?.click()}
             onDragOver={e => { e.preventDefault(); setDragging(true) }}
@@ -193,7 +212,7 @@ export default function ManagePage() {
                 </div>
               ))}
             </div>
-            {auth.has('doc:write_batch') && (
+            {canBatch && (
               <div className="folder-row">
                 <button className="folder-btn" onClick={() => folderInput.current?.click()}
                   title="同一页面内重复点击会直接读取上次那个文件夹">📁 选择文件夹批量上传</button>
@@ -203,7 +222,7 @@ export default function ManagePage() {
           </div>
           <input ref={fileInput} type="file" multiple hidden onChange={e => { pickFiles(e.target.files); e.target.value = '' }} />
           <input ref={folderInput} type="file" multiple hidden {...{ webkitdirectory: '' }} onChange={e => { pickFiles(e.target.files); e.target.value = '' }} />
-        </div>
+        </div>}
 
         {msg && <div className={`upload-msg ${msg.type}`}>{msg.text}</div>}
 
@@ -215,22 +234,22 @@ export default function ManagePage() {
 
         <div className="table-card">
           <div className="scroll"><table>
-            <thead><tr><th style={{ width: '38%' }}>文件名</th><th style={{ width: 130 }}>所属部门</th><th>切片数</th><th>最近上传时间</th><th style={{ width: 170 }}>操作</th></tr></thead>
+            <thead><tr><th style={{ width: '38%' }}>文件名</th><th style={{ width: 130 }}>所属部门</th><th>切片数</th><th>最近上传时间</th>{canOps && <th style={{ width: 170 }}>操作</th>}</tr></thead>
             <tbody id="docTbody">
               {slice.length === 0
-                ? <tr><td colSpan={5} className="empty">{search ? '无匹配文档' : (auth.has('doc:write') ? '知识库暂无文档，先上传一份吧' : '知识库暂无文档')}</td></tr>
+                ? <tr><td colSpan={canOps ? 5 : 4} className="empty">{search ? '无匹配文档' : (canUpload ? '知识库暂无文档，先上传一份吧' : '知识库暂无文档')}</td></tr>
                 : slice.map(d => (
                   <tr key={d.fileName + (d.tenantId || '')}>
                     <td className="doc-name" title={d.fileName}>{d.fileName}</td>
                     <td>{scopeBadge(d)}</td>
                     <td><span className="tag">{d.chunks} 片</span></td>
                     <td>{fmtTime(d.uploadedAt)}</td>
-                    <td>
+                    {canOps && <td>
                       <div className="doc-ops">
-                        {auth.has('doc:chunks') && <button className="btn btn-sm btn-chunks" onClick={() => setChunkFile(d.fileName)}>查看分片</button>}
-                        {auth.has('doc:delete') && <button className="btn btn-sm btn-danger" onClick={() => void removeDoc(d)}>删除</button>}
+                        {canChunk && <button className="btn btn-sm btn-chunks" onClick={() => setChunkFile(d.fileName)}>查看分片</button>}
+                        {canDelete && <button className="btn btn-sm btn-danger" onClick={() => void removeDoc(d)}>删除</button>}
                       </div>
-                    </td>
+                    </td>}
                   </tr>
                 ))}
             </tbody>

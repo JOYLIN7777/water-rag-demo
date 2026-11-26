@@ -162,6 +162,7 @@ export default function Shell({ children }: { children: React.ReactNode }) {
           ))}
         </nav>
 
+        {auth.has('chat:use') && <>
         <button className="new-chat" type="button" onClick={newChat}>＋ 新建会话</button>
         <div className="section-label">历史会话</div>
         <div className="session-list" id="sessionList">
@@ -180,6 +181,7 @@ export default function Shell({ children }: { children: React.ReactNode }) {
               )
             })}
         </div>
+        </>}
           </>
         )}
 

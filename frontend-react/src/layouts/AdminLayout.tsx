@@ -96,10 +96,10 @@ export default function AdminLayout() {
           <div className="brand-crumb"><span>管理后台</span><span className="sep">/</span><span id="panelTitle">{title}</span></div>
         </div>
         <div className="topbar-right">
-          <button className="msg-bell" data-perm="admin:access" onClick={() => setMsgOpen(true)} title="消息中心">
+          {auth.has('admin:access') && <button className="msg-bell" data-perm="admin:access" onClick={() => setMsgOpen(true)} title="消息中心">
             <span>✉</span><span>消息</span>
             {pendingCount > 0 && <span className="dot">{pendingCount}</span>}
-          </button>
+          </button>}
         </div>
       </header>
       {/* admin-page：后台内容区铺满主区（旧版 .page 不带 1160 上限） */}

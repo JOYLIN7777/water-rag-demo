@@ -81,10 +81,10 @@ export default function LoginPage() {
           <h1 className="lb-title">水利知识库</h1>
           <p className="lb-sub">RAG 智能问答系统</p>
           <div className="lb-features">
-            <div className="lb-features-title">平台能力</div>
-            <div className="lb-feature"><span className="tick">✓</span><span>上传规程、报告与表格，构建专属知识库</span></div>
-            <div className="lb-feature"><span className="tick">✓</span><span>基于原文作答，每条回答都可溯源</span></div>
-            <div className="lb-feature"><span className="tick">✓</span><span>数据按账号与部门隔离，安全可控</span></div>
+            <div className="lb-features-title">能帮你做什么</div>
+            <div className="lb-feature"><span className="tick">✓</span><span>把工作里的规程、报告和表格放进来，随时问、随时查</span></div>
+            <div className="lb-feature"><span className="tick">✓</span><span>回答有出处，点开就能看原文，不用自己翻文件</span></div>
+            <div className="lb-feature"><span className="tick">✓</span><span>各部门只看得到自己的资料，重要数据不串门</span></div>
           </div>
           <div className="lb-foot">让知识更好用 · 水利知识库</div>
         </div>
@@ -120,11 +120,10 @@ export default function LoginPage() {
           </form>
 
           <div className="demo-box">
-            <div className="demo-title">演示账号（点击填入）</div>
-            <div className="demo-row"><code>admin / Admin@123456</code><span>系统管理员</span>
+            <div className="demo-title">本机演示账号（点击填入）</div>
+            <div className="demo-row"><code>admin / Admin@123456</code><span>首次登录用</span>
               <button type="button" onClick={() => fill('admin', 'Admin@123456')}>填入</button></div>
-            <div className="demo-row"><code>analyst / Analyst@123456</code><span>水利分析员</span>
-              <button type="button" onClick={() => fill('analyst', 'Analyst@123456')}>填入</button></div>
+            <div className="demo-note">仅演示环境保留。正式部署请删除此区域，并用管理员账号新建真实用户。</div>
           </div>
         </div>
       </div>
