@@ -144,9 +144,9 @@ public class RagChatService {
         Flux<String> tokens;
 
         if (!breaker.allowCall()) {
-            // 熔断打开期：不再请求大模型，直接降级返回检索原文，快速失败
+            // 熔断打开期：明确提示模型服务异常，不再用检索原文冒充模型回答
             degraded[0] = true;
-            String fallback = degradeText("AI 服务处于熔断保护中", hits);
+            String fallback = modelErrorMessage("AI 服务处于熔断保护中，暂时无法生成回答，请稍后重试");
             answerBuf.append(fallback);
             tokens = Flux.just(fallback);
         } else {
@@ -280,8 +280,8 @@ public class RagChatService {
         } catch (Exception ex) {
             breaker.recordFailure();
             degraded[0] = true;
-            log.error("Chat 模型构建失败，触发降级：{}", ex.getMessage());
-            String fallback = degradeText("模型配置异常，已自动降级", hits);
+            log.error("Chat 模型构建失败：{}", ex.getMessage());
+            String fallback = modelErrorMessage("模型配置异常，无法生成回答，请联系管理员检查模型设置");
             answerBuf.append(fallback);
             return Flux.just(fallback);
         }
@@ -308,8 +308,8 @@ public class RagChatService {
                 .onErrorResume(ex -> {
                     breaker.recordFailure();
                     degraded[0] = true;
-                    log.error("模型调用失败，触发降级：{}", ex.getMessage());
-                    String fallback = degradeText("AI 服务出现异常，已自动降级", hits);
+                    log.error("模型调用失败：{}", ex.getMessage());
+                    String fallback = modelErrorMessage("模型服务异常，本次回答生成失败，请稍后重试");
                     answerBuf.setLength(0);
                     answerBuf.append(fallback);
                     return Flux.just(fallback);
@@ -523,24 +523,11 @@ public class RagChatService {
         return sb.toString();
     }
 
-    /**
-     * 降级文案：大模型不可用时，把检索到的原文直接给用户兜底。
-     * 这是 RAG 特有的降级红利——即使没有生成环节，检索结果本身仍有参考价值。
-     */
-    private String degradeText(String reason, List<Document> hits) {
-        StringBuilder sb = new StringBuilder("【服务降级】").append(reason)
-                .append("，以下为知识库检索到的原文片段，供直接参考：\n");
-        if (hits.isEmpty()) {
-            return sb.append("\n（知识库中暂无相关内容，请稍后重试）").toString();
-        }
-        for (Document d : hits) {
-            Map<String, Object> meta = d.getMetadata();
-            sb.append("\n【来源：").append(meta.getOrDefault("fileName", "未知文件"))
-                    .append(" · 第").append(meta.getOrDefault("chunkIndex", "?")).append("段】\n")
-                    .append(preview(d.getText(), 200)).append('\n');
-        }
-        return sb.toString();
+    /** 模型不可用时的明确错误提示：不再把检索原文包装成回答 */
+    private String modelErrorMessage(String message) {
+        return "【模型异常】" + message;
     }
+
 
     /**
      * 引用片段序列化为 JSON（sources 事件载荷）。

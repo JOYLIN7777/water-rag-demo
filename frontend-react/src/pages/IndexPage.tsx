@@ -140,6 +140,8 @@ export default function IndexPage() {
   const [openCites, setOpenCites] = useState<Record<string, boolean>>({})
   const [uploadMsg, setUploadMsg] = useState<{ type: string; text: string } | null>(null)
   const [chunkDetail, setChunkDetail] = useState<{ fileName: string; index: number; content: string } | null>(null)
+  /** 当前点开的引用片段：回答结束后也能看到选中态 */
+  const [activeCite, setActiveCite] = useState<string>('')
   /** 多个可用 CHAT 模型时可按次选择（类似 WorkBuddy），选择保存在本机 */
   const [chatModels, setChatModels] = useState<Array<{ id: number; name: string; model: string; active?: boolean }>>([])
   const [modelId, setModelId] = useState<number | null>(() => {
@@ -160,6 +162,7 @@ export default function IndexPage() {
     }
   }
   const fileInput = useRef<HTMLInputElement>(null)
+  const inputRef = useRef<HTMLTextAreaElement>(null)
   const [force, setForce] = useState(0)   // 触发重渲染（流式增量）
 
   function scrollBottom(forceScroll = false) {
@@ -177,7 +180,7 @@ export default function IndexPage() {
       await chat.loadSuggestions()
       void http.get<Array<{ id: number; name: string; model: string; type: string; enabled?: boolean; active?: boolean }>>('/api/models')
         .then(list => setChatModels((Array.isArray(list) ? list : [])
-          .filter(m => m.type === 'CHAT' && m.enabled !== false)
+          .filter(m => m.type === 'CHAT' && m.active === true && m.enabled !== false)
           .map(m => ({ id: m.id, name: m.name, model: m.model, active: m.active }))))
         .catch(() => setChatModels([]))
       // 读最新 store：挂载到 syncSessions 返回期间用户可能已经提问，
@@ -226,6 +229,7 @@ export default function IndexPage() {
     if (lastSendRef.current && lastSendRef.current.q === query && now - lastSendRef.current.at < 1500) return
     lastSendRef.current = { q: query, at: now }
     setQ('')
+    if (inputRef.current) inputRef.current.style.height = '38px' 
     setError('')
     try { localStorage.removeItem(`draft:${ownerId}`) } catch { /* 同上 */ }
 
@@ -421,9 +425,12 @@ export default function IndexPage() {
                       </div>
                       {groupCites(m.sources).map((g, k) => (
                         <div className={`cite-preview${openCites[`${i}-${k}`] ? ' open' : ''}`} key={k} id={`cite-p-${i}-${k}`}>
-                          {g.segs.map((s, j) => <div className="cite-seg" key={j}
+                          {g.segs.map((s, j) => <div className={'cite-seg' + (activeCite === `${i}-${k}-${j}` ? ' on' : '')} key={j}
                             role="button" title="点击查看该段原文全文"
-                            onClick={() => void showChunkDetail(String(s.fileName || g.name), Number(s.chunkIndex || 0))}>
+                            onClick={() => {
+                              setActiveCite(`${i}-${k}-${j}`)
+                              void showChunkDetail(String(s.fileName || g.name), Number(s.chunkIndex || 0))
+                            }}>
                             <span className="cite-seg-no">第{Number(s.chunkIndex || 0) + 1}段</span>{s.preview || ''}
                           </div>)}
                         </div>
@@ -440,7 +447,14 @@ export default function IndexPage() {
         <div className={`error-bar${error ? ' show' : ''}`}>{error}</div>
         <div className="composer">
           <textarea id="question" rows={1} placeholder="输入你的问题，Enter 发送，Shift+Enter 换行"
-            value={q} onChange={e => setQ(e.target.value)}
+            value={q} ref={inputRef}
+            onChange={e => {
+              setQ(e.target.value)
+              // 按内容高度自适应，长问题完整显示（最多约 8 行）
+              const el = e.target
+              el.style.height = 'auto'
+              el.style.height = Math.min(200, Math.max(38, el.scrollHeight)) + 'px'
+            }}
             onKeyDown={e => {
               if (e.key === 'Enter' && !e.shiftKey && !(e as any).isComposing) { e.preventDefault(); void send() }
             }} />

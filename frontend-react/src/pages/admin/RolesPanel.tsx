@@ -146,8 +146,8 @@ export default function RolesPanel() {
                       {members.length === 0 ? <span className="dim">—</span> : <>
                         {members.slice(0, 2).map(u => <span className="tag-role" key={u.username}
                           title={u.username}>{u.displayName || u.username}</span>)}
-                        {members.length > 2 && <span className="tag"
-                          title={members.map(u => u.displayName || u.username).join('、')}>+{members.length - 2}</span>}
+                        {members.length > 2 && <button className="op-btn" title="查看全部关联用户"
+                          onClick={() => setViewing(r)}>+{members.length - 2} 查看全部</button>}
                       </>}
                     </td>
                     <td>

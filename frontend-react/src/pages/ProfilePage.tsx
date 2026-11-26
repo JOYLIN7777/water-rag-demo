@@ -1,5 +1,5 @@
 /** 个人中心：DOM/class 与旧版 profile.html 1:1，JWT 有效期/修改密码逻辑完整 */
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Modal, message } from 'antd'
 import { http } from '@/api/http'
 import { getAccess, encryptPassword, logout } from '@/api/auth'
@@ -64,6 +64,7 @@ export default function ProfilePage() {
   const [avatarInput, setAvatarInput] = useState('')
   const [preset, setPreset] = useState('')
   const [profileErr, setProfileErr] = useState('')
+  const renewing = useRef(false)
 
   useEffect(() => {
     void (async () => {
@@ -102,6 +103,22 @@ export default function ProfilePage() {
       const iat = c.iat || (c.exp - remain)
       const total = Math.max(1, c.exp - iat)
       setToken({ remain, pct: Math.min(100, Math.round(remain / total * 100)) })
+      // 令牌到期后自动续期，失败就直接让页面重新登录，不再停在 0 分 00 秒
+      if (remain === 0 && !renewing.current) {
+        renewing.current = true
+        void http.post<{ accessToken: string; refreshToken: string }>('/api/auth/refresh')
+          .then(j => {
+            sessionStorage.setItem('wrk_access_token', j.accessToken)
+            sessionStorage.setItem('wrk_refresh_token', j.refreshToken)
+            setToken(null)
+            updateToken()
+          })
+          .catch(() => {
+            auth.reset(); chat.reset()
+            navigate('/login.html', { replace: true })
+          })
+          .finally(() => { renewing.current = false })
+      }
     } else setToken(null)
   }
 

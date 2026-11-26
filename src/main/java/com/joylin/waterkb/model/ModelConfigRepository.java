@@ -79,8 +79,9 @@ public class ModelConfigRepository {
             )
             """);
         // 每种类型至多一个 active：partial unique index 保证数据一致性
-        jdbc.execute("CREATE UNIQUE INDEX IF NOT EXISTS uk_model_active_type " +
-                "ON model_config(type) WHERE is_active = TRUE");
+        // CHAT 支持多个同时激活（提问框可选），只有 EMBEDDING 必须唯一（向量库维度只能有一套）
+        jdbc.execute("CREATE UNIQUE INDEX IF NOT EXISTS uk_model_active_embedding " +
+                "ON model_config(type) WHERE is_active = TRUE AND type = 'EMBEDDING'");
         seedIfEmpty();
     }
 
@@ -112,7 +113,9 @@ public class ModelConfigRepository {
     public int activate(long id) {
         ModelConfig c = findById(id);
         if (c == null) return 0;
-        jdbc.update("UPDATE model_config SET is_active=FALSE, updated_at=CURRENT_TIMESTAMP WHERE type=?", c.getType());
+        if ("EMBEDDING".equalsIgnoreCase(c.getType())) {
+            jdbc.update("UPDATE model_config SET is_active=FALSE, updated_at=CURRENT_TIMESTAMP WHERE type=?", c.getType());
+        }
         return jdbc.update("UPDATE model_config SET is_active=TRUE, updated_at=CURRENT_TIMESTAMP WHERE id=?", id);
     }
 

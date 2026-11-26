@@ -157,6 +157,17 @@ public class UserStore {
         return true;
     }
 
+    /** 启用/停用账号（新增时可创建即停用） */
+    public boolean setEnabled(String username, boolean enabled) {
+        String name = username == null ? "" : username.trim().toLowerCase();
+        UserAccount u = users.get(name);
+        if (u == null) return false;
+        users.put(name, new UserAccount(u.username(), u.passwordHash(), u.groups(), u.tenant(),
+                u.displayName(), enabled, u.gender(), u.phone(), u.avatar()));
+        persist(users.get(name));
+        return true;
+    }
+
     /** 后台删除账号；禁止删除自己由接口层校验 */
     public boolean delete(String username) {
         String name = username == null ? "" : username.trim().toLowerCase();

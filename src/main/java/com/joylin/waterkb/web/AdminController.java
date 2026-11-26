@@ -207,6 +207,12 @@ public class AdminController {
                 str(body.get("tenant")), str(body.get("displayName")))) {
             throw new IllegalArgumentException("账号已存在，或初始密码不足 8 位");
         }
+        // 资料字段与启用状态
+        if (body.containsKey("gender") || body.containsKey("phone")) {
+            users.updateProfile(username, str(body.get("gender")), str(body.get("phone")), "");
+        }
+        boolean enabled = !body.containsKey("enabled") || Boolean.parseBoolean(String.valueOf(body.get("enabled")));
+        if (!enabled) users.setEnabled(username, false);
         return Map.of("message", "账号已创建", "username", username.toLowerCase());
     }
 

@@ -31,7 +31,7 @@ export default function UsersPanel() {
   // 新增/编辑
   const [editing, setEditing] = useState<User | null>(null)
   const [isNew, setIsNew] = useState(false)
-  const [form, setForm] = useState({ displayName: '', tenant: 'default', password: '', groups: [] as string[], enabled: true })
+  const [form, setForm] = useState({ displayName: '', tenant: 'default', password: '', groups: [] as string[], enabled: true, gender: '', phone: '' })
   // 重置密码
   const [pwdUser, setPwdUser] = useState<User | null>(null)
   const [newPwd, setNewPwd] = useState('')
@@ -125,13 +125,13 @@ export default function UsersPanel() {
   function openCreate(presetTenant = '') {
     setIsNew(true)
     setEditing({ username: '', displayName: '', groups: ['viewer'], tenant: presetTenant || 'default', enabled: true })
-    setForm({ displayName: '', tenant: presetTenant || 'default', password: '', groups: ['viewer'], enabled: true })
+    setForm({ displayName: '', tenant: presetTenant || 'default', password: '', groups: ['viewer'], enabled: true, gender: '', phone: '' })
     setFormErr('')
   }
   function openEdit(u: User) {
     setIsNew(false)
     setEditing(u)
-    setForm({ displayName: u.displayName || '', tenant: u.tenant || 'default', password: '', groups: u.groups || [], enabled: u.enabled !== false })
+    setForm({ displayName: u.displayName || '', tenant: u.tenant || 'default', password: '', groups: u.groups || [], enabled: u.enabled !== false, gender: (u as any).gender || '', phone: (u as any).phone || '' })
     setFormErr('')
   }
 
@@ -150,7 +150,8 @@ export default function UsersPanel() {
       try {
         await adminApi.createUser({
           username: editing.username, displayName: form.displayName, tenant: form.tenant,
-          password: form.password, groups: form.groups, enabled: true
+          password: form.password, groups: form.groups, enabled: true,
+          gender: form.gender, phone: form.phone
         })
         setEditing(null); message.success('账号已创建'); await load()
       } catch (e: any) { setFormErr(e?.message || '创建失败') }
@@ -158,7 +159,8 @@ export default function UsersPanel() {
     }
     try {
       await adminApi.updateUser(editing.username, {
-        displayName: form.displayName, groups: form.groups, tenant: form.tenant, enabled: form.enabled
+        displayName: form.displayName, groups: form.groups, tenant: form.tenant, enabled: form.enabled,
+        gender: form.gender, phone: form.phone
       })
       setEditing(null); message.success('账号已更新'); await load()
     } catch (e: any) { setFormErr(e?.message || '保存失败') }
@@ -312,7 +314,7 @@ export default function UsersPanel() {
       </div>
 
       {/* 新增 / 编辑账号：字段与旧版 userForm 一致 */}
-      <WbModal title={isNew ? (form.tenant && form.tenant !== 'default' ? `新增账号 · ${byKey(form.tenant)?.name || ''}` : '新增账号') : `编辑账号 · ${editing?.username || ''}`}
+      <WbModal size="md" title={isNew ? (form.tenant && form.tenant !== 'default' ? `新增账号 · ${byKey(form.tenant)?.name || ''}` : '新增账号') : `编辑账号 · ${editing?.username || ''}`}
         open={!!editing} okText={isNew ? '创建' : '保存'} cancelText="取消"
         onOk={() => void save()} onCancel={() => setEditing(null)}>
         {formErr && <div className="msg err show">{formErr}</div>}
@@ -331,6 +333,20 @@ export default function UsersPanel() {
         {isNew && <div className="field"><label>初始密码</label>
           <input type="password" autoComplete="new-password" value={form.password} placeholder="至少 8 位，请自行设定"
             onChange={e => setForm(f => ({ ...f, password: e.target.value }))} /></div>}
+        <div className="row">
+          <div className="field"><label>手机号（可用于登录）</label>
+            <input type="tel" value={form.phone} maxLength={11} placeholder="11 位手机号，可留空"
+              onChange={e => setForm(f => ({ ...f, phone: e.target.value }))} /></div>
+          <div className="field"><label>性别</label>
+            <select value={form.gender} onChange={e => setForm(f => ({ ...f, gender: e.target.value }))}>
+              <option value="">不公开</option><option value="男">男</option><option value="女">女</option>
+            </select></div>
+        </div>
+        {isNew && <div className="field status-field">
+          <label className="field-check"><input type="checkbox" checked={form.enabled}
+            onChange={e => setForm(f => ({ ...f, enabled: e.target.checked }))} />账号正常</label>
+          <div className="form-hint">取消勾选则创建后账号处于停用状态，无法登录。</div>
+        </div>}
         <div className="field"><label>角色 / 用户组</label>
           <div className="check-grid">
             {roleOptions.map(([v, l]) => {
