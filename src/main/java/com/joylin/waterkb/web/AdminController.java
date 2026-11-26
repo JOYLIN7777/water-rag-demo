@@ -227,10 +227,21 @@ public class AdminController {
             throw new IllegalArgumentException("不能禁用自己或移除自己的管理员角色");
         }
         UserStore.UserAccount before = users.find(name);
-        // 系统管理员账号是系统底座：不允许改显示名/角色/组织/状态。
-        // 仅保留"改自己密码"入口（走 reset-password，另有限制），避免被接管。
+        // 系统管理员账号：角色/组织/状态是系统底座不可动，但资料字段（显示名、性别、手机号、头像）允许编辑。
+        // 之前整账号拒绝，导致在用户管理里点保存必然 400。
         if (before != null && before.groups().contains("admin")) {
-            throw new IllegalArgumentException("系统管理员账号不可编辑");
+            boolean sameGroups = groups != null && groups.equals(before.groups());
+            String wantedTenant = str(body.get("tenant"));
+            boolean sameTenant = wantedTenant.isEmpty() || wantedTenant.equals(before.tenant());
+            boolean sameEnabled = enabled == before.enabled();
+            if (!sameGroups || !sameTenant || !sameEnabled) {
+                throw new IllegalArgumentException("系统管理员的角色、所属组织和启用状态不可修改");
+            }
+            String gender = body.containsKey("gender") ? str(body.get("gender")) : before.gender();
+            String phone = body.containsKey("phone") ? str(body.get("phone")) : before.phone();
+            String avatar = body.containsKey("avatar") ? str(body.get("avatar")) : before.avatar();
+            users.updateProfile(name, gender, phone, avatar);
+            return Map.of("message", "账号已更新", "username", name);
         }
         // 非 admin 调用者不得自行提权进 admin 组
         boolean callerAdmin = UserContext.get().hasGroup("admin");
@@ -240,10 +251,13 @@ public class AdminController {
         if (!users.update(name, str(body.get("displayName")), groups, str(body.get("tenant")), enabled)) {
             throw new IllegalArgumentException("账号不存在：" + name);
         }
-        // 资料字段可选：只在传了时才更新，兼容旧调用
+        // 资料字段可选：没传的保留原值，避免编辑一项就把另外两项清空
         if (body.containsKey("gender") || body.containsKey("phone") || body.containsKey("avatar")) {
             UserStore.UserAccount a = users.find(name);
-            if (a != null) users.updateProfile(name, str(body.get("gender")), str(body.get("phone")), str(body.get("avatar")));
+            if (a != null) users.updateProfile(name,
+                    body.containsKey("gender") ? str(body.get("gender")) : a.gender(),
+                    body.containsKey("phone") ? str(body.get("phone")) : a.phone(),
+                    body.containsKey("avatar") ? str(body.get("avatar")) : a.avatar());
         }
         return Map.of("message", "账号已更新", "username", name);
     }

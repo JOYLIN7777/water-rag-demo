@@ -21,6 +21,7 @@ interface AuthState {
   loadPermissions: () => Promise<PermissionsResponse | null>
   landingPage: () => string
   reset: () => void
+  updateProfile: (patch: { displayName?: string; gender?: string; phone?: string; avatar?: string }) => void
 }
 
 export const useAuthStore = create<AuthState>((set, get) => ({
@@ -98,6 +99,11 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   reset: () => {
     clearSession()
     set({ user: null, permissions: [], allPermissions: [], menus: [], navGroups: [], roleMatrix: [], loaded: false })
+  },
+
+  /** 个人资料保存后立即同步全局用户态（侧栏头像等不用刷新页面） */
+  updateProfile: (patch: { displayName?: string; gender?: string; phone?: string; avatar?: string }) => {
+    set(s => s.user ? { user: { ...s.user, ...patch } } : {})
   }
 }))
 

@@ -124,7 +124,7 @@ export default function UsersPanel() {
   function openCreate(presetTenant = '') {
     setIsNew(true)
     setEditing({ username: '', displayName: '', groups: ['viewer'], tenant: presetTenant || 'default', enabled: true })
-    setForm({ displayName: '', tenant: presetTenant || 'default', password: '', groups: ['viewer'], enabled: true, gender: '', phone: '' })
+    setForm({ displayName: '', tenant: presetTenant || '', password: '', groups: ['viewer'], enabled: true, gender: '', phone: '' })
     setFormErr('')
   }
   function openEdit(u: User) {
@@ -145,6 +145,9 @@ export default function UsersPanel() {
     if (isNew) {
       if (!editing.username) { setFormErr('请填写登录账号'); return }
       if (!/^[a-zA-Z0-9_-]{2,32}$/.test(editing.username)) { setFormErr('登录账号只能用 2-32 位英文字母、数字、下划线或短横线'); return }
+      if (!form.displayName.trim()) { setFormErr('请填写显示名称'); return }
+      if (!form.tenant) { setFormErr('请选择所属组织'); return }
+      if (form.phone && !/^\d{11}$/.test(form.phone)) { setFormErr('手机号必须是 11 位数字'); return }
       if (!form.password || form.password.length < 8) { setFormErr('初始密码至少 8 位'); return }
       try {
         await adminApi.createUser({
@@ -156,6 +159,8 @@ export default function UsersPanel() {
       } catch (e: any) { setFormErr(e?.message || '创建失败') }
       return
     }
+    if (!form.displayName.trim()) { setFormErr('请填写显示名称'); return }
+    if (form.phone && !/^\d{11}$/.test(form.phone)) { setFormErr('手机号必须是 11 位数字'); return }
     try {
       await adminApi.updateUser(editing.username, {
         displayName: form.displayName, groups: form.groups, tenant: form.tenant, enabled: form.enabled,

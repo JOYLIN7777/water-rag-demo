@@ -282,6 +282,7 @@ export default function ProfilePage() {
             if (preset) localStorage.setItem(AVATAR_KEY, preset)
             else localStorage.removeItem(AVATAR_KEY)
             setMe(m => m ? { ...m, gender, phone, avatar } : m)
+            auth.updateProfile({ gender, phone, avatar })   // 侧栏头像即时同步
             setProfileOpen(false)
             message.success('个人资料已保存')
           } catch (e: any) { setProfileErr(e?.message || '保存失败') }

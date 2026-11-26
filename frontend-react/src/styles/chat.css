@@ -127,7 +127,9 @@
   .cite-seg:hover{background:#eef4ff;color:var(--primary)}
   .cite-seg.on{background:var(--primary-soft);color:var(--primary);font-weight:600;
     border-left:3px solid var(--primary);padding-left:9px}
-  .model-pick{margin-left:auto;font-size:12px;max-width:190px}
+  /* 始终占位的槽位：模型列表异步加载时发送按钮不会左右跳 */
+  .model-pick-slot{margin-left:auto;display:inline-flex;min-width:120px;justify-content:flex-end}
+  .model-pick{font-size:12px;max-width:190px}
   .model-pick .ant-select-selector{border:0 !important;background:transparent !important;
     box-shadow:none !important;padding:0 7px !important;color:var(--ink-2)}
   .model-pick.ant-select-focused .ant-select-selector{box-shadow:none !important}

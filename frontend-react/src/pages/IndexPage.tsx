@@ -1,5 +1,5 @@
 /** 问答页：DOM/class 与旧版 index.html 1:1，流式/引用/分支/草稿隔离全功能 */
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { marked } from 'marked'
 import DOMPurify from 'dompurify'
 import { message, Modal, Select } from 'antd'
@@ -220,6 +220,14 @@ export default function IndexPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [chat.currentId])
 
+  // 草稿载入 / 会话切换后立刻按内容定高，避免首屏先渲染 1 行再变高导致按钮跳动
+  useLayoutEffect(() => {
+    const el = inputRef.current
+    if (!el) return
+    el.style.height = 'auto'
+    el.style.height = Math.min(200, Math.max(38, el.scrollHeight)) + 'px'
+  }, [q, chat.currentId])
+
   async function send(text?: string) {
     const query = (text ?? q).trim()
     // 页面刚挂载、初始化还没设 currentId 时先建空会话，避免消息挂到空 key 上被后续初始化冲掉
@@ -396,7 +404,17 @@ export default function IndexPage() {
                     <span className="ai-card-actions">
                       {m.usage && localStorage.getItem('wrk_pref_usage') !== '0' &&
                         <span className="ai-usage" title={usageTip(m.usage)}>{usageInner(m.usage)}</span>}
-                      {!!m.sources?.length && <button className="icon-btn ai-cite-count" title="引用片段">▤ {groupCites(m.sources).length} 篇</button>}
+                      {!!m.sources?.length && <button className="icon-btn ai-cite-count" title="点击查看全部引用片段"
+                        onClick={() => {
+                          const groups = groupCites(m.sources || [])
+                          const allOpen = groups.every((_, k) => openCites[`${i}-${k}`])
+                          setOpenCites(s => {
+                            const next = { ...s }
+                            groups.forEach((_, k) => { next[`${i}-${k}`] = !allOpen })
+                            return next
+                          })
+                          setTimeout(() => scrollBottom(true), 120)
+                        }}>▤ {groupCites(m.sources).length} 文档 / {m.sources.length} 片段</button>}
                       <button className="icon-btn" title="复制回答到剪贴板"
                         onClick={() => { void navigator.clipboard.writeText(m.content); message.success('回答已复制') }}>复制</button>
                     </span>
@@ -416,7 +434,7 @@ export default function IndexPage() {
                     {!!m.sources?.length && <>
                       <div className="cite-row">
                         {groupCites(m.sources).map((g, k) => (
-                          <span className={'cite-chip' + (openCites[`${i}-${k}`] || activeCite.startsWith(`${i}-${k}-`) ? ' on' : '')}
+                          <span className={'cite-chip' + (openCites[`${i}-${k}`] ? ' on' : '')}
                             key={k} title={`展开该文档的 ${g.segs.length} 个引用片段`}
                             onClick={() => setOpenCites(s => ({ ...s, [`${i}-${k}`]: !s[`${i}-${k}`] }))}>
                             <span className="cite-num">{k + 1}</span><span className="cite-file">{g.name}</span>
@@ -465,17 +483,21 @@ export default function IndexPage() {
               <button className="composer-tool" onClick={() => fileInput.current?.click()} title="上传文档到知识库">⇪ 上传文档</button>
               <input ref={fileInput} type="file" multiple hidden onChange={e => { void uploadFiles(e.target.files); e.target.value = '' }} />
             </>}
-            {chatModels.length > 1 && <Select className="model-pick" value={modelId || undefined} size="small"
-              popupMatchSelectWidth={false} placeholder="默认模型" title="选择本次回答使用的对话模型"
-              options={[
-                { value: 0, label: '默认模型' },
-                ...chatModels.map(m => ({ value: m.id, label: m.name }))
-              ]}
-              onChange={v => {
-                const n = Number(v) || 0
-                setModelId(n || null)
-                localStorage.setItem('wrk_chat_model', n ? String(n) : '')
-              }} />}
+            <span className="model-pick-slot">
+              <Select className="model-pick" value={modelId || undefined} size="small"
+                popupMatchSelectWidth={false} placeholder="默认模型" title="选择本次回答使用的对话模型"
+                disabled={chatModels.length <= 1}
+                style={{ visibility: chatModels.length > 1 ? 'visible' : 'hidden' }}
+                options={[
+                  { value: 0, label: '默认模型' },
+                  ...chatModels.map(m => ({ value: m.id, label: m.name }))
+                ]}
+                onChange={v => {
+                  const n = Number(v) || 0
+                  setModelId(n || null)
+                  localStorage.setItem('wrk_chat_model', n ? String(n) : '')
+                }} />
+            </span>
             <button className="send-btn" onClick={() => {
               if (busy) { chat.aborters[chat.currentId]?.abort(); return }
               void send()

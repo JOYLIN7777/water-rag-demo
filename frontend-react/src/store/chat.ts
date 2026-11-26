@@ -51,7 +51,7 @@ interface ChatState {
   syncSessions: () => Promise<void>
   newSession: () => string
   switchSession: (id: string) => Promise<void>
-  removeSession: (id: string) => void
+  removeSession: (id: string) => Promise<void>
   touchSession: (id: string, title: string, fullQ: string) => void
   cacheMessages: (id: string, msgs: ChatMessageExt[]) => void
   loadSuggestions: () => Promise<void>
@@ -114,6 +114,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
     set({ currentId: id, messages: get().bySession[id] || loadMessages(id) })
     try {
       const list = await chatApi.history(id)
+      // 回答还没落库时切走再切回：后端 history 为空，别用它盖掉本地正在生成的消息
+      if ((!list || list.length === 0) && (get().bySession[id] || []).length > 0) return
       const msgs: ChatMessageExt[] = (list || []).map((m, i) => ({
         role: m.role === 'assistant' ? 'assistant' : 'user',
         content: m.content || '', sources: m.sources,
@@ -127,20 +129,23 @@ export const useChatStore = create<ChatState>((set, get) => ({
     } catch { /* 用缓存 */ }
   },
 
-  removeSession: (id: string) => {
+  removeSession: async (id: string) => {
+    let nextId = ''
     set(s => {
       const sessions = s.sessions.filter(x => x.id !== id)
       const wasCurrent = s.currentId === id
-      const next = wasCurrent ? (sessions[0]?.id || '') : s.currentId
+      nextId = wasCurrent ? (sessions[0]?.id || '') : s.currentId
       const bySession = { ...s.bySession }; delete bySession[id]
-      // 删掉当前会话必须把视图切到新会话的消息；之前写成 next === s.currentId，
-      // 删第一个会话时永远不成立，界面继续显示已删会话的内容。
-      return { sessions, currentId: next, messages: wasCurrent ? (bySession[next] || []) : s.messages, bySession }
+      // 删掉当前会话必须把视图切到新会话；之前写成 next === s.currentId，永远不成立
+      return { sessions, currentId: nextId, messages: wasCurrent ? (bySession[nextId] || []) : s.messages, bySession }
     })
     get().saveLocal()
-    // 清掉本地消息缓存，避免下次进入又从 localStorage 读回已删会话
     try { localStorage.removeItem(scopedKey('msgs:' + id)) } catch { /* 隐私模式 */ }
     void chatApi.clearSession(id).catch(() => {})
+    // 消息区也要跟着跳过去：loadMessages 只读本地缓存，没缓存过就是欢迎页。
+    // 调 switchSession 从服务端把下一会话的历史拉回来。
+    if (nextId) await get().switchSession(nextId)
+    else set({ messages: [] })
   },
 
   touchSession: (id, title, fullQ) => {
