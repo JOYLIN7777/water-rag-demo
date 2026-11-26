@@ -41,6 +41,11 @@ interface ChatState {
   messages: ChatMessageExt[]          // 当前会话消息（视图）
   bySession: Record<string, ChatMessageExt[]> // 多会话缓存
   busyIds: Set<string>
+  /** 每个会话正在进行的流式请求；删除会话时必须先 abort，否则回调还在写已删除的会话 */
+  aborters: Record<string, AbortController>
+  setAborter: (id: string, ac: AbortController) => void
+  removeAborter: (id: string) => void
+  abortSession: (id: string) => void
   sending: boolean
   suggestions: string[]
   syncSessions: () => Promise<void>
@@ -60,6 +65,14 @@ export const useChatStore = create<ChatState>((set, get) => ({
   messages: [],
   bySession: {},
   busyIds: new Set(),
+  aborters: {},
+  setAborter: (id, ac) => set(s => ({ aborters: { ...s.aborters, [id]: ac } })),
+  removeAborter: (id) => set(s => { const a = { ...s.aborters }; delete a[id]; return { aborters: a } }),
+  abortSession: (id) => {
+    const ac = get().aborters[id]
+    if (ac) ac.abort()
+    get().removeAborter(id)
+  },
   sending: false,
   suggestions: [],
 
@@ -147,6 +160,6 @@ export const useChatStore = create<ChatState>((set, get) => ({
   },
 
   reset: () => {
-    set({ sessions: [], currentId: '', messages: [], bySession: {}, busyIds: new Set(), sending: false })
+    set({ sessions: [], currentId: '', messages: [], bySession: {}, busyIds: new Set(), aborters: {}, sending: false })
   }
 }))

@@ -62,6 +62,18 @@ export default function UsersPanel() {
   /** 组织全路径：水利业务部 / 调度科 —— 有层级后同名科室才不会选错 */
   const orgCrumb = (k: string) => k ? orgPathKeys(k).map(x => byKey(x)?.name || x).join(' / ') : '全部组织'
 
+  /** 组织节点旁显示该组织（含下级）的用户数，扫一眼就知道哪个部门有多少人 */
+  const orgUserCount = (k: string) => {
+    const keys = new Set<string>(), queue = [k]
+    while (queue.length) {
+      const cur = queue.shift()!
+      if (keys.has(cur)) continue
+      keys.add(cur)
+      orgChildren(cur).forEach(o => queue.push(o.key))
+    }
+    return users.filter(u => keys.has(u.tenant || 'default')).length
+  }
+
   /** 组织选择用 AntD TreeSelect：树形层级 + 可展开收起，不再是一排看不出关系的 option */
   const orgTreeData = (): OrgTreeNode[] => {
     const build = (parent: string): OrgTreeNode[] =>
@@ -207,7 +219,7 @@ export default function UsersPanel() {
           <span className="tn" title={orgPathKeys(o.key).join(' / ')}>
             <span className="tree-tier">L{depth + 1}</span>{o.name}
           </span>
-          {kids.length > 0 && <span className="cnt" title={`${kids.length} 个下级组织`}>{kids.length}</span>}
+          <span className="cnt" title={`${kids.length} 个下级组织 · ${orgUserCount(o.key)} 个用户`}>{orgUserCount(o.key)} 人</span>
         </div>)
         if (!isFolded) walk(o.key, depth + 1)
       })

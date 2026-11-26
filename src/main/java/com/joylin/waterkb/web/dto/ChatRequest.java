@@ -11,6 +11,7 @@ import jakarta.validation.constraints.Size;
  * @param parentId  从哪条消息继续：null=当前 head（默认顺延）；
  *                  传某个历史节点 ID=从那里分叉（fork），祖先链作为本次上下文，
  *                  该节点之后的旧分支保留不删（pi-mono rewind 语义）
+ * @param modelId   可选：指定本次回答使用的 CHAT 模型配置 ID；null=当前激活模型
  */
 public record ChatRequest(
 
@@ -21,5 +22,7 @@ public record ChatRequest(
         @Size(max = 2000, message = "问题长度不能超过 2000 字")
         String question,
 
-        String parentId) {
+        String parentId,
+
+        Long modelId) {
 }

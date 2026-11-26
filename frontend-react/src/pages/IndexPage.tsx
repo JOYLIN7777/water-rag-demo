@@ -7,6 +7,8 @@ import { useSearchParams } from 'react-router-dom'
 import { useChatStore, type ChatMessageExt } from '@/store/chat'
 import { useAuthStore } from '@/store/auth'
 import { tsLocal } from '@/lib/ui'
+import { http } from '@/api/http'
+import WbModal from '@/components/WbModal'
 import { streamChat, uploadDocument } from '@/api'
 import { Modal } from 'antd'
 import AdminEntry from '@/components/AdminEntry'
@@ -20,8 +22,39 @@ function normalizeMarkdown(text: string): string {
   return String(text || '').replace(/^([ \t]*)(#{1,6})[ \t\u3000]*(?=\S)/gm, '$1$2 ')
 }
 
+/**
+ * 模型常把表格输出成空格对齐的纯文本（"序号  特征水位  相应水位/米"），marked 认不出来。
+ * 这里把连续多行、列数一致的对齐文本补成标准 Markdown 表格，再交给 marked 渲染。
+ */
+function normalizeTables(text: string): string {
+  const lines = String(text || '').split('\n')
+  const isRow = (s: string) => {
+    const t = s.trim()
+    if (!t || t.length > 200) return false
+    const parts = t.split(/\s{2,}/)
+    return parts.length >= 2 && parts.every(p => p.length > 0 && p.length < 40 && !/[。；，：]$/.test(p))
+  }
+  const out: string[] = []
+  let i = 0
+  while (i < lines.length) {
+    if (isRow(lines[i])) {
+      const rows: string[][] = []
+      while (i < lines.length && isRow(lines[i])) { rows.push(lines[i].trim().split(/\s{2,}/).map(s => s.trim())); i++ }
+      const cols = rows[0].length
+      if (rows.length >= 2 && rows.every(r => r.length === cols)) {
+        out.push('| ' + rows[0].join(' | ') + ' |')
+        out.push('| ' + Array(cols).fill('---').join(' | ') + ' |')
+        rows.slice(1).forEach(r => out.push('| ' + r.join(' | ') + ' |'))
+      } else out.push(...rows.map(r => r.join('  ')))
+      continue
+    }
+    out.push(lines[i]); i++
+  }
+  return out.join('\n')
+}
+
 function renderMarkdown(text: string): string {
-  const html = marked.parse(normalizeMarkdown(text), { breaks: true }) as string
+  const html = marked.parse(normalizeTables(normalizeMarkdown(text)), { breaks: true }) as string
   // 回答里模型给出的示例问题（含问号的列表项）做成可点击：蓝色 + 点击填入输入框
   const withSuggest = html.replace(/<li>([^<]*[？?][^<]*)<\/li>/g, '<li class="ask-suggest">$1</li>')
   return DOMPurify.sanitize(withSuggest)
@@ -75,8 +108,27 @@ export default function IndexPage() {
   const [error, setError] = useState('')
   const [openCites, setOpenCites] = useState<Record<string, boolean>>({})
   const [uploadMsg, setUploadMsg] = useState<{ type: string; text: string } | null>(null)
+  const [chunkDetail, setChunkDetail] = useState<{ fileName: string; index: number; content: string } | null>(null)
+  /** 多个可用 CHAT 模型时可按次选择（类似 WorkBuddy），选择保存在本机 */
+  const [chatModels, setChatModels] = useState<Array<{ id: number; name: string; model: string; active?: boolean }>>([])
+  const [modelId, setModelId] = useState<number | null>(() => {
+    const v = Number(localStorage.getItem('wrk_chat_model'))
+    return Number.isFinite(v) && v > 0 ? v : null
+  })
+
+  /** 点引用片段：按文件名+序号取该段原文，弹框展示完整内容 */
+  async function showChunkDetail(fileName: string, index: number) {
+    setChunkDetail({ fileName, index, content: '正在读取原文…' })
+    try {
+      const j = await http.get<{ chunks?: Array<{ chunkIndex: number; content: string }> }>(
+        '/api/docs/chunks?fileName=' + encodeURIComponent(fileName))
+      const c = (j?.chunks || []).find(x => Number(x.chunkIndex) === Number(index))
+      setChunkDetail({ fileName, index, content: c?.content || '未找到该片段的原文' })
+    } catch (e: any) {
+      setChunkDetail({ fileName, index, content: '读取失败：' + (e?.message || '') })
+    }
+  }
   const fileInput = useRef<HTMLInputElement>(null)
-  const abortMap = useRef<Record<string, AbortController>>({})
   const [force, setForce] = useState(0)   // 触发重渲染（流式增量）
 
   function scrollBottom(forceScroll = false) {
@@ -92,6 +144,11 @@ export default function IndexPage() {
     void (async () => {
       await chat.syncSessions()
       await chat.loadSuggestions()
+      void http.get<Array<{ id: number; name: string; model: string; type: string; enabled?: boolean; active?: boolean }>>('/api/models')
+        .then(list => setChatModels((Array.isArray(list) ? list : [])
+          .filter(m => m.type === 'CHAT' && m.enabled !== false)
+          .map(m => ({ id: m.id, name: m.name, model: m.model, active: m.active }))))
+        .catch(() => setChatModels([]))
       // 读最新 store：挂载到 syncSessions 返回期间用户可能已经提问，
       // 这时候再用旧闭包里的 currentId/会话列表去 switchSession 会把新消息冲掉。
       const state = useChatStore.getState()
@@ -136,7 +193,7 @@ export default function IndexPage() {
 
     chat.touchSession(ownerId, query.length > 18 ? query.slice(0, 18) + '…' : query, query)
     const ac = new AbortController()
-    abortMap.current[ownerId] = ac
+    chat.setAborter(ownerId, ac)
     setBusy(ownerId, true)
 
     const store = chat.bySession[ownerId] || chat.messages
@@ -150,7 +207,8 @@ export default function IndexPage() {
 
     let finished = false
     try {
-      const r = await fetch('/api/chat/stream', {
+      const streamUrl = '/api/chat/stream' + (modelId ? '?modelId=' + modelId : '')
+      const r = await fetch(streamUrl, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ sessionId: ownerId, question: query }), signal: ac.signal
       })
@@ -203,7 +261,7 @@ export default function IndexPage() {
         message.info('已停止生成，已收到的部分保留')
       }
     } finally {
-      delete abortMap.current[ownerId]
+      chat.removeAborter(ownerId)
       setBusy(ownerId, false)
       ai.streaming = false
       chat.cacheMessages(ownerId, next)
@@ -326,7 +384,9 @@ export default function IndexPage() {
                       </div>
                       {groupCites(m.sources).map((g, k) => (
                         <div className={`cite-preview${openCites[`${i}-${k}`] ? ' open' : ''}`} key={k} id={`cite-p-${i}-${k}`}>
-                          {g.segs.map((s, j) => <div className="cite-seg" key={j}>
+                          {g.segs.map((s, j) => <div className="cite-seg" key={j}
+                            role="button" title="点击查看该段原文全文"
+                            onClick={() => void showChunkDetail(String(s.fileName || g.name), Number(s.chunkIndex || 0))}>
                             <span className="cite-seg-no">第{Number(s.chunkIndex || 0) + 1}段</span>{s.preview || ''}
                           </div>)}
                         </div>
@@ -349,12 +409,21 @@ export default function IndexPage() {
             }} />
           <div className="composer-bar">
             <span className="composer-tool" title="基于知识库检索作答"><span style={{ color: 'var(--primary)' }}>◈</span> 知识库问答</span>
+            {chatModels.length > 1 && <select className="model-pick" value={modelId || ''} title="选择本次回答使用的对话模型"
+              onChange={e => {
+                const v = Number(e.target.value)
+                setModelId(v || null)
+                localStorage.setItem('wrk_chat_model', v ? String(v) : '')
+              }}>
+              <option value="">默认模型</option>
+              {chatModels.map(m => <option key={m.id} value={m.id}>{m.name}{m.active ? '（当前）' : ''}</option>)}
+            </select>}
             {auth.has('doc:write_chat') && <>
               <button className="composer-tool" onClick={() => fileInput.current?.click()} title="上传文档到知识库">⇪ 上传文档</button>
               <input ref={fileInput} type="file" multiple hidden onChange={e => { void uploadFiles(e.target.files); e.target.value = '' }} />
             </>}
             <button className="send-btn" onClick={() => {
-              if (busy) { abortMap.current[chat.currentId]?.abort(); return }
+              if (busy) { chat.aborters[chat.currentId]?.abort(); return }
               void send()
             }}>{busy ? '停止' : <>发送 <span style={{ opacity: .75 }}>↵</span></>}</button>
           </div>
@@ -362,6 +431,13 @@ export default function IndexPage() {
         <div className="composer-tip">回答基于知识库生成，关键数据请以正式规程为准</div>
         {uploadMsg && <div className={`upload-msg ${uploadMsg.type}`}>{uploadMsg.text}</div>}
       </div>
+
+      <WbModal size="chunk"
+        title={chunkDetail ? `原文详情 · ${chunkDetail.fileName} · 第${chunkDetail.index + 1}段` : '原文详情'}
+        open={!!chunkDetail} okText="关闭" cancelText={null}
+        onOk={() => setChunkDetail(null)} onCancel={() => setChunkDetail(null)}>
+        <div className="chunk-detail-text">{chunkDetail?.content || '正在读取原文…'}</div>
+      </WbModal>
     </>
   )
 }

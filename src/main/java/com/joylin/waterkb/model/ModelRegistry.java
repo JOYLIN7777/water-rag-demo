@@ -72,6 +72,13 @@ public class ModelRegistry {
         return builder.build();
     }
 
+    /** 按指定配置构造 ChatClient：提问框按次选模型时用，不改全局激活配置 */
+    public ChatClient chatClientFor(ModelConfig c, Object... tools) {
+        ChatClient.Builder builder = ChatClient.builder(chatModel(c));
+        if (tools.length > 0) builder.defaultTools(tools);
+        return builder.build();
+    }
+
     /** 按配置构造并缓存 ChatModel */
     public ChatModel chatModel(ModelConfig c) {
         String fp = fingerprint(c);

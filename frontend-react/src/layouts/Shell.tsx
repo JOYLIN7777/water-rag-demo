@@ -73,6 +73,8 @@ export default function Shell({ children }: { children: React.ReactNode }) {
     if (!location.pathname.includes('index.html')) navigate('/index.html')
   }
   async function removeSession(id: string) {
+    // 正在流式回答时删会话：先中止请求，否则回调还会往已删的会话里写消息
+    chat.abortSession(id)
     const s = chat.sessions.find(x => x.id === id)
     const ok = await new Promise<boolean>(resolve => {
       Modal.confirm({

@@ -46,20 +46,19 @@ export default function SettingsPage() {
           <h1 className="page-title">设置</h1>
           <p className="page-desc">更多功能都放在这里，按需使用即可。只显示当前账号有权使用的功能。</p>
         </div>
-        <div className="setting-grid">
-          {visible.length === 0
-            ? <div className="card"><div className="empty-inline">当前账号暂无可使用的设置项</div></div>
-            : visible.map(s => (
-              <Link key={s.key} to={s.href} className="setting-card">
-                <span className="setting-icon"><Icon name={s.icon} className="" /></span>
-                <span className="setting-text">
-                  <span className="setting-name">{s.label}</span>
-                  <span className="setting-desc">{s.desc}</span>
-                  <span className="setting-go">进入功能</span>
-                </span>
-              </Link>
-            ))}
-        </div>
+        {/* 没有可用设置项时整块不渲染，不再摆一个「暂无权限」空框给用户看 */}
+        {visible.length > 0 && <div className="setting-grid">
+          {visible.map(s => (
+            <Link key={s.key} to={s.href} className="setting-card">
+              <span className="setting-icon"><Icon name={s.icon} className="" /></span>
+              <span className="setting-text">
+                <span className="setting-name">{s.label}</span>
+                <span className="setting-desc">{s.desc}</span>
+                <span className="setting-go">进入功能</span>
+              </span>
+            </Link>
+          ))}
+        </div>}
 
         <div className="card setting-extra">
           <div className="card-head"><h3>问答偏好</h3><span className="hint">保存在本机，下次使用同一浏览器自动生效</span></div>

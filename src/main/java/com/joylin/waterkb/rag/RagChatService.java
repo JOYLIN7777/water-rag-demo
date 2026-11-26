@@ -96,7 +96,7 @@ public class RagChatService {
      * "usage":{"promptTokens":1194,"completionTokens":229,"totalTokens":1423,"model":"qwen-plus"}}}，
      * 前端据此展示"本次调用的消耗"；降级/熔断分支带 {@code "degraded":true} 且无 usage。</p>
      */
-    public Flux<ServerSentEvent<String>> chatStream(String sessionId, String question, String parentId) {
+    public Flux<ServerSentEvent<String>> chatStream(String sessionId, String question, String parentId, Long modelId) {
         // 同步捕获身份快照：SSE 的 doFinally 在 Reactor 异步线程执行，
         // 那时 Filter 已 clear ThreadLocal，直接读会拿到 anonymous/default（多租户串台）。
         final String tenantAtStart = UserContext.get().tenantId();
@@ -151,7 +151,7 @@ public class RagChatService {
             tokens = Flux.just(fallback);
         } else {
             // 每次调用动态取当前激活的 Chat 模型（含 Tool Calling 工具注册）
-            tokens = buildTokens(question, systemPrompt, answerBuf, degraded, hits, usageRef);
+            tokens = buildTokens(question, systemPrompt, answerBuf, degraded, hits, usageRef, modelId);
         }
 
         // 统一收尾：先落库（同步、可观测），再发 done。所有分支（正常/熔断/降级）都经过这里。
@@ -179,7 +179,7 @@ public class RagChatService {
                 int completionTokens = u == null || u.getCompletionTokens() == null ? 0 : u.getCompletionTokens();
                 int totalTokens = u == null || u.getTotalTokens() == null
                         ? promptTokens + completionTokens : u.getTotalTokens();
-                String model = activeChatModelName();
+                String model = activeChatModelName(modelId);
                 usageRecorder.record(userAtStart, model, promptTokens, completionTokens, durationMs,
                         sessionId, question, tenantAtStart);
                 usage = new LinkedHashMap<>();
@@ -248,10 +248,11 @@ public class RagChatService {
                 });
     }
 
-    /** 当前激活的对话模型名（用量记录用）；取不到回落 unknown */
-    private String activeChatModelName() {
+    /** 本次使用的对话模型名（用量记录用）：按次指定优先，否则当前激活；取不到回落 unknown */
+    private String activeChatModelName(Long modelId) {
         try {
-            com.joylin.waterkb.model.ModelConfig c = modelConfigRepository.findActive("CHAT");
+            com.joylin.waterkb.model.ModelConfig c = modelId == null
+                    ? modelConfigRepository.findActive("CHAT") : modelConfigRepository.findById(modelId);
             return c == null || c.getModel() == null ? "unknown" : c.getModel();
         } catch (Exception e) {
             return "unknown";
@@ -265,10 +266,17 @@ public class RagChatService {
      * ChatResponse 上，只有完整对象流才能拿到输入/输出 Token 用于用量统计。
      */
     private Flux<String> buildTokens(String question, String systemPrompt, StringBuilder answerBuf,
-                                     boolean[] degraded, List<Document> hits, AtomicReference<Usage> usageRef) {
+                                     boolean[] degraded, List<Document> hits, AtomicReference<Usage> usageRef,
+                                     Long modelId) {
         ChatClient chatClient;
         try {
-            chatClient = modelRegistry.currentChatClient(waterInfoTool);
+            // 按次选择的模型优先；不切换全局激活配置，只影响本次回答
+            com.joylin.waterkb.model.ModelConfig chosen = modelId == null
+                    ? modelConfigRepository.findActive("CHAT") : modelConfigRepository.findById(modelId);
+            if (chosen == null || !chosen.isEnabled()) {
+                throw new IllegalStateException("所选 CHAT 模型不可用");
+            }
+            chatClient = modelRegistry.chatClientFor(chosen, waterInfoTool);
         } catch (Exception ex) {
             breaker.recordFailure();
             degraded[0] = true;

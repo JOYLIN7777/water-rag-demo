@@ -70,12 +70,14 @@ public class ChatController {
     public Flux<ServerSentEvent<String>> chat(@RequestBody @Valid ChatRequest req) {
         // 全部 CHAT 模型被禁用时明确告诉用户，而不是让它变成一次「连接中断」网络错误
         return Flux.defer(() -> {
-            if (models.findActive("CHAT") == null) {
+            com.joylin.waterkb.model.ModelConfig chosen = req.modelId() == null
+                    ? models.findActive("CHAT") : models.findById(req.modelId());
+            if (chosen == null || !"CHAT".equalsIgnoreCase(chosen.getType()) || !chosen.isEnabled()) {
                 return Flux.just(ServerSentEvent.<String>builder().event("error")
-                        .data("当前对话模型已禁用或未激活，请联系管理员在「模型设置」中启用并激活一个 CHAT 模型。")
+                        .data("所选对话模型不可用（已禁用或未激活），请联系管理员在「模型设置」中启用。")
                         .build());
             }
-            return ragChatService.chatStream(req.sessionId(), req.question(), req.parentId());
+            return ragChatService.chatStream(req.sessionId(), req.question(), req.parentId(), req.modelId());
         });
     }
 

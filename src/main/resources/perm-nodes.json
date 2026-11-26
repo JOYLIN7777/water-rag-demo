@@ -35,10 +35,10 @@
     },
     {
       "code": "doc:write",
-      "name": "上传接口权限（仅后端校验）",
+      "name": "上传接口权限",
       "type": "btn",
       "module": "工作台",
-      "desc": "后端 /api/docs/upload 接口校验用；不控制前端按钮显隐",
+      "desc": "控制知识库文档上传：前端按此权限显示上传入口，后端 /api/docs/upload 同步校验",
       "parent": "doc:read",
       "route": "",
       "order": 121
