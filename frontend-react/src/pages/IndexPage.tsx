@@ -164,6 +164,7 @@ export default function IndexPage() {
   const fileInput = useRef<HTMLInputElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const [force, setForce] = useState(0)   // 触发重渲染（流式增量）
+  const [initializing, setInitializing] = useState(true)  // 刷新时先不渲染欢迎页，避免闪一下
 
   function scrollBottom(forceScroll = false) {
     if (localStorage.getItem('wrk_pref_autoscroll') === '0') return
@@ -198,6 +199,7 @@ export default function IndexPage() {
       else await chat.switchSession(chat.newSession())
       // 刷新/切会话后定位到最新一条消息，而不是停在最初提问的位置
       setTimeout(() => scrollBottom(true), 150)
+      setInitializing(false)
     })()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -205,6 +207,8 @@ export default function IndexPage() {
   // 草稿按会话隔离：切会话时存旧草稿、载新草稿
   /** 防同一问题在 1.5 秒内被 Enter/点击重复触发，产生多条同名会话 */
   const lastSendRef = useRef<{ q: string; at: number } | null>(null)
+  /** 回答中又输入的问题排队，等本轮结束后自动提交 */
+  const queuedRef = useRef<string>('')
   const prevSid = useRef('')
   useEffect(() => {
     const old = prevSid.current
@@ -252,8 +256,7 @@ export default function IndexPage() {
     const ai: ChatMessageExt = { role: 'assistant', content: '', sources: [], streaming: true, ts: at }
     const next = [...store, um, ai]
     chat.cacheMessages(ownerId, next)
-    if (chat.currentId === ownerId) setForce(x => x + 1)
-    scrollBottom(true)
+    if (chat.currentId === ownerId) { setForce(x => x + 1); scrollBottom(true) }
 
     let finished = false
     try {
@@ -298,8 +301,7 @@ export default function IndexPage() {
           }
         }
         // 流式增量只重渲染，不重建整列 DOM（React 的 key 保证最小更新）
-        if (chat.currentId === ownerId) setForce(x => x + 1)
-        scrollBottom()
+        if (chat.currentId === ownerId) { setForce(x => x + 1); scrollBottom() }
         if (finished) break
       }
     } catch (e: any) {
@@ -316,6 +318,9 @@ export default function IndexPage() {
       ai.streaming = false
       chat.cacheMessages(ownerId, next)
       if (chat.currentId === ownerId) setForce(x => x + 1)
+      const queued = queuedRef.current
+      queuedRef.current = ''
+      if (queued) setTimeout(() => void send(queued), 200)
     }
   }
 
@@ -371,7 +376,7 @@ export default function IndexPage() {
         <div className="topbar-nav"><AdminEntry /></div>
       </header>
       <div className="scroll-area" id="scrollArea" ref={scrollRef}>
-        {!hasMessages ? (
+        {!hasMessages && !initializing ? (
           <div className="welcome" id="welcome">
             <div className="welcome-mark has-logo"><img className="brand-logo" src="/assets/logo.svg" alt="" /></div>
             <h1>水利知识库智能问答</h1>
@@ -475,7 +480,11 @@ export default function IndexPage() {
               el.style.height = Math.min(200, Math.max(38, el.scrollHeight)) + 'px'
             }}
             onKeyDown={e => {
-              if (e.key === 'Enter' && !e.shiftKey && !(e as any).isComposing) { e.preventDefault(); void send() }
+              if (e.key === 'Enter' && !e.shiftKey && !(e as any).isComposing) {
+                e.preventDefault()
+                if (busy) { const text = q.trim(); if (text) { queuedRef.current = text; setQ(''); message.info('已排队，回答结束后自动发送') } }
+                else void send()
+              }
             }} />
           <div className="composer-bar">
             <span className="composer-tool" title="基于知识库检索作答"><span style={{ color: 'var(--primary)' }}>◈</span> 知识库问答</span>
@@ -498,10 +507,19 @@ export default function IndexPage() {
                   localStorage.setItem('wrk_chat_model', n ? String(n) : '')
                 }} />
             </span>
+            {busy && <button className="stop-btn" onClick={() => chat.aborters[chat.currentId]?.abort()}
+              title="停止当前回答">■ 停止</button>}
             <button className="send-btn" onClick={() => {
-              if (busy) { chat.aborters[chat.currentId]?.abort(); return }
+              if (busy) {
+                const text = q.trim()
+                if (!text) { message.info('当前正在回答，输入问题后可排队发送'); return }
+                queuedRef.current = text
+                setQ('')
+                message.info('已排队，当前回答结束后自动发送')
+                return
+              }
               void send()
-            }}>{busy ? '停止' : <>发送 <span style={{ opacity: .75 }}>↵</span></>}</button>
+            }}>{busy ? '排队' : <>发送 <span style={{ opacity: .75 }}>↵</span></>}</button>
           </div>
         </div>
         <div className="composer-tip">回答基于知识库生成，关键数据请以正式规程为准</div>

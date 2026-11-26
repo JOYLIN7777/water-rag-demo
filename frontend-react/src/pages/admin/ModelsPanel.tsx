@@ -85,6 +85,14 @@ export default function ModelsPanel() {
     } catch (e: any) { message.error('激活失败：' + (e?.message || '')) }
   }
 
+  async function deactivate(id: number) {
+    try {
+      const j = await http.post<{ message?: string }>('/api/models/' + id + '/deactivate')
+      message.success(j?.message || '已取消激活')
+      await load()
+    } catch (e: any) { message.error('取消激活失败：' + (e?.message || '')) }
+  }
+
   async function test(id: number) {
     setTesting(id)
     try {
@@ -123,7 +131,7 @@ export default function ModelsPanel() {
         <div className="card">
           <div className="card-head"><h3>新增模型配置</h3></div>
           <div className="row">
-            <div className="field" style={{ flex: 2 }}><label>名称</label>
+            <div className="field" style={{ flex: 2 }}><label><span className="req">*</span>名称</label>
               <input value={form.name} autoComplete="off" placeholder="如：内网-Qwen3.5-397B"
                 onChange={e => setForm(f => ({ ...f, name: e.target.value }))} /></div>
             <div className="field"><label>类型</label>
@@ -131,11 +139,11 @@ export default function ModelsPanel() {
                 <option value="CHAT">CHAT 对话</option><option value="EMBEDDING">EMBEDDING 向量</option>
               </select></div>
           </div>
-          <div className="field"><label>服务地址</label>
+          <div className="field"><label><span className="req">*</span>服务地址</label>
             <input value={form.baseUrl} autoComplete="off" placeholder="云服务地址或内网模型地址"
               onChange={e => setForm(f => ({ ...f, baseUrl: e.target.value }))} /></div>
           <div className="row">
-            <div className="field"><label>模型名</label>
+            <div className="field"><label><span className="req">*</span>模型名</label>
               <input value={form.model} autoComplete="off" placeholder="qwen-plus / text-embedding-v3"
                 onChange={e => setForm(f => ({ ...f, model: e.target.value }))} /></div>
             <div className="field"><label>访问密钥（内网可留空）</label>
@@ -143,7 +151,7 @@ export default function ModelsPanel() {
                 onChange={e => setForm(f => ({ ...f, apiKey: e.target.value }))} /></div>
           </div>
           {form.type === 'EMBEDDING' &&
-            <div className="field"><label>向量维度（EMBEDDING 必填）</label>
+            <div className="field"><label><span className="req">*</span>向量维度（EMBEDDING 必填）</label>
               <input type="number" value={form.dimensions} placeholder="1024"
                 onChange={e => setForm(f => ({ ...f, dimensions: e.target.value }))} /></div>}
           <button className="primary-btn" onClick={() => void create()}>＋ 添加配置</button>
@@ -200,7 +208,7 @@ export default function ModelsPanel() {
                       {m.enabled === false
                         ? <button className="btn btn-sm" disabled>已停用</button>
                         : m.active
-                          ? <button className="btn btn-sm" disabled>已激活</button>
+                          ? <button className="btn btn-sm" title="点击取消激活" onClick={() => void deactivate(m.id)}>已激活</button>
                           : <button className="btn btn-sm" onClick={() => void activate(m.id)}>激活</button>}
                       <button className="btn btn-sm" disabled={testing === m.id} onClick={() => void test(m.id)}>
                         {testing === m.id ? '测试中…' : '测试'}
@@ -218,7 +226,7 @@ export default function ModelsPanel() {
       <WbModal size="md" title={'编辑模型配置 · ' + (editing?.name || '')} open={!!editing}
         okText="保存修改" cancelText="取消" onOk={() => void saveEdit()} onCancel={() => setEditing(null)}>
         <div className="row">
-          <div className="field" style={{ flex: 2 }}><label>名称</label>
+          <div className="field" style={{ flex: 2 }}><label><span className="req">*</span>名称</label>
             <input value={editForm.name} autoComplete="off"
               onChange={e => setEditForm(f => ({ ...f, name: e.target.value }))} /></div>
           <div className="field"><label>类型</label>
@@ -226,11 +234,11 @@ export default function ModelsPanel() {
               <option value="CHAT">CHAT 对话</option><option value="EMBEDDING">EMBEDDING 向量</option>
             </select></div>
         </div>
-        <div className="field"><label>服务地址</label>
+        <div className="field"><label><span className="req">*</span>服务地址</label>
           <input value={editForm.baseUrl} autoComplete="off"
             onChange={e => setEditForm(f => ({ ...f, baseUrl: e.target.value }))} /></div>
         <div className="row">
-          <div className="field"><label>模型名</label>
+          <div className="field"><label><span className="req">*</span>模型名</label>
             <input value={editForm.model} autoComplete="off"
               onChange={e => setEditForm(f => ({ ...f, model: e.target.value }))} /></div>
           <div className="field"><label>访问密钥</label>
@@ -239,7 +247,7 @@ export default function ModelsPanel() {
               onChange={e => setEditForm(f => ({ ...f, apiKey: e.target.value }))} /></div>
         </div>
         {editForm.type === 'EMBEDDING' &&
-          <div className="field"><label>向量维度</label>
+          <div className="field"><label><span className="req">*</span>向量维度</label>
             <input type="number" value={editForm.dimensions} placeholder="1024"
               onChange={e => setEditForm(f => ({ ...f, dimensions: e.target.value }))} /></div>}
         <div className="field status-field">

@@ -86,7 +86,7 @@ export async function encryptPassword(value: string): Promise<string> {
 }
 
 let refreshing: Promise<boolean> | null = null
-function ensureFresh(): Promise<boolean> {
+export function ensureFresh(): Promise<boolean> {
   if (!refreshing) refreshing = doRefresh().finally(() => { refreshing = null })
   return refreshing
 }

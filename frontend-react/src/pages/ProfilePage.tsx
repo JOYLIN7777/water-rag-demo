@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Modal, message } from 'antd'
 import { http } from '@/api/http'
-import { getAccess, encryptPassword, logout } from '@/api/auth'
+import { getAccess, encryptPassword, logout, ensureFresh } from '@/api/auth'
 import { useAuthStore } from '@/store/auth'
 import { useChatStore } from '@/store/chat'
 import { useNavigate, Link } from 'react-router-dom'
@@ -103,21 +103,15 @@ export default function ProfilePage() {
       const iat = c.iat || (c.exp - remain)
       const total = Math.max(1, c.exp - iat)
       setToken({ remain, pct: Math.min(100, Math.round(remain / total * 100)) })
-      // 令牌到期后自动续期，失败就直接让页面重新登录，不再停在 0 分 00 秒
-      if (remain === 0 && !renewing.current) {
+      // 令牌到期前静默续期：走项目统一的 ensureFresh（会带上 refreshToken 并写回会话），
+      // 成功就留在本页继续用，只有 refreshToken 也失效才跳登录。
+      if (remain <= 30 && !renewing.current) {
         renewing.current = true
-        void http.post<{ accessToken: string; refreshToken: string }>('/api/auth/refresh')
-          .then(j => {
-            sessionStorage.setItem('wrk_access_token', j.accessToken)
-            sessionStorage.setItem('wrk_refresh_token', j.refreshToken)
-            setToken(null)
-            updateToken()
-          })
-          .catch(() => {
-            auth.reset(); chat.reset()
-            navigate('/login.html', { replace: true })
-          })
-          .finally(() => { renewing.current = false })
+        void ensureFresh().then(ok => {
+          if (ok) { updateToken(); return }
+          auth.reset(); chat.reset()
+          navigate('/login.html', { replace: true })
+        }).finally(() => { renewing.current = false })
       }
     } else setToken(null)
   }

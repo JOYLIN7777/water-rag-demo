@@ -114,6 +114,17 @@ public class ModelController {
         return Map.of("message", "已激活：" + c.getName(), "type", c.getType());
     }
 
+    /** 取消激活：只改 active、保留 enabled，清缓存并让代理回落其它激活配置 */
+    @PostMapping("/{id}/deactivate")
+    @RequirePermission(Permission.MODEL_WRITE)
+    public Map<String, Object> deactivate(@PathVariable long id) {
+        ModelConfig c = repository.findById(id);
+        if (c == null) throw new IllegalArgumentException("模型配置不存在：" + id);
+        if (repository.deactivate(id) == 0) throw new IllegalArgumentException("取消激活失败：" + id);
+        registry.invalidate();
+        return Map.of("message", "已取消激活：" + c.getName(), "type", c.getType());
+    }
+
     /** 连通性测试：真实调用模型端点，返回耗时与错误 */
     @PostMapping("/{id}/test")
     @RequirePermission(Permission.MODEL_WRITE)

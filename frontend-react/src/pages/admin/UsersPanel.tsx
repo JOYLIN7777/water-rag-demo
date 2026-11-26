@@ -285,8 +285,10 @@ export default function UsersPanel() {
                   const isAdmin = (u.groups || []).includes('admin')
                   return <tr key={u.username}>
                     <td className="row-idx">{(curPage - 1) * PAGE_SIZE + i + 1}</td>
-                    <td><a className="name" href="javascript:void(0)" style={{ color: 'var(--primary)', textDecoration: 'none' }}
-                      onClick={() => openEdit(u)}>{u.username}</a></td>
+                    <td>{isAdmin
+                      ? <span className="name" style={{ color: 'var(--muted)' }}>{u.username}</span>
+                      : <a className="name" href="javascript:void(0)" style={{ color: 'var(--primary)', textDecoration: 'none' }}
+                        onClick={() => openEdit(u)}>{u.username}</a>}</td>
                     <td>{u.displayName || ''}</td>
                     <td>{(u.groups || []).map(g => <span className={'tag-role role-' + g} key={g}>{auth.groupLabel(g)}</span>)}</td>
                     <td>{orgCrumb(u.tenant || 'default')}</td>
@@ -320,18 +322,18 @@ export default function UsersPanel() {
         onOk={() => void save()} onCancel={() => setEditing(null)}>
         {formErr && <div className="msg err show">{formErr}</div>}
         {self && <div className="form-note">正在编辑当前登录的账号：为避免把自己锁在系统外，「账号正常」与「系统管理员」两项不可取消。显示名、所属组织与其它角色可正常修改。</div>}
-        <div className="field"><label>登录账号</label>
+        <div className="field"><label><span className="req">*</span>登录账号</label>
           <input value={editing?.username || ''} disabled={!isNew} autoComplete="off" placeholder="英文字母或数字"
             onChange={e => setEditing(u => u ? { ...u, username: e.target.value } : u)} /></div>
-        <div className="field"><label>显示名称</label>
+        <div className="field"><label><span className="req">*</span>显示名称</label>
           <input value={form.displayName} autoComplete="off" placeholder="例如：张工"
             onChange={e => setForm(f => ({ ...f, displayName: e.target.value }))} /></div>
-        <div className="field"><label>所属组织</label>
+        <div className="field"><label><span className="req">*</span>所属组织</label>
           <TreeSelect style={{ width: '100%' }} value={form.tenant || undefined}
             treeData={orgTreeData()} treeDefaultExpandAll placeholder="选择所属组织"
             onChange={v => setForm(f => ({ ...f, tenant: String(v || 'default') }))} />
           <div className="form-hint">组织决定这个账号能看到哪些文档与会话：跨组织互相不可见。</div></div>
-        {isNew && <div className="field"><label>初始密码</label>
+        {isNew && <div className="field"><label><span className="req">*</span>初始密码</label>
           <input type="password" autoComplete="new-password" value={form.password} placeholder="至少 8 位，请自行设定"
             onChange={e => setForm(f => ({ ...f, password: e.target.value }))} /></div>}
         <div className="row">
@@ -343,11 +345,6 @@ export default function UsersPanel() {
               <option value="">不公开</option><option value="男">男</option><option value="女">女</option>
             </select></div>
         </div>
-        {isNew && <div className="field status-field">
-          <label className="field-check"><input type="checkbox" checked={form.enabled}
-            onChange={e => setForm(f => ({ ...f, enabled: e.target.checked }))} />账号正常</label>
-          <div className="form-hint">取消勾选则创建后账号处于停用状态，无法登录。</div>
-        </div>}
         <div className="field"><label>角色 / 用户组</label>
           <div className="check-grid">
             {roleOptions.map(([v, l]) => {
@@ -368,6 +365,11 @@ export default function UsersPanel() {
               : null
           })()}
         </div>
+        {isNew && <div className="field status-field">
+          <label className="field-check"><input type="checkbox" checked={form.enabled}
+            onChange={e => setForm(f => ({ ...f, enabled: e.target.checked }))} />账号正常</label>
+          <div className="form-hint">取消勾选则创建后账号处于停用状态，无法登录。</div>
+        </div>}
         {!isNew && <div className="field status-field"><label>账号状态</label>
           <label className="field-check"><input type="checkbox" checked={form.enabled} disabled={self}
             onChange={e => setForm(f => ({ ...f, enabled: e.target.checked }))} />账号正常

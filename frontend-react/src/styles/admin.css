@@ -412,3 +412,7 @@
   .role-member-name{font-size:12.5px;font-weight:600;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .role-member code{font-size:10.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .role-detail-empty{padding:14px;border:1px dashed var(--line);border-radius:8px;text-align:center}
+  /* 必填字段红星号 */
+  .field>label .req{color:#e0245e;margin-right:3px;font-weight:700}
+  .usage-row-link{cursor:pointer}
+  .usage-row-link:hover{background:var(--primary-soft)}

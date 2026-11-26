@@ -173,7 +173,7 @@ export default function RolesPanel() {
         onOk={() => void saveCreate()} onCancel={() => setCreating(false)}>
         {formErr && <div className="msg err show">{formErr}</div>}
         <div className="form-note">角色标识是权限系统的内部键，只能用<b>英文小写字母</b>开头，可含数字、下划线、短横线（例：<code>operator</code>、<code>flood_viewer</code>）。新建后在用户管理的「角色 / 用户组」里分配。</div>
-        <div className="field"><label>角色名称（中文，显示在角色列表与用户管理）</label>
+        <div className="field"><label><span className="req">*</span>角色名称（中文，显示在角色列表与用户管理）</label>
           <input value={roleName} maxLength={32} autoComplete="off" placeholder="例如：防汛值班员"
             onChange={e => setRoleName(e.target.value)} /></div>
         <div className="field"><label>角色标识（英文，赋给用户后生效）</label>

@@ -173,6 +173,10 @@
   .send-btn{border:0;background:linear-gradient(135deg,var(--primary-hi),var(--primary));color:#fff;padding:8px 18px;border-radius:10px;font-size:12.5px;font-weight:600;transition:all .18s;box-shadow:0 3px 10px rgba(59,110,245,.28);display:flex;align-items:center;gap:6px;margin-left:0}
   .send-btn:hover:not(:disabled){transform:translateY(-1px);box-shadow:0 5px 16px rgba(59,110,245,.36)}
   /* 生成中的停止态：白底细边 + 实心方块图标（WorkBuddy 同款克制风格），不再是一整块刺眼红 */
+  /* 停止与发送分离：停止=安静的中性灰，发送=主色，避免两个红按钮打架 */
+  .stop-btn{border:1px solid var(--line);background:#fff;color:var(--muted);border-radius:8px;
+    padding:7px 12px;font-size:12px;cursor:pointer;transition:all .15s;white-space:nowrap}
+  .stop-btn:hover{border-color:#f2b8c4;color:#c74457;background:#fff6f8}
   .send-btn.stop{background:#fff;border:1px solid #edc3cb;color:#b93c50;box-shadow:none;padding:7px 14px}
   .send-btn.stop:hover{background:#fff5f6;border-color:#e69caa;transform:none;box-shadow:0 2px 8px rgba(224,90,109,.12)}
   .send-btn.stop .stop-ico{display:inline-block;width:9px;height:9px;border-radius:2px;background:#c74457;flex:0 0 9px}

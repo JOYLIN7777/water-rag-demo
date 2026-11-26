@@ -248,7 +248,7 @@ export default function OrgPanel() {
           <TreeSelect style={{ width: '100%' }} value={form.parentKey}
             treeData={parentTreeData()} treeDefaultExpandAll placeholder="选择上级组织"
             onChange={v => setForm(f => ({ ...f, parentKey: String(v || '') }))} /></div>
-        <div className="field"><label>组织名称</label>
+        <div className="field"><label><span className="req">*</span>组织名称</label>
           <input value={form.name} autoComplete="off" placeholder="例如：水利业务部"
             onChange={e => {
               const name = e.target.value
@@ -264,7 +264,7 @@ export default function OrgPanel() {
       <WbModal title={'编辑组织 · ' + (editing?.name || '')} open={!!editing}
         okText="保存" cancelText="取消" onOk={() => void saveEdit()} onCancel={() => setEditing(null)}>
         {formErr && <div className="msg err show">{formErr}</div>}
-        <div className="field"><label>组织名称</label>
+        <div className="field"><label><span className="req">*</span>组织名称</label>
           <input value={form.name} autoComplete="off" onChange={e => setForm(f => ({ ...f, name: e.target.value }))} />
           <div className="form-hint">只改显示名，组织标识「{editing?.key}」不变——它是文档与会话的归属键，改键等于把数据搬走。</div></div>
         <div className="field"><label>上级组织</label>

@@ -1,5 +1,6 @@
 /** 后台-用量统计：DOM/class 与旧版 admin.html usage 面板 1:1（4 张卡片 + 按模型表 + 钻取明细） */
 import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import WbModal from '@/components/WbModal'
 import { num, tsLocal } from '@/lib/ui'
 import { http } from '@/api/http'
@@ -13,10 +14,11 @@ interface Summary {
 }
 interface Record0 {
   ts: string; user?: string; model?: string; promptTokens?: number
-  completionTokens?: number; totalTokens?: number; durationMs?: number; question?: string
+  completionTokens?: number; totalTokens?: number; durationMs?: number; question?: string; sessionId?: string
 }
 
 export default function UsagePanel() {
+  const navigate = useNavigate()
   const [sum, setSum] = useState<Summary | null>(null)
   const [hint, setHint] = useState('')
   const [err, setErr] = useState('')
@@ -182,7 +184,13 @@ export default function UsagePanel() {
                   <tbody>
                     {records.map((r, i) => {
                       const q = String(r.question || '').trim()
-                      return <tr key={i}>
+                      return <tr key={i} className={r.sessionId ? 'usage-row-link' : ''}
+                        title={r.sessionId ? '点击跳转到该会话' : '历史记录未保存会话ID'}
+                        onClick={() => {
+                          if (!r.sessionId) return
+                          setDrill(null)
+                          navigate('/index.html?sid=' + encodeURIComponent(r.sessionId))
+                        }}>
                         <td><span className="mono">{tsLocal(r.ts)}</span></td>
                         <td className={q ? 'q' : 'q dim'} title={q}>{q ? (q.length > 46 ? q.slice(0, 46) + '…' : q) : '—'}</td>
                         <td><span className="mono" style={{ fontSize: 11 }}>{r.model || '—'}</span></td>
