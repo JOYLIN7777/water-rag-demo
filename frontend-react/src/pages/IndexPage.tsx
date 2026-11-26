@@ -207,8 +207,17 @@ export default function IndexPage() {
   // 草稿按会话隔离：切会话时存旧草稿、载新草稿
   /** 防同一问题在 1.5 秒内被 Enter/点击重复触发，产生多条同名会话 */
   const lastSendRef = useRef<{ q: string; at: number } | null>(null)
-  /** 回答中又输入的问题排队，等本轮结束后自动提交 */
-  const queuedRef = useRef<string>('')
+  /** 回答中又输入的问题排队（支持多条），等本轮结束后按顺序自动提交 */
+  const queuedRef = useRef<string[]>([])
+  const [queuedList, setQueuedList] = useState<string[]>([])
+  function enqueue(text: string) {
+    queuedRef.current = [...queuedRef.current, text]
+    setQueuedList([...queuedRef.current])
+  }
+  function dequeueAt(idx: number) {
+    queuedRef.current = queuedRef.current.filter((_, i) => i !== idx)
+    setQueuedList([...queuedRef.current])
+  }
   const prevSid = useRef('')
   useEffect(() => {
     const old = prevSid.current
@@ -318,8 +327,9 @@ export default function IndexPage() {
       ai.streaming = false
       chat.cacheMessages(ownerId, next)
       if (chat.currentId === ownerId) setForce(x => x + 1)
-      const queued = queuedRef.current
-      queuedRef.current = ''
+      const queued = queuedRef.current.shift()
+      queuedRef.current = [...queuedRef.current]
+      setQueuedList([...queuedRef.current])
       if (queued) setTimeout(() => void send(queued), 200)
     }
   }
@@ -469,6 +479,14 @@ export default function IndexPage() {
       </div>
       <div className="composer-wrap">
         <div className={`error-bar${error ? ' show' : ''}`}>{error}</div>
+        {queuedList.length > 0 && <div className="queue-list">
+          <div className="queue-head">待发送问题（{queuedList.length}）</div>
+          {queuedList.map((text, idx) => <div className="queue-item" key={idx}>
+            <span className="queue-no">{idx + 1}</span>
+            <span className="queue-text" title={text}>{text}</span>
+            <button className="queue-del" title="移除这条排队" onClick={() => dequeueAt(idx)}>×</button>
+          </div>)}
+        </div>}
         <div className="composer">
           <textarea id="question" rows={1} placeholder="输入你的问题，Enter 发送，Shift+Enter 换行"
             value={q} ref={inputRef}
@@ -482,7 +500,7 @@ export default function IndexPage() {
             onKeyDown={e => {
               if (e.key === 'Enter' && !e.shiftKey && !(e as any).isComposing) {
                 e.preventDefault()
-                if (busy) { const text = q.trim(); if (text) { queuedRef.current = text; setQ(''); message.info('已排队，回答结束后自动发送') } }
+                if (busy) { const text = q.trim(); if (text) { enqueue(text); setQ(''); message.info(`已排队（第 ${queuedRef.current.length} 条），回答结束后依次发送`) } }
                 else void send()
               }
             }} />
@@ -513,9 +531,9 @@ export default function IndexPage() {
               if (busy) {
                 const text = q.trim()
                 if (!text) { message.info('当前正在回答，输入问题后可排队发送'); return }
-                queuedRef.current = text
+                enqueue(text)
                 setQ('')
-                message.info('已排队，当前回答结束后自动发送')
+                message.info(`已排队（第 ${queuedRef.current.length} 条），回答结束后依次发送`)
                 return
               }
               void send()
