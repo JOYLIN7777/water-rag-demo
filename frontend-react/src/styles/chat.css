@@ -227,7 +227,8 @@
 .error-bar.show{display:block}
   /* 待发送问题队列：显示在输入框上方 */
   /* 待发送问题：跟引用片段一样的行内小胶囊，点一下撤回输入框 */
-  .queue-bar{display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin:0 0 7px;padding:5px 9px}
+  .queue-bar{display:flex;align-items:center;gap:7px;flex-wrap:wrap;
+    max-width:100%;margin:0 0 9px;padding:0;border-bottom:1px dashed var(--line);padding-bottom:8px}
   .queue-label{font-size:11px;color:var(--muted);white-space:nowrap}
   .queue-chip{display:inline-flex;align-items:center;gap:6px;max-width:320px;
     border:1px solid #dbe5ff;background:#f7faff;color:var(--ink-2);border-radius:7px;

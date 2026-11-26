@@ -479,21 +479,21 @@ export default function IndexPage() {
       </div>
       <div className="composer-wrap">
         <div className={`error-bar${error ? ' show' : ''}`}>{error}</div>
-        {queuedList.length > 0 && <div className="queue-bar">
-          <span className="queue-label">待发送</span>
-          {queuedList.map((text, idx) => <span className="queue-chip" key={idx}
-            title="点击撤回这条问题到输入框重新编辑"
-            onClick={() => {
-              setQ(text)
-              dequeueAt(idx)
-              setTimeout(() => inputRef.current?.focus(), 50)
-            }}>
-            <span className="queue-no">{idx + 1}</span>
-            <span className="queue-text">{text}</span>
-            <span className="queue-undo">↩</span>
-          </span>)}
-        </div>}
         <div className="composer">
+          {queuedList.length > 0 && <div className="queue-bar">
+            <span className="queue-label">待发送</span>
+            {queuedList.map((text, idx) => <span className="queue-chip" key={idx}
+              title="点击撤回这条问题到输入框重新编辑"
+              onClick={() => {
+                setQ(text)
+                dequeueAt(idx)
+                setTimeout(() => inputRef.current?.focus(), 50)
+              }}>
+              <span className="queue-no">{idx + 1}</span>
+              <span className="queue-text">{text}</span>
+              <span className="queue-undo">↩</span>
+            </span>)}
+          </div>}
           <textarea id="question" rows={1} placeholder="输入你的问题，Enter 发送，Shift+Enter 换行"
             value={q} ref={inputRef}
             onChange={e => {
