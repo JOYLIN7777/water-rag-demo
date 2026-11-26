@@ -1,6 +1,9 @@
-/** 后台-用户管理：DOM/class 与旧版 admin.html users 面板 1:1 */
+/** 后台-用户管理：DOM/class 与旧版 admin.html users 面板 1:1（左树筛选 + 表格 + 账号表单） */
 import { useEffect, useMemo, useState } from 'react'
-import { Modal, message } from 'antd'
+import { message } from 'antd'
+import WbModal from '@/components/WbModal'
+import Pager from '@/components/Pager'
+import { confirmDialog } from '@/lib/ui'
 import { http } from '@/api/http'
 import { adminApi } from '@/api'
 import { useAuthStore } from '@/store/auth'
@@ -8,23 +11,9 @@ import { Avatar } from '@/components/Avatar'
 import '@/styles/admin.css'
 
 interface User { username: string; displayName?: string; groups?: string[]; tenant?: string; enabled?: boolean }
-interface Org { key: string; name: string; parentKey?: string; membersAll?: number }
+interface Org { key: string; name: string; parentKey?: string }
 
 const PAGE_SIZE = 20
-
-/** 页码窗口：首页/末页 + 当前页前后 2 页，中间用 0 表示省略号（对齐旧版 renderPager） */
-function pageWindow(page: number, pages: number): number[] {
-  const win = new Set<number>([1, pages])
-  for (let p = Math.max(1, page - 2); p <= Math.min(pages, page + 2); p++) win.add(p)
-  const out: number[] = []
-  let prev = 0
-  for (const p of [...win].sort((a, b) => a - b)) {
-    if (prev && p - prev > 1) out.push(0)
-    out.push(p)
-    prev = p
-  }
-  return out
-}
 
 export default function UsersPanel() {
   const auth = useAuthStore()
@@ -36,12 +25,16 @@ export default function UsersPanel() {
   const [orgKey, setOrgKey] = useState('')
   const [folded, setFolded] = useState<Set<string>>(new Set())
   const [page, setPage] = useState(1)
-  const [jump, setJump] = useState('1')
-  const [editUser, setEditUser] = useState<User | null>(null)
-  const [pwdUser, setPwdUser] = useState<User | null>(null)
-  const [form, setForm] = useState({ displayName: '', groups: '', enabled: true })
-  const [newPwd, setNewPwd] = useState('')
   const [err, setErr] = useState('')
+
+  // 新增/编辑
+  const [editing, setEditing] = useState<User | null>(null)
+  const [isNew, setIsNew] = useState(false)
+  const [form, setForm] = useState({ displayName: '', tenant: 'default', password: '', groups: [] as string[], enabled: true })
+  // 重置密码
+  const [pwdUser, setPwdUser] = useState<User | null>(null)
+  const [newPwd, setNewPwd] = useState('')
+  const [formErr, setFormErr] = useState('')
 
   async function load() {
     try {
@@ -51,9 +44,22 @@ export default function UsersPanel() {
       ])
       setUsers(Array.isArray(u) ? u : [])
       setOrgs(Array.isArray(o) ? o : [])
+      setErr('')
     } catch (e: any) { setErr(e?.message || '加载失败') }
   }
   useEffect(() => { void load() }, [])
+
+  const me = String(auth.user?.user || '').toLowerCase()
+  const orgChildren = (p?: string) => orgs.filter(o => String(o.parentKey || '') === String(p || ''))
+  const byKey = (k: string) => orgs.find(o => o.key === k) || null
+  const orgPathKeys = (k: string) => {
+    const out: string[] = []; const seen = new Set<string>()
+    let cur = k
+    while (cur && !seen.has(cur)) { seen.add(cur); out.unshift(cur); cur = String(byKey(cur)?.parentKey || '') }
+    return out
+  }
+  /** 组织全路径：水利业务部 / 调度科 —— 有层级后同名科室才不会选错 */
+  const orgCrumb = (k: string) => k ? orgPathKeys(k).map(x => byKey(x)?.name || x).join(' / ') : '全部组织'
 
   const filtered = useMemo(() => {
     const k = kw.trim().toLowerCase()
@@ -63,14 +69,13 @@ export default function UsersPanel() {
       if (status === '0' && u.enabled !== false) return false
       if (role && !(u.groups || []).includes(role)) return false
       if (orgKey) {
-        // 含下级：父链匹配
         const keys = new Set<string>()
         const queue = [orgKey]
         while (queue.length) {
           const cur = queue.shift()!
           if (keys.has(cur)) continue
           keys.add(cur)
-          orgs.filter(o => o.parentKey === cur).forEach(o => queue.push(o.key))
+          orgChildren(cur).forEach(o => queue.push(o.key))
         }
         if (!keys.has(u.tenant || 'default')) return false
       }
@@ -79,75 +84,104 @@ export default function UsersPanel() {
   }, [users, kw, status, role, orgKey, orgs])
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
-  const rows = filtered.slice((Math.min(page, totalPages) - 1) * PAGE_SIZE, Math.min(page, totalPages) * PAGE_SIZE)
-  // 页码变化时把跳页输入框同步成当前页
-  useEffect(() => { setJump(String(Math.min(page, totalPages))) }, [page, totalPages])
+  const curPage = Math.min(page, totalPages)
+  const rows = filtered.slice((curPage - 1) * PAGE_SIZE, curPage * PAGE_SIZE)
 
   function resetFilter() { setKw(''); setStatus(''); setRole(''); setOrgKey(''); setPage(1) }
-  function goJump() {
-    const n = parseInt(jump, 10)
-    if (!isNaN(n)) setPage(Math.min(Math.max(n, 1), totalPages))
-  }
 
   async function toggleEnabled(u: User, enabled: boolean) {
+    // 先本地乐观更新，失败再回滚：开关是高频操作，等接口回来才动会显得卡
+    setUsers(list => list.map(x => x.username === u.username ? { ...x, enabled } : x))
     try {
       await adminApi.updateUser(u.username, { enabled })
-      setUsers(list => list.map(x => x.username === u.username ? { ...x, enabled } : x))
       message.success(enabled ? '已启用' : '已停用')
-    } catch (e: any) { message.error(e?.message || '操作失败') }
+    } catch (e: any) {
+      setUsers(list => list.map(x => x.username === u.username ? { ...x, enabled: !enabled } : x))
+      message.error(e?.message || '操作失败')
+    }
   }
 
-  function openEdit(u: User) {
-    setEditUser(u)
-    setForm({ displayName: u.displayName || '', groups: (u.groups || []).join(','), enabled: u.enabled !== false })
-    setErr('')
+  function openCreate(presetTenant = '') {
+    setIsNew(true)
+    setEditing({ username: '', displayName: '', groups: ['viewer'], tenant: presetTenant || 'default', enabled: true })
+    setForm({ displayName: '', tenant: presetTenant || 'default', password: '', groups: ['viewer'], enabled: true })
+    setFormErr('')
   }
-  async function saveEdit() {
-    if (!editUser) return
+  function openEdit(u: User) {
+    setIsNew(false)
+    setEditing(u)
+    setForm({ displayName: u.displayName || '', tenant: u.tenant || 'default', password: '', groups: u.groups || [], enabled: u.enabled !== false })
+    setFormErr('')
+  }
+
+  const roleOptions = auth.roleMatrix.length
+    ? auth.roleMatrix.map(r => [r.role, r.name || r.role] as [string, string])
+    : Array.from(new Set(users.flatMap(u => u.groups || []))).map(g => [g, auth.groupLabel(g)] as [string, string])
+
+  const self = !!editing && !isNew && String(editing.username).toLowerCase() === me
+
+  async function save() {
+    if (!editing) return
+    if (isNew) {
+      if (!editing.username) { setFormErr('请填写登录账号'); return }
+      if (!/^[a-zA-Z0-9_-]{2,32}$/.test(editing.username)) { setFormErr('登录账号只能用 2-32 位英文字母、数字、下划线或短横线'); return }
+      if (!form.password || form.password.length < 8) { setFormErr('初始密码至少 8 位'); return }
+      try {
+        await adminApi.createUser({
+          username: editing.username, displayName: form.displayName, tenant: form.tenant,
+          password: form.password, groups: form.groups, enabled: true
+        })
+        setEditing(null); message.success('账号已创建'); await load()
+      } catch (e: any) { setFormErr(e?.message || '创建失败') }
+      return
+    }
     try {
-      await adminApi.updateUser(editUser.username, {
-        displayName: form.displayName,
-        groups: form.groups.split(',').map(x => x.trim()).filter(Boolean),
-        enabled: form.enabled
+      await adminApi.updateUser(editing.username, {
+        displayName: form.displayName, groups: form.groups, tenant: form.tenant, enabled: form.enabled
       })
-      message.success('已保存'); setEditUser(null); await load()
-    } catch (e: any) { setErr(e?.message || '保存失败') }
+      setEditing(null); message.success('账号已更新'); await load()
+    } catch (e: any) { setFormErr(e?.message || '保存失败') }
   }
 
   async function savePwd() {
     if (!pwdUser) return
-    if (newPwd.length < 8) { setErr('新密码长度至少 8 位'); return }
+    if (newPwd.length < 8) { setFormErr('新密码至少 8 位'); return }
     try {
       await adminApi.resetPassword(pwdUser.username, { password: newPwd })
-      message.success('密码已重置'); setPwdUser(null); setNewPwd(''); setErr('')
-    } catch (e: any) { setErr(e?.message || '重置失败') }
+      message.success('密码已重置'); setPwdUser(null); setNewPwd(''); setFormErr('')
+    } catch (e: any) { setFormErr(e?.message || '重置失败') }
   }
 
   async function remove(u: User) {
-    if (!window.confirm(`确定删除账号「${u.username}」吗？`)) return
-    try { await adminApi.deleteUser(u.username); message.success('已删除'); await load() }
+    const ok = await confirmDialog({
+      title: '删除账号', danger: true, okText: '确认删除',
+      content: <p style={{ margin: 0 }}>确定删除账号「{u.displayName || u.username}」（{u.username}）吗？该账号将无法登录。</p>
+    })
+    if (!ok) return
+    try { await adminApi.deleteUser(u.username); message.success('账号已删除'); await load() }
     catch (e: any) { message.error(e?.message || '删除失败') }
   }
 
   function exportUsers() {
-    const header = ['账号', '显示名', '角色', '组织', '状态']
+    const header = ['账号', '显示名', '角色', '所属组织', '状态']
     const csv = '\uFEFF' + [header.join(','), ...filtered.map(u => [
-      u.username, u.displayName || '', (u.groups || []).join('|'), u.tenant || '', u.enabled === false ? '停用' : '正常'
-    ].join(','))].join('\n')
+      u.username, u.displayName || '', (u.groups || []).map(g => auth.groupLabel(g)).join(' / '),
+      orgCrumb(u.tenant || 'default'), u.enabled === false ? '停用' : '正常'
+    ].map(c => '"' + String(c).replace(/"/g, '""') + '"').join(','))].join('\n')
     const a = document.createElement('a')
     a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }))
-    a.download = '用户清单.csv'; a.click(); URL.revokeObjectURL(a.href)
+    a.download = '用户列表.csv'; a.click(); URL.revokeObjectURL(a.href)
+    message.success(`已导出 ${filtered.length} 个账号`)
   }
 
-  // 组织树（平铺 + padding，与旧版一致）
   function treeNodes() {
     const out: React.ReactNode[] = []
     const walk = (parent: string, depth: number) => {
-      for (const o of orgs.filter(x => (x.parentKey || '') === parent)) {
-        const kids = orgs.filter(x => x.parentKey === o.key)
+      for (const o of orgChildren(parent)) {
+        const kids = orgChildren(o.key)
         const isFolded = folded.has(o.key)
         out.push(<div key={o.key} className={`tree-node${orgKey === o.key ? ' active' : ''}`}
-          data-k={o.key} style={{ paddingLeft: 10 + depth * 13 }} onClick={() => { setOrgKey(o.key); setPage(1) }}>
+          style={{ paddingLeft: 10 + depth * 13 }} onClick={() => { setOrgKey(o.key); setPage(1) }}>
           <span className={`caret${kids.length ? '' : ' ghost'}`}
             onClick={e => {
               if (!kids.length) return
@@ -185,17 +219,15 @@ export default function UsersPanel() {
           <button className="btn btn-sm btn-search" onClick={() => setPage(1)}>搜索</button>
           <button className="btn btn-sm" onClick={resetFilter}>重置</button>
           <button className="btn btn-sm btn-green" onClick={exportUsers}>导出用户</button>
-          <button className="btn btn-sm btn-amber" onClick={() => {
-            setEditUser({ username: '', displayName: '', groups: [], tenant: orgKey, enabled: true })
-            setForm({ displayName: '', groups: '', enabled: true }); setErr('')
-          }}>＋ 新增账号</button>
+          <button className="btn btn-sm btn-amber" onClick={() => openCreate(orgKey)}>＋ 新增账号</button>
         </div>
       </div>
       {err && <div className="msg err show">{err}</div>}
       <div className="workbench" style={{ minHeight: 'auto' }}>
         <div className="tree-pane">
           <div className="tree-head">组织架构（仅用于筛选）</div>
-          <div className="tree-node" onClick={() => { setOrgKey(''); setPage(1) }} style={{ paddingLeft: 10 }}>
+          <div className={`tree-node${orgKey === '' ? ' active' : ''}`} style={{ paddingLeft: 10 }}
+            onClick={() => { setOrgKey(''); setPage(1) }}>
             <span className="caret ghost" /><span className="tn">全部组织（{users.length}）</span>
           </div>
           <div id="uTree">{treeNodes()}</div>
@@ -203,7 +235,7 @@ export default function UsersPanel() {
         <div className="data-pane">
           <div className="toolbar">
             <span style={{ fontSize: 12, color: 'var(--muted)' }} id="uFilterHint">
-              共 {filtered.length} 个账号{orgKey ? `（组织：${orgs.find(o => o.key === orgKey)?.name || orgKey}）` : ''}
+              共 {filtered.length} 个账号{orgKey ? `（组织：${orgCrumb(orgKey)}）` : ''}
             </span><span className="grow" />
             <button className="btn btn-sm" onClick={() => void load()}>刷新</button>
           </div>
@@ -215,15 +247,15 @@ export default function UsersPanel() {
                 : rows.map((u, i) => {
                   const isAdmin = (u.groups || []).includes('admin')
                   return <tr key={u.username}>
-                    <td className="row-idx">{(Math.min(page, totalPages) - 1) * PAGE_SIZE + i + 1}</td>
+                    <td className="row-idx">{(curPage - 1) * PAGE_SIZE + i + 1}</td>
                     <td><span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
                       <Avatar name={u.displayName || u.username} size="sm" />
                       <a className="name" href="javascript:void(0)" style={{ color: 'var(--primary)', textDecoration: 'none' }}
                         onClick={() => openEdit(u)}>{u.username}</a>
                     </span></td>
                     <td>{u.displayName || ''}</td>
-                    <td>{(u.groups || []).map(g => <span className="tag" key={g}>{auth.groupLabel(g)}</span>)}</td>
-                    <td>{orgs.find(o => o.key === (u.tenant || 'default'))?.name || u.tenant}</td>
+                    <td>{(u.groups || []).map(g => <span className="tag-role" key={g}>{auth.groupLabel(g)}</span>)}</td>
+                    <td>{orgCrumb(u.tenant || 'default')}</td>
                     <td>{isAdmin
                       ? <><span className="tag ok">正常</span><span style={{ marginLeft: 8, fontSize: 11.5, color: 'var(--muted)' }}>系统管理员不可停用</span></>
                       : <><label className="switch" title={u.enabled === false ? '点击启用该账号' : '点击停用该账号'}>
@@ -236,7 +268,7 @@ export default function UsersPanel() {
                       ? <span style={{ color: 'var(--muted)', fontSize: 11.5 }} title="系统管理员账号受保护">不可编辑</span>
                       : <>
                         <button className="op-btn" onClick={() => openEdit(u)}>编辑</button>
-                        <button className="op-btn warn" onClick={() => { setPwdUser(u); setNewPwd(''); setErr('') }}>重置密码</button>
+                        <button className="op-btn warn" onClick={() => { setPwdUser(u); setNewPwd(''); setFormErr('') }}>重置密码</button>
                         <button className="op-btn danger" onClick={() => void remove(u)}>删除</button>
                       </>}
                     </td>
@@ -244,46 +276,66 @@ export default function UsersPanel() {
                 })}
             </tbody>
           </table></div>
-          <div className="pager" id="uPager">
-            <span>共 {filtered.length} 条</span><span style={{ color: '#c3cddd' }}>|</span><span>每页 {PAGE_SIZE} 条</span>
-            <button className="pg-btn" disabled={page <= 1} onClick={() => setPage(1)}>首页</button>
-            <button className="pg-btn" disabled={page <= 1} onClick={() => setPage(page - 1)}>上一页</button>
-            {pageWindow(page, totalPages).map((p, i) => p === 0
-              ? <span className="pg-sep" key={'sep' + i}>…</span>
-              : <button key={p} className={`pg-btn${p === page ? ' on' : ''}`} onClick={() => setPage(p)}>{p}</button>)}
-            <button className="pg-btn" disabled={page >= totalPages} onClick={() => setPage(page + 1)}>下一页</button>
-            <button className="pg-btn" disabled={page >= totalPages} onClick={() => setPage(totalPages)}>末页</button>
-            <span className="pg-info">
-              第 {Math.min(page, totalPages)} / {totalPages} 页 · 跳至
-              <input type="number" min={1} max={totalPages} value={jump} aria-label="跳转到页码"
-                onChange={e => setJump(e.target.value)}
-                onKeyDown={e => { if (e.key === 'Enter') goJump() }} />
-              <button className="pg-btn" onClick={goJump}>跳转</button>
-            </span>
-          </div>
+          <Pager id="uPager" total={filtered.length} page={curPage} size={PAGE_SIZE} onChange={setPage} />
         </div>
       </div>
 
-      <Modal title={editUser?.username ? '编辑账号' : '新增账号'} open={!!editUser}
-        onCancel={() => setEditUser(null)} onOk={() => void saveEdit()} okText="保存">
-        {err && <div className="msg err show">{err}</div>}
-        <div className="field"><label>用户名</label>
-          <input value={editUser?.username || ''} disabled={!!editUser?.username}
-            onChange={e => setEditUser(u => u ? { ...u, username: e.target.value } : u)} /></div>
-        <div className="field"><label>显示名</label>
-          <input value={form.displayName} onChange={e => setForm(f => ({ ...f, displayName: e.target.value }))} /></div>
-        <div className="field"><label>角色（逗号分隔）</label>
-          <input value={form.groups} onChange={e => setForm(f => ({ ...f, groups: e.target.value }))} /></div>
-        <div className="field"><label className="checkbox"><input type="checkbox" checked={form.enabled}
-          onChange={e => setForm(f => ({ ...f, enabled: e.target.checked }))} />启用</label></div>
-      </Modal>
+      {/* 新增 / 编辑账号：字段与旧版 userForm 一致 */}
+      <WbModal title={isNew ? (form.tenant && form.tenant !== 'default' ? `新增账号 · ${byKey(form.tenant)?.name || ''}` : '新增账号') : `编辑账号 · ${editing?.username || ''}`}
+        open={!!editing} okText={isNew ? '创建' : '保存'} cancelText="取消"
+        onOk={() => void save()} onCancel={() => setEditing(null)}>
+        {formErr && <div className="msg err show">{formErr}</div>}
+        {self && <div className="form-note">正在编辑当前登录的账号：为避免把自己锁在系统外，「账号正常」与「系统管理员」两项不可取消。显示名、所属组织与其它角色可正常修改。</div>}
+        <div className="field"><label>登录账号</label>
+          <input value={editing?.username || ''} disabled={!isNew} autoComplete="off" placeholder="英文字母或数字"
+            onChange={e => setEditing(u => u ? { ...u, username: e.target.value } : u)} /></div>
+        <div className="field"><label>显示名称</label>
+          <input value={form.displayName} autoComplete="off" placeholder="例如：张工"
+            onChange={e => setForm(f => ({ ...f, displayName: e.target.value }))} /></div>
+        <div className="field"><label>所属组织</label>
+          <select value={form.tenant} onChange={e => setForm(f => ({ ...f, tenant: e.target.value }))}>
+            {(orgs.length ? orgs : [{ key: 'default', name: '顶层组织' }]).map(o =>
+              <option key={o.key} value={o.key}>{orgCrumb(o.key)}</option>)}
+          </select>
+          <div className="form-hint">组织决定这个账号能看到哪些文档与会话：跨组织互相不可见。</div></div>
+        {isNew && <div className="field"><label>初始密码</label>
+          <input type="password" autoComplete="new-password" value={form.password} placeholder="至少 8 位，请自行设定"
+            onChange={e => setForm(f => ({ ...f, password: e.target.value }))} /></div>}
+        <div className="field"><label>角色 / 用户组</label>
+          <div className="check-grid">
+            {roleOptions.map(([v, l]) => {
+              const lock = self && v === 'admin'
+              return <label key={v} title={lock ? '不能移除当前登录账号自己的管理员角色' : ''}>
+                <input type="checkbox" checked={form.groups.includes(v)} disabled={lock}
+                  onChange={e => setForm(f => ({
+                    ...f,
+                    groups: e.target.checked ? Array.from(new Set([...f.groups, v])) : f.groups.filter(x => x !== v)
+                  }))} />
+                <span>{l}</span></label>
+            })}
+          </div>
+          {(() => {
+            const legacy = form.groups.filter(g => !roleOptions.some(([v]) => v === g))
+            return legacy.length
+              ? <div className="form-hint">该账号仍保留已停用的角色：{legacy.map(g => auth.groupLabel(g)).join('、')}，如需移除请先到「角色定义」处理。</div>
+              : null
+          })()}
+        </div>
+        {!isNew && <div className="field status-field"><label>账号状态</label>
+          <label className="field-check"><input type="checkbox" checked={form.enabled} disabled={self}
+            onChange={e => setForm(f => ({ ...f, enabled: e.target.checked }))} />账号正常
+            {self && <span className="form-inline-note">（当前登录账号不可停用）</span>}</label>
+          <div className="form-hint">停用后该账号无法登录。</div></div>}
+      </WbModal>
 
-      <Modal title={'重置密码 · ' + (pwdUser?.username || '')} open={!!pwdUser}
-        onCancel={() => setPwdUser(null)} onOk={() => void savePwd()} okText="确认重置">
-        {err && <div className="msg err show">{err}</div>}
+      <WbModal title={'重置密码 · ' + (pwdUser?.username || '')} open={!!pwdUser}
+        okText="确认重置" cancelText="取消" onOk={() => void savePwd()} onCancel={() => setPwdUser(null)}>
+        {formErr && <div className="msg err show">{formErr}</div>}
+        <p style={{ margin: '0 0 10px', color: 'var(--muted)', fontSize: 12.5 }}>重置后旧密码立即失效，新密码至少 8 位。</p>
         <div className="field"><label>新密码</label>
-          <input type="password" value={newPwd} onChange={e => setNewPwd(e.target.value)} placeholder="至少 8 位" /></div>
-      </Modal>
+          <input type="password" autoComplete="new-password" value={newPwd} placeholder="至少 8 位"
+            onChange={e => setNewPwd(e.target.value)} /></div>
+      </WbModal>
     </>
   )
 }

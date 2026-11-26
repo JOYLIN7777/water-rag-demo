@@ -1,6 +1,9 @@
 /** 知识库文档管理：DOM/class 与旧版 manage.html 1:1，上传/分片/删除/分页全功能 */
 import { useEffect, useRef, useState } from 'react'
-import { Modal, message } from 'antd'
+import { message } from 'antd'
+import WbModal from '@/components/WbModal'
+import ChunkPreview from '@/components/ChunkPreview'
+import { confirmDialog } from '@/lib/ui'
 import { http } from '@/api/http'
 import { uploadDocument } from '@/api'
 import { getUser } from '@/api/auth'
@@ -17,7 +20,6 @@ interface DocItem {
   visibleSubtree?: boolean
   uploadedAt?: string
 }
-interface Chunk { chunkIndex: number; content: string }
 
 const FMT_GROUPS = [
   { name: '文本与网页', exts: ['.txt', '.md', '.html', '.htm'] },
@@ -43,9 +45,7 @@ export default function ManagePage() {
   const [jump, setJump] = useState('')
   const [msg, setMsg] = useState<{ type: string; text: string } | null>(null)
   const [dragging, setDragging] = useState(false)
-  const [chunks, setChunks] = useState<{ name: string; list: Chunk[]; error?: string } | null>(null)
-  const [openChunks, setOpenChunks] = useState<Set<number>>(new Set([0]))
-  const [fullChunks, setFullChunks] = useState<Set<number>>(new Set())
+  const [chunkFile, setChunkFile] = useState<string | null>(null)
   const [scopeOpen, setScopeOpen] = useState(false)
   const [pendingFiles, setPendingFiles] = useState<File[]>([])
   const [includeSubtree, setIncludeSubtree] = useState(false)
@@ -93,7 +93,13 @@ export default function ManagePage() {
   }
 
   async function removeDoc(d: DocItem) {
-    if (!window.confirm(`确定从知识库删除「${d.fileName}」（${d.chunks} 个切片）吗？\n删除后相关内容将无法再被问答引用。`)) return
+    const ok = await confirmDialog({
+      title: '删除文档',
+      content: <p style={{ margin: 0 }}>确定删除「{d.fileName}」及其全部 {d.chunks} 个片段吗？删除后相关内容将无法再被问答引用，且无法恢复。</p>,
+      okText: '确认删除',
+      danger: true
+    })
+    if (!ok) return
     showMsg('', `正在删除 ${d.fileName} ...`)
     try {
       const q = '?fileName=' + encodeURIComponent(d.fileName) + (d.tenantId ? '&tenantId=' + encodeURIComponent(d.tenantId) : '')
@@ -105,23 +111,6 @@ export default function ManagePage() {
     } catch (e: any) { showMsg('err', '✗ 删除失败：' + (e?.message || '')) }
   }
 
-  async function showChunks(fileName: string) {
-    setChunks({ name: fileName, list: [] })
-    setOpenChunks(new Set([0]))
-    setFullChunks(new Set())
-    try {
-      const j = await http.get<{ chunks?: Chunk[]; message?: string }>('/api/docs/chunks?fileName=' + encodeURIComponent(fileName))
-      if (!j.chunks) throw new Error(j.message || '读取失败')
-      setChunks({ name: fileName, list: j.chunks })
-    } catch (e: any) { setChunks({ name: fileName, list: [], error: e?.message || '' }) }
-  }
-  function toggleChunk(i: number) {
-    setOpenChunks(prev => { const s = new Set(prev); s.has(i) ? s.delete(i) : s.add(i); return s })
-  }
-  function expandAll() {
-    setOpenChunks(new Set((chunks?.list || []).map((_, i) => i)))
-    setFullChunks(new Set((chunks?.list || []).map((_, i) => i)))
-  }
 
   /** 选完文件弹框确认可见范围，取消则不上传 */
   function pickFiles(files: FileList | File[] | null) {
@@ -233,7 +222,7 @@ export default function ManagePage() {
                     <td><span className="tag">{d.chunks} 片</span></td>
                     <td>{fmtTime(d.uploadedAt)}</td>
                     <td>
-                      {auth.has('doc:chunks') && <button className="btn btn-sm btn-chunks" onClick={() => void showChunks(d.fileName)}>查看分片</button>}
+                      {auth.has('doc:chunks') && <button className="btn btn-sm btn-chunks" onClick={() => setChunkFile(d.fileName)}>查看分片</button>}
                       {auth.has('doc:delete') && <button className="btn btn-sm btn-danger" style={{ marginLeft: 6 }} onClick={() => void removeDoc(d)}>删除</button>}
                     </td>
                   </tr>
@@ -266,7 +255,7 @@ export default function ManagePage() {
       </div>
 
       {/* 上传前确认可见范围（旧版 askVisibility 弹框） */}
-      <Modal title="文档可见范围" open={scopeOpen} okText="确认上传" cancelText="取消"
+      <WbModal size="md" title="文档可见范围" open={scopeOpen} okText="确认上传" cancelText="取消"
         onCancel={() => { setScopeOpen(false); setPendingFiles([]) }} onOk={() => { if (pendingFiles.length) void doUpload() }}>
         <p style={{ margin: '0 0 12px' }}>已选择 {pendingFiles.length} 个文件，请确认文档可见范围：</p>
         <label style={{ display: 'flex', gap: 8, alignItems: 'flex-start', marginBottom: 10, cursor: 'pointer' }}>
@@ -277,41 +266,9 @@ export default function ManagePage() {
           <input type="radio" name="visScope" checked={includeSubtree} onChange={() => setIncludeSubtree(true)} />
           <span><b>含下级部门可见</b><div style={{ fontSize: 11.5, color: 'var(--muted)' }}>本部门及其下级组织都能看到、检索到这些文档</div></span>
         </label>
-      </Modal>
+      </WbModal>
 
-      {/* 分片预览 */}
-      <Modal title={'分片预览 · ' + (chunks?.name || '')} open={!!chunks} okText="关闭" cancelText={null}
-        width={720} onOk={() => setChunks(null)} onCancel={() => setChunks(null)}>
-        {chunks?.error
-          ? <div className="chunk-empty">加载失败：{chunks.error}</div>
-          : !chunks?.list.length
-            ? <div className="chunk-empty">正在读取分片…</div>
-            : <div className="chunk-tree">
-              <div className="chunk-root">
-                <span className="cf-name" title={chunks.name}>{chunks.name}</span>
-                <span className="tag">共 {chunks.list.length} 片</span>
-                <button className="btn btn-sm chunk-all" style={{ marginLeft: 'auto' }} onClick={expandAll}>全部展开</button>
-              </div>
-              {chunks.list.map((c, i) => {
-                const txt = String(c.content || '')
-                const open = openChunks.has(i)
-                const full = fullChunks.has(i)
-                return <div className={`chunk-item${open ? ' open' : ''}${full ? ' full' : ''}`} key={i}>
-                  <div className="chunk-head" onClick={() => toggleChunk(i)}>
-                    <span className="chunk-caret">{open ? '▾' : '▸'}</span>
-                    <span className="chunk-no">第 {Number(c.chunkIndex || 0) + 1} 片</span>
-                    <span className="chunk-preview">{txt.slice(0, 90).replace(/\s+/g, ' ')}</span>
-                    <span className="chunk-len">{txt.length} 字</span>
-                  </div>
-                  <div className="chunk-body">{txt}</div>
-                  {txt.length > 240 && <button className="chunk-more"
-                    onClick={() => setFullChunks(prev => { const s = new Set(prev); s.has(i) ? s.delete(i) : s.add(i); return s })}>
-                    展开全文（{txt.length} 字）
-                  </button>}
-                </div>
-              })}
-            </div>}
-      </Modal>
+      <ChunkPreview fileName={chunkFile} onClose={() => setChunkFile(null)} />
     </>
   )
 }

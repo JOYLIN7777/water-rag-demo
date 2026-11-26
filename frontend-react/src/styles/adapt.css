@@ -28,9 +28,12 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC'
 .topbar-left:has(.topbar-nav-left) .topbar-sub { display: none; }
 
 /* ===== 弹框样式对齐旧版自绘 modal（legacy.css 的 .modal-box 视觉） ===== */
+/* 宽度分四档，由 WbModal 的 size 通过 --wb-modal-w 传入：
+   默认 460（表单/提示）、md 560（列表类）、wide 680（权限矩阵/树预览）、chunk 820（分片预览）。
+   之前一刀切 460，导致宽内容被挤成一条竖排文字。 */
 .ant-modal {
-  width: min(460px, 92vw) !important;
-  max-width: min(460px, 92vw) !important;
+  width: var(--wb-modal-w, min(460px, 92vw)) !important;
+  max-width: 92vw !important;
   padding: 0 !important;
   border-radius: 14px !important;
   box-shadow: 0 24px 70px rgba(10,20,45,.3) !important;
