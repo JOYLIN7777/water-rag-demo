@@ -14,7 +14,8 @@ export default function ChunkPreview({ fileName, onClose }: { fileName: string |
 
   useEffect(() => {
     if (!fileName) return
-    setList([]); setError(''); setOpen(new Set([0])); setFull(new Set())
+    // 默认展开的第一段也要直接显示全文，避免「已展开还得再点展开全文」
+    setList([]); setError(''); setOpen(new Set([0])); setFull(new Set([0]))
     let alive = true
     http.get<{ chunks?: Chunk[]; message?: string }>('/api/docs/chunks?fileName=' + encodeURIComponent(fileName))
       .then(j => {
@@ -26,8 +27,15 @@ export default function ChunkPreview({ fileName, onClose }: { fileName: string |
     return () => { alive = false }
   }, [fileName])
 
-  const toggle = (i: number) => setOpen(prev => { const s = new Set(prev); s.has(i) ? s.delete(i) : s.add(i); return s })
+  /** 展开一段就直接显示该段全文，不再让用户点第二下「展开全文」 */
+  const toggle = (i: number) => {
+    const opening = !open.has(i)
+    setOpen(prev => { const s = new Set(prev); opening ? s.add(i) : s.delete(i); return s })
+    setFull(prev => { const s = new Set(prev); opening ? s.add(i) : s.delete(i); return s })
+  }
+  const allOpen = list.length > 0 && open.size === list.length
   const expandAll = () => {
+    if (allOpen) { setOpen(new Set()); setFull(new Set()); return }
     setOpen(new Set(list.map((_, i) => i)))
     setFull(new Set(list.map((_, i) => i)))
   }
@@ -43,7 +51,7 @@ export default function ChunkPreview({ fileName, onClose }: { fileName: string |
             <div className="chunk-root">
               <span className="cf-name" title={fileName || ''}>{fileName}</span>
               <span className="tag">共 {list.length} 片</span>
-              <button className="btn btn-sm chunk-all" style={{ marginLeft: 'auto' }} onClick={expandAll}>全部展开</button>
+              <button className="btn btn-sm chunk-all" style={{ marginLeft: 'auto' }} onClick={expandAll}>{allOpen ? '全部收起' : '全部展开'}</button>
             </div>
             {list.map((c, i) => {
               const txt = String(c.content || '')
@@ -57,10 +65,6 @@ export default function ChunkPreview({ fileName, onClose }: { fileName: string |
                   <span className="chunk-len">{txt.length} 字</span>
                 </div>
                 <div className="chunk-body">{txt}</div>
-                {txt.length > 240 && <button className="chunk-more"
-                  onClick={() => setFull(prev => { const s = new Set(prev); s.has(i) ? s.delete(i) : s.add(i); return s })}>
-                  展开全文（{txt.length} 字）
-                </button>}
               </div>
             })}
           </div>}

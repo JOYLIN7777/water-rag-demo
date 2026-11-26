@@ -93,7 +93,7 @@ public class AuditService {
                 SELECT ts,tenant_id,user_id,groups,action,resource,detail,ip,status,duration_ms,result
                 FROM audit_log WHERE tenant_id=? AND (action LIKE '%/api/auth/login%' OR action LIKE '%/api/auth/refresh%')
                 ORDER BY ts DESC LIMIT ?
-                """, tenant, Math.min(Math.max(limit, 1), 500));
+                """, tenant, Math.min(Math.max(limit, 1), 10000));
         } catch (Exception e) {
             log.warn("登录日志查询失败：{}", e.getMessage());
             return new ArrayList<>();
@@ -106,7 +106,7 @@ public class AuditService {
             return jdbc.queryForList("""
                 SELECT ts,tenant_id,user_id,groups,action,resource,detail,ip,status,duration_ms,result
                 FROM audit_log WHERE tenant_id=? ORDER BY ts DESC LIMIT ?
-                """, tenant, Math.min(Math.max(limit, 1), 500));
+                """, tenant, Math.min(Math.max(limit, 1), 10000));
         } catch (Exception e) {
             log.warn("审计查询失败：{}", e.getMessage());
             return new ArrayList<>();
@@ -119,7 +119,7 @@ public class AuditService {
             return jdbc.queryForList("""
                 SELECT ts,tenant_id,user_id,groups,action,resource,detail,ip,status,duration_ms,result
                 FROM audit_log ORDER BY ts DESC LIMIT ?
-                """, Math.min(Math.max(limit, 1), 500));
+                """, Math.min(Math.max(limit, 1), 10000));
         } catch (Exception e) {
             log.warn("全量审计查询失败：{}", e.getMessage());
             return new ArrayList<>();

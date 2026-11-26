@@ -21,7 +21,10 @@ function normalizeMarkdown(text: string): string {
 }
 
 function renderMarkdown(text: string): string {
-  return DOMPurify.sanitize(marked.parse(normalizeMarkdown(text), { breaks: true }) as string)
+  const html = marked.parse(normalizeMarkdown(text), { breaks: true }) as string
+  // 回答里模型给出的示例问题（含问号的列表项）做成可点击：蓝色 + 点击填入输入框
+  const withSuggest = html.replace(/<li>([^<]*[？?][^<]*)<\/li>/g, '<li class="ask-suggest">$1</li>')
+  return DOMPurify.sanitize(withSuggest)
 }
 
 /** 问答时间统一显示完整年月日时分秒：提问在气泡上方、回答在卡片头部，层级分明 */
@@ -169,6 +172,7 @@ export default function IndexPage() {
           }
           const data = dataLines.join('\n')
           if (ev === 'sources') { try { ai.sources = JSON.parse(data) } catch { /* 忽略 */ } }
+          else if (ev === 'error') { ai.content = data; setError(data) }
           else if (ev === 'message') ai.content += data
           else if (ev === 'done') {
             finished = true
@@ -298,7 +302,17 @@ export default function IndexPage() {
                         onClick={() => { void navigator.clipboard.writeText(m.content); message.success('回答已复制') }}>复制</button>
                     </span>
                   </div>
-                  <div className="ai-card-body" dangerouslySetInnerHTML={{ __html: renderMarkdown(m.content) + (m.streaming ? '<span class="cursor"></span>' : '') }} />
+                  <div className="ai-card-body"
+                    onClick={e => {
+                      const li = (e.target as HTMLElement).closest('li.ask-suggest')
+                      if (!li) return
+                      const q = String(li.textContent || '').trim()
+                      if (!q) return
+                      setQ(q)
+                      document.getElementById('question')?.focus()
+                      message.info('已填入输入框，确认后即可发送')
+                    }}
+                    dangerouslySetInnerHTML={{ __html: renderMarkdown(m.content) + (m.streaming ? '<span class="cursor"></span>' : '') }} />
                   {!m.streaming && <div className="cite-zone">
                     {!!m.sources?.length && <>
                       <div className="cite-row">

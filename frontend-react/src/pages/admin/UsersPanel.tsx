@@ -1,6 +1,6 @@
 /** 后台-用户管理：DOM/class 与旧版 admin.html users 面板 1:1（左树筛选 + 表格 + 账号表单） */
 import { useEffect, useMemo, useState } from 'react'
-import { message } from 'antd'
+import { message, TreeSelect } from 'antd'
 import WbModal from '@/components/WbModal'
 import Pager from '@/components/Pager'
 import { confirmDialog } from '@/lib/ui'
@@ -12,6 +12,7 @@ import '@/styles/admin.css'
 
 interface User { username: string; displayName?: string; groups?: string[]; tenant?: string; enabled?: boolean }
 interface Org { key: string; name: string; parentKey?: string }
+interface OrgTreeNode { value: string; title: string; children?: OrgTreeNode[] }
 
 const PAGE_SIZE = 20
 
@@ -60,6 +61,14 @@ export default function UsersPanel() {
   }
   /** 组织全路径：水利业务部 / 调度科 —— 有层级后同名科室才不会选错 */
   const orgCrumb = (k: string) => k ? orgPathKeys(k).map(x => byKey(x)?.name || x).join(' / ') : '全部组织'
+
+  /** 组织选择用 AntD TreeSelect：树形层级 + 可展开收起，不再是一排看不出关系的 option */
+  const orgTreeData = (): OrgTreeNode[] => {
+    const build = (parent: string): OrgTreeNode[] =>
+      orgChildren(parent).map(o => ({ value: o.key, title: o.name, children: build(o.key) }))
+    const nodes = build('')
+    return nodes.length ? nodes : [{ value: 'default', title: '顶层组织' }]
+  }
 
   const filtered = useMemo(() => {
     const k = kw.trim().toLowerCase()
@@ -303,10 +312,9 @@ export default function UsersPanel() {
           <input value={form.displayName} autoComplete="off" placeholder="例如：张工"
             onChange={e => setForm(f => ({ ...f, displayName: e.target.value }))} /></div>
         <div className="field"><label>所属组织</label>
-          <select value={form.tenant} onChange={e => setForm(f => ({ ...f, tenant: e.target.value }))}>
-            {(orgs.length ? orgs : [{ key: 'default', name: '顶层组织' }]).map(o =>
-              <option key={o.key} value={o.key}>{orgCrumb(o.key)}</option>)}
-          </select>
+          <TreeSelect style={{ width: '100%' }} value={form.tenant || undefined}
+            treeData={orgTreeData()} treeDefaultExpandAll placeholder="选择所属组织"
+            onChange={v => setForm(f => ({ ...f, tenant: String(v || 'default') }))} />
           <div className="form-hint">组织决定这个账号能看到哪些文档与会话：跨组织互相不可见。</div></div>
         {isNew && <div className="field"><label>初始密码</label>
           <input type="password" autoComplete="new-password" value={form.password} placeholder="至少 8 位，请自行设定"

@@ -34,6 +34,9 @@ public class OrgController {
             Map<String, Object> row = new LinkedHashMap<>();
             row.put("key", m.get("key"));
             row.put("name", m.get("name"));
+            // 前端侧栏/用户树的层级全靠 parentKey；之前只发 key+name，
+            // 数据库里明明是树，界面却把所有部门都画成顶层兄弟。
+            row.put("parentKey", m.getOrDefault("parentKey", ""));
             out.add(row);
         }
         return out;

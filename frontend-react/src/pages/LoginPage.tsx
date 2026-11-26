@@ -22,10 +22,6 @@ export default function LoginPage() {
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
 
-  function fill(u: string, p: string) {
-    setUsername(u); setPassword(p); setError('')
-  }
-
   /** 落地页完全按服务端菜单决定，不信任客户端 groups；失败落个人中心 */
   async function pickLandingPage(): Promise<string> {
     try {
@@ -118,13 +114,6 @@ export default function LoginPage() {
             </div>
             <button className="login-btn" type="submit" disabled={busy}>{busy ? '登录中…' : '登 录'}</button>
           </form>
-
-          <div className="demo-box">
-            <div className="demo-title">本机演示账号（点击填入）</div>
-            <div className="demo-row"><code>admin / Admin@123456</code><span>首次登录用</span>
-              <button type="button" onClick={() => fill('admin', 'Admin@123456')}>填入</button></div>
-            <div className="demo-note">仅演示环境保留。正式部署请删除此区域，并用管理员账号新建真实用户。</div>
-          </div>
         </div>
       </div>
     </div>

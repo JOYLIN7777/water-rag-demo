@@ -45,17 +45,20 @@ public class ChatController {
     private final ChatSessionStore sessionStore;
     private final WaterInfoTool waterInfoTool;
     private final ToolPermissionRegistry toolPermissions;
+    private final com.joylin.waterkb.model.ModelConfigRepository models;
 
     public ChatController(RagChatService ragChatService,
                           ConversationTreeStore treeStore,
                           ChatSessionStore sessionStore,
                           WaterInfoTool waterInfoTool,
-                          ToolPermissionRegistry toolPermissions) {
+                          ToolPermissionRegistry toolPermissions,
+                          com.joylin.waterkb.model.ModelConfigRepository models) {
         this.ragChatService = ragChatService;
         this.treeStore = treeStore;
         this.sessionStore = sessionStore;
         this.waterInfoTool = waterInfoTool;
         this.toolPermissions = toolPermissions;
+        this.models = models;
     }
 
     /**
@@ -65,7 +68,15 @@ public class ChatController {
      */
     @PostMapping(value = "/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public Flux<ServerSentEvent<String>> chat(@RequestBody @Valid ChatRequest req) {
-        return ragChatService.chatStream(req.sessionId(), req.question(), req.parentId());
+        // 全部 CHAT 模型被禁用时明确告诉用户，而不是让它变成一次「连接中断」网络错误
+        return Flux.defer(() -> {
+            if (models.findActive("CHAT") == null) {
+                return Flux.just(ServerSentEvent.<String>builder().event("error")
+                        .data("当前对话模型已禁用或未激活，请联系管理员在「模型设置」中启用并激活一个 CHAT 模型。")
+                        .build());
+            }
+            return ragChatService.chatStream(req.sessionId(), req.question(), req.parentId());
+        });
     }
 
     /**

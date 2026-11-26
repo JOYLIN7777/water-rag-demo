@@ -1,6 +1,6 @@
 /** 后台-组织架构：DOM/class 与旧版 admin.html org 面板 1:1（单表树形 + 三档弹框） */
 import { useEffect, useMemo, useState } from 'react'
-import { message } from 'antd'
+import { message, TreeSelect } from 'antd'
 import WbModal from '@/components/WbModal'
 import { infoDialog } from '@/lib/ui'
 import { http } from '@/api/http'
@@ -8,6 +8,7 @@ import { useAuthStore } from '@/store/auth'
 import '@/styles/admin.css'
 
 interface Org { key: string; name: string; parentKey?: string; orderNum?: number; members?: number; membersAll?: number }
+interface OrgTreeNode { value: string; title: string; children?: OrgTreeNode[] }
 
 /** 组织名转英文标识：含英文直接取英文，中文按常用字拼音拼，猜不出回落 org */
 const PINYIN: Record<string, string> = {
@@ -97,21 +98,14 @@ export default function OrgPanel() {
     return k ? out.filter(r => r.o.name.toLowerCase().includes(k) || String(r.o.key).toLowerCase().includes(k)) : out
   }, [rows, folded, kw])
 
-  /** 上级组织下拉：按层级缩进；编辑时排除自己与子孙（防环） */
-  function parentOptions(selected: string, selfKey?: string) {
+  /** 上级组织用 TreeSelect：树形展示、可展开收起；编辑时排除自己与子孙（防环） */
+  function parentTreeData(selfKey?: string) {
     const skip = selfKey ? subtree(selfKey) : new Set<string>()
-    const out: Array<{ key: string; name: string; depth: number }> = [{ key: '', name: '（顶层，没有上级）', depth: -1 }]
-    const walk = (parent: string, depth: number) => {
-      for (const o of children(parent)) {
-        if (skip.has(o.key)) continue
-        out.push({ key: o.key, name: o.name, depth })
-        walk(o.key, depth + 1)
-      }
-    }
-    walk('', 0)
-    return out.map(r => <option key={r.key || 'top'} value={r.key}>
-      {r.depth >= 0 ? '　'.repeat(r.depth) + '└ ' + r.name : r.name}
-    </option>)
+    const build = (parent: string): OrgTreeNode[] =>
+      children(parent).filter(o => !skip.has(o.key)).map(o => ({
+        value: o.key, title: o.name, children: build(o.key)
+      }))
+    return [{ value: '', title: '（顶层，没有上级）' }, ...build('')]
   }
 
   function suggestKey(name: string) {
@@ -251,9 +245,9 @@ export default function OrgPanel() {
         {formErr && <div className="msg err show">{formErr}</div>}
         <div className="form-note">组织是数据隔离的边界：新组织下的成员只能看到本组织的文档、会话与统计。层级只决定归属与展示，不会让下级自动继承上级的文档。</div>
         <div className="field"><label>上级组织</label>
-          <select value={form.parentKey} onChange={e => setForm(f => ({ ...f, parentKey: e.target.value }))}>
-            {parentOptions(form.parentKey)}
-          </select></div>
+          <TreeSelect style={{ width: '100%' }} value={form.parentKey}
+            treeData={parentTreeData()} treeDefaultExpandAll placeholder="选择上级组织"
+            onChange={v => setForm(f => ({ ...f, parentKey: String(v || '') }))} /></div>
         <div className="field"><label>组织名称</label>
           <input value={form.name} autoComplete="off" placeholder="例如：水利业务部"
             onChange={e => {
@@ -274,9 +268,9 @@ export default function OrgPanel() {
           <input value={form.name} autoComplete="off" onChange={e => setForm(f => ({ ...f, name: e.target.value }))} />
           <div className="form-hint">只改显示名，组织标识「{editing?.key}」不变——它是文档与会话的归属键，改键等于把数据搬走。</div></div>
         <div className="field"><label>上级组织</label>
-          <select value={form.parentKey} onChange={e => setForm(f => ({ ...f, parentKey: e.target.value }))}>
-            {parentOptions(form.parentKey, editing?.key)}
-          </select>
+          <TreeSelect style={{ width: '100%' }} value={form.parentKey}
+            treeData={parentTreeData(editing?.key)} treeDefaultExpandAll placeholder="选择上级组织"
+            onChange={v => setForm(f => ({ ...f, parentKey: String(v || '') }))} />
           <div className="form-hint">调整上级等于把整棵子树挪到别处，已有数据不受影响；不能挪到自己的下级里。</div></div>
       </WbModal>
 
@@ -287,10 +281,11 @@ export default function OrgPanel() {
           只删组织不迁数据，文档会留在已删除的组织上成为孤儿。</p>
         <p style={{ margin: '0 0 12px' }}>当前直属成员 <b>{deleting ? directMembers(deleting.key) : 0}</b> 个。</p>
         <div className="field"><label>把数据迁到</label>
-          <select value={moveTo} onChange={e => setMoveTo(e.target.value)}>
-            {rows.filter(r => !subtree(deleting?.key || '').has(r.key))
-              .map(r => <option key={r.key} value={r.key}>{crumb(r.key)}</option>)}
-          </select>
+          <TreeSelect style={{ width: '100%' }} value={moveTo || undefined}
+            treeData={rows.filter(r => !subtree(deleting?.key || '').has(r.key))
+              .map(r => ({ value: r.key, title: crumb(r.key) }))}
+            treeDefaultExpandAll placeholder="选择迁移目标组织"
+            onChange={v => setMoveTo(String(v || ''))} />
           <div className="form-hint">迁完即删除「{deleting?.name}」，组织标识 {deleting?.key} 作废。</div></div>
       </WbModal>
     </>

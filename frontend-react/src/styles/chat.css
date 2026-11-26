@@ -114,6 +114,9 @@
   /* 引用计数是"▤ N 篇"文字按钮，必须自适应宽度且不换行 */
   .ai-cite-count{font-size:11px;letter-spacing:.2px}
   .ai-card-body{padding:16px 22px 18px;font-size:14px;line-height:1.85;color:var(--ink)}
+  /* 回答里带问号的示例问题：蓝色可点击，点一下填进输入框 */
+  .ai-card-body li.ask-suggest{color:var(--primary);cursor:pointer}
+  .ai-card-body li.ask-suggest:hover{text-decoration:underline}
   /* 引用区：按文档去重后的角标行，与正文用细分隔线 + 淡底色区分 */
   .cite-zone:not(:empty){border-top:1px solid #f1f4f9;padding:13px 22px 15px;background:#fafbfe}
   .cite-row{display:flex;flex-wrap:wrap;gap:7px}

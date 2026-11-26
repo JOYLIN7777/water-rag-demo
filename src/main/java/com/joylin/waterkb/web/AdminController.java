@@ -410,7 +410,7 @@ public class AdminController {
     @RequirePermission(Permission.LOGINLOG_READ)
     public List<Map<String, Object>> loginLogs(@RequestParam(required = false, defaultValue = "100") int limit) {
         String tenant = UserContext.get().tenantId();
-        List<Map<String, Object>> out = new ArrayList<>(audit.loginLogs(tenant, Math.min(Math.max(limit, 1), 500)));
+        List<Map<String, Object>> out = new ArrayList<>(audit.loginLogs(tenant, Math.min(Math.max(limit, 1), 10000)));
         return out;
     }
 }

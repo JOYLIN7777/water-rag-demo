@@ -12,10 +12,10 @@ interface LogRow {
 }
 
 const PAGE_SIZE = 15
-/** 首次只取最近 100 条：实测 500 条约 125KB / 0.8 秒，切页时明显卡一下；
-    需要更多时点「加载更多」按需追加，上限与后端一致 500 条。 */
+/** 首次只取最近 100 条保证切页流畅；需要更多时点「加载更多」翻倍追加。
+    后端上限 10000，不再把用户锁死在 500 条。 */
 const INIT_LIMIT = 100
-const MAX_LIMIT = 500
+const MAX_LIMIT = 10000
 /** 后端记录的是接口路径与英文结果码，界面统一转中文 */
 const ACTION_CN: Record<string, string> = { '/api/auth/login': '账号登录', '/api/auth/refresh': '令牌刷新' }
 const RESULT_CN: Record<string, string> = {
@@ -128,8 +128,8 @@ export default function LogsPanel({ type }: { type: 'login' | 'audit' }) {
         <div className="logs-more">
           {rows.length > 0 && <span className="hint" style={{ margin: 0 }}>当前显示最近 {rows.length} 条</span>}
           {rows.length >= limit && limit < MAX_LIMIT &&
-            <button className="btn btn-sm" onClick={() => setLimit(x => Math.min(x + 200, MAX_LIMIT))}>
-              加载更多（最多 {MAX_LIMIT} 条）
+            <button className="btn btn-sm" onClick={() => setLimit(x => Math.min(x * 2, MAX_LIMIT))}>
+              加载更多
             </button>}
         </div>
         <Pager id={isLogin ? 'lPager' : 'aPager'} total={rows.length} page={page} size={PAGE_SIZE} onChange={setPage} />
