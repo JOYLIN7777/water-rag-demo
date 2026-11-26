@@ -31,10 +31,14 @@
   .admin-panel{display:block}
   .admin-panel.active{display:block}
   /* 后台内容区占满视口高度：main→page→panel→工作台逐层拉伸，
-     避免表格在一个屏幕中段就结束、下面露出一大片页面底色 */
-  main.main > .page{flex:1;display:flex;flex-direction:column;padding-bottom:48px}
+     避免表格在一个屏幕中段就结束、下面露出一大片页面底色。
+     选择器带上 .admin-page：legacy.css 的 .page 有 1160px 上限，且加载顺序在 admin.css 之后。 */
+  main.main > .page.admin-page{flex:1;display:flex;flex-direction:column;padding-bottom:36px}
   .admin-panel.active{flex:1;display:flex;flex-direction:column}
   .admin-panel.active > .workbench,.admin-panel.active > .card{flex:1}
+  /* 后台侧栏底部用户卡：外层 .admin-back 已有分隔线，内层不再重复画线 */
+  .admin-sidebar .admin-back{display:flex;flex-direction:column}
+  .admin-sidebar .admin-back .user-block{border-top:0;margin-top:0;padding:10px 4px 2px}
   .admin-nav-item{display:flex;align-items:center;gap:10px;padding:8px 11px;border-radius:8px;color:#b9c6de;text-decoration:none;font-size:12.5px;cursor:pointer;margin-bottom:2px;transition:all .15s;border:0;background:transparent;width:100%;text-align:left}
   .admin-nav-item:hover{background:rgba(255,255,255,.06);color:#fff}
   .admin-nav-item.active{background:rgba(124,92,214,.3);color:#fff;font-weight:650}
@@ -182,8 +186,8 @@
   tr.perm-group:hover .pg-caret{color:var(--primary)}
 
   /* ===== 企业级中后台视觉（参考截图：内容占满 + 高密度 + 完整组件） ===== */
-  /* 后台内容占满主区，表格随窗口铺满 */
-  .page{max-width:none;margin:0;padding:20px 24px 36px}
+  /* 后台内容占满主区，表格随窗口铺满；.admin-page 提高优先级压过 legacy.css 的 1160px 上限 */
+  .page.admin-page{max-width:none;margin:0;padding:20px 24px 36px}
   /* 顶栏面包屑：管理后台 / 用户管理 */
   .brand-crumb{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--muted)}
   .brand-crumb #panelTitle{color:var(--ink);font-weight:650;font-size:14px}

@@ -127,6 +127,8 @@
                         <phase>initialize</phase>
                         <goals><goal>run</goal></goals>
                         <configuration>
+                            <!-- -DskipFrontend=true 时不能删 static：否则跳过构建会打出空 static 的包 -->
+                            <skip>${skipFrontend}</skip>
                             <target>
                                 <delete dir="${project.basedir}/src/main/resources/static" />
                                 <delete dir="${project.build.outputDirectory}/static" />

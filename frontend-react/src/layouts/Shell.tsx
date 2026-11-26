@@ -8,14 +8,8 @@ import { isLoggedIn, logout, getUser } from '@/api/auth'
 import { Icon } from '@/components/Icon'
 import { Avatar, fmtTime } from '@/components/Avatar'
 
-/** 后台入口：需 chat:use + 任一后台权限，与旧版 renderAdminEntry 同规则 */
-const ADMIN_PAGES = [
-  ['admin:access', 'users.html'], ['user:read', 'users.html'], ['org:read', 'org.html'],
-  ['role:read', 'roles.html'], ['perm:read', 'perms.html'], ['admin:docs', 'docs.html'],
-  ['model:read', 'models.html'], ['usage:read', 'usage.html'],
-  ['loginlog:read', 'loginlogs.html'], ['audit:read', 'audit.html']
-]
-const ADMIN_PATHS = /admin\.html|users\.html|org\.html|roles\.html|perms\.html|docs\.html|models\.html|usage\.html|loginlogs\.html|audit\.html/
+/** 后台页路径：命中即切后台侧栏（与旧版 renderAdminEntry 的 inAdmin 判定一致） */
+const ADMIN_PATHS = /admin\.html|admin-profile\.html|users\.html|org\.html|roles\.html|perms\.html|docs\.html|models\.html|usage\.html|loginlogs\.html|audit\.html/
 const CHAT_NAV = [
   { key: 'index', href: 'index.html', label: '智能问答', icon: 'chat', perm: 'chat:use' },
   { key: 'manage', href: 'manage.html', label: '知识库文档', icon: 'doc', perm: 'doc:read' }
@@ -31,12 +25,14 @@ export default function Shell({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (!isLoggedIn()) { navigate('/login.html', { replace: true }); return }
     if (!auth.loaded) void auth.loadPermissions()
-    if (!inAdmin) void chat.syncSessions()
-  }, [auth, chat, navigate, inAdmin])
+  }, [auth.loaded, navigate])
 
-  const adminTarget = auth.has('chat:use')
-    ? (ADMIN_PAGES.find(p => auth.has(p[0])) || [])[1]
-    : null
+  useEffect(() => {
+    if (!isLoggedIn() || inAdmin) return
+    void chat.syncSessions()
+    // 只在进入问答域时同步一次，避免每次会话状态变化都请求后端
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [inAdmin, auth.loaded])
 
   const user = auth.user
   const tenant = user?.tenant || 'default'
@@ -64,9 +60,12 @@ export default function Shell({ children }: { children: React.ReactNode }) {
   const tenantLabel = (t: string) => orgLabels[t] || t || '顶层组织'
 
   function newChat() {
+    // 空会话只作当前编辑态：本页直接切过去，跨页则跳回问答页由页面初始化接管
     const id = chat.newSession()
-    void chat.switchSession(id)
-    if (!location.pathname.includes('index.html')) navigate('/index.html')
+    if (!location.pathname.includes('index.html')) {
+      navigate('/index.html')
+      void id
+    }
   }
   function pickSession(id: string) { void chat.switchSession(id) }
   async function removeSession(id: string) {
@@ -118,7 +117,7 @@ export default function Shell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="layout" id="sidebarHost">
-      <aside className="sidebar">
+      <aside className={inAdmin ? 'sidebar admin-sidebar' : 'sidebar'}>
         <div className="brand">
           <div className="brand-mark has-logo">
             <img className="brand-logo" src="/assets/logo.svg" alt="水利知识库"
@@ -180,28 +179,37 @@ export default function Shell({ children }: { children: React.ReactNode }) {
           </>
         )}
 
-        <div id="adminEntrySlot">
-          {adminTarget && !inAdmin && (
-            <a className="admin-entry-btn" href={adminTarget} title="进入管理后台"
-              onClick={e => { e.preventDefault(); navigate('/' + adminTarget) }}>⚙ 管理后台</a>
-          )}
-          {inAdmin && auth.has('chat:use') && (
-            <Link className="admin-nav-item" to="/index.html" title="返回问答">
-              <span className="ic">⌂</span>返回问答
-            </Link>
-          )}
-        </div>
-
-        <div className="user-block" id="sidebarUserBlock">
-          <Link className="user-avatar" to="/profile.html" title="个人中心"><Avatar name={name} size="md" /></Link>
-          <Link className="user-meta" to="/profile.html" title="个人中心">
-            <div className="user-name">{name}</div>
-            <div className="user-tenant">{tenantLabel(tenant)}</div>
-          </Link>
-          <Link className="user-icon-btn" to="/settings.html" title="设置"><Icon name="settings" className="nav-icon" /></Link>
-          <button className="user-logout" type="button" title="退出登录" onClick={() => void confirmLogout()}>⏻</button>
-        </div>
-        <div className="sidebar-footer">水利知识库 · 让知识更好用</div>
+        {inAdmin ? (
+          /* 后台底部：返回问答 + 用户卡（后台相对独立，头像进后台自己的个人中心） */
+          <div className="admin-back">
+            {auth.has('chat:use') && (
+              <Link className="admin-nav-item" to="/index.html" title="返回问答">
+                <span className="ic">⌂</span>返回问答
+              </Link>
+            )}
+            <div className="user-block" id="adminUserBlock">
+              <Link className="user-avatar" to="/admin-profile.html" title="个人中心"><Avatar name={name} size="md" /></Link>
+              <Link className="user-meta" to="/admin-profile.html" title="个人中心">
+                <div className="user-name">{name}</div>
+                <div className="user-tenant">{tenantLabel(tenant)}</div>
+              </Link>
+              <button className="user-logout" type="button" title="退出登录" onClick={() => void confirmLogout()}>⏻</button>
+            </div>
+          </div>
+        ) : (
+          <>
+            <div className="user-block" id="sidebarUserBlock">
+              <Link className="user-avatar" to="/profile.html" title="个人中心"><Avatar name={name} size="md" /></Link>
+              <Link className="user-meta" to="/profile.html" title="个人中心">
+                <div className="user-name">{name}</div>
+                <div className="user-tenant">{tenantLabel(tenant)}</div>
+              </Link>
+              <Link className="user-icon-btn" to="/settings.html" title="设置"><Icon name="settings" className="nav-icon" /></Link>
+              <button className="user-logout" type="button" title="退出登录" onClick={() => void confirmLogout()}>⏻</button>
+            </div>
+            <div className="sidebar-footer">水利知识库 · 让知识更好用</div>
+          </>
+        )}
       </aside>
       <main className="main">{children}</main>
     </div>

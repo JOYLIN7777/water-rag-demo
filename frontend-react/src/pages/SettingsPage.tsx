@@ -4,6 +4,7 @@ import { useAuthStore } from '@/store/auth'
 import { Icon } from '@/components/Icon'
 import '@/styles/settings.css'
 import TopbarNav from '@/components/TopbarNav'
+import AdminEntry from '@/components/AdminEntry'
 
 /** ShellSettings（与 app.js 一致），只显示有权限的 */
 const SETTINGS = [
@@ -21,6 +22,7 @@ export default function SettingsPage() {
     <>
       <header className="topbar">
         <div className="topbar-left"><TopbarNav /><div className="topbar-title">设置</div><span className="topbar-sub">更多功能</span></div>
+        <div className="topbar-nav"><AdminEntry /></div>
       </header>
       <div className="page">
         <div className="page-head">

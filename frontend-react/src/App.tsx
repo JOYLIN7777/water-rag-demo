@@ -56,6 +56,8 @@ export default function App() {
       <Route path="/loginlogs.html" element={<WithShell><AdminLayout /></WithShell>} />
       <Route path="/audit.html" element={<WithShell><AdminLayout /></WithShell>} />
       <Route path="/admin.html" element={<WithShell><AdminLayout /></WithShell>} />
+      {/* 后台自己的个人中心：后台相对独立，头像不跳问答系统的 profile.html */}
+      <Route path="/admin-profile.html" element={<WithShell><AdminLayout /></WithShell>} />
       {/* 未移植页：暂回退 static */}
       <Route path="/forgot.html" element={<ForgotPage />} />
       <Route path="*" element={<Navigate to="/index.html" replace />} />

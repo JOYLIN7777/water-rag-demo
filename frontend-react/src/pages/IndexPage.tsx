@@ -8,12 +8,33 @@ import { useChatStore, type ChatMessageExt } from '@/store/chat'
 import { useAuthStore } from '@/store/auth'
 import { streamChat, uploadDocument } from '@/api'
 import { Modal } from 'antd'
+import AdminEntry from '@/components/AdminEntry'
 import '@/styles/chat.css'
 
 interface CiteGroup { name: string; segs: Array<{ fileName?: string; chunkIndex?: number; preview?: string }> }
 
 function renderMarkdown(text: string): string {
   return DOMPurify.sanitize(marked.parse(text || '', { breaks: true }) as string)
+}
+
+/** 千分位：与旧版 fmtInt 一致 */
+function fmtInt(n?: number): string {
+  return Number(n || 0).toLocaleString('en-US')
+}
+
+/** 本次调用的消耗：主显示"合计 token + 耗时"，明细放 title 悬浮提示（对齐旧版 usageInner） */
+function usageInner(u: Record<string, any>) {
+  const sec = (u.durationMs || 0) / 1000
+  const d = sec >= 10 ? Math.round(sec) + 's' : sec.toFixed(1) + 's'
+  const total = u.totalTokens ?? (Number(u.promptTokens || 0) + Number(u.completionTokens || 0))
+  return <>本次 <b>{fmtInt(total)}</b> tokens<span className="ai-usage-sep">·</span>{d}</>
+}
+
+function usageTip(u: Record<string, any>): string {
+  const sec = (u.durationMs || 0) / 1000
+  return '本次调用消耗：输入 ' + fmtInt(u.promptTokens) + ' tokens / 输出 ' + fmtInt(u.completionTokens)
+    + ' tokens，合计 ' + fmtInt(u.totalTokens ?? (Number(u.promptTokens || 0) + Number(u.completionTokens || 0)))
+    + ' tokens · 模型 ' + (u.model || '-') + ' · 耗时 ' + sec.toFixed(2) + ' 秒'
 }
 
 function groupCites(src: any[]): CiteGroup[] {
@@ -54,6 +75,8 @@ export default function IndexPage() {
       const sid = params.get('sid')
       if (sid && chat.sessions.some(s => s.id === sid)) await chat.switchSession(sid)
       else if (params.get('new') === '1') await chat.switchSession(chat.newSession())
+      // 先尊重当前选择：从「新建会话」进来时 currentId 已是空会话，不能再跳回第一条历史
+      else if (chat.currentId) await chat.switchSession(chat.currentId)
       else if (chat.sessions.length) await chat.switchSession(chat.sessions[0].id)
       else await chat.switchSession(chat.newSession())
     })()
@@ -166,17 +189,6 @@ export default function IndexPage() {
     useChatStore.setState({ busyIds: ids, sending: ids.has(s.currentId) })
   }
 
-  async function clearHistory() {
-    if (!window.confirm('确定清空当前会话的全部对话记录吗？此操作不可撤销。')) return
-    try {
-      await (await import('@/api')).chatApi.clearSession(chat.currentId)
-      chat.cacheMessages(chat.currentId, [])
-      setForce(x => x + 1)
-      setError('')
-      message.success('已清空')
-    } catch (e: any) { setError(e?.message || '清空失败') }
-  }
-
   async function uploadFiles(files: FileList | File[] | null) {
     const list = Array.from(files || [])
     if (!list.length) return
@@ -220,9 +232,7 @@ export default function IndexPage() {
     <>
       <header className="topbar">
         <div className="topbar-left"><div className="topbar-title">知识库问答</div></div>
-        <div className="topbar-nav">
-          <button className="text-btn" onClick={() => void clearHistory()} disabled={!hasMessages}>清空历史</button>
-        </div>
+        <div className="topbar-nav"><AdminEntry /></div>
       </header>
       <div className="scroll-area" id="scrollArea" ref={scrollRef}>
         {!hasMessages ? (
@@ -250,9 +260,7 @@ export default function IndexPage() {
                     {m.branch && <span className="branch-chip">分支</span>}
                     <span className="ai-state" style={m.streaming ? { color: 'var(--primary)' } : undefined}>{m.streaming ? '生成中…' : ''}</span>
                     <span className="ai-card-actions">
-                      {m.usage && <span className="ai-usage" title={`输入 ${m.usage.promptTokens || 0} / 输出 ${m.usage.completionTokens || 0} Token`}>
-                        {(m.usage.promptTokens || 0) + (m.usage.completionTokens || 0)} tok · {((m.usage.durationMs || 0) / 1000).toFixed(1)}s
-                      </span>}
+                      {m.usage && <span className="ai-usage" title={usageTip(m.usage)}>{usageInner(m.usage)}</span>}
                       {!!m.sources?.length && <button className="icon-btn ai-cite-count" title="引用片段">▤ {groupCites(m.sources).length} 篇</button>}
                       <button className="icon-btn" title="复制回答到剪贴板"
                         onClick={() => { void navigator.clipboard.writeText(m.content); message.success('回答已复制') }}>复制</button>

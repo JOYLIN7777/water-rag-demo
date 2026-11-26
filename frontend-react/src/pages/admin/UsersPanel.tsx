@@ -10,7 +10,21 @@ import '@/styles/admin.css'
 interface User { username: string; displayName?: string; groups?: string[]; tenant?: string; enabled?: boolean }
 interface Org { key: string; name: string; parentKey?: string; membersAll?: number }
 
-const PAGE_SIZE = 10
+const PAGE_SIZE = 20
+
+/** 页码窗口：首页/末页 + 当前页前后 2 页，中间用 0 表示省略号（对齐旧版 renderPager） */
+function pageWindow(page: number, pages: number): number[] {
+  const win = new Set<number>([1, pages])
+  for (let p = Math.max(1, page - 2); p <= Math.min(pages, page + 2); p++) win.add(p)
+  const out: number[] = []
+  let prev = 0
+  for (const p of [...win].sort((a, b) => a - b)) {
+    if (prev && p - prev > 1) out.push(0)
+    out.push(p)
+    prev = p
+  }
+  return out
+}
 
 export default function UsersPanel() {
   const auth = useAuthStore()
@@ -22,6 +36,7 @@ export default function UsersPanel() {
   const [orgKey, setOrgKey] = useState('')
   const [folded, setFolded] = useState<Set<string>>(new Set())
   const [page, setPage] = useState(1)
+  const [jump, setJump] = useState('1')
   const [editUser, setEditUser] = useState<User | null>(null)
   const [pwdUser, setPwdUser] = useState<User | null>(null)
   const [form, setForm] = useState({ displayName: '', groups: '', enabled: true })
@@ -65,8 +80,14 @@ export default function UsersPanel() {
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
   const rows = filtered.slice((Math.min(page, totalPages) - 1) * PAGE_SIZE, Math.min(page, totalPages) * PAGE_SIZE)
+  // 页码变化时把跳页输入框同步成当前页
+  useEffect(() => { setJump(String(Math.min(page, totalPages))) }, [page, totalPages])
 
   function resetFilter() { setKw(''); setStatus(''); setRole(''); setOrgKey(''); setPage(1) }
+  function goJump() {
+    const n = parseInt(jump, 10)
+    if (!isNaN(n)) setPage(Math.min(Math.max(n, 1), totalPages))
+  }
 
   async function toggleEnabled(u: User, enabled: boolean) {
     try {
@@ -158,7 +179,7 @@ export default function UsersPanel() {
           </select></div>
         <div className="filter-item"><label htmlFor="uRole">所属角色</label>
           <select id="uRole" value={role} onChange={e => { setRole(e.target.value); setPage(1) }}>
-            <option value="">全部角色</option>{allRoles.map(r => <option key={r} value={r}>{r}</option>)}
+            <option value="">全部角色</option>{allRoles.map(r => <option key={r} value={r}>{auth.groupLabel(r)}</option>)}
           </select></div>
         <div className="filter-actions">
           <button className="btn btn-sm btn-search" onClick={() => setPage(1)}>搜索</button>
@@ -201,7 +222,7 @@ export default function UsersPanel() {
                         onClick={() => openEdit(u)}>{u.username}</a>
                     </span></td>
                     <td>{u.displayName || ''}</td>
-                    <td>{(u.groups || []).map(g => <span className="tag" key={g}>{g}</span>)}</td>
+                    <td>{(u.groups || []).map(g => <span className="tag" key={g}>{auth.groupLabel(g)}</span>)}</td>
                     <td>{orgs.find(o => o.key === (u.tenant || 'default'))?.name || u.tenant}</td>
                     <td>{isAdmin
                       ? <><span className="tag ok">正常</span><span style={{ marginLeft: 8, fontSize: 11.5, color: 'var(--muted)' }}>系统管理员不可停用</span></>
@@ -227,10 +248,18 @@ export default function UsersPanel() {
             <span>共 {filtered.length} 条</span><span style={{ color: '#c3cddd' }}>|</span><span>每页 {PAGE_SIZE} 条</span>
             <button className="pg-btn" disabled={page <= 1} onClick={() => setPage(1)}>首页</button>
             <button className="pg-btn" disabled={page <= 1} onClick={() => setPage(page - 1)}>上一页</button>
-            {Array.from(new Set([1, totalPages, page - 1, page, page + 1].filter(p => p >= 1 && p <= totalPages)))
-              .sort((a, b) => a - b).map(p => <button key={p} className={`pg-btn${p === page ? ' on' : ''}`} onClick={() => setPage(p)}>{p}</button>)}
+            {pageWindow(page, totalPages).map((p, i) => p === 0
+              ? <span className="pg-sep" key={'sep' + i}>…</span>
+              : <button key={p} className={`pg-btn${p === page ? ' on' : ''}`} onClick={() => setPage(p)}>{p}</button>)}
             <button className="pg-btn" disabled={page >= totalPages} onClick={() => setPage(page + 1)}>下一页</button>
             <button className="pg-btn" disabled={page >= totalPages} onClick={() => setPage(totalPages)}>末页</button>
+            <span className="pg-info">
+              第 {Math.min(page, totalPages)} / {totalPages} 页 · 跳至
+              <input type="number" min={1} max={totalPages} value={jump} aria-label="跳转到页码"
+                onChange={e => setJump(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') goJump() }} />
+              <button className="pg-btn" onClick={goJump}>跳转</button>
+            </span>
           </div>
         </div>
       </div>

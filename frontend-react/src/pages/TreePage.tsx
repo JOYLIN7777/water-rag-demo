@@ -6,6 +6,7 @@ import { http } from '@/api/http'
 import { useAuthStore } from '@/store/auth'
 import '@/styles/tree.css'
 import TopbarNav from '@/components/TopbarNav'
+import AdminEntry from '@/components/AdminEntry'
 
 interface TreeNode {
   id: string
@@ -33,6 +34,7 @@ function LockedCard() {
     <>
       <header className="topbar">
         <div className="topbar-left"><TopbarNav /><div className="topbar-title">会话结构</div><span className="topbar-sub">消息树与分支</span></div>
+        <div className="topbar-nav"><AdminEntry /></div>
       </header>
       <div className="page">
         <div className="card" style={{ margin: 'auto', maxWidth: 520, padding: 36, textAlign: 'center' }}>
@@ -156,6 +158,7 @@ export default function TreePage() {
     <>
       <header className="topbar">
         <div className="topbar-left"><TopbarNav /><div className="topbar-title">会话结构</div><span className="topbar-sub">消息树与分支</span></div>
+        <div className="topbar-nav"><AdminEntry /></div>
       </header>
       <div className="page">
         <div className="page-head">

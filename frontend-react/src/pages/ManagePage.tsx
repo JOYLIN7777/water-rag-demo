@@ -7,6 +7,7 @@ import { getUser } from '@/api/auth'
 import { useAuthStore } from '@/store/auth'
 import '@/styles/manage.css'
 import TopbarNav from '@/components/TopbarNav'
+import AdminEntry from '@/components/AdminEntry'
 
 interface DocItem {
   fileName: string
@@ -162,6 +163,7 @@ export default function ManagePage() {
     <>
       <header className="topbar">
         <div className="topbar-left"><TopbarNav /><div className="topbar-title">知识库文档管理</div><span className="topbar-sub">/ 文档</span></div>
+        <div className="topbar-nav"><AdminEntry /></div>
       </header>
       <div className="page">
         <div className="page-head">

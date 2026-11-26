@@ -3,7 +3,7 @@ import { create } from 'zustand'
 import { authApi } from '@/api'
 import { http } from '@/api/http'
 import { getUser, clearSession, scope } from '@/api/auth'
-import type { CurrentUser, PermissionsResponse, MenuItem, NavGroup } from '@/types'
+import type { CurrentUser, PermissionsResponse, MenuItem, NavGroup, RoleItem } from '@/types'
 
 interface AuthState {
   user: CurrentUser | null
@@ -11,10 +11,13 @@ interface AuthState {
   allPermissions: string[]
   menus: MenuItem[]
   navGroups: NavGroup[]
+  roleMatrix: RoleItem[]
   loaded: boolean
   loading: boolean
   has: (perm: string | undefined) => boolean
   isAdmin: () => boolean
+  /** 角色码 → 中文名（对齐旧版 gl()：优先服务端角色定义，回落原码） */
+  groupLabel: (code: string) => string
   loadPermissions: () => Promise<PermissionsResponse | null>
   landingPage: () => string
   reset: () => void
@@ -26,6 +29,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   allPermissions: [],
   menus: [],
   navGroups: [],
+  roleMatrix: [],
   loaded: false,
   loading: false,
 
@@ -35,6 +39,12 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     return get().permissions.includes(perm)
   },
   isAdmin: () => !!get().user?.admin || get().permissions.includes('admin:access'),
+
+  groupLabel: (code) => {
+    if (!code) return ''
+    const hit = get().roleMatrix.find(r => r.role === code)
+    return hit?.name || code
+  },
 
   loadPermissions: async () => {
     if (get().loading) return null
@@ -58,6 +68,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         allPermissions: j.allPermissions || [],
         menus: j.menus || [],
         navGroups: j.navGroups || [],
+        roleMatrix: j.roleMatrix || [],
         loaded: true
       })
       return j
@@ -83,7 +94,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
   reset: () => {
     clearSession()
-    set({ user: null, permissions: [], allPermissions: [], menus: [], navGroups: [], loaded: false })
+    set({ user: null, permissions: [], allPermissions: [], menus: [], navGroups: [], roleMatrix: [], loaded: false })
   }
 }))
 

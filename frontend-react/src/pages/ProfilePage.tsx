@@ -9,6 +9,7 @@ import { useNavigate } from 'react-router-dom'
 import { Avatar } from '@/components/Avatar'
 import '@/styles/profile.css'
 import TopbarNav from '@/components/TopbarNav'
+import AdminEntry from '@/components/AdminEntry'
 
 interface MeResponse {
   user: string
@@ -120,6 +121,7 @@ export default function ProfilePage() {
     <>
       <header className="topbar">
         <div className="topbar-left"><TopbarNav /><div className="topbar-title">个人中心</div><span className="topbar-sub">账号与安全</span></div>
+        <div className="topbar-nav"><AdminEntry /></div>
       </header>
       <div className="page">
         <div className="page-head">

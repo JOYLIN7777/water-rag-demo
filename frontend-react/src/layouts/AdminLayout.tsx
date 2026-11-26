@@ -9,7 +9,7 @@ import '@/styles/admin.css'
 const TITLES: Record<string, string> = {
   users: '用户管理', org: '组织架构', roles: '角色定义', perms: '菜单权限',
   docs: '文档管理', models: '模型设置', usage: '用量统计',
-  loginlogs: '登录日志', audit: '操作日志', profile: '个人中心'
+  loginlogs: '登录日志', audit: '操作日志', 'admin-profile': '个人中心', profile: '个人中心'
 }
 
 export default function AdminLayout() {
@@ -44,7 +44,8 @@ export default function AdminLayout() {
           </button>
         </div>
       </header>
-      <div className="page"><div className="admin-panel" data-panel={key}><MainPanel panel={key} /></div></div>
+      {/* admin-page：后台内容区铺满主区（旧版 .page 不带 1160 上限） */}
+      <div className="page admin-page"><div className="admin-panel active" data-panel={key}><MainPanel panel={key} /></div></div>
       <Modal title="消息中心" open={msgOpen} onCancel={() => setMsgOpen(false)} footer={null}>
         {pending.length === 0
           ? <div style={{ color: 'var(--muted)', textAlign: 'center', padding: 24 }}>暂无待处理消息</div>
@@ -65,6 +66,7 @@ import DocsPanel from '@/pages/admin/DocsPanel'
 import ModelsPanel from '@/pages/admin/ModelsPanel'
 import UsagePanel from '@/pages/admin/UsagePanel'
 import LogsPanel from '@/pages/admin/LogsPanel'
+import ProfilePanel from '@/pages/admin/ProfilePanel'
 
 function MainPanel({ panel }: { panel: string }) {
   switch (panel) {
@@ -77,6 +79,8 @@ function MainPanel({ panel }: { panel: string }) {
     case 'usage': return <UsagePanel />
     case 'loginlogs': return <LogsPanel type="login" />
     case 'audit': return <LogsPanel type="audit" />
+    case 'admin-profile': return <ProfilePanel />
+    case 'profile': return <ProfilePanel />
     default: return <UsersPanel />
   }
 }
