@@ -23,16 +23,18 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC'
 .ant-modal { top: 0 !important; padding: 0 !important; margin: auto !important; }
 .ant-modal-confirm .ant-modal-body { padding: 24px !important; }
 
-/* 全站确认/信息弹框统一重新设计（含各处直接调用的 Modal.confirm）：
-   图标 / 标题 / 正文 / 按钮分四层，正文行高与按钮区留白都放大。 */
-.ant-modal-confirm.ant-modal{width:min(560px,92vw) !important}
-.ant-modal-confirm .ant-modal-body{padding:36px 38px 30px !important}
-.ant-modal-confirm .ant-modal-confirm-body{display:flex;flex-direction:column;gap:14px}
-.ant-modal-confirm .ant-modal-confirm-body>.anticon{margin-right:0 !important;font-size:26px !important}
-.ant-modal-confirm .ant-modal-confirm-title{font-size:18px !important;line-height:1.5 !important;margin-top:8px}
-.ant-modal-confirm .ant-modal-confirm-content{margin:0 !important;font-size:14px !important;line-height:2 !important;color:var(--ink-2) !important}
-.ant-modal-confirm .ant-modal-confirm-btns{display:flex;gap:14px;margin-top:34px !important;padding-top:22px;border-top:1px solid var(--line)}
-.ant-modal-confirm .ant-modal-confirm-btns .ant-btn{min-width:112px;height:40px !important;border-radius:9px !important;font-size:13px !important}
+/* 全站确认/信息弹框：图标与标题同行、正文缩进对齐、按钮右对齐。
+   上一版把四段全拆成竖排且四周留白过大，看着像空了一块。 */
+.ant-modal-confirm.ant-modal{width:min(520px,92vw) !important}
+.ant-modal-confirm .ant-modal-body{padding:24px 26px 20px !important}
+.ant-modal-confirm .ant-modal-confirm-body{min-height:32px}
+.ant-modal-confirm .ant-modal-confirm-body>.anticon{float:left;font-size:21px !important;margin:2px 12px 0 0 !important}
+.ant-modal-confirm .ant-modal-confirm-title{display:block !important;font-size:15px !important;line-height:1.5 !important;margin:0 0 6px}
+.ant-modal-confirm .ant-modal-confirm-content{margin:0 0 0 33px !important;font-size:12.5px !important;
+  line-height:1.8 !important;color:var(--ink-2) !important;min-height:24px}
+.ant-modal-confirm .ant-modal-confirm-btns{clear:both;display:flex;justify-content:flex-end;gap:10px;
+  margin-top:20px !important;padding-top:14px;border-top:1px solid var(--line)}
+.ant-modal-confirm .ant-modal-confirm-btns .ant-btn{min-width:94px;height:34px !important;border-radius:7px !important;font-size:12.5px !important}
 
 /* 顶栏导航：有面包屑时隐藏重复标题（对齐旧版 renderTopbarNav） */
 .topbar-left:has(.topbar-nav-left) .topbar-title,

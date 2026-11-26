@@ -51,7 +51,12 @@ export default function ManagePage() {
   const [pendingFiles, setPendingFiles] = useState<File[]>([])
   const [includeSubtree, setIncludeSubtree] = useState(false)
 
-  function showMsg(type: string, text: string) { setMsg({ type, text }) }
+  /** 进度仍留在页面内联条；成功/失败统一走 AntD message，不再各页自绘提示框 */
+  function showMsg(type: string, text: string) {
+    if (type === 'ok') { message.success(text); setMsg(null); return }
+    if (type === 'err') { message.error(text); setMsg(null); return }
+    setMsg({ type, text })
+  }
 
   async function loadDocs() {
     try {
@@ -128,8 +133,7 @@ export default function ManagePage() {
       const q = '?fileName=' + encodeURIComponent(d.fileName) + (d.tenantId ? '&tenantId=' + encodeURIComponent(d.tenantId) : '')
       const j = await http.delete<{ deletedChunks?: number; message?: string }>('/api/docs' + q)
       if (j.deletedChunks === undefined) throw new Error(j.message || '删除失败')
-      showMsg('ok', `✓ 已删除「${d.fileName}」（${j.deletedChunks} 个切片）`)
-      message.success('文档已删除')
+      showMsg('ok', `已删除「${d.fileName}」（${j.deletedChunks} 个切片）`)
       await loadDocs()
     } catch (e: any) { showMsg('err', '✗ 删除失败：' + (e?.message || '')) }
   }
@@ -160,8 +164,7 @@ export default function ManagePage() {
         showMsg('', `[${i + 1}/${list.length}] ✓ ${f.name}：${j.chunks} 片（${j.chars} 字，${secs} 秒）`)
       } catch (e: any) { fail++; showMsg('err', `[${i + 1}/${list.length}] ✗ ${f.name}：${e?.message || ''}`) }
     }
-    showMsg(fail ? 'err' : 'ok', `✓ 完成：成功 ${ok} 份 / 失败 ${fail} 份，共 ${totalChunks} 个切片，已可提问`)
-    message.success(fail ? `完成，${fail} 份失败` : `${ok} 份文档已入库`)
+    showMsg(fail ? 'err' : 'ok', `完成：成功 ${ok} 份 / 失败 ${fail} 份，共 ${totalChunks} 个切片，已可提问`)
     await loadDocs()
   }
 

@@ -5,6 +5,7 @@ import { Modal, message } from 'antd'
 import { useAuthStore } from '@/store/auth'
 import { useChatStore } from '@/store/chat'
 import { isLoggedIn, logout, getUser } from '@/api/auth'
+import { http } from '@/api/http'
 import { Icon } from '@/components/Icon'
 import { Avatar, fmtTime } from '@/components/Avatar'
 
@@ -38,6 +39,14 @@ export default function Shell({ children }: { children: React.ReactNode }) {
   const tenant = user?.tenant || 'default'
   const [orgLabels, setOrgLabels] = useState<Record<string, string>>({})
   const [displayOverride, setDisplayOverride] = useState('')
+  /** 右下角服务状态胶囊：旧版就有，React 版漏了；点击可重新探测 */
+  const [svcOk, setSvcOk] = useState<boolean | null>(null)
+  function checkService() {
+    if (!isLoggedIn()) return
+    void http.get<{ healthy: boolean }>('/api/search/health')
+      .then(j => setSvcOk(j?.healthy !== false)).catch(() => setSvcOk(false))
+  }
+  useEffect(() => { checkService() /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [])
   const name = displayOverride || (user ? (user.displayName || user.user) : '演示用户')
   useEffect(() => {
     if (!isLoggedIn()) return
@@ -220,6 +229,10 @@ export default function Shell({ children }: { children: React.ReactNode }) {
         )}
       </aside>
       <main className="main">{children}</main>
+      <div className={'svc-pill' + (svcOk === false ? ' off' : '')} onClick={checkService}
+        title="检索服务状态，点击重新检测">
+        <span className="status-dot" />{svcOk === false ? '服务异常' : '服务正常'}
+      </div>
     </div>
   )
 }

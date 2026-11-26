@@ -117,14 +117,17 @@
   /* 回答里带问号的示例问题：蓝色可点击，点一下填进输入框 */
   .ai-card-body li.ask-suggest{color:var(--primary);cursor:pointer}
   .ai-card-body li.ask-suggest:hover{text-decoration:underline}
+  .ai-card-body span.ask-suggest{color:var(--primary);cursor:pointer}
+  .ai-card-body span.ask-suggest:hover{text-decoration:underline}
   /* 回答中的表格与可点击引用片段 */
   .ai-card-body table{border-collapse:collapse;margin:10px 0 12px;font-size:12.5px;max-width:100%}
   .ai-card-body table th,.ai-card-body table td{border:1px solid var(--line);padding:6px 12px;text-align:left}
   .ai-card-body table th{background:#f7f9fc;font-weight:650;color:var(--ink-2)}
   .cite-seg{cursor:pointer}
   .cite-seg:hover{background:#eef4ff;color:var(--primary)}
-  .model-pick{border:1px solid var(--line);background:#fff;color:var(--ink-2);border-radius:7px;
-    padding:5px 8px;font-size:12px;max-width:190px;cursor:pointer}
+  .model-pick{border:0;background:transparent;color:var(--ink-2);border-radius:6px;
+    padding:5px 7px;font-size:12px;max-width:190px;cursor:pointer;margin-left:auto}
+  .model-pick:hover{background:var(--primary-soft);color:var(--primary)}
   .chunk-detail-text{white-space:pre-wrap;line-height:1.9;font-size:13px;color:var(--ink);max-height:64vh;overflow:auto}
   /* 引用区：按文档去重后的角标行，与正文用细分隔线 + 淡底色区分 */
   .cite-zone:not(:empty){border-top:1px solid #f1f4f9;padding:13px 22px 15px;background:#fafbfe}

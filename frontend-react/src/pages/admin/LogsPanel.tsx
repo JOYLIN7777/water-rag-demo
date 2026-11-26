@@ -11,6 +11,15 @@ interface LogRow {
   duration_ms?: number; duration?: number; ip?: string; result?: string
 }
 
+/** 日志按审计要求显示完整年月日时分秒，不用 tsLocal 的 MM-DD 简写 */
+function tsFull(v?: string | number | null): string {
+  if (!v) return '—'
+  const d = new Date(v)
+  if (isNaN(d.getTime())) return tsLocal(v)
+  const p = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`
+}
+
 const PAGE_SIZE = 15
 /** 首次只取最近 100 条保证切页流畅；需要更多时点「加载更多」翻倍追加。
     后端上限 10000，不再把用户锁死在 500 条。 */
@@ -106,7 +115,7 @@ export default function LogsPanel({ type }: { type: 'login' | 'audit' }) {
                 ? <tr><td colSpan={isLogin ? 7 : 6} className="empty">{err ? '暂时无法显示 · ' + err : (isLogin ? '暂无登录记录' : '暂无记录')}</td></tr>
                 : slice.map((l, i) => isLogin
                   ? <tr key={i}>
-                    <td>{tsLocal(l.ts)}</td>
+                    <td>{tsFull(l.ts)}</td>
                     <td className="name">{l.user_id || ''}</td>
                     <td>{actionCn(l.action)}</td>
                     <td><span className={'tag ' + (Number(l.status) >= 400 ? 'no' : 'ok')}>{String(l.status)}</span></td>
@@ -115,7 +124,7 @@ export default function LogsPanel({ type }: { type: 'login' | 'audit' }) {
                     <td><span className="mono" style={{ fontSize: 11.5 }}>{l.ip || '—'}</span></td>
                   </tr>
                   : <tr key={i}>
-                    <td>{tsLocal(l.ts)}</td>
+                    <td>{tsFull(l.ts)}</td>
                     <td>{l.user_id || ''}</td>
                     <td>{l.action || ''}</td>
                     <td><span className={'tag ' + (Number(l.status) >= 400 ? 'no' : 'ok')}>{String(l.status)}</span></td>

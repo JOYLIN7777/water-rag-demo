@@ -9,11 +9,13 @@ import { useAuthStore } from '@/store/auth'
 import '@/styles/admin.css'
 
 interface Role { role: string; name: string; permissions: string[]; builtin?: boolean; description?: string }
+interface RoleUser { username: string; displayName?: string; groups?: string[] }
 
 export default function RolesPanel() {
   const auth = useAuthStore()
   const [roles, setRoles] = useState<Role[]>([])
   const [perms, setPerms] = useState<PermNode[]>([])
+  const [users, setUsers] = useState<RoleUser[]>([])
   const [kw, setKw] = useState('')
   const [err, setErr] = useState('')
 
@@ -31,12 +33,14 @@ export default function RolesPanel() {
 
   async function load() {
     try {
-      const [r, p] = await Promise.all([
+      const [r, p, u] = await Promise.all([
         http.get<Role[]>('/api/admin/roles'),
-        http.get<PermNode[]>('/api/admin/perms')
+        http.get<PermNode[]>('/api/admin/perms'),
+        http.get<RoleUser[]>('/api/admin/users').catch(() => [] as RoleUser[])
       ])
       setRoles(Array.isArray(r) ? r : [])
       setPerms(Array.isArray(p) ? p : [])
+      setUsers(Array.isArray(u) ? u : [])
       setErr('')
     } catch (e: any) { setErr(e?.message || '加载失败') }
   }
@@ -123,20 +127,29 @@ export default function RolesPanel() {
           <table className="data-table">
             <thead><tr>
               <th className="row-idx">序号</th><th>角色名称</th><th>角色标识</th><th>数据范围</th>
-              <th>权限数</th><th>角色权限明细</th><th>操作</th>
+              <th>权限数</th><th>关联用户</th><th>角色权限明细</th><th>操作</th>
             </tr></thead>
             <tbody>
               {list.length === 0
-                ? <tr><td colSpan={7} className="empty">{roles.length ? '没有匹配的角色' : '暂无角色定义'}</td></tr>
+                ? <tr><td colSpan={8} className="empty">{roles.length ? '没有匹配的角色' : '暂无角色定义'}</td></tr>
                 : list.map((r, i) => {
                   const ps = r.permissions || []
                   const scope = ps.includes('admin:access') ? '全部组织' : '本组织'
+                  const members = users.filter(u => (u.groups || []).includes(r.role))
                   return <tr key={r.role}>
                     <td className="row-idx">{i + 1}</td>
                     <td className="name">{auth.groupLabel(r.role)}</td>
                     <td><span className="mono" style={{ fontSize: 11 }}>{r.role}</span></td>
                     <td>{scope}</td>
                     <td>{ps.length}</td>
+                    <td>
+                      {members.length === 0 ? <span className="dim">—</span> : <>
+                        {members.slice(0, 2).map(u => <span className="tag-role" key={u.username}
+                          title={u.username}>{u.displayName || u.username}</span>)}
+                        {members.length > 2 && <span className="tag"
+                          title={members.map(u => u.displayName || u.username).join('、')}>+{members.length - 2}</span>}
+                      </>}
+                    </td>
                     <td>
                       {ps.slice(0, 3).map(p => <span className="tag" key={p} style={{ marginRight: 4 }}>{p}</span>)}
                       {ps.length > 3 && <span className="tag off">+{ps.length - 3}</span>}
@@ -185,6 +198,20 @@ export default function RolesPanel() {
       {/* 权限明细 */}
       <WbModal title={(viewing ? auth.groupLabel(viewing.role) : '') + ' · 权限明细'} open={!!viewing}
         okText="关闭" cancelText={null} onOk={() => setViewing(null)} onCancel={() => setViewing(null)}>
+        {(() => {
+          const members = users.filter(u => (u.groups || []).includes(viewing?.role || ''))
+          return <div className="role-view-members">
+            <div className="form-hint" style={{ marginBottom: 8 }}>关联用户（{members.length} 人）</div>
+            <div className="perm-grid2">
+              {members.length
+                ? members.map(u => <div className="perm-pill" key={u.username}>
+                  <b>{u.displayName || u.username}</b>{u.username}
+                </div>)
+                : <div className="dim">暂无用户分配该角色</div>}
+            </div>
+            <div className="form-hint" style={{ marginTop: 18, marginBottom: 8 }}>权限明细</div>
+          </div>
+        })()}
         <div className="perm-grid2">
           {(viewing?.permissions || []).map(p => <div className="perm-pill" key={p}>
             <b>{p}</b>{permDesc(p)}

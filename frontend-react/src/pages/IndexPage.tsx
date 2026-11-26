@@ -53,11 +53,34 @@ function normalizeTables(text: string): string {
   return out.join('\n')
 }
 
+/**
+ * 按回复内容动态识别「示例问题」：列表项里的问句、以及正文里以 -/序号开头的短问句，
+ * 都标记为蓝色可点击；点一下把问题填进输入框。不是写死匹配某几种句式。
+ */
+function markSuggestions(html: string): string {
+  let out = html.replace(/<li>([\s\S]*?)<\/li>/g, (m, inner) => {
+    const txt = String(inner).replace(/<[^>]+>/g, '').trim()
+    return /[？?]/.test(txt) ? `<li class="ask-suggest">${inner}</li>` : m
+  })
+  out = out.replace(/<p>([\s\S]*?)<\/p>/g, (m, inner) => {
+    const parts = String(inner).split(/(<br\s*\/?>)/i)
+    const marked = parts.map(part => {
+      if (/^<br/i.test(part)) return part
+      const txt = part.replace(/<[^>]+>/g, '').trim()
+      const looksQuestion = /[？?]/.test(txt) && txt.length < 90 &&
+        (/^[-–—•*·\d一二三四五六七八九十]/.test(txt) || /[？?]$/.test(txt))
+      if (!looksQuestion) return part
+      const q = txt.replace(/^[-–—•*·\d一二三四五六七八九十、.\s]+/, '').replace(/"/g, '&quot;')
+      return `<span class="ask-suggest" data-q="${q}">${part}</span>`
+    })
+    return '<p>' + marked.join('') + '</p>'
+  })
+  return out
+}
+
 function renderMarkdown(text: string): string {
   const html = marked.parse(normalizeTables(normalizeMarkdown(text)), { breaks: true }) as string
-  // 回答里模型给出的示例问题（含问号的列表项）做成可点击：蓝色 + 点击填入输入框
-  const withSuggest = html.replace(/<li>([^<]*[？?][^<]*)<\/li>/g, '<li class="ask-suggest">$1</li>')
-  return DOMPurify.sanitize(withSuggest)
+  return DOMPurify.sanitize(markSuggestions(html))
 }
 
 /** 问答时间统一显示完整年月日时分秒：提问在气泡上方、回答在卡片头部，层级分明 */
@@ -167,6 +190,8 @@ export default function IndexPage() {
   }, [])
 
   // 草稿按会话隔离：切会话时存旧草稿、载新草稿
+  /** 防同一问题在 1.5 秒内被 Enter/点击重复触发，产生多条同名会话 */
+  const lastSendRef = useRef<{ q: string; at: number } | null>(null)
   const prevSid = useRef('')
   useEffect(() => {
     const old = prevSid.current
@@ -187,6 +212,9 @@ export default function IndexPage() {
     // 页面刚挂载、初始化还没设 currentId 时先建空会话，避免消息挂到空 key 上被后续初始化冲掉
     const ownerId = chat.currentId || chat.newSession()
     if (!query || chat.busyIds.has(ownerId)) return
+    const now = Date.now()
+    if (lastSendRef.current && lastSendRef.current.q === query && now - lastSendRef.current.at < 1500) return
+    lastSendRef.current = { q: query, at: now }
     setQ('')
     setError('')
     try { localStorage.removeItem(`draft:${ownerId}`) } catch { /* 同上 */ }
@@ -207,10 +235,10 @@ export default function IndexPage() {
 
     let finished = false
     try {
-      const streamUrl = '/api/chat/stream' + (modelId ? '?modelId=' + modelId : '')
-      const r = await fetch(streamUrl, {
+      // modelId 必须放进请求体：后端 @RequestBody ChatRequest 从 body 读，放 URL query 会被忽略
+      const r = await fetch('/api/chat/stream', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sessionId: ownerId, question: query }), signal: ac.signal
+        body: JSON.stringify({ sessionId: ownerId, question: query, modelId: modelId || undefined }), signal: ac.signal
       })
       if (!r.ok) throw new Error('请求失败（HTTP ' + r.status + '）')
       const reader = r.body!.getReader()
@@ -303,11 +331,10 @@ export default function IndexPage() {
     for (let i = 0; i < list.length; i++) {
       setUploadMsg({ type: '', text: `[${i + 1}/${list.length}] 正在解析 ${list[i].name} …` })
       try { await uploadDocument(list[i], undefined, ok); success++ }
-      catch (e: any) { setUploadMsg({ type: 'err', text: `✗ ${list[i].name}：${e?.message || ''}` }) }
+      catch (e: any) { message.error(`${list[i].name}：${e?.message || ''}`) }
     }
-    setUploadMsg({ type: success ? 'ok' : 'err', text: `✓ 完成：成功 ${success} 份，已可提问` })
-    message.success(`${success} 份文档已入库`)
-    setTimeout(() => setUploadMsg(null), 3000)
+    setUploadMsg(null)
+    if (success) message.success(`完成：成功 ${success} 份，已可提问`)
   }
 
   const msgs = chat.messages
@@ -362,9 +389,9 @@ export default function IndexPage() {
                   </div>
                   <div className="ai-card-body"
                     onClick={e => {
-                      const li = (e.target as HTMLElement).closest('li.ask-suggest')
-                      if (!li) return
-                      const q = String(li.textContent || '').trim()
+                      const el = (e.target as HTMLElement).closest('.ask-suggest') as HTMLElement | null
+                      if (!el) return
+                      const q = el.getAttribute('data-q') || String(el.textContent || '').trim()
                       if (!q) return
                       setQ(q)
                       document.getElementById('question')?.focus()
@@ -409,6 +436,10 @@ export default function IndexPage() {
             }} />
           <div className="composer-bar">
             <span className="composer-tool" title="基于知识库检索作答"><span style={{ color: 'var(--primary)' }}>◈</span> 知识库问答</span>
+            {auth.has('doc:write_chat') && <>
+              <button className="composer-tool" onClick={() => fileInput.current?.click()} title="上传文档到知识库">⇪ 上传文档</button>
+              <input ref={fileInput} type="file" multiple hidden onChange={e => { void uploadFiles(e.target.files); e.target.value = '' }} />
+            </>}
             {chatModels.length > 1 && <select className="model-pick" value={modelId || ''} title="选择本次回答使用的对话模型"
               onChange={e => {
                 const v = Number(e.target.value)
@@ -416,12 +447,8 @@ export default function IndexPage() {
                 localStorage.setItem('wrk_chat_model', v ? String(v) : '')
               }}>
               <option value="">默认模型</option>
-              {chatModels.map(m => <option key={m.id} value={m.id}>{m.name}{m.active ? '（当前）' : ''}</option>)}
+              {chatModels.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
             </select>}
-            {auth.has('doc:write_chat') && <>
-              <button className="composer-tool" onClick={() => fileInput.current?.click()} title="上传文档到知识库">⇪ 上传文档</button>
-              <input ref={fileInput} type="file" multiple hidden onChange={e => { void uploadFiles(e.target.files); e.target.value = '' }} />
-            </>}
             <button className="send-btn" onClick={() => {
               if (busy) { chat.aborters[chat.currentId]?.abort(); return }
               void send()
