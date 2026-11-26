@@ -116,6 +116,11 @@ public class ModelConfigRepository {
         return jdbc.update("UPDATE model_config SET is_active=TRUE, updated_at=CURRENT_TIMESTAMP WHERE id=?", id);
     }
 
+    /** 禁用配置时一并取消激活，否则列表还显示「使用中」，代理仍在调一个已禁用的模型 */
+    public int deactivate(long id) {
+        return jdbc.update("UPDATE model_config SET is_active=FALSE, updated_at=CURRENT_TIMESTAMP WHERE id=?", id);
+    }
+
     public int insert(String name, String type, String baseUrl, String apiKey, String model, Integer dimensions, boolean active) {
         return jdbc.update("INSERT INTO model_config(name,type,base_url,api_key,model_name,dimensions,is_active) " +
                         "VALUES(?,?,?,?,?,?,?)", name, type, baseUrl, apiKey == null ? "" : apiKey, model, dimensions, active);

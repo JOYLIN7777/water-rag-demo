@@ -10,6 +10,15 @@
   .org-tree-table th:first-child{width:44%}
   .org-tree-table td:nth-child(2){color:#3b6ef5;font-family:ui-monospace,monospace;font-size:11.5px}
   .org-node{display:inline-flex;align-items:center;gap:8px}
+  /* 组织树层级：引导线 + 逐层不同的图标/字色/底色，别再靠纯缩进猜父子 */
+  .org-branch{font-family:ui-monospace,Consolas,monospace;color:#a9b8cf;font-size:11px;flex:0 0 auto;letter-spacing:-1px}
+  .org-node .org-name{font-weight:650;color:var(--ink)}
+  .org-depth-1 .org-name{color:#25469b}
+  .org-depth-2 .org-name{color:#0d7f75;font-weight:500}
+  .org-depth-3 .org-name{color:#6b7a99;font-weight:400}
+  .org-level{font-size:9px;line-height:1;color:#8b9ab5;background:#eef2f8;border-radius:3px;padding:2px 4px;font-weight:600}
+  .org-row-depth-0>td{background:#fbfcff}
+  .org-row-depth-2>td{background:#fcfdff}
   .org-caret{width:18px;height:18px;border:1px solid var(--line);border-radius:4px;background:#fff;
     display:inline-flex;align-items:center;justify-content:center;font-size:10px;color:var(--ink-2);cursor:pointer;flex:0 0 18px}
   .org-caret.leaf{visibility:hidden}
@@ -79,6 +88,7 @@
   .tree-node.tree-lv3 .tn{color:#6b7a99}
   .tree-branch{font-family:ui-monospace,Consolas,monospace;color:#a9b8cf;font-size:11px;
     flex:0 0 auto;letter-spacing:-1px;margin-right:3px}
+  .tree-ic{color:#7f94b8;font-size:11px;flex:0 0 auto;margin-right:-2px}
   .tree-node.active .tree-branch{color:var(--primary)}
   .tree-node .tree-tier{font-size:9px;line-height:1;color:#8b9ab5;background:#eef2f8;
     border-radius:3px;padding:2px 3px;margin-right:5px;font-weight:600;letter-spacing:.2px}
@@ -254,10 +264,34 @@
   .usage-detail td.q{max-width:0;color:var(--ink-2)}
   .usage-detail td:nth-child(4),.usage-detail td:nth-child(5){text-align:right;font-variant-numeric:tabular-nums}
   .usage-detail .dim{color:var(--muted)}
+  /* 用量统计：趋势 / 效率 / 模型分布 / 最近提问，全部来自真实调用记录 */
+  .usage-grid{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(0,1fr);gap:14px;margin-bottom:14px}
+  .trend-chart{display:flex;align-items:flex-end;gap:12px;height:148px;padding:10px 16px 12px}
+  .trend-col{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:4px;height:100%}
+  .trend-n{font-size:10.5px;color:var(--muted)}
+  .trend-bar{width:60%;max-width:34px;background:linear-gradient(180deg,var(--primary-hi),var(--primary));border-radius:5px 5px 0 0;transition:height .25s}
+  .trend-label{font-size:10.5px;color:var(--muted);white-space:nowrap}
+  .usage-kpis{display:grid;grid-template-columns:repeat(3,1fr);padding:18px 16px 14px}
+  .usage-kpis div{text-align:center;border-right:1px solid var(--line)}
+  .usage-kpis div:last-child{border-right:0}
+  .usage-kpis b{display:block;font-size:20px;color:var(--ink);font-variant-numeric:tabular-nums}
+  .usage-kpis span{font-size:11px;color:var(--muted)}
+  .dist-bar{height:4px;background:#eef2f8;border-radius:3px;margin-top:5px;max-width:220px}
+  .dist-bar i{display:block;height:100%;background:var(--primary);border-radius:3px}
+  .recent-questions{padding:6px 16px 12px}
+  .rq-row{display:flex;gap:12px;align-items:center;padding:8px 0;border-bottom:1px dashed #eef1f6;font-size:12px}
+  .rq-row:last-child{border-bottom:0}
+  .rq-time{color:var(--muted);font-size:11px;flex:0 0 124px}
+  .rq-q{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--ink-2)}
+  .rq-tok{color:var(--muted);font-size:11px;flex:0 0 auto}
+  @media(max-width:900px){.usage-grid{grid-template-columns:1fr}}
   /* 操作列：彩色文字链接 */
   .op-btn{font-size:12px;padding:2px 5px}
   .op-btn.warn{color:var(--warn)}
   .op-btn.danger{color:var(--danger)}
+  /* 权限树操作列：最多四个入口，必须同一行且间距一致 */
+  .perm-ops{display:inline-flex;align-items:center;gap:9px;flex-wrap:nowrap;white-space:nowrap}
+  .perm-ops .op-btn{padding:2px 3px;flex:0 0 auto}
   /* 分页器 */
   /* 分页条必须跟在表格后面参与正常文档流。旧版用 sticky bottom 吸附，
      表格一滚动就压在最后几行上，看起来像"分页混进列表/行被遮住"。 */

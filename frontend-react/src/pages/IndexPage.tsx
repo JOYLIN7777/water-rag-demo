@@ -24,13 +24,13 @@ function renderMarkdown(text: string): string {
   return DOMPurify.sanitize(marked.parse(normalizeMarkdown(text), { breaks: true }) as string)
 }
 
-/** 气泡上方的时间只留时分，完整秒数放到 title 里备查 */
-function askTime(ts?: number): string {
-  const full = tsLocal(ts)
-  if (full === '—') return full
-  // tsLocal 是 "MM-DD HH:mm:ss"，取空格后的时分，不能用 slice(-5)（那会拿到分:秒）
-  const parts = full.split(' ')
-  return parts.length > 1 ? parts[1].slice(0, 5) : full
+/** 问答时间统一显示完整年月日时分秒：提问在气泡上方、回答在卡片头部，层级分明 */
+function fullTime(ts?: number): string {
+  if (!ts) return '—'
+  const d = new Date(ts)
+  if (isNaN(d.getTime())) return tsLocal(ts)
+  const p = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`
 }
 
 /** 千分位：与旧版 fmtInt 一致 */
@@ -77,6 +77,7 @@ export default function IndexPage() {
   const [force, setForce] = useState(0)   // 触发重渲染（流式增量）
 
   function scrollBottom(forceScroll = false) {
+    if (localStorage.getItem('wrk_pref_autoscroll') === '0') return
     requestAnimationFrame(() => {
       const el = scrollRef.current
       if (el) el.scrollTop = el.scrollHeight
@@ -268,7 +269,7 @@ export default function IndexPage() {
               <div className="msg-group user" key={i}>
                 {m.branchSeal && <div className="branch-seal"><span>↳ 接着这一轮换了个问法 · 以下为新分支（上面的原对话保留）</span></div>}
                 <div className="user-ask">
-                  <div className="ask-meta"><span className="ask-time" title={tsLocal(m.ts)}>{askTime(m.ts)}</span></div>
+                  <div className="ask-meta"><span className="ask-time">{fullTime(m.ts)}</span></div>
                   <div className="user-bubble">{m.content}</div>
                 </div>
               </div>
@@ -281,9 +282,10 @@ export default function IndexPage() {
                     <span className="ai-badge">水</span><span className="ai-card-name">水利知识库助手</span>
                     {m.branch && <span className="branch-chip">分支</span>}
                     {m.streaming && <span className="ai-state" style={{ color: 'var(--primary)' }}>生成中…</span>}
-                    <span className="ai-time">{tsLocal(m.ts)}</span>
+                    <span className="ai-time">{fullTime(m.ts)}</span>
                     <span className="ai-card-actions">
-                      {m.usage && <span className="ai-usage" title={usageTip(m.usage)}>{usageInner(m.usage)}</span>}
+                      {m.usage && localStorage.getItem('wrk_pref_usage') !== '0' &&
+                        <span className="ai-usage" title={usageTip(m.usage)}>{usageInner(m.usage)}</span>}
                       {!!m.sources?.length && <button className="icon-btn ai-cite-count" title="引用片段">▤ {groupCites(m.sources).length} 篇</button>}
                       <button className="icon-btn" title="复制回答到剪贴板"
                         onClick={() => { void navigator.clipboard.writeText(m.content); message.success('回答已复制') }}>复制</button>

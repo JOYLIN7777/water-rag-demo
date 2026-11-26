@@ -23,6 +23,17 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC'
 .ant-modal { top: 0 !important; padding: 0 !important; margin: auto !important; }
 .ant-modal-confirm .ant-modal-body { padding: 24px !important; }
 
+/* 统一确认/信息弹框：标题、正文、按钮分三层，留足呼吸空间。
+   旧版默认 AntD confirm 三段挤在一起，危险操作看着像随手一按。 */
+.wb-confirm.ant-modal{width:min(520px,92vw) !important}
+.wb-confirm .ant-modal-body{padding:30px 32px 24px !important}
+.wb-confirm .ant-modal-confirm-body{display:flex;flex-direction:column;gap:10px}
+.wb-confirm .ant-modal-confirm-body>.anticon{margin-right:0 !important;font-size:24px !important}
+.wb-confirm .ant-modal-confirm-title{font-size:17px !important;line-height:1.5 !important;margin-top:12px}
+.wb-confirm .ant-modal-confirm-content{margin:0 !important;font-size:13.5px !important;line-height:1.9 !important;color:var(--ink-2) !important}
+.wb-confirm .ant-modal-confirm-btns{display:flex;gap:12px;margin-top:28px !important}
+.wb-confirm .ant-modal-confirm-btns .ant-btn{min-width:100px;height:36px !important;border-radius:8px !important}
+
 /* 顶栏导航：有面包屑时隐藏重复标题（对齐旧版 renderTopbarNav） */
 .topbar-left:has(.topbar-nav-left) .topbar-title,
 .topbar-left:has(.topbar-nav-left) .topbar-sub { display: none; }

@@ -17,6 +17,7 @@ export function confirmDialog(opts: {
 }): Promise<boolean> {
   return new Promise<boolean>(resolve => {
     Modal.confirm({
+      className: 'wb-confirm',
       title: opts.title,
       content: opts.content,
       okText: opts.okText || '确定',
@@ -31,6 +32,7 @@ export function confirmDialog(opts: {
 /** 只有提示、没有取消按钮的信息弹框（对齐旧版 Shell.modal 的 cancelText:''） */
 export function infoDialog(opts: { title: string; content?: ReactNode; okText?: string }): void {
   Modal.info({
+    className: 'wb-confirm',
     title: opts.title,
     content: opts.content,
     okText: opts.okText || '知道了'

@@ -83,14 +83,14 @@ export default function OrgPanel() {
 
   /** 表体：按层级展平，折叠的父节点不再往下走 */
   const list = useMemo(() => {
-    const out: Array<{ o: Org; d: number; idx: number; kids: number }> = []
+    const out: Array<{ o: Org; d: number; idx: number; kids: number; last: boolean }> = []
     const walk = (parent: string, depth: number) => {
-      let i = 0
-      for (const o of children(parent)) {
+      const siblings = children(parent)
+      siblings.forEach((o, i) => {
         const kids = children(o.key).length
-        out.push({ o, d: depth, idx: ++i, kids })
+        out.push({ o, d: depth, idx: i + 1, kids, last: i === siblings.length - 1 })
         if (kids && !folded[o.key]) walk(o.key, depth + 1)
-      }
+      })
     }
     walk('', 0)
     const k = kw.trim().toLowerCase()
@@ -217,14 +217,17 @@ export default function OrgPanel() {
           <tbody>
             {list.length === 0
               ? <tr><td colSpan={5} className="empty">{rows.length ? '没有匹配的组织' : '暂无组织，先建一个吧'}</td></tr>
-              : list.map(({ o, d, idx, kids }) => <tr key={o.key}>
+              : list.map(({ o, d, idx, kids, last }) => <tr key={o.key} className={`org-row-depth-${Math.min(d, 3)}`}>
                 <td>
-                  <span className="org-node" style={{ paddingLeft: d * 22 }}>
+                  <span className={`org-node org-depth-${Math.min(d, 3)}`} style={{ paddingLeft: d * 22 }}>
+                    <span className="org-branch">{last ? '└─' : '├─'}</span>
                     <span className={'org-caret' + (kids ? '' : ' leaf')}
                       onClick={() => kids && setFolded(f => ({ ...f, [o.key]: !f[o.key] }))}>
                       {kids ? (folded[o.key] ? '▸' : '▾') : '▸'}
                     </span>
-                    <span className="org-ic">⌘</span>{o.name}
+                    <span className="org-ic">{d === 0 ? '▣' : d === 1 ? '▤' : '▪'}</span>
+                    <span className="org-name">{o.name}</span>
+                    <span className="org-level">L{d + 1}</span>
                   </span>
                 </td>
                 <td>{o.key}</td>

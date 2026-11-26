@@ -176,8 +176,16 @@ public class RolePermissions {
     /** 供前端展示：系统中所有角色及其权限（带中文显示名） */
     public List<Map<String, Object>> roleMatrix() {
         List<Map<String, Object>> out = new ArrayList<>();
-        Set<String> roles = new LinkedHashSet<>(effective.keySet());
-        roles.addAll(roleNames.keySet());   // 只建了名称还没配权限的角色也要能看到
+        Set<String> all = new LinkedHashSet<>(effective.keySet());
+        all.addAll(roleNames.keySet());   // 只建了名称还没配权限的角色也要能看到
+        // Map.copyOf 的 keySet 顺序不保证稳定，直接遍历会让角色列表每次刷新都不一样。
+        // 固定按角色码排序，admin 作为超级角色放最后，便于对照。
+        List<String> roles = new ArrayList<>(all);
+        roles.sort((a, b) -> {
+            boolean aa = "admin".equals(a), ba = "admin".equals(b);
+            if (aa != ba) return aa ? 1 : -1;
+            return a.compareToIgnoreCase(b);
+        });
         roles.forEach(role -> {
             Map<String, Object> m = new LinkedHashMap<>();
             m.put("role", role);

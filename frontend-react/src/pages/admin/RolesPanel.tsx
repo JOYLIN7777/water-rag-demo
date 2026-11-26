@@ -45,6 +45,8 @@ export default function RolesPanel() {
   const list = useMemo(() => {
     const k = kw.trim().toLowerCase()
     return roles.filter(r => !k || (r.role + ' ' + auth.groupLabel(r.role)).toLowerCase().includes(k))
+      // 接口顺序做兜底：按角色码稳定排序，admin 固定放最后
+      .sort((a, b) => a.role === 'admin' ? 1 : b.role === 'admin' ? -1 : a.role.localeCompare(b.role))
   }, [roles, kw, auth])
 
   const permDesc = (code: string) => perms.find(p => p.code === code)?.description || '系统内置权限'

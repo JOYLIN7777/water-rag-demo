@@ -194,6 +194,7 @@ export default function UsersPanel() {
             }}>{kids.length ? (isFolded ? '▸' : '▾') : ''}</span>
           {/* 树形引导线：同级最后一个用 └─，其余 ├─，一眼看清从「全部组织」分出的层级 */}
           <span className="tree-branch">{last ? '└─' : '├─'}</span>
+          <span className="tree-ic">{depth === 0 ? '▣' : depth === 1 ? '▤' : '▪'}</span>
           <span className="tn" title={orgPathKeys(o.key).join(' / ')}>
             <span className="tree-tier">L{depth + 1}</span>{o.name}
           </span>

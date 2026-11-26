@@ -73,13 +73,17 @@ export default function ManagePage() {
   const cur = Math.min(page, totalPages)
   const slice = filtered.slice((cur - 1) * PAGE_SIZE, cur * PAGE_SIZE)
   const myOrg = getUser()?.tenant || ''
+  // 后端 /api/docs/formats 返回的是不带点的大写扩展名（CSS/CSV/DOC…），
+  // 这里统一成小写带点再与分组比较，否则所有格式都会落到「其他」。
+  const normExt = (e: string) => '.' + String(e || '').trim().toLowerCase().replace(/^\./, '')
+  const actualExts = formats.map(normExt)
   const usedExts = new Set<string>()
   const fmtGroups: Array<{ name: string; list: string[] }> = FMT_GROUPS.map(g => {
-    const list = g.exts.filter(e => formats.includes(e))
+    const list = g.exts.filter(e => actualExts.includes(e))
     list.forEach(e => usedExts.add(e))
     return { ...g, list }
   }).filter(g => g.list.length)
-  const rest = formats.filter(e => !usedExts.has(e))
+  const rest = actualExts.filter(e => !usedExts.has(e))
   if (rest.length) fmtGroups.push({ name: '其他', list: rest })
 
   function scopeBadge(d: DocItem): React.ReactNode {
@@ -185,7 +189,7 @@ export default function ManagePage() {
               {fmtGroups.map(g => (
                 <div key={g.name}>
                   <div className="fmt-group-title">{g.name}</div>
-                  <div className="fmt-list">{g.list.map(e => <span className="fmt" key={e}>{e.toUpperCase()}</span>)}</div>
+                  <div className="fmt-list">{g.list.map(e => <span className="fmt" key={e}>{e.replace(/^\./, '').toUpperCase()}</span>)}</div>
                 </div>
               ))}
             </div>

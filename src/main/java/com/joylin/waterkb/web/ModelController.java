@@ -81,9 +81,13 @@ public class ModelController {
                 body.getModel(), body.getDimensions(), body.isEnabled()) == 0) {
             throw new IllegalArgumentException("模型配置不存在：" + id);
         }
-        // 改的是激活配置 → 缓存与代理一起刷新
+        // 改的是激活配置 → 缓存与代理一起刷新；如果顺手禁用了它，必须同时取消激活，
+        // 否则外面列表仍显示「使用中」，代理还在调一个禁用模型。
         ModelConfig current = repository.findById(id);
-        if (current != null && current.isActive()) registry.invalidate();
+        if (current != null && current.isActive()) {
+            if (!current.isEnabled()) repository.deactivate(id);
+            registry.invalidate();
+        }
         return Map.of("message", "模型配置已更新", "id", id);
     }
 

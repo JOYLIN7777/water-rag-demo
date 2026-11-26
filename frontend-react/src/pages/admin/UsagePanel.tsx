@@ -22,17 +22,23 @@ export default function UsagePanel() {
   const [err, setErr] = useState('')
   const [drill, setDrill] = useState<'today' | 'month' | null>(null)
   const [records, setRecords] = useState<Record0[]>([])
+  const [recent, setRecent] = useState<Record0[]>([])
   const [loading, setLoading] = useState(false)
 
   async function load() {
     try {
-      const j = await http.get<Summary>('/api/usage/summary')
+      // 汇总 + 本月明细一起取：趋势/模型分布/效率都从真实调用记录算，不造数据
+      const [j, r] = await Promise.all([
+        http.get<Summary>('/api/usage/summary'),
+        http.get<{ records?: Record0[] }>('/api/usage/records?scope=month&limit=500').catch(() => ({ records: [] }))
+      ])
       setSum(j)
+      setRecent(Array.isArray(r?.records) ? r.records : [])
       setHint(j?.hint || '')
       setErr('')
     } catch (e: any) {
-      setErr('')
-      setHint('暂未获取到用量数据：' + (e?.message || ''))
+      setErr('暂未获取到用量数据：' + (e?.message || ''))
+      setRecent([])
     }
   }
   useEffect(() => { void load() }, [])
@@ -53,6 +59,25 @@ export default function UsagePanel() {
   const label = drill === 'month' ? '本月' : '今日'
   const sumTokens = records.reduce((s, r) => s + Number(r.totalTokens || 0), 0)
   const noQ = records.filter(r => !String(r.question || '').trim()).length
+
+  // 由本月真实调用记录派生：近 7 日趋势 / 平均效率 / 最近提问
+  const recentTokens = recent.reduce((s, r) => s + Number(r.totalTokens || 0), 0)
+  const avgMs = recent.length ? Math.round(recent.reduce((s, r) => s + Number(r.durationMs || 0), 0) / recent.length) : 0
+  const avgTokens = recent.length ? Math.round(recentTokens / recent.length) : 0
+  const trend = (() => {
+    const days: Array<{ label: string; n: number }> = []
+    const now = new Date()
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date(now); d.setDate(d.getDate() - i)
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+      days.push({ label: key.slice(5), n: recent.filter(r => String(r.ts || '').startsWith(key)).length })
+    }
+    return days
+  })()
+  const maxTrend = Math.max(1, ...trend.map(x => x.n))
+  const modelRows = sum?.models || []
+  const maxModel = Math.max(1, ...modelRows.map(m => Number(m.requests || 0)))
+  const lastQuestions = recent.filter(r => String(r.question || '').trim()).slice(0, 5)
 
   function card(kind: 'todayReq' | 'todayTok' | 'monthReq' | 'monthTok') {
     if (kind === 'todayReq') return <div className="stat-card" key={kind}>
@@ -83,6 +108,39 @@ export default function UsagePanel() {
         {card('todayReq')}{card('todayTok')}{card('monthReq')}{card('monthTok')}
       </div>
 
+      <div className="usage-grid">
+        <div className="card">
+          <div className="card-head"><h3>近 7 日调用趋势</h3><span className="hint">按真实调用时间统计</span></div>
+          <div className="trend-chart">
+            {trend.map(d => <div className="trend-col" key={d.label}>
+              <div className="trend-n">{d.n || ''}</div>
+              <div className="trend-bar" style={{ height: Math.max(4, Math.round(d.n / maxTrend * 96)) }} />
+              <div className="trend-label">{d.label.slice(5)}</div>
+            </div>)}
+          </div>
+        </div>
+        <div className="card">
+          <div className="card-head"><h3>调用效率</h3></div>
+          <div className="usage-kpis">
+            <div><b>{num(recent.length)}</b><span>本月调用</span></div>
+            <div><b>{avgMs ? (avgMs / 1000).toFixed(1) + 's' : '—'}</b><span>平均耗时</span></div>
+            <div><b>{avgTokens ? num(avgTokens) : '—'}</b><span>平均 Token</span></div>
+          </div>
+          <div className="hint">统计自最近 {recent.length} 条真实调用记录，不含模型官方汇总。</div>
+        </div>
+      </div>
+
+      {lastQuestions.length > 0 && <div className="card">
+        <div className="card-head"><h3>最近提问</h3></div>
+        <div className="recent-questions">
+          {lastQuestions.map((r, i) => <div className="rq-row" key={i}>
+            <span className="rq-time">{tsLocal(r.ts)}</span>
+            <span className="rq-q" title={String(r.question)}>{String(r.question)}</span>
+            <span className="rq-tok">{num(r.totalTokens)} tok</span>
+          </div>)}
+        </div>
+      </div>}
+
       <div className="card">
         <div className="card-head"><h3>按模型查看</h3>
           <button className="btn btn-sm" onClick={() => void load()}>刷新</button></div>
@@ -93,7 +151,9 @@ export default function UsagePanel() {
               {(sum?.models || []).length === 0
                 ? <tr><td colSpan={4} className="empty">所选时间范围暂无调用记录</td></tr>
                 : (sum?.models || []).map(m => <tr key={m.model}>
-                  <td className="name">{m.model}</td>
+                  <td className="name">{m.model}
+                    <div className="dist-bar"><i style={{ width: Math.max(2, Math.round(Number(m.requests || 0) / maxModel * 100)) + '%' }} /></div>
+                  </td>
                   <td>{num(m.requests)}</td>
                   <td>{num(m.inputTokens)}</td>
                   <td>{num(m.outputTokens)}</td>
@@ -101,7 +161,6 @@ export default function UsagePanel() {
             </tbody>
           </table>
         </div>
-        <div className="hint" id="uUsageHint">{hint}</div>
       </div>
 
       <WbModal size="chunk" title={`${label}每一次消耗`} open={!!drill} okText="关闭" cancelText={null}

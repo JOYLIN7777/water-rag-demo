@@ -87,8 +87,13 @@ public class AuthController {
             audit.record(AuditService.of("default", username == null ? "anonymous" : username, "",
                     "POST /api/auth/login", "/api/auth/login", "Login failed",
                     req.getRemoteAddr(), HttpStatus.UNAUTHORIZED.value(), 0, "DENIED"));
+            // 账号被管理员停用是常见运维场景，给明确提示，避免用户一直以为自己记错密码。
+            // 用户不存在仍统一返回「用户名或密码错误」，不做用户枚举。
+            UserAccount found = users.find(username);
+            String message = (found != null && !found.enabled())
+                    ? "账号已停用，请联系管理员" : "用户名或密码错误";
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                    .body(Map.of("code", 401, "message", "用户名或密码错误"));
+                    .body(Map.of("code", 401, "message", message));
         }
         String accessJti = UUID.randomUUID().toString();
         String refreshJti = UUID.randomUUID().toString();

@@ -5,7 +5,7 @@ import { http } from '@/api/http'
 import { getAccess, encryptPassword, logout } from '@/api/auth'
 import { useAuthStore } from '@/store/auth'
 import { useChatStore } from '@/store/chat'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, Link } from 'react-router-dom'
 import { Avatar } from '@/components/Avatar'
 import '@/styles/profile.css'
 import TopbarNav from '@/components/TopbarNav'
@@ -49,6 +49,7 @@ export default function ProfilePage() {
   const [newPwd2, setNewPwd2] = useState('')
   const [pwdMsg, setPwdMsg] = useState('')
   const [pwdBusy, setPwdBusy] = useState(false)
+  const [docsCount, setDocsCount] = useState(0)
 
   useEffect(() => {
     void (async () => {
@@ -67,6 +68,9 @@ export default function ProfilePage() {
         const j = await http.get<MeResponse>('/api/auth/me')
         setMe(j)
         updateToken()
+        // 文档数属于当前账号可见范围，取不到就显示 0，不影响页面其它信息
+        void http.get<unknown[]>('/api/docs/list')
+          .then(list => setDocsCount(Array.isArray(list) ? list.length : 0)).catch(() => setDocsCount(0))
       } catch { setLoadErr(true) }
     })()
     const timer = setInterval(updateToken, 1000)
@@ -87,6 +91,7 @@ export default function ProfilePage() {
   const gl = (g: string) => (orgLabels[g] || g)
   const name = me?.displayName || me?.user || '演示用户'
   const groups = me?.groups || []
+  const msgCount = Object.values(chat.bySession).reduce((n, arr) => n + (Array.isArray(arr) ? arr.length : 0), 0)
 
   async function changePassword() {
     setPwdMsg('')
@@ -107,6 +112,29 @@ export default function ProfilePage() {
       setPwdMsg(e?.message || '网络异常，请稍后重试')
       return false
     } finally { setPwdBusy(false) }
+  }
+
+  /** 把本机会话与消息导出为 JSON：换机器/备份时能用，不依赖后端导出接口 */
+  function exportSessions() {
+    const payload = {
+      exportedAt: new Date().toISOString(),
+      account: me?.user || '',
+      sessions: chat.sessions,
+      messages: chat.bySession
+    }
+    const url = URL.createObjectURL(new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' }))
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `我的会话-${new Date().toISOString().slice(0, 10)}.json`
+    a.click()
+    setTimeout(() => URL.revokeObjectURL(url), 2000)
+    message.success(`已导出 ${chat.sessions.length} 个会话`)
+  }
+
+  function clearDrafts() {
+    const keys = Object.keys(localStorage).filter(k => k.startsWith('draft:'))
+    keys.forEach(k => localStorage.removeItem(k))
+    message.success(keys.length ? `已清除 ${keys.length} 条未发送草稿` : '当前没有待清除的草稿')
   }
 
   function doLogout() {
@@ -148,6 +176,25 @@ export default function ProfilePage() {
                 <div className="info-cell"><div className="k">所属组织</div><div className="v">{tl(me?.tenant)}</div></div>
                 <div className="info-cell"><div className="k">登录方式</div><div className="v"><span className="tag info">账号密码</span></div></div>
               </>}
+          </div>
+        </div>
+
+        <div className="card">
+          <div className="card-head"><h3>我的知识库使用概览</h3><Link to="/settings.html" className="op-btn">问答偏好设置 ›</Link></div>
+          <div className="usage-mini">
+            <div><b>{chat.sessions.length}</b><span>历史会话</span></div>
+            <div><b>{msgCount}</b><span>本机消息</span></div>
+            <div><b>{docsCount}</b><span>可见文档</span></div>
+          </div>
+        </div>
+
+        <div className="card">
+          <div className="card-head"><h3>数据与快捷操作</h3></div>
+          <div className="sub">导出本机会话做备份；清除草稿只影响这台设备，不会删除服务端记录。</div>
+          <div className="quick-actions">
+            <button className="btn btn-sm btn-primary" type="button" onClick={exportSessions}>导出我的会话</button>
+            <button className="btn btn-sm" type="button" onClick={clearDrafts}>清除本地草稿</button>
+            <Link className="btn btn-sm" to="/index.html">继续提问</Link>
           </div>
         </div>
 

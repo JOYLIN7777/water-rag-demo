@@ -240,7 +240,7 @@ export default function PermsPanel() {
         <div className="table-wrap" style={{ border: '1px solid var(--line)', borderRadius: '0 0 var(--radius) var(--radius)', background: '#fff' }}>
           <table className="data-table">
             <thead><tr>
-              <th>菜单 / 权限名称</th><th>节点类型</th><th>权限标识</th><th>路由路径</th><th>排序</th><th>操作</th>
+              <th>菜单 / 权限名称</th><th>节点类型</th><th>权限标识</th><th>路由路径</th><th>排序</th><th style={{ width: 240 }}>操作</th>
             </tr></thead>
             <tbody>
               {tree.length === 0
@@ -263,10 +263,12 @@ export default function PermsPanel() {
                     <td><span className="mono" style={{ fontSize: 11, color: 'var(--muted)' }}>{node.routePath || '—'}</span></td>
                     <td>{node.orderNum || 0}</td>
                     <td>
-                      {typ !== 'btn' && <button className="op-btn" title="在此层级下新增子项" onClick={() => openCreate(node.code)}>＋子项</button>}
-                      <button className="op-btn" onClick={() => setViewRoles(node)}>查看角色</button>
-                      <button className="op-btn" onClick={() => openEdit(node)}>编辑</button>
-                      {!node.builtin && <button className="op-btn danger" onClick={() => void remove(node)}>删除</button>}
+                      <div className="perm-ops">
+                        {typ !== 'btn' && <button className="op-btn" title="在此层级下新增子项" onClick={() => openCreate(node.code)}>＋子项</button>}
+                        <button className="op-btn" onClick={() => setViewRoles(node)}>查看角色</button>
+                        <button className="op-btn" onClick={() => openEdit(node)}>编辑</button>
+                        {!node.builtin && <button className="op-btn danger" onClick={() => void remove(node)}>删除</button>}
+                      </div>
                     </td>
                   </tr>
                 })}

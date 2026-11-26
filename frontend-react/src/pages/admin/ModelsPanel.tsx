@@ -21,6 +21,7 @@ export default function ModelsPanel() {
   const [editForm, setEditForm] = useState({ ...EDIT_EMPTY })
   const [err, setErr] = useState('')
   const [testing, setTesting] = useState<number | null>(null)
+  const [tested, setTested] = useState<Record<number, boolean>>({})
 
   async function load() {
     try {
@@ -89,7 +90,7 @@ export default function ModelsPanel() {
     try {
       const j = await http.post<{ result: string; name: string }>('/api/models/' + id + '/test')
       const ok = String(j.result || '').startsWith('OK')
-      if (ok) message.success(`${j.name}：${j.result}`)
+      if (ok) { setTested(s => ({ ...s, [id]: true })); message.success(`${j.name}：${j.result}`) }
       else message.error(`${j.name}：${j.result}`)
     } catch (e: any) { message.error('测试失败：' + (e?.message || '')) }
     finally { setTesting(null) }
@@ -187,15 +188,20 @@ export default function ModelsPanel() {
                     <span className="mono">{m.model}</span>
                   </td>
                   <td><span className="mono">{m.apiKey}</span></td>
-                  <td><span className={'tag ' + (m.active ? 'active' : 'off')}>
-                    {m.active ? '使用中' : (m.enabled ? '待命' : '已禁用')}
-                  </span></td>
+                  <td>
+                    <span className={'tag ' + (m.active && m.enabled !== false ? 'active' : 'off')}>
+                      {m.enabled === false ? '已禁用' : (m.active ? '使用中' : '待命')}
+                    </span>
+                    {tested[m.id] && <span className="tag ok" style={{ marginLeft: 6 }}>服务正常</span>}
+                  </td>
                   <td>
                     <div className="model-ops">
                       <button className="btn btn-sm" onClick={() => openEdit(m)}>编辑</button>
-                      {m.active
-                        ? <button className="btn btn-sm" disabled>已激活</button>
-                        : <button className="btn btn-sm" onClick={() => void activate(m.id)}>激活</button>}
+                      {m.enabled === false
+                        ? <button className="btn btn-sm" disabled>已停用</button>
+                        : m.active
+                          ? <button className="btn btn-sm" disabled>已激活</button>
+                          : <button className="btn btn-sm" onClick={() => void activate(m.id)}>激活</button>}
                       <button className="btn btn-sm" disabled={testing === m.id} onClick={() => void test(m.id)}>
                         {testing === m.id ? '测试中…' : '测试'}
                       </button>
@@ -239,7 +245,10 @@ export default function ModelsPanel() {
         <div className="field status-field">
           <label className="field-check"><input type="checkbox" checked={editForm.enabled}
             onChange={e => setEditForm(f => ({ ...f, enabled: e.target.checked }))} />启用该配置</label>
-          <div className="form-hint">禁用后该配置不能被激活；正在使用的配置需先激活其他同类型模型。</div>
+          <div className="form-hint">
+            当前：{editForm.enabled ? '启用（可激活使用）' : '停用（保存后立即下线并取消使用中）'}。
+            禁用正在使用的配置会同时取消激活，并切换代理到同类型的其他可用模型。
+          </div>
         </div>
       </WbModal>
     </>
