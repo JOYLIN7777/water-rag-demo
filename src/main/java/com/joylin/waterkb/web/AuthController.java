@@ -17,9 +17,11 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -164,12 +166,30 @@ public class AuthController {
     @GetMapping("/me")
     public Map<String, Object> me() {
         UserContext.CurrentUser u = UserContext.get();
-        return Map.of(
-                "user", u.userId(),
-                "groups", u.groups(),
-                "tenant", u.tenantId(),
-                "authType", u.authType(),
-                "anonymous", u.isAnonymous());
+        Map<String, Object> m = new LinkedHashMap<>();
+        m.put("user", u.userId());
+        m.put("groups", u.groups());
+        m.put("tenant", u.tenantId());
+        m.put("authType", u.authType());
+        m.put("anonymous", u.isAnonymous());
+        UserStore.UserAccount account = users.find(u.userId());
+        if (account != null) {
+            m.put("displayName", account.displayName());
+            m.put("gender", account.gender());
+            m.put("phone", account.phone());
+            m.put("avatar", account.avatar());
+        }
+        return m;
+    }
+
+    /** 当前用户修改自己的资料：性别、手机号、头像（头像为 data URL 或预设标识） */
+    @PutMapping("/profile")
+    public Map<String, Object> updateProfile(@RequestBody Map<String, String> body) {
+        String me = UserContext.get().userId();
+        if (me == null || me.isBlank()) throw new IllegalArgumentException("请先登录");
+        boolean ok = users.updateProfile(me, body.get("gender"), body.get("phone"), body.get("avatar"));
+        if (!ok) throw new IllegalArgumentException("账号不存在");
+        return Map.of("message", "个人资料已保存");
     }
 
     /** 当前用户的完整权限视图：功能菜单 + 数据权限 + 工具权限 */

@@ -184,6 +184,9 @@ public class AdminController {
             m.put("groups", u.groups());
             m.put("tenant", u.tenant());
             m.put("enabled", u.enabled());
+            m.put("gender", u.gender());
+            m.put("phone", u.phone());
+            m.put("avatar", u.avatar());
             out.add(m);
         }
         return out;
@@ -230,6 +233,11 @@ public class AdminController {
         }
         if (!users.update(name, str(body.get("displayName")), groups, str(body.get("tenant")), enabled)) {
             throw new IllegalArgumentException("账号不存在：" + name);
+        }
+        // 资料字段可选：只在传了时才更新，兼容旧调用
+        if (body.containsKey("gender") || body.containsKey("phone") || body.containsKey("avatar")) {
+            UserStore.UserAccount a = users.find(name);
+            if (a != null) users.updateProfile(name, str(body.get("gender")), str(body.get("phone")), str(body.get("avatar")));
         }
         return Map.of("message", "账号已更新", "username", name);
     }

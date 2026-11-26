@@ -250,7 +250,7 @@ export default function UsersPanel() {
           <button className="btn btn-sm btn-search" onClick={() => setPage(1)}>搜索</button>
           <button className="btn btn-sm" onClick={resetFilter}>重置</button>
           <button className="btn btn-sm btn-green" onClick={exportUsers}>导出用户</button>
-          <button className="btn btn-sm btn-amber" onClick={() => openCreate(orgKey)}>＋ 新增账号</button>
+          <button className="btn btn-sm btn-primary" onClick={() => openCreate(orgKey)}>＋ 新增账号</button>
         </div>
       </div>
       {err && <div className="msg err show">{err}</div>}

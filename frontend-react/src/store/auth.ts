@@ -52,7 +52,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     try {
       const j = await authApi.permissions()
       // 显示名/组织名从 /me 取（permissions 接口不返回 displayName）
-      let me: { displayName?: string; tenant?: string } | null = null
+      let me: { displayName?: string; tenant?: string; gender?: string; phone?: string; avatar?: string } | null = null
       try { me = await http.get<{ displayName?: string; tenant?: string }>('/api/auth/me') }
       catch { /* 失败时用 sessionStorage 里的旧值 */ }
       set({
@@ -61,6 +61,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           displayName: me?.displayName || j.displayName || get().user?.displayName || j.user,
           groups: j.groups || get().user?.groups || [],
           tenant: me?.tenant || j.tenant || get().user?.tenant || 'default',
+          gender: me?.gender,
+          phone: me?.phone,
+          avatar: me?.avatar,
           admin: !!j.admin,
           anonymous: !!j.anonymous
         } : get().user,

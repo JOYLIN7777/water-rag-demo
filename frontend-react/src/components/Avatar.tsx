@@ -12,11 +12,15 @@ function hashHue(name: string): number {
   return h
 }
 
-export function Avatar({ name, size = 'md' }: { name: string; size?: 'sm' | 'md' | 'lg' | 'xl' }) {
+export function Avatar({ name, size = 'md', src }: { name: string; size?: 'sm' | 'md' | 'lg' | 'xl'; src?: string }) {
   const n = String(name == null || name === '' ? '?' : name).trim()
   const ch = n.slice(0, 1).toUpperCase()
   const pair = AV_PALETTE[hashHue(n) % AV_PALETTE.length]
   const style: CSSProperties = { background: `linear-gradient(135deg,${pair[0]},${pair[1]})` }
+  // 用户自定义头像：data URL 或预设头像标识，优先于首字母
+  if (src && /^data:image\//.test(src)) {
+    return <img className={`av av-${size} av-img`} src={src} alt={n} />
+  }
   return <span className={`av av-${size}`} style={style}>{ch}</span>
 }
 

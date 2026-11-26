@@ -16,7 +16,14 @@ interface MeResponse {
   displayName?: string
   groups?: string[]
   tenant: string
+  gender?: string
+  phone?: string
+  avatar?: string
 }
+
+/** 预设头像：不上传时用这些，存的是标识而不是图片 */
+const PRESET_AVATARS = ['🦉', '🐟', '🌊', '💧', '🛡️', '📚']
+const AVATAR_KEY = 'wrk_preset_avatar' 
 
 function parseJwt(tok: string): { exp?: number; iat?: number } | null {
   try {
@@ -50,6 +57,13 @@ export default function ProfilePage() {
   const [pwdMsg, setPwdMsg] = useState('')
   const [pwdBusy, setPwdBusy] = useState(false)
   const [docsCount, setDocsCount] = useState(0)
+  // 个人资料：头像（上传 data URL 或预设 emoji）、性别、手机号
+  const [profileOpen, setProfileOpen] = useState(false)
+  const [gender, setGender] = useState('')
+  const [phone, setPhone] = useState('')
+  const [avatarInput, setAvatarInput] = useState('')
+  const [preset, setPreset] = useState('')
+  const [profileErr, setProfileErr] = useState('')
 
   useEffect(() => {
     void (async () => {
@@ -67,6 +81,10 @@ export default function ProfilePage() {
 
         const j = await http.get<MeResponse>('/api/auth/me')
         setMe(j)
+        setGender(j?.gender || '')
+        setPhone(j?.phone || '')
+        setAvatarInput(j?.avatar || '')
+        setPreset(localStorage.getItem(AVATAR_KEY) || '')
         updateToken()
         // 文档数属于当前账号可见范围，取不到就显示 0，不影响页面其它信息
         void http.get<unknown[]>('/api/docs/list')
@@ -158,7 +176,11 @@ export default function ProfilePage() {
         </div>
 
         <div className="profile-head">
-          <div className="profile-avatar">{name.slice(0, 1)}</div>
+          <div className="profile-avatar">
+            {me?.avatar && /^data:image\//.test(me.avatar)
+              ? <img src={me.avatar} alt="头像" className="profile-avatar-img" />
+              : (preset || name.slice(0, 1))}
+          </div>
           <div>
             <div className="profile-name">{name}</div>
             <div className="profile-sub">{tl(me?.tenant)} · {(groups.map(gl).join('、')) || '普通用户'}</div>
@@ -216,11 +238,65 @@ export default function ProfilePage() {
         </div>
 
         <div className="card">
+          <div className="card-head"><h3>个人资料</h3>
+            <button className="btn btn-sm btn-primary" type="button"
+              onClick={() => { setProfileErr(''); setProfileOpen(true) }}>编辑资料</button></div>
+          <div className="info-grid">
+            <div className="info-cell"><div className="k">性别</div><div className="v">{gender || '未设置'}</div></div>
+            <div className="info-cell"><div className="k">手机号</div><div className="v">{phone || '未设置'}</div></div>
+            <div className="info-cell"><div className="k">头像</div><div className="v">{avatarInput.startsWith('data:image/') ? '已上传自定义头像' : (preset ? '预设头像 ' + preset : '默认首字母')}</div></div>
+          </div>
+        </div>
+
+        <div className="card">
           <div className="card-head"><h3>账号安全</h3></div>
           <div className="sub">修改后下次登录请使用新密码。密码经过加密存储，系统不会保存明文。</div>
           <button className="btn btn-primary" type="button" onClick={() => { setPwdMsg(''); setPwdOpen(true) }}>修改密码</button>
         </div>
       </div>
+
+      <Modal title="编辑个人资料" open={profileOpen} okText="保存" cancelText="取消"
+        onCancel={() => setProfileOpen(false)} onOk={async () => {
+          setProfileErr('')
+          if (phone && !/^\d{11}$/.test(phone)) { setProfileErr('手机号必须是 11 位数字'); return }
+          try {
+            const avatar = avatarInput || preset
+            await http.put('/api/auth/profile', { gender, phone, avatar })
+            if (preset) localStorage.setItem(AVATAR_KEY, preset)
+            else localStorage.removeItem(AVATAR_KEY)
+            setMe(m => m ? { ...m, gender, phone, avatar } : m)
+            setProfileOpen(false)
+            message.success('个人资料已保存')
+          } catch (e: any) { setProfileErr(e?.message || '保存失败') }
+        }}>
+        <div className="field"><label>头像</label>
+          <div className="avatar-picker">
+            {PRESET_AVATARS.map(a => <button type="button" key={a}
+              className={'avatar-preset' + (preset === a && !avatarInput.startsWith('data:image/') ? ' on' : '')}
+              onClick={() => { setPreset(a); setAvatarInput('') }}>{a}</button>)}
+            <label className="avatar-upload">上传图片
+              <input type="file" accept="image/*" hidden onChange={e => {
+                const f = e.target.files?.[0]
+                if (!f) return
+                if (f.size > 512 * 1024) { setProfileErr('头像图片不能超过 512KB'); return }
+                const r = new FileReader()
+                r.onload = () => { setAvatarInput(String(r.result || '')); setPreset('') }
+                r.readAsDataURL(f)
+              }} />
+            </label>
+          </div>
+          {avatarInput.startsWith('data:image/') && <img src={avatarInput} alt="预览" className="avatar-preview" />}
+          <div className="form-hint">可直接点选预设头像，或上传自己的图片（不超过 512KB）。</div></div>
+        <div className="field"><label>性别</label>
+          <select value={gender} onChange={e => setGender(e.target.value)}>
+            <option value="">不公开</option><option value="男">男</option><option value="女">女</option>
+          </select></div>
+        <div className="field"><label>手机号（可用于登录）</label>
+          <input type="tel" value={phone} maxLength={11} placeholder="11 位手机号"
+            onChange={e => setPhone(e.target.value)} />
+          <div className="form-hint">设置后可以用手机号代替用户名登录，同一手机号不能给多个账号使用。</div></div>
+        {profileErr && <div className="msg err show">{profileErr}</div>}
+      </Modal>
 
       <Modal title="修改密码" open={pwdOpen} okText="确认修改" cancelText="取消"
         confirmLoading={pwdBusy} onCancel={() => setPwdOpen(false)}

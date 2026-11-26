@@ -411,6 +411,9 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,te
 .chunk-more:hover{text-decoration:underline}
 .chunk-item.open .chunk-more{display:inline-block}
 .chunk-item.open .chunk-body{display:block}
+/* 展开的分段要有明确选中态，不然看不出当前打开的是哪一段 */
+.chunk-item.open{background:#f5f9ff;box-shadow:inset 3px 0 0 var(--primary)}
+.chunk-item.full .chunk-head .chunk-no{color:var(--primary);font-weight:650}
 .chunk-item.open .chunk-caret{color:var(--primary)}
 .chunk-empty{padding:26px;text-align:center;color:var(--muted);font-size:12.5px}
 

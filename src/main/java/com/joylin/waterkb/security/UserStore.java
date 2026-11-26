@@ -87,12 +87,18 @@ public class UserStore {
                     + "groups TEXT NOT NULL, tenant VARCHAR(64) NOT NULL, "
                     + "display_name VARCHAR(128), enabled BOOLEAN NOT NULL DEFAULT TRUE, "
                     + "updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)");
-            jdbc.query("SELECT username,password_hash,groups,tenant,display_name,enabled FROM app_users", rs -> {
+            // 个人资料扩展：性别、手机号（可登录）、头像（data URL 或预设标识）
+            jdbc.execute("ALTER TABLE app_users ADD COLUMN IF NOT EXISTS gender VARCHAR(16) DEFAULT ''");
+            jdbc.execute("ALTER TABLE app_users ADD COLUMN IF NOT EXISTS phone VARCHAR(32) DEFAULT ''");
+            jdbc.execute("ALTER TABLE app_users ADD COLUMN IF NOT EXISTS avatar TEXT DEFAULT ''");
+            jdbc.execute("CREATE UNIQUE INDEX IF NOT EXISTS uq_app_users_phone ON app_users(phone) WHERE phone <> ''");
+            jdbc.query("SELECT username,password_hash,groups,tenant,display_name,enabled,gender,phone,avatar FROM app_users", rs -> {
                 String username = rs.getString("username").trim().toLowerCase();
                 List<String> groups = Arrays.stream(rs.getString("groups").split(","))
                         .map(String::trim).filter(s -> !s.isEmpty()).toList();
                 users.put(username, new UserAccount(username, rs.getString("password_hash"), groups,
-                        rs.getString("tenant"), rs.getString("display_name"), rs.getBoolean("enabled")));
+                        rs.getString("tenant"), rs.getString("display_name"), rs.getBoolean("enabled"),
+                        nvl(rs.getString("gender")), nvl(rs.getString("phone")), nvl(rs.getString("avatar"))));
             });
             log.info("已从 app_users 载入账号，当前账号数 {}", users.size());
         } catch (Exception e) {
@@ -100,16 +106,19 @@ public class UserStore {
         }
     }
 
+    private static String nvl(String s) { return s == null ? "" : s.trim(); }
+
     private void persist(UserAccount u) {
         if (jdbc == null) return;
         try {
-            jdbc.update("INSERT INTO app_users(username,password_hash,groups,tenant,display_name,enabled,updated_at) "
-                            + "VALUES(?,?,?,?,?,?,CURRENT_TIMESTAMP) ON CONFLICT(username) DO UPDATE SET "
+            jdbc.update("INSERT INTO app_users(username,password_hash,groups,tenant,display_name,enabled,gender,phone,avatar,updated_at) "
+                            + "VALUES(?,?,?,?,?,?,?,?,?,CURRENT_TIMESTAMP) ON CONFLICT(username) DO UPDATE SET "
                             + "password_hash=EXCLUDED.password_hash, groups=EXCLUDED.groups, "
                             + "tenant=EXCLUDED.tenant, display_name=EXCLUDED.display_name, "
-                            + "enabled=EXCLUDED.enabled, updated_at=CURRENT_TIMESTAMP",
+                            + "enabled=EXCLUDED.enabled, gender=EXCLUDED.gender, phone=EXCLUDED.phone, "
+                            + "avatar=EXCLUDED.avatar, updated_at=CURRENT_TIMESTAMP",
                     u.username(), u.passwordHash(), String.join(",", u.groups()), u.tenant(),
-                    u.displayName(), u.enabled());
+                    u.displayName(), u.enabled(), nvl(u.gender()), nvl(u.phone()), nvl(u.avatar()));
         } catch (Exception e) {
             throw new IllegalStateException("账号保存失败：" + e.getMessage(), e);
         }
@@ -174,12 +183,41 @@ public class UserStore {
         return true;
     }
 
-    /** 校验用户名密码，成功返回账号，失败返回 null。用户名比较忽略大小写。 */
+    /** 校验用户名/手机号 + 密码，成功返回账号。手机号只按精确匹配，且必须是完整 11 位。 */
     public UserAccount authenticate(String username, String password) {
         if (username == null || password == null) return null;
-        UserAccount u = users.get(username.trim().toLowerCase());
+        String key = username.trim();
+        UserAccount u = users.get(key.toLowerCase());
+        if (u == null && key.matches("\\d{11}")) {
+            u = users.values().stream().filter(a -> key.equals(a.phone())).findFirst().orElse(null);
+        }
         if (u == null || !u.enabled()) return null;
         return hasher.matches(password, u.passwordHash()) ? u : null;
+    }
+
+    /** 个人资料：性别、手机号、头像；手机号全局唯一，避免一人多号混用 */
+    public boolean updateProfile(String username, String gender, String phone, String avatar) {
+        String name = username == null ? "" : username.trim().toLowerCase();
+        UserAccount u = users.get(name);
+        if (u == null) return false;
+        String p = nvl(phone);
+        if (!p.isEmpty()) {
+            if (!p.matches("\\d{11}")) throw new IllegalArgumentException("手机号必须是 11 位数字");
+            boolean taken = users.values().stream().anyMatch(a -> !a.username().equals(name) && p.equals(a.phone()));
+            if (taken) throw new IllegalArgumentException("该手机号已被其他账号使用");
+        }
+        UserAccount next = new UserAccount(u.username(), u.passwordHash(), u.groups(), u.tenant(),
+                u.displayName(), u.enabled(), nvl(gender), p, nvl(avatar));
+        users.put(name, next);
+        persist(next);
+        log.info("账号 {} 个人资料已更新", name);
+        return true;
+    }
+
+    public UserAccount findByPhone(String phone) {
+        if (phone == null || phone.isBlank()) return null;
+        String p = phone.trim();
+        return users.values().stream().filter(a -> p.equals(a.phone())).findFirst().orElse(null);
     }
 
     public UserAccount find(String username) {
@@ -205,9 +243,14 @@ public class UserStore {
 
     /** 不可变账号值对象：绝不暴露密码哈希给外部（toString 里也不含） */
     public record UserAccount(String username, String passwordHash, List<String> groups,
-                              String tenant, String displayName, boolean enabled) {
+                              String tenant, String displayName, boolean enabled,
+                              String gender, String phone, String avatar) {
         public UserAccount(String username, String passwordHash, List<String> groups, String tenant, String displayName) {
-            this(username, passwordHash, List.copyOf(groups), tenant, displayName, true);
+            this(username, passwordHash, List.copyOf(groups), tenant, displayName, true, "", "", "");
+        }
+        public UserAccount(String username, String passwordHash, List<String> groups, String tenant,
+                           String displayName, boolean enabled) {
+            this(username, passwordHash, List.copyOf(groups), tenant, displayName, enabled, "", "", "");
         }
         @Override
         public String toString() {

@@ -1,5 +1,5 @@
 /** 全站侧栏：DOM/class 与旧版 renderSidebar 1:1 对齐 */
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { Modal, message } from 'antd'
 import { useAuthStore } from '@/store/auth'
@@ -28,12 +28,25 @@ export default function Shell({ children }: { children: React.ReactNode }) {
     if (!auth.loaded) void auth.loadPermissions()
   }, [auth.loaded, navigate])
 
+  // 账号切换时先清空上一个账号的会话/草稿缓存，再按新账号重新拉取。
+  // 之前 store 在模块加载时读了一次旧 scope 的 localStorage，切号后直接合并，
+  // 就把上一账号的历史会话带到了新账号侧栏（实测 13560009876 只剩 1 条，界面却显示 admin 的 25 条）。
+  const accountKey = auth.user?.user || ''
+  const lastAccount = useRef('')
+  useEffect(() => {
+    if (!accountKey || !auth.loaded) return
+    if (lastAccount.current && lastAccount.current !== accountKey) {
+      chat.reset()
+    }
+    lastAccount.current = accountKey
+  }, [accountKey, auth.loaded, chat])
+
   useEffect(() => {
     if (!isLoggedIn() || inAdmin) return
     void chat.syncSessions()
     // 只在进入问答域时同步一次，避免每次会话状态变化都请求后端
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [inAdmin, auth.loaded])
+  }, [inAdmin, auth.loaded, accountKey])
 
   const user = auth.user
   const tenant = user?.tenant || 'default'
@@ -205,7 +218,7 @@ export default function Shell({ children }: { children: React.ReactNode }) {
               </Link>
             )}
             <div className="user-block" id="adminUserBlock">
-              <Link className="user-avatar" to="/admin-profile.html" title="个人中心"><Avatar name={name} size="md" /></Link>
+              <Link className="user-avatar" to="/admin-profile.html" title="个人中心"><Avatar name={name} size="md" src={auth.user?.avatar} /></Link>
               <Link className="user-meta" to="/admin-profile.html" title="个人中心">
                 <div className="user-name">{name}</div>
                 <div className="user-tenant">{tenantLabel(tenant)}</div>
@@ -216,7 +229,7 @@ export default function Shell({ children }: { children: React.ReactNode }) {
         ) : (
           <>
             <div className="user-block" id="sidebarUserBlock">
-              <Link className="user-avatar" to="/profile.html" title="个人中心"><Avatar name={name} size="md" /></Link>
+              <Link className="user-avatar" to="/profile.html" title="个人中心"><Avatar name={name} size="md" src={auth.user?.avatar} /></Link>
               <Link className="user-meta" to="/profile.html" title="个人中心">
                 <div className="user-name">{name}</div>
                 <div className="user-tenant">{tenantLabel(tenant)}</div>

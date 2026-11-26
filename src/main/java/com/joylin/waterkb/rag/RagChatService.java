@@ -495,7 +495,9 @@ public class RagChatService {
                 }
             }
             if (names.isEmpty()) return "【知识库文档清单】当前没有可见文档。";
-            StringBuilder sb = new StringBuilder("【知识库文档清单（共 ").append(names.size()).append(" 份，按文件名列出）】\n");
+            // 这是「与本次问题相关的文档清单」，不是知识库全量（全量可能几十份，塞进 Prompt 会爆上下文）。
+            // 之前写成「当前知识库中包含以下文档（共N份）」，用户按 N 和知识库总数对不上，以为数据错了。
+            StringBuilder sb = new StringBuilder("【与本次问题相关的知识库文档（共 ").append(names.size()).append(" 份，按文件名列出）】\n");
             for (int i = 0; i < names.size(); i++) {
                 sb.append(i + 1).append(". ").append(names.get(i)).append('\n');
             }

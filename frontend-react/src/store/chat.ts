@@ -94,11 +94,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
   syncSessions: async () => {
     try {
       const list = await chatApi.sessions()
-      if (list?.length) {
-        const local = get().sessions
-        const ids = new Set(list.map(s => s.id))
-        const merged = [...list, ...local.filter(s => !ids.has(s.id))]
-        set({ sessions: merged })
+      // 服务端清单就是唯一权威：它已经按 user_id 过滤。
+      // 之前把首次挂载时读到的本地缓存并进来，切账号后就会把上一个账号的会话带过来。
+      if (Array.isArray(list)) {
+        set({ sessions: list })
         get().saveLocal()
       }
     } catch { /* 用本地缓存 */ }

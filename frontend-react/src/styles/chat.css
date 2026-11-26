@@ -125,9 +125,11 @@
   .ai-card-body table th{background:#f7f9fc;font-weight:650;color:var(--ink-2)}
   .cite-seg{cursor:pointer}
   .cite-seg:hover{background:#eef4ff;color:var(--primary)}
-  .model-pick{border:0;background:transparent;color:var(--ink-2);border-radius:6px;
-    padding:5px 7px;font-size:12px;max-width:190px;cursor:pointer;margin-left:auto}
-  .model-pick:hover{background:var(--primary-soft);color:var(--primary)}
+  .model-pick{margin-left:auto;font-size:12px;max-width:190px}
+  .model-pick .ant-select-selector{border:0 !important;background:transparent !important;
+    box-shadow:none !important;padding:0 7px !important;color:var(--ink-2)}
+  .model-pick.ant-select-focused .ant-select-selector{box-shadow:none !important}
+  .model-pick:hover .ant-select-selector{background:var(--primary-soft) !important;color:var(--primary)}
   .chunk-detail-text{white-space:pre-wrap;line-height:1.9;font-size:13px;color:var(--ink);max-height:64vh;overflow:auto}
   /* 引用区：按文档去重后的角标行，与正文用细分隔线 + 淡底色区分 */
   .cite-zone:not(:empty){border-top:1px solid #f1f4f9;padding:13px 22px 15px;background:#fafbfe}

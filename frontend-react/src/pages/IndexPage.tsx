@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { marked } from 'marked'
 import DOMPurify from 'dompurify'
-import { message } from 'antd'
+import { message, Modal, Select } from 'antd'
 import { useSearchParams } from 'react-router-dom'
 import { useChatStore, type ChatMessageExt } from '@/store/chat'
 import { useAuthStore } from '@/store/auth'
@@ -10,7 +10,6 @@ import { tsLocal } from '@/lib/ui'
 import { http } from '@/api/http'
 import WbModal from '@/components/WbModal'
 import { streamChat, uploadDocument } from '@/api'
-import { Modal } from 'antd'
 import AdminEntry from '@/components/AdminEntry'
 import '@/styles/chat.css'
 
@@ -57,21 +56,30 @@ function normalizeTables(text: string): string {
  * 按回复内容动态识别「示例问题」：列表项里的问句、以及正文里以 -/序号开头的短问句，
  * 都标记为蓝色可点击；点一下把问题填进输入框。不是写死匹配某几种句式。
  */
+/** 只认「独立成行、以问号结尾的短问句」；说明文字/网址/引用片段一律不算推荐问题 */
+function isRealQuestion(txt: string): boolean {
+  const s = String(txt || '').trim()
+  if (s.length < 4 || s.length > 60) return false
+  if (!/[？?]$/.test(s)) return false
+  if (/https?:\/\/|www\.|片段\d|【片段|\([^)]{0,40}\)/.test(s)) return false
+  // 带多个逗号/顿号的句子是说明文字，不是提问
+  if ((s.match(/[，,]/g) || []).length >= 3) return false
+  return true
+}
+
 function markSuggestions(html: string): string {
   let out = html.replace(/<li>([\s\S]*?)<\/li>/g, (m, inner) => {
     const txt = String(inner).replace(/<[^>]+>/g, '').trim()
-    return /[？?]/.test(txt) ? `<li class="ask-suggest">${inner}</li>` : m
+    return isRealQuestion(txt) ? `<li class="ask-suggest">${inner}</li>` : m
   })
   out = out.replace(/<p>([\s\S]*?)<\/p>/g, (m, inner) => {
     const parts = String(inner).split(/(<br\s*\/?>)/i)
     const marked = parts.map(part => {
       if (/^<br/i.test(part)) return part
       const txt = part.replace(/<[^>]+>/g, '').trim()
-      const looksQuestion = /[？?]/.test(txt) && txt.length < 90 &&
-        (/^[-–—•*·\d一二三四五六七八九十]/.test(txt) || /[？?]$/.test(txt))
-      if (!looksQuestion) return part
-      const q = txt.replace(/^[-–—•*·\d一二三四五六七八九十、.\s]+/, '').replace(/"/g, '&quot;')
-      return `<span class="ask-suggest" data-q="${q}">${part}</span>`
+      const clean = txt.replace(/^[-–—•*·\d一二三四五六七八九十、.\s]+/, '')
+      if (!isRealQuestion(clean)) return part
+      return `<span class="ask-suggest" data-q="${clean.replace(/"/g, '&quot;')}">${part}</span>`
     })
     return '<p>' + marked.join('') + '</p>'
   })
@@ -185,6 +193,8 @@ export default function IndexPage() {
       }
       else if (state.sessions.length) await chat.switchSession(state.sessions[0].id)
       else await chat.switchSession(chat.newSession())
+      // 刷新/切会话后定位到最新一条消息，而不是停在最初提问的位置
+      setTimeout(() => scrollBottom(true), 150)
     })()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -440,15 +450,17 @@ export default function IndexPage() {
               <button className="composer-tool" onClick={() => fileInput.current?.click()} title="上传文档到知识库">⇪ 上传文档</button>
               <input ref={fileInput} type="file" multiple hidden onChange={e => { void uploadFiles(e.target.files); e.target.value = '' }} />
             </>}
-            {chatModels.length > 1 && <select className="model-pick" value={modelId || ''} title="选择本次回答使用的对话模型"
-              onChange={e => {
-                const v = Number(e.target.value)
-                setModelId(v || null)
-                localStorage.setItem('wrk_chat_model', v ? String(v) : '')
-              }}>
-              <option value="">默认模型</option>
-              {chatModels.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
-            </select>}
+            {chatModels.length > 1 && <Select className="model-pick" value={modelId || undefined} size="small"
+              popupMatchSelectWidth={false} placeholder="默认模型" title="选择本次回答使用的对话模型"
+              options={[
+                { value: 0, label: '默认模型' },
+                ...chatModels.map(m => ({ value: m.id, label: m.name }))
+              ]}
+              onChange={v => {
+                const n = Number(v) || 0
+                setModelId(n || null)
+                localStorage.setItem('wrk_chat_model', n ? String(n) : '')
+              }} />}
             <button className="send-btn" onClick={() => {
               if (busy) { chat.aborters[chat.currentId]?.abort(); return }
               void send()

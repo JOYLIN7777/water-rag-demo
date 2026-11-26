@@ -6,6 +6,9 @@ export interface CurrentUser {
   tenant: string
   admin?: boolean
   anonymous?: boolean
+  gender?: string
+  phone?: string
+  avatar?: string
 }
 
 export interface MenuItem {
