@@ -226,11 +226,15 @@
 .error-bar{display:none}
 .error-bar.show{display:block}
   /* 待发送问题队列：显示在输入框上方 */
-  .queue-list{margin:0 0 8px;padding:9px 12px;border:1px solid #dbe5ff;border-radius:10px;background:#f7faff}
-  .queue-head{font-size:11px;color:var(--primary);font-weight:600;margin-bottom:6px}
-  .queue-item{display:flex;align-items:center;gap:8px;padding:4px 0;font-size:12px;color:var(--ink-2)}
-  .queue-no{flex:0 0 18px;height:18px;line-height:18px;text-align:center;border-radius:5px;background:var(--primary);
-    color:#fff;font-size:10px;font-weight:600}
-  .queue-text{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  .queue-del{border:0;background:transparent;color:var(--muted);font-size:15px;line-height:1;cursor:pointer;padding:0 3px}
-  .queue-del:hover{color:#e0245e}
+  /* 待发送问题：跟引用片段一样的行内小胶囊，点一下撤回输入框 */
+  .queue-bar{display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin:0 0 7px;padding:5px 9px}
+  .queue-label{font-size:11px;color:var(--muted);white-space:nowrap}
+  .queue-chip{display:inline-flex;align-items:center;gap:6px;max-width:320px;
+    border:1px solid #dbe5ff;background:#f7faff;color:var(--ink-2);border-radius:7px;
+    padding:4px 8px;font-size:11.5px;cursor:pointer;transition:all .15s}
+  .queue-chip:hover{background:var(--primary-soft);border-color:#b9cbff;color:#25469b}
+  .queue-no{flex:0 0 17px;height:17px;line-height:17px;text-align:center;border-radius:5px;
+    background:var(--primary);color:#fff;font-size:10px;font-weight:600}
+  .queue-text{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .queue-undo{color:var(--muted);font-size:12px}
+  .queue-chip:hover .queue-undo{color:#25469b}
