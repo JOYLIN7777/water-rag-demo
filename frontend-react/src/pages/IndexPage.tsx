@@ -275,9 +275,12 @@ export default function IndexPage() {
             ) : (
               <div className="msg-group ai" key={i}>
                 <div className={'ai-card' + (m.streaming ? ' streaming' : '')}>
-                  {!m.streaming && <div className="ai-card-head">
+                  {/* 头部从提问发出起就显示： badge/助手名/时间/运行中状态；
+                      token 消耗要等 done 事件才有值，所以它自然在回答结束后出现。 */}
+                  <div className="ai-card-head">
                     <span className="ai-badge">水</span><span className="ai-card-name">水利知识库助手</span>
                     {m.branch && <span className="branch-chip">分支</span>}
+                    {m.streaming && <span className="ai-state" style={{ color: 'var(--primary)' }}>生成中…</span>}
                     <span className="ai-time">{tsLocal(m.ts)}</span>
                     <span className="ai-card-actions">
                       {m.usage && <span className="ai-usage" title={usageTip(m.usage)}>{usageInner(m.usage)}</span>}
@@ -285,7 +288,7 @@ export default function IndexPage() {
                       <button className="icon-btn" title="复制回答到剪贴板"
                         onClick={() => { void navigator.clipboard.writeText(m.content); message.success('回答已复制') }}>复制</button>
                     </span>
-                  </div>}
+                  </div>
                   <div className="ai-card-body" dangerouslySetInnerHTML={{ __html: renderMarkdown(m.content) + (m.streaming ? '<span class="cursor"></span>' : '') }} />
                   {!m.streaming && <div className="cite-zone">
                     {!!m.sources?.length && <>
