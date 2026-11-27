@@ -43,9 +43,10 @@ export default function AdminLayout() {
   useEffect(() => { void loadResets() /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [auth.loaded])
 
   const isPending = (r: ResetRow) => r.status === 'PENDING'
-  /** 已过期（重置码作废）的不再列出，否则列表越用越长 */
-  const visible = pending.filter(r => isPending(r) || !(r.expiresAt && r.expiresAt <= Date.now()))
-  const pendingCount = visible.filter(isPending).length
+  // 待办只看 PENDING；历史保留全部已处理记录（含过期/驳回），过期也是历史的一部分
+  const pendingList = pending.filter(isPending)
+  const historyList = pending.filter(r => !isPending(r))
+  const pendingCount = pendingList.length
 
   /** 账号的中文显示名：有显示名就写「显示名（账号）」，只有账号时才退回账号 */
   function userLabel(username: string, displayName?: string) {
@@ -114,10 +115,10 @@ export default function AdminLayout() {
           <button className={msgTab === 'todo' ? 'on' : ''} onClick={() => setMsgTab('todo')}>待办（{pendingCount}）</button>
           <button className={msgTab === 'history' ? 'on' : ''} onClick={() => setMsgTab('history')}>历史记录</button>
         </div>
-        <div className="form-note">{msgTab === 'todo' ? '待办都在这里，处理完就会消失。' : '已处理、已发码或已过期的申请记录。'}</div>
-        {(msgTab === 'todo' ? visible.filter(isPending) : visible.filter(r => !isPending(r))).length === 0
+        <div className="msg-list-scroll">
+        {(msgTab === 'todo' ? pendingList : historyList).length === 0
           ? <div className="empty-inline">{msgTab === 'todo' ? '暂无待办' : '暂无历史记录'}</div>
-          : (msgTab === 'todo' ? visible.filter(isPending) : visible.filter(r => !isPending(r))).map(r => {
+          : (msgTab === 'todo' ? pendingList : historyList).map(r => {
             const isPend = isPending(r)
             return <div className="msg-row" key={r.id}>
               <div className="msg-main">
@@ -126,10 +127,16 @@ export default function AdminLayout() {
                   {tsLocal(r.requestedAt)} · 来源 {r.requestIp || '—'} ·{' '}
                   {isPend
                     ? <span className="tag warn">待审批</span>
-                    : <>
-                      <span className="tag info">已发码 · 待使用</span>
-                      {r.expiresAt ? ` · ${tsLocal(r.expiresAt)} 前有效` : ''}
-                    </>}
+                    : r.status === 'REJECTED'
+                      ? <span className="tag err">已驳回</span>
+                      : r.status === 'USED'
+                        ? <span className="tag ok">已使用</span>
+                        : r.expiresAt && r.expiresAt <= Date.now()
+                          ? <span className="tag off">已过期</span>
+                          : <>
+                            <span className="tag info">已发码 · 待使用</span>
+                            {r.expiresAt ? ` · ${tsLocal(r.expiresAt)} 前有效` : ''}
+                          </>}
                 </div>
               </div>
               <div className="msg-ops">
@@ -142,6 +149,7 @@ export default function AdminLayout() {
               </div>
             </div>
           })}
+        </div>
       </WbModal>
 
       {/* 重置码只显示这一次，关掉就再也看不到 */}

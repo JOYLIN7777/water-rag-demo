@@ -97,7 +97,7 @@ public class PasswordResetService {
         try {
             jdbc.query("SELECT id,username,status,attempts,request_ip,requested_at,approved_by,approved_at,"
                     + "expires_at,used_at FROM password_reset_request "
-                    + "WHERE status IN ('PENDING','APPROVED') "
+                    + "WHERE status IN ('PENDING','APPROVED','REJECTED','USED') "
                     + "ORDER BY CASE status WHEN 'PENDING' THEN 0 ELSE 1 END, requested_at DESC", rs -> {
                 Map<String, Object> m = new LinkedHashMap<>();
                 m.put("id", rs.getLong("id"));

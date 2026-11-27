@@ -163,7 +163,7 @@ export default function Shell({ children }: { children: React.ReactNode }) {
     <div className="layout" id="sidebarHost">
       {upload && <div className={`upload-float ${upload.type}`}>
         <div className="upload-float-body">{upload.text}</div>
-        {!upload.running && <button className="upload-float-close" title="关闭" onClick={clearUpload}>×</button>}
+        <button className="upload-float-close" title="关闭提示" onClick={clearUpload}>×</button>
       </div>}
       <aside className={inAdmin ? 'sidebar admin-sidebar' : 'sidebar'}>
         <div className="brand">

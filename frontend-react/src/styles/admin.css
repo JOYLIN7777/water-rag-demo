@@ -449,3 +449,6 @@
   .msg-tabs button{border:0;background:transparent;padding:7px 12px;font-size:12.5px;color:var(--muted);
     cursor:pointer;border-bottom:2px solid transparent}
   .msg-tabs button.on{color:var(--primary);font-weight:600;border-bottom-color:var(--primary)}
+  .tag.err{background:#fff0f2;color:#c74457}
+  .tag.off{background:#f2f4f7;color:#8792a3}
+  .msg-list-scroll{max-height:420px;overflow-y:auto;padding-right:6px}
