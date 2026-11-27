@@ -481,6 +481,3 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,te
   text-decoration:none;border:1px solid transparent}
 .perm-denied-primary{background:var(--primary,#2f6bff);color:#fff}
 .perm-denied-secondary{background:#fff;border-color:var(--line,#e4e9f2);color:var(--ink-2,#475467)}
-.sidebar .session-copy{border:0;background:transparent;color:#8fa0c0;font-size:13px;opacity:.42;padding:0 2px;line-height:1;flex:0 0 auto;transition:all .15s}
-.sidebar .session-item:hover .session-copy{opacity:1}
-.sidebar .session-copy:hover{color:#7cc6ff}

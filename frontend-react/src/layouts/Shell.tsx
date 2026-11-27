@@ -1,7 +1,7 @@
 /** 全站侧栏：DOM/class 与旧版 renderSidebar 1:1 对齐 */
 import { useEffect, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { Modal, message } from 'antd'
+import { Modal } from 'antd'
 import { useAuthStore } from '@/store/auth'
 import { useChatStore } from '@/store/chat'
 import { useTaskStore } from '@/store/task'
@@ -221,13 +221,6 @@ export default function Shell({ children }: { children: React.ReactNode }) {
                   data-sid={s.id} title={s.title || ''} onClick={() => pickSession(s.id)}>
                   <span className="session-name">{s.title || ('会话 ' + short)}</span>
                   <span className="session-time">{fmtTime(s.updatedAt)}</span>
-                  <button className="session-copy" type="button" title="复制会话ID"
-                    onClick={e => {
-                      e.stopPropagation()
-                      void navigator.clipboard.writeText(s.id).then(() => message.success('会话ID已复制')).catch(() => {
-                        window.prompt('复制会话ID：', s.id)
-                      })
-                    }}>⧉</button>
                   <button className="session-delete" type="button" title="删除会话"
                     onClick={e => { e.stopPropagation(); removeSession(s.id) }}>×</button>
                 </div>
