@@ -170,6 +170,7 @@ export default function IndexPage() {
   const fileInput = useRef<HTMLInputElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const [force, setForce] = useState(0)   // 触发重渲染（流式增量）
+  const [flashLimit, setFlashLimit] = useState(false)
   const [initializing, setInitializing] = useState(true)  // 刷新时先不渲染欢迎页，避免闪一下
 
   /** 只有用户本来就贴着底部时才自动跟随；手动上滚看历史时绝不拉回来 */
@@ -379,6 +380,8 @@ export default function IndexPage() {
                 if (data.startsWith('{')) {
                   try {
                     const d = JSON.parse(data)
+                    // 模型异常/降级时没有真实回答，前置发出的引用片段不算数，清掉避免误导
+                    if (d?.degraded) ai.sources = []
                     if (d?.usage) ai.usage = { durationMs: d.durationMs || 0, ...d.usage }
                     if (d?.nodes && next.length >= 2) {
                       next[next.length - 2].nodeId = d.nodes.questionId
@@ -611,9 +614,17 @@ export default function IndexPage() {
             </span>)}
           </div>}
           <textarea id="question" rows={1} placeholder="输入你的问题，Enter 发送，Shift+Enter 换行"
-            className={q.length > 2000 ? 'over-limit' : ''} value={q} ref={inputRef}
+            className={flashLimit ? 'over-limit' : ''} value={q} ref={inputRef}
             onChange={e => {
-              setQ(e.target.value)
+              const raw = e.target.value
+              // 超过上限主动截断，并短暂闪一下红提示（闪完恢复，不常驻红字）
+              if (raw.length > 2000) {
+                setQ(raw.slice(0, 2000))
+                setFlashLimit(true)
+                setTimeout(() => setFlashLimit(false), 600)
+              } else {
+                setQ(raw)
+              }
               // 按内容高度自适应，长问题完整显示（最多约 8 行）
               const el = e.target
               el.style.height = 'auto'

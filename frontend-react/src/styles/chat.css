@@ -262,8 +262,8 @@
   .ask-copy{border:0;background:transparent;color:#94a2b8;font-size:11px;cursor:pointer;padding:1px 4px}
   .ask-copy:hover{color:var(--primary)}
   /* 提问超长：字体变红并闪烁一次提示 */
-  @keyframes questionOverLimit{0%,100%{color:var(--ink)}25%,75%{color:#e5484d}}
-  #question.over-limit{color:#e5484d;animation:questionOverLimit .5s ease-in-out 2}
+  @keyframes questionOverLimit{0%,100%{color:var(--ink)}30%,70%{color:#e5484d}}
+  #question.over-limit{animation:questionOverLimit .6s ease-in-out 1}
   /* 右侧提问快捷跳转条：默认最小化，hover展开 */
   .ask-jump{position:fixed;right:14px;top:50%;transform:translateY(-50%);z-index:60;
     max-height:70vh;display:flex;flex-direction:column;align-items:flex-end;
