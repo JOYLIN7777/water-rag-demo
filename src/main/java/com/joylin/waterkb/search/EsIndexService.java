@@ -1,5 +1,9 @@
 package com.joylin.waterkb.search;
 
+import com.joylin.waterkb.security.Permission;
+import com.joylin.waterkb.security.RolePermissions;
+import com.joylin.waterkb.security.UserContext;
+
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.joylin.waterkb.config.EsProperties;
@@ -45,7 +49,11 @@ public class EsIndexService {
     private final RestClient client;
     private final DocVisibilityService visibility;
 
-    public EsIndexService(EsProperties props, ObjectMapper mapper, DocVisibilityService visibility) {
+    private final RolePermissions rolePermissions;
+
+    public EsIndexService(EsProperties props, ObjectMapper mapper, DocVisibilityService visibility,
+                          RolePermissions rolePermissions) {
+        this.rolePermissions = rolePermissions;
         this.props = props;
         this.mapper = mapper;
         this.visibility = visibility;
@@ -241,7 +249,7 @@ public class EsIndexService {
         // fileName 本身就是 keyword 类型，没有 .keyword 子字段
         String scope = visibility.deleteScopeFilter();
         if (tenantId != null && !tenantId.isBlank()
-                && com.joylin.waterkb.security.UserContext.get().hasGroup("admin")) {
+                && rolePermissions.permissionsOf(UserContext.get()).contains(Permission.ADMIN_ACCESS)) {
             scope = "{\"term\":{\"tenantId\":" + quote(tenantId) + "}}";
         }
         String dsl = "{\"query\":{\"bool\":{\"must\":["

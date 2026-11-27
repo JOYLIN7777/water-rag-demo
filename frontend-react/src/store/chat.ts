@@ -75,24 +75,12 @@ export const useChatStore = create<ChatState>((set, get) => ({
   },
 
   /** 首屏：一次拉会话清单 + 各会话消息，服务端为唯一数据源 */
+  /** 首屏：只拉会话清单，消息交给 switchSession 按需加载当前会话 */
   bootstrap: async () => {
     try {
-      const data = await chatApi.bootstrap(30)
-      if (!data) return
-      const bySession: Record<string, ChatMessageExt[]> = {}
-      for (const [sid, list] of Object.entries(data.histories || {})) {
-        bySession[sid] = (list || []).map((m, i) => ({
-          role: m.role === 'assistant' ? 'assistant' : 'user',
-          content: m.content || '', sources: m.sources,
-          usage: m.usage || undefined, nodeId: m.id, parentId: m.parentId,
-          branch: m.branch, branchSeal: m.branchSeal,
-          ts: normalizeTs(m.ts), id: `${sid}-${i}`
-        }))
-      }
-      const cur = get().currentId
-      set({ sessions: Array.isArray(data.sessions) ? data.sessions : [],
-            bySession, messages: cur ? (bySession[cur] || []) : [] })
-    } catch { /* 保留当前内存态，不回退本地缓存 */ }
+      const list = await chatApi.bootstrap()
+      if (Array.isArray(list)) set({ sessions: list })
+    } catch { /* 保留当前内存态 */ }
   },
 
   syncSessions: async () => {

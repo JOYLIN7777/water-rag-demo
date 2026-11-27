@@ -1,5 +1,8 @@
 package com.joylin.waterkb.search;
 
+import com.joylin.waterkb.security.Permission;
+import com.joylin.waterkb.security.RolePermissions;
+
 import com.joylin.waterkb.security.OrgStore;
 import com.joylin.waterkb.security.UserContext;
 import org.springframework.stereotype.Service;
@@ -34,9 +37,16 @@ public class DocVisibilityService {
 
     private final OrgStore orgStore;
 
-    public DocVisibilityService(OrgStore orgStore) {
+    private final RolePermissions rolePermissions;
+
+    @org.springframework.beans.factory.annotation.Autowired
+    public DocVisibilityService(OrgStore orgStore, RolePermissions rolePermissions) {
         this.orgStore = orgStore;
+        this.rolePermissions = rolePermissions;
     }
+
+    /** 单测用：无权限服务时按无 admin 权限处理 */
+    public DocVisibilityService(OrgStore orgStore) { this(orgStore, new RolePermissions()); }
 
     /**
      * 当前用户的可见范围 ES query 对象（可直接放进 bool.filter / bool.must）。
@@ -44,7 +54,7 @@ public class DocVisibilityService {
      */
     public String visibilityFilter() {
         UserContext.CurrentUser user = UserContext.get();
-        if (user.hasGroup("admin")) {
+        if (rolePermissions.permissionsOf(user).contains(Permission.ADMIN_ACCESS)) {
             return "{\"match_all\":{}}";
         }
         String org = user.tenantId() == null || user.tenantId().isBlank()
@@ -77,7 +87,7 @@ public class DocVisibilityService {
      */
     public String deleteScopeFilter() {
         UserContext.CurrentUser user = UserContext.get();
-        if (user.hasGroup("admin")) {
+        if (rolePermissions.permissionsOf(user).contains(Permission.ADMIN_ACCESS)) {
             return "{\"match_all\":{}}";
         }
         String org = user.tenantId() == null || user.tenantId().isBlank()

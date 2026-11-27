@@ -25,7 +25,13 @@ export default function SettingsPage() {
   const [params] = useSearchParams()
   const backToProfile = params.get('from') === 'profile'
   const auth = useAuthStore()
-  const visible = SETTINGS.filter(s => auth.has(s.perm))
+  // 设置项从服务端菜单取：名称、顺序、是否可见全由后台权限配置决定；SETTINGS 只作兜底
+  const serverItems = auth.menus.filter(m => m.allowed && ['/search.html', '/tree.html'].includes(String(m.href)))
+  const visible = serverItems.length
+    ? serverItems.map(m => ({ key: String(m.href).replace(/^\//, '').replace('.html', ''),
+        href: String(m.href), label: m.name, icon: m.icon || 'doc',
+        desc: SETTINGS.find(s => s.href === String(m.href))?.desc || '' }))
+    : SETTINGS.filter(s => auth.has(s.perm))
   const [prefs, setPrefs] = useState<Record<string, boolean>>(() => {
     const out: Record<string, boolean> = {}
     for (const p of PREFS) out[p.key] = localStorage.getItem(p.key) !== '0'

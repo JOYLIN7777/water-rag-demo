@@ -23,7 +23,14 @@ function WithShell({ children, perm }: { children: React.ReactNode; perm?: strin
     if (!auth.loaded) void auth.loadPermissions()
   }, [auth, navigate])
   if (!isLoggedIn()) return null
-  if (perm && auth.loaded && !auth.has(perm)) return <Navigate to="/profile.html" replace />
+  // 服务端菜单是权威：菜单里标记 allowed=false 的页面一律拒绝；
+  // perm 只在权限接口未返回时兜底，避免权限视图抖动造成误拦。
+  if (auth.loaded) {
+    const here = '/' + location.pathname.split('/').pop()
+    const menu = auth.menus.find(m => m.href === here)
+    if (menu && !menu.allowed) return <Navigate to="/profile.html" replace />
+    if (!menu && auth.menus.length && perm && !auth.has(perm)) return <Navigate to="/profile.html" replace />
+  }
   return <Shell>{children}</Shell>
 }
 

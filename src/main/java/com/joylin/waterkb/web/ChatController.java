@@ -217,26 +217,33 @@ public class ChatController {
     // 现在清单落 PostgreSQL，Redis 只负责消息内容：清缓存后清单还在、点开还能读回历史。
 
     /**
-     * 首屏引导：一次返回会话清单 + 每个会话最近的历史消息。
-     * 前端不再依赖 localStorage 预热，服务端是唯一数据源；避免 N+1 请求。
+     * 首屏引导：只返回会话清单。消息由 /api/chat/history 按需拉当前会话，
+     * 不再一次把全部会话的历史灌进前端（实测 17 会话 × 30 条 = 248KB，
+     * 其中 16 个会话的消息根本用不到，还和随后的 history 请求重复）。
      */
     @GetMapping("/bootstrap")
-    public Map<String, Object> bootstrap(@RequestParam(defaultValue = "30") int messagesPerSession) {
-        int cap = Math.max(1, Math.min(messagesPerSession, 200));
-        List<Map<String, Object>> sessions = sessionStore.list();
-        Map<String, Object> result = new LinkedHashMap<>();
-        result.put("sessions", sessions);
-        Map<String, Object> histories = new LinkedHashMap<>();
-        for (Map<String, Object> s : sessions) {
-            String sid = String.valueOf(s.getOrDefault("id", ""));
-            if (sid.isEmpty()) continue;
-            List<Map<String, Object>> all = treeStore.historyList(sid);
-            // historyList 按时间正序，取最近 cap 条
-            if (all.size() > cap) all = new ArrayList<>(all.subList(all.size() - cap, all.size()));
-            histories.put(sid, all);
+    public List<Map<String, Object>> bootstrap() {
+        return sessionStore.list();
+    }
+
+    /**
+     * 提问框可选模型：所有有 chat:use 的角色都能看，内容由管理员在模型设置里配置。
+     * 只返回 id/名称/模型标识，绝不带 base-url 与 api-key 等敏感信息。
+     */
+    @GetMapping("/models")
+    public java.util.List<java.util.Map<String, Object>> chatModels() {
+        java.util.List<java.util.Map<String, Object>> out = new ArrayList<>();
+        for (var c : models.findAll()) {
+            if (!"CHAT".equalsIgnoreCase(c.getType()) || !c.isActive() || !c.isEnabled()) continue;
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("id", c.getId());
+            m.put("name", c.getName());
+            m.put("model", c.getModel());
+            m.put("active", c.isActive());
+            m.put("isDefault", c.isDefault());
+            out.add(m);
         }
-        result.put("histories", histories);
-        return result;
+        return out;
     }
 
     /** 当前账号的全部会话，按最近更新倒序 */

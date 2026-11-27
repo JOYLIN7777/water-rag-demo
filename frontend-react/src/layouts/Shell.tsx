@@ -4,6 +4,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { Modal, message } from 'antd'
 import { useAuthStore } from '@/store/auth'
 import { useChatStore } from '@/store/chat'
+import { useTaskStore } from '@/store/task'
 import { isLoggedIn, logout, getUser } from '@/api/auth'
 import { http } from '@/api/http'
 import { Icon } from '@/components/Icon'
@@ -147,8 +148,15 @@ export default function Shell({ children }: { children: React.ReactNode }) {
         m.href !== 'admin.html' && m.href !== 'profile.html')
     })).filter(g => g.items.length)
 
+  const upload = useTaskStore(s => s.upload)
+  const clearUpload = useTaskStore(s => s.clearUpload)
+
   return (
     <div className="layout" id="sidebarHost">
+      {upload && <div className={`upload-float ${upload.type}`}>
+        <div className="upload-float-body">{upload.text}</div>
+        {!upload.running && <button className="upload-float-close" title="关闭" onClick={clearUpload}>×</button>}
+      </div>}
       <aside className={inAdmin ? 'sidebar admin-sidebar' : 'sidebar'}>
         <div className="brand">
           <div className="brand-mark has-logo">

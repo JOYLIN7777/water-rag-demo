@@ -198,9 +198,9 @@ export default function IndexPage() {
     void (async () => {
       await chat.bootstrap()
       await chat.loadSuggestions()
-      void http.get<Array<{ id: number; name: string; model: string; type: string; enabled?: boolean; active?: boolean }>>('/api/models')
+      // 所有角色都能拿可选模型列表；可选哪些由管理员在模型设置里配置
+      void http.get<Array<{ id: number; name: string; model: string; active?: boolean; isDefault?: boolean }>>('/api/chat/models')
         .then(list => setChatModels((Array.isArray(list) ? list : [])
-          .filter(m => m.type === 'CHAT' && m.active === true && m.enabled !== false)
           .map(m => ({ id: m.id, name: m.name, model: m.model, active: m.active }))))
         .catch(() => setChatModels([]))
       void http.get<{ extensions: string[] }>('/api/docs/formats')
@@ -575,9 +575,10 @@ export default function IndexPage() {
             </>}
             <span className="model-pick-slot">
               <Select className="model-pick" value={modelId || undefined} size="small"
-                popupMatchSelectWidth={false} placeholder="默认模型" title="选择本次回答使用的对话模型"
-                disabled={chatModels.length <= 1}
-                style={{ visibility: chatModels.length > 1 ? 'visible' : 'hidden' }}
+                placement="topLeft" popupMatchSelectWidth={false}
+                popupClassName="model-pick-dropdown"
+                placeholder="默认模型" title="选择本次回答使用的对话模型"
+                disabled={chatModels.length === 0}
                 options={[
                   { value: 0, label: '默认模型' },
                   ...chatModels.map(m => ({ value: m.id, label: m.name }))

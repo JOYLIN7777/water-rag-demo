@@ -263,7 +263,7 @@ export default function ProfilePage() {
             <button className="btn btn-sm btn-primary" type="button"
               onClick={() => { setProfileErr(''); setProfileOpen(true) }}>编辑资料</button></div>
           <div className="info-grid">
-            <div className="info-cell"><div className="k">性别</div><div className="v">{gender || '未设置'}</div></div>
+            <div className="info-cell"><div className="k">性别</div><div className="v">{gender || '不公开'}</div></div>
             <div className="info-cell"><div className="k">手机号</div><div className="v">{phone || '未设置'}</div></div>
             <div className="info-cell"><div className="k">头像</div><div className="v">{avatarInput.startsWith('data:image/') ? '已上传自定义头像' : (preset ? '预设头像 ' + preset : '默认首字母')}</div></div>
           </div>

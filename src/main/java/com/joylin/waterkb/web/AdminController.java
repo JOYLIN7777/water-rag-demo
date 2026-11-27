@@ -244,7 +244,7 @@ public class AdminController {
             return Map.of("message", "账号已更新", "username", name);
         }
         // 非 admin 调用者不得自行提权进 admin 组
-        boolean callerAdmin = UserContext.get().hasGroup("admin");
+        boolean callerAdmin = rolePermissions.permissionsOf(UserContext.get()).contains(Permission.ADMIN_ACCESS);
         if (!callerAdmin && groups.contains("admin")) {
             throw new IllegalArgumentException("只有管理员可以授予管理员角色");
         }

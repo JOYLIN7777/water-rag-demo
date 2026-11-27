@@ -80,7 +80,7 @@ public class UsageController {
     @GetMapping("/summary")
     public Map<String, Object> summary() {
         // admin 看全库；有后台用量页权限的看本部门；普通用户只看自己
-        boolean admin = UserContext.get().hasGroup("admin");
+        boolean admin = rolePermissions.permissionsOf(UserContext.get()).contains(Permission.ADMIN_ACCESS);
         boolean dept = rolePermissions.permissionsOf(UserContext.get()).contains("usage:read");
         Map<String, Object> local = admin ? recorder.summary(null)
                 : dept ? recorder.summary(UserContext.get().tenantId())
@@ -137,7 +137,7 @@ public class UsageController {
     @GetMapping("/records")
     public Map<String, Object> records(@RequestParam(defaultValue = "today") String scope,
                                        @RequestParam(defaultValue = "200") int limit) {
-        boolean admin = UserContext.get().hasGroup("admin");
+        boolean admin = rolePermissions.permissionsOf(UserContext.get()).contains(Permission.ADMIN_ACCESS);
         boolean dept = rolePermissions.permissionsOf(UserContext.get()).contains("usage:read");
         List<Map<String, Object>> rows = admin ? recorder.records(scope, limit, null)
                 : dept ? recorder.records(scope, limit, UserContext.get().tenantId())

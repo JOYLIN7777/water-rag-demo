@@ -8,6 +8,7 @@ import { http } from '@/api/http'
 import { uploadDocument } from '@/api'
 import { getUser } from '@/api/auth'
 import { useAuthStore } from '@/store/auth'
+import { useTaskStore } from '@/store/task'
 import '@/styles/manage.css'
 import TopbarNav from '@/components/TopbarNav'
 import AdminEntry from '@/components/AdminEntry'
@@ -44,17 +45,15 @@ export default function ManagePage() {
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
   const [jump, setJump] = useState('')
-  const [msg, setMsg] = useState<{ type: string; text: string } | null>(null)
+  const setUpload = useTaskStore(s => s.setUpload)
   const [dragging, setDragging] = useState(false)
   const [chunkFile, setChunkFile] = useState<string | null>(null)
   const [scopeOpen, setScopeOpen] = useState(false)
   const [pendingFiles, setPendingFiles] = useState<File[]>([])
 
   /** 进度常驻右下角；单项失败不中断整批，错误也留在进度里，全部完成才关闭 */
-  const [uploading, setUploading] = useState(false)
   function showMsg(type: string, text: string) {
-    if (type === 'ok' || type === 'err') { setMsg({ type, text }); return }
-    setMsg({ type, text })
+    setUpload({ type: (type || 'info') as 'info' | 'ok' | 'err', text, running: type === '' })
   }
 
   async function loadDocs() {
@@ -149,7 +148,6 @@ export default function ManagePage() {
   async function doUpload(list: File[], subtree: boolean) {
     setScopeOpen(false)
     setPendingFiles([])
-    setUploading(true)
     let ok = 0, fail = 0, totalChunks = 0
     for (let i = 0; i < list.length; i++) {
       const f = list[i]
@@ -163,7 +161,6 @@ export default function ManagePage() {
       } catch (e: any) { fail++; showMsg('err', `[${i + 1}/${list.length}] ✗ ${f.name}：${e?.message || ''}`) }
     }
     showMsg(fail ? 'err' : 'ok', `完成：成功 ${ok} 份 / 失败 ${fail} 份，共 ${totalChunks} 个切片，已可提问`)
-    setUploading(false)
     await loadDocs()
   }
 
@@ -226,10 +223,7 @@ export default function ManagePage() {
           <input ref={folderInput} type="file" multiple hidden {...{ webkitdirectory: '' }} onChange={e => { pickFiles(e.target.files); e.target.value = '' }} />
         </div>}
 
-        {msg && <div className={`upload-float ${msg.type}`}>
-          <div className="upload-float-body">{msg.text}</div>
-          {!uploading && <button className="upload-float-close" title="关闭" onClick={() => setMsg(null)}>×</button>}
-        </div>}
+
 
         <div className="toolbar">
           <input className="search" type="text" placeholder="按文件名过滤…" value={search}

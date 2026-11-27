@@ -247,3 +247,6 @@
   .msg-group.msg-located .user-bubble{box-shadow:0 0 0 2px var(--primary),0 4px 14px rgba(59,110,245,.2)}
   .msg-group.msg-located{animation:msgFlash 1.6s ease-out}
   @keyframes msgFlash{0%,60%{background:rgba(59,110,245,.10)}100%{background:transparent}}
+  /* 模型下拉：左对齐触发器，不溢出容器右边界 */
+  .model-pick-dropdown .ant-select-item-option{font-size:12px;min-width:210px}
+  .model-pick-dropdown.ant-select-dropdown{padding:4px}

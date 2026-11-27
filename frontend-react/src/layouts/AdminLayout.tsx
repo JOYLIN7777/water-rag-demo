@@ -28,7 +28,9 @@ export default function AdminLayout() {
   const [code, setCode] = useState<string | null>(null)
 
   const key = location.pathname.split('/').pop()?.replace('.html', '') || 'users'
-  const title = TITLES[key] || '用户管理'
+  // 面板标题优先取服务端菜单名，TITLES 只在菜单未返回时兜底
+  const menuTitle = auth.menus.find(m => String(m.href).replace(/^\//, '').replace('.html', '') === key)?.name
+  const title = menuTitle || TITLES[key] || '用户管理'
 
   const loadResets = useCallback(async () => {
     if (!auth.has('admin:access')) { setPending([]); return }

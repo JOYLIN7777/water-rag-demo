@@ -96,18 +96,10 @@ export const authApi = {
   changePassword: (body: unknown) => http.post('/api/auth/change-password', body)
 }
 
-export interface ChatBootstrap {
-  sessions: import('@/types').SessionItem[]
-  histories: Record<string, Array<{
-    role: string; content: string; sources?: unknown[]; usage?: Record<string, any>
-    id?: string; parentId?: string; ts?: string; branch?: boolean; branchSeal?: boolean
-  }>>
-}
 
 export const chatApi = {
-  /** 首屏一次拉全量：会话清单 + 各会话消息，服务端是唯一数据源 */
-  bootstrap: (messagesPerSession = 30) =>
-    http.get<ChatBootstrap>(`/api/chat/bootstrap?messagesPerSession=${messagesPerSession}`),
+  /** 首屏拉会话清单（消息由 history 按需加载，避免一次灌入全部历史） */
+  bootstrap: () => http.get<import('@/types').SessionItem[]>('/api/chat/bootstrap'),
   sessions: () => http.get<import('@/types').SessionItem[]>('/api/chat/sessions'),
   history: (id: string) => http.get<Array<{ role: string; content: string; sources?: unknown[]; usage?: Record<string, any>; id?: string; parentId?: string }>>(
     `/api/chat/history?sessionId=${encodeURIComponent(id)}`),
