@@ -5,6 +5,7 @@ import org.junit.jupiter.api.Test;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
+import com.joylin.waterkb.mapper.UserStore;
 
 /** 后台账号维护的纯内存单测：新增、编辑、禁用、重置密码、删除。 */
 class UserStoreCrudTest {

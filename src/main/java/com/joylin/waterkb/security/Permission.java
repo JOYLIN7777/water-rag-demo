@@ -1,4 +1,5 @@
 package com.joylin.waterkb.security;
+import com.joylin.waterkb.service.RolePermissions;
 
 /**
  * 企业级 RBAC 权限码。

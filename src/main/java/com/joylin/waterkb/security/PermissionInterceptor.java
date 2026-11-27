@@ -3,7 +3,7 @@ package com.joylin.waterkb.security;
 import static com.joylin.waterkb.common.ErrorCode.FORBIDDEN;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.joylin.waterkb.audit.AuditService;
+import com.joylin.waterkb.service.AuditService;
 import jakarta.servlet.DispatcherType;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -14,6 +14,7 @@ import org.springframework.web.servlet.HandlerInterceptor;
 
 import java.io.IOException;
 import java.util.Map;
+import com.joylin.waterkb.service.RolePermissions;
 
 /**
  * 权限拦截器：在 Controller 方法执行前校验 {@link RequirePermission} 声明的权限码。

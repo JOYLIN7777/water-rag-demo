@@ -7,6 +7,7 @@ import java.util.Base64;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
+import com.joylin.waterkb.service.JwtService;
 
 /** JWT 签发/验签单测：合法 token、篡改签名、过期、缺 sub 四条路径。 */
 class JwtServiceTest {

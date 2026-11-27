@@ -7,6 +7,7 @@ import org.junit.jupiter.api.Test;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
+import com.joylin.waterkb.service.ToolPermissionRegistry;
 
 /** 工具权限：统一走 tool:water_query 权限码，默认拒绝、授权角色放行、管理员全权限放行。 */
 class ToolPermissionRegistryTest {

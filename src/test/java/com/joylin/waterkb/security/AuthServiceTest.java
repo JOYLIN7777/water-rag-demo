@@ -5,6 +5,8 @@ import org.junit.jupiter.api.Test;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
+import com.joylin.waterkb.mapper.UserStore;
+import com.joylin.waterkb.service.JwtService;
 
 /** 登录核心单测：密码哈希不可逆且带盐、校验正确/错误密码、用户库加载与认证。 */
 class AuthServiceTest {

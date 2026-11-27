@@ -1,7 +1,7 @@
 package com.joylin.waterkb.rag;
 
 import com.joylin.waterkb.config.RagProperties;
-import com.joylin.waterkb.web.dto.UploadResult;
+import com.joylin.waterkb.vo.UploadResult;
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
@@ -20,6 +20,8 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
+import com.joylin.waterkb.service.DocumentIngestService;
+import com.joylin.waterkb.service.ParagraphSplitter;
 
 /**
  * 多格式文档解析 + 入库链路测试。

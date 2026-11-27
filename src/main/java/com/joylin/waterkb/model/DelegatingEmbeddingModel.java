@@ -12,6 +12,7 @@ import org.springframework.context.annotation.Primary;
 import org.springframework.stereotype.Component;
 
 import java.util.Objects;
+import com.joylin.waterkb.service.ModelRegistry;
 
 /**
  * 可切换的 EmbeddingModel 代理。

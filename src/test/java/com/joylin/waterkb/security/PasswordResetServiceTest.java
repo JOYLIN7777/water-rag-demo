@@ -3,6 +3,8 @@ package com.joylin.waterkb.security;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.*;
+import com.joylin.waterkb.mapper.UserStore;
+import com.joylin.waterkb.service.PasswordResetService;
 
 /**
  * 忘记密码的参数校验单测：不连数据库，只验证"错在哪一步"的判定顺序。

@@ -4,7 +4,7 @@ import static com.joylin.waterkb.common.ErrorCode.UNAUTHORIZED;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.joylin.waterkb.audit.AuditService;
+import com.joylin.waterkb.service.AuditService;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -19,6 +19,8 @@ import org.springframework.web.filter.OncePerRequestFilter;
 import java.io.IOException;
 import java.util.Map;
 import java.util.Set;
+import com.joylin.waterkb.mapper.RefreshTokenStore;
+import com.joylin.waterkb.service.JwtService;
 
 /**
  * 认证入口（企业级登录 + OIDC 骨架）。

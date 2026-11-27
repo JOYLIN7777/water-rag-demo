@@ -14,6 +14,7 @@ import java.security.KeyFactory;
 import java.util.Base64;
 
 import static org.junit.jupiter.api.Assertions.*;
+import com.joylin.waterkb.service.LoginCryptoService;
 
 /** 密码传输加密：前端公钥加密 → 后端私钥解密，密文损坏不泄露细节。 */
 class LoginCryptoServiceTest {

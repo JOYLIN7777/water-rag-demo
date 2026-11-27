@@ -11,6 +11,9 @@ import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
 import java.util.Set;
+import com.joylin.waterkb.security.JwtAuthFilter;
+import com.joylin.waterkb.service.AuditService;
+import com.joylin.waterkb.service.WaterInfoTool;
 
 /**
  * 审计拦截器：所有 /api/** 请求自动落审计，无需在各 Controller 逐一埋点。

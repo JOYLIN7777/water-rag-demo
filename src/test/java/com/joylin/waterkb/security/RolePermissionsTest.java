@@ -7,6 +7,8 @@ import java.util.Map;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.*;
+import com.joylin.waterkb.service.PermissionCatalog;
+import com.joylin.waterkb.service.RolePermissions;
 
 /** 企业级 RBAC 权限判定单测：确保默认拒绝、admin 全权限、角色不可越权 */
 class RolePermissionsTest {
