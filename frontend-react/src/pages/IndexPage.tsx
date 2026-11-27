@@ -140,6 +140,7 @@ export default function IndexPage() {
   const [error, setError] = useState('')
   const [openCites, setOpenCites] = useState<Record<string, boolean>>({})
   const [uploadMsg, setUploadMsg] = useState<{ type: string; text: string } | null>(null)
+  const [uploading, setUploading] = useState(false)
   const [pickerOpen, setPickerOpen] = useState(false)
   const [pickerFiles, setPickerFiles] = useState<File[]>([])
   const [supportedExts, setSupportedExts] = useState<string[]>([])
@@ -238,10 +239,11 @@ export default function IndexPage() {
   /** 防同一问题在 1.5 秒内被 Enter/点击重复触发，产生多条同名会话 */
   const lastSendRef = useRef<{ q: string; at: number } | null>(null)
   /** 回答中又输入的问题排队（支持多条），等本轮结束后按顺序自动提交 */
-  const queuedRef = useRef<string[]>([])
-  const [queuedList, setQueuedList] = useState<string[]>([])
+  const queuedRef = useRef<Array<{ text: string; sid: string }>>([])
+  const [queuedList, setQueuedList] = useState<Array<{ text: string; sid: string }>>([])
   function enqueue(text: string) {
-    queuedRef.current = [...queuedRef.current, text]
+    // 记住排队时所在的会话：切到别的会话后，这条问题仍要回原会话发送
+    queuedRef.current = [...queuedRef.current, { text, sid: useChatStore.getState().currentId }]
     setQueuedList([...queuedRef.current])
   }
   function dequeueAt(idx: number) {
@@ -274,8 +276,10 @@ export default function IndexPage() {
   async function send(text?: string) {
     const query = (text ?? q).trim()
     // 页面刚挂载、初始化还没设 currentId 时先建空会话，避免消息挂到空 key 上被后续初始化冲掉
-    const ownerId = chat.currentId || chat.newSession()
-    if (!query || chat.busyIds.has(ownerId)) return
+    // 直接读 store 最新值：排队问题会在切回原会话后触发 send，不能用旧闭包里的 currentId
+    const state = useChatStore.getState()
+    const ownerId = state.currentId || state.newSession()
+    if (!query || useChatStore.getState().busyIds.has(ownerId)) return
     const now = Date.now()
     if (lastSendRef.current && lastSendRef.current.q === query && now - lastSendRef.current.at < 1500) return
     lastSendRef.current = { q: query, at: now }
@@ -302,50 +306,69 @@ export default function IndexPage() {
 
     let finished = false
     try {
-      // modelId 必须放进请求体：后端 @RequestBody ChatRequest 从 body 读，放 URL query 会被忽略
-      const r = await fetch('/api/chat/stream', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sessionId: ownerId, question: query, modelId: modelId || undefined }), signal: ac.signal
-      })
-      if (!r.ok) throw new Error('请求失败（HTTP ' + r.status + '）')
-      const reader = r.body!.getReader()
-      const dec = new TextDecoder()
-      let buf = ''
-      while (true) {
-        const { done, value } = await reader.read()
-        if (done) break
-        buf = (buf + dec.decode(value, { stream: true })).replace(/\r\n/g, '\n')
-        let p: number
-        while ((p = buf.indexOf('\n\n')) !== -1) {
-          const block = buf.slice(0, p); buf = buf.slice(p + 2)
-          let ev = 'message'; const dataLines: string[] = []
-          for (const line of block.split('\n')) {
-            if (line.startsWith('event:')) ev = line.slice(6).trim()
-            else if (line.startsWith('data:')) dataLines.push(line.slice(5).trim())
-          }
-          const data = dataLines.join('\n')
-          if (ev === 'sources') { try { ai.sources = JSON.parse(data) } catch { /* 忽略 */ } }
-          else if (ev === 'error') { ai.content = data; setError(data) }
-          else if (ev === 'message') ai.content += data
-          else if (ev === 'done') {
-            finished = true
-            if (data.startsWith('{')) {
-              try {
-                const d = JSON.parse(data)
-                if (d?.usage) ai.usage = { durationMs: d.durationMs || 0, ...d.usage }
-                if (d?.nodes && next.length >= 2) {
-                  next[next.length - 2].nodeId = d.nodes.questionId
-                  next[next.length - 1].nodeId = d.nodes.answerId
-                  next[next.length - 1].parentId = d.nodes.questionId
-                }
-              } catch { /* 兼容旧格式 */ }
-            }
-          }
+      // 网络中断后自动重试：后端每次从 question 重新生成，重试时清掉已收内容重来
+      const MAX_RETRY = 3
+      for (let attempt = 0; attempt <= MAX_RETRY && !finished; attempt++) {
+        if (attempt > 0) {
+          if (ac.signal.aborted) break
+          ai.content = ''
+          setError(`连接中断，正在重连（${attempt}/${MAX_RETRY}）…`)
+          // 等网络恢复再重连，最多等 15 秒
+          for (let w = 0; w < 30 && !navigator.onLine && !ac.signal.aborted; w++) await new Promise(r => setTimeout(r, 500))
+          await new Promise(r => setTimeout(r, 800))
         }
-        // 流式增量只重渲染，不重建整列 DOM（React 的 key 保证最小更新）
-        if (chat.currentId === ownerId) { setForce(x => x + 1); scrollBottom() }
-        if (finished) break
+        const r = await fetch('/api/chat/stream', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ sessionId: ownerId, question: query, modelId: modelId || undefined }), signal: ac.signal
+        })
+        if (!r.ok) throw new Error('请求失败（HTTP ' + r.status + '）')
+        const reader = r.body!.getReader()
+        const dec = new TextDecoder()
+        let buf = ''
+        let broken = false
+        try {
+          while (true) {
+            const { done, value } = await reader.read()
+            if (done) break
+            buf = (buf + dec.decode(value, { stream: true })).replace(/\r\n/g, '\n')
+            let p: number
+            while ((p = buf.indexOf('\n\n')) !== -1) {
+              const block = buf.slice(0, p); buf = buf.slice(p + 2)
+              let ev = 'message'; const dataLines: string[] = []
+              for (const line of block.split('\n')) {
+                if (line.startsWith('event:')) ev = line.slice(6).trim()
+                else if (line.startsWith('data:')) dataLines.push(line.slice(5).trim())
+              }
+              const data = dataLines.join('\n')
+              if (ev === 'sources') { try { ai.sources = JSON.parse(data) } catch { /* 忽略 */ } }
+              else if (ev === 'error') { ai.content = data; setError(data) }
+              else if (ev === 'message') ai.content += data
+              else if (ev === 'done') {
+                finished = true
+                if (data.startsWith('{')) {
+                  try {
+                    const d = JSON.parse(data)
+                    if (d?.usage) ai.usage = { durationMs: d.durationMs || 0, ...d.usage }
+                    if (d?.nodes && next.length >= 2) {
+                      next[next.length - 2].nodeId = d.nodes.questionId
+                      next[next.length - 1].nodeId = d.nodes.answerId
+                      next[next.length - 1].parentId = d.nodes.questionId
+                    }
+                  } catch { /* 兼容旧格式 */ }
+                }
+              }
+            }
+            if (chat.currentId === ownerId) { setForce(x => x + 1); scrollBottom() }
+            if (finished) break
+          }
+        } catch (err) {
+          // 网络层中断，进入下一次重试；用户主动停止则跳出
+          if (ac.signal.aborted || attempt >= MAX_RETRY) throw err
+          broken = true
+        }
+        if (!broken) break
       }
+      if (!finished) setError('')
     } catch (e: any) {
       const aborted = ac.signal.aborted
       if (!finished && !aborted && !ai.content) {
@@ -363,7 +386,14 @@ export default function IndexPage() {
       const queued = queuedRef.current.shift()
       queuedRef.current = [...queuedRef.current]
       setQueuedList([...queuedRef.current])
-      if (queued) setTimeout(() => void send(queued), 200)
+      if (queued) {
+        setTimeout(async () => {
+          if (queued.sid && useChatStore.getState().currentId !== queued.sid) {
+            await useChatStore.getState().switchSession(queued.sid)
+          }
+          await send(queued.text)
+        }, 200)
+      }
     }
   }
 
@@ -385,6 +415,7 @@ export default function IndexPage() {
   async function doUploadPicked(list: File[], subtree: boolean) {
     setPickerOpen(false)
     setPickerFiles([])
+    setUploading(true)
     const ok = subtree
     let success = 0
     for (let i = 0; i < list.length; i++) {
@@ -393,6 +424,7 @@ export default function IndexPage() {
       catch (e: any) { message.error(`${list[i].name}：${e?.message || ''}`) }
     }
     setUploadMsg(null)
+    setUploading(false)
     if (success) message.success(`完成：成功 ${success} 份，已可提问`)
   }
 
@@ -504,15 +536,15 @@ export default function IndexPage() {
         <div className="composer">
           {queuedList.length > 0 && <div className="queue-bar">
             <span className="queue-label">待发送</span>
-            {queuedList.map((text, idx) => <span className="queue-chip" key={idx}>
+            {queuedList.map((item, idx) => <span className="queue-chip" key={idx}>
               <span className="queue-main" title="点击撤回这条问题到输入框重新编辑"
                 onClick={() => {
-                  setQ(text)
+                  setQ(item.text)
                   dequeueAt(idx)
                   setTimeout(() => inputRef.current?.focus(), 50)
                 }}>
                 <span className="queue-no">{idx + 1}</span>
-                <span className="queue-text">{text}</span>
+                <span className="queue-text">{item.text}</span>
                 <span className="queue-undo">↩</span>
               </span>
               <button className="queue-del" title="直接删除这条排队" onClick={() => dequeueAt(idx)}>×</button>

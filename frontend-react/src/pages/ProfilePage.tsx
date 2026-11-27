@@ -93,6 +93,8 @@ export default function ProfilePage() {
           .then(list => setDocsCount(Array.isArray(list) ? list.length : 0)).catch(() => setDocsCount(0))
       } catch { setLoadErr(true) }
     })()
+    // 有后台用量页权限就显示本部门口径，否则只看本人（后端已按此规则过滤）
+    const usageScope = auth.has('usage:read') ? 'dept' : 'self'
     void http.get<{ totals?: { todayRequests?: number; todayTokens?: number } }>('/api/usage/summary')
       .then(j => setMyUsage({ todayRequests: Number(j?.totals?.todayRequests || 0), todayTokens: Number(j?.totals?.todayTokens || 0) }))
       .catch(() => setMyUsage(null))
@@ -217,7 +219,7 @@ export default function ProfilePage() {
         </div>
 
         <div className="card">
-          <div className="card-head"><h3>我的知识库使用概览</h3><Link to="/settings.html" className="op-btn">问答偏好设置 ›</Link></div>
+          <div className="card-head"><h3>我的知识库使用概览</h3><Link to="/settings.html?from=profile" className="op-btn">问答偏好设置 ›</Link></div>
           <div className="usage-mini">
             <div><b>{chat.sessions.length}</b><span>历史会话</span></div>
             <div><b>{msgCount}</b><span>本机消息</span></div>
@@ -225,7 +227,7 @@ export default function ProfilePage() {
             <div><b>{myUsage?.todayRequests ?? '—'}</b><span>今日提问</span></div>
             <div><b>{myUsage?.todayTokens ?? '—'}</b><span>今日 Token</span></div>
           </div>
-          <div className="form-hint" style={{ marginTop: 8 }}>用量只统计当前账号，与后台管理员查看的全站用量不同。</div>
+          <div className="form-hint" style={{ marginTop: 8 }}>{auth.has('usage:read') ? '当前显示本部门用量（你有用量统计权限）；管理员可查看全站。' : '用量只统计当前账号；管理员可查看全站。'}</div>
         </div>
 
         <div className="card">

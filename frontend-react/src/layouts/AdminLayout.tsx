@@ -24,6 +24,7 @@ export default function AdminLayout() {
   const auth = useAuthStore()
   const [pending, setPending] = useState<ResetRow[]>([])
   const [msgOpen, setMsgOpen] = useState(false)
+  const [msgTab, setMsgTab] = useState<'todo' | 'history'>('todo')
   const [code, setCode] = useState<string | null>(null)
 
   const key = location.pathname.split('/').pop()?.replace('.html', '') || 'users'
@@ -107,10 +108,14 @@ export default function AdminLayout() {
 
       {/* 消息中心：待办通知的收件箱 */}
       <WbModal size="md" title="消息中心" open={msgOpen} footer={null} onCancel={() => setMsgOpen(false)}>
-        <div className="form-note">待办都在这里，处理完就会消失。</div>
-        {visible.length === 0
-          ? <div className="empty-inline">暂无待办</div>
-          : visible.map(r => {
+        <div className="msg-tabs">
+          <button className={msgTab === 'todo' ? 'on' : ''} onClick={() => setMsgTab('todo')}>待办（{pendingCount}）</button>
+          <button className={msgTab === 'history' ? 'on' : ''} onClick={() => setMsgTab('history')}>历史记录</button>
+        </div>
+        <div className="form-note">{msgTab === 'todo' ? '待办都在这里，处理完就会消失。' : '已处理、已发码或已过期的申请记录。'}</div>
+        {(msgTab === 'todo' ? visible.filter(isPending) : visible.filter(r => !isPending(r))).length === 0
+          ? <div className="empty-inline">{msgTab === 'todo' ? '暂无待办' : '暂无历史记录'}</div>
+          : (msgTab === 'todo' ? visible.filter(isPending) : visible.filter(r => !isPending(r))).map(r => {
             const isPend = isPending(r)
             return <div className="msg-row" key={r.id}>
               <div className="msg-main">

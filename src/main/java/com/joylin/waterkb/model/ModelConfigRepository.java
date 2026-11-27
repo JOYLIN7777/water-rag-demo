@@ -105,7 +105,9 @@ public class ModelConfigRepository {
     }
 
     public ModelConfig findActive(String type) {
-        List<ModelConfig> list = jdbc.query("SELECT * FROM model_config WHERE type=? AND is_active=TRUE AND enabled=TRUE", MAPPER, type);
+        // 最后激活的作为全局默认模型，对所有角色生效（多模型同时激活时按 updated_at 倒序）
+        List<ModelConfig> list = jdbc.query("SELECT * FROM model_config WHERE type=? AND is_active=TRUE AND enabled=TRUE "
+                + "ORDER BY updated_at DESC, id DESC", MAPPER, type);
         return list.isEmpty() ? null : list.get(0);
     }
 

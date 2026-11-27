@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.joylin.waterkb.security.Permission;
 import com.joylin.waterkb.security.RequirePermission;
+import com.joylin.waterkb.security.RolePermissions;
 import com.joylin.waterkb.security.UserContext;
 import com.joylin.waterkb.usage.UsageRecorder;
 import org.springframework.beans.factory.annotation.Value;
@@ -53,16 +54,18 @@ public class UsageController {
     private final String workspaceId;
     private final String region;
     private final UsageRecorder recorder;
+    private final RolePermissions rolePermissions;
 
     public UsageController(ObjectMapper mapper,
                            @Value("${usage.bailian.workspace-id:${BAILIAN_WORKSPACE_ID:}}") String workspaceId,
                            @Value("${usage.bailian.region:cn-beijing}") String region,
-                           UsageRecorder recorder) {
+                           UsageRecorder recorder, RolePermissions rolePermissions) {
         this.mapper = mapper;
         this.apiKey = System.getenv("AI_API_KEY");
         this.workspaceId = workspaceId == null ? "" : workspaceId.trim();
         this.region = region == null || region.isBlank() ? "cn-beijing" : region.trim();
         this.recorder = recorder;
+        this.rolePermissions = rolePermissions;
         this.http = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5)).build();
     }
 
@@ -76,9 +79,11 @@ public class UsageController {
      */
     @GetMapping("/summary")
     public Map<String, Object> summary() {
-        // 用量明细里有提问原文：admin 看全库，其它账号只能看自己（个人中心也是这个口径）
+        // admin 看全库；有后台用量页权限的看本部门；普通用户只看自己
         boolean admin = UserContext.get().hasGroup("admin");
+        boolean dept = rolePermissions.permissionsOf(UserContext.get()).contains("usage:read");
         Map<String, Object> local = admin ? recorder.summary(null)
+                : dept ? recorder.summary(UserContext.get().tenantId())
                 : recorder.summaryOfUser(UserContext.get().userId());
         // 未配置官方工作空间：直接用本地真实调用记录
         if (workspaceId.isBlank() || apiKey == null || apiKey.isBlank()) {
@@ -133,7 +138,9 @@ public class UsageController {
     public Map<String, Object> records(@RequestParam(defaultValue = "today") String scope,
                                        @RequestParam(defaultValue = "200") int limit) {
         boolean admin = UserContext.get().hasGroup("admin");
+        boolean dept = rolePermissions.permissionsOf(UserContext.get()).contains("usage:read");
         List<Map<String, Object>> rows = admin ? recorder.records(scope, limit, null)
+                : dept ? recorder.records(scope, limit, UserContext.get().tenantId())
                 : recorder.recordsOfUser(scope, limit, UserContext.get().userId());
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("scope", "month".equalsIgnoreCase(scope) ? "month" : "today");

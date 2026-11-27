@@ -78,6 +78,10 @@ public class DocumentIngestService {
             "pdf", "doc", "docx", "ppt", "pptx", "rtf", "odt", "ods", "odp",
             "html", "htm", "epub", "msg", "eml");
 
+    /** 图片：Tika 拿不到文本，走 OCR */
+    private static final Set<String> IMAGE_EXTENSIONS = Set.of(
+            "png", "jpg", "jpeg", "bmp", "tif", "tiff", "gif", "webp");
+
     /** 单工作表最多读取行数，防止超大表格把内存打爆 */
     private static final int MAX_SHEET_ROWS = 5000;
 
@@ -102,6 +106,7 @@ public class DocumentIngestService {
         Set<String> all = new LinkedHashSet<>(PLAIN_TEXT_EXTENSIONS);
         all.addAll(TABLE_EXTENSIONS);
         all.addAll(TIKA_EXTENSIONS);
+        all.addAll(IMAGE_EXTENSIONS);   // 图片走 OCR，也列进支持格式
         return all;
     }
 
@@ -120,9 +125,16 @@ public class DocumentIngestService {
      * @return 入库结果（文件名、切片数、字符数）
      */
     public UploadResult ingest(String fileName, byte[] bytes, boolean includeSubtree) throws IOException {
+        String ext = extension(fileName);
         String text = extractText(fileName, bytes);
+        // 扫描版 PDF / 图片没有文本层，Tika 解析为空 → OCR 兜底
         if (text == null || text.isBlank()) {
-            throw new IllegalArgumentException("文件解析结果为空：可能是扫描版 PDF/图片（需 OCR），或文件内容本身为空");
+            if ("pdf".equals(ext) || isImageExt(ext)) {
+                text = ocr(fileName, bytes, ext);
+            }
+        }
+        if (text == null || text.isBlank()) {
+            throw new IllegalArgumentException("文件解析结果为空：不是可识别的扫描件，或文件内容本身为空");
         }
 
         List<String> chunks = splitter.split(text);
@@ -179,6 +191,7 @@ public class DocumentIngestService {
         if (TIKA_EXTENSIONS.contains(ext)) {
             return extractByTika(fileName, bytes);
         }
+        if (IMAGE_EXTENSIONS.contains(ext)) return "";   // 图片交给 OCR
         throw new IllegalArgumentException("暂不支持的文件格式：." + ext);
     }
 
@@ -306,6 +319,62 @@ public class DocumentIngestService {
             line.append(header).append("：").append(values.get(i));
         }
         return line.toString();
+    }
+
+    private boolean isImageExt(String ext) { return IMAGE_EXTENSIONS.contains(ext); }
+
+    /**
+     * OCR 兜底：扫描版 PDF 先用 pdftoppm 转图片，图片直接落临时文件，
+     * 再统一交给 tesseract（chi_sim+eng）识别。容器里已安装这两个工具。
+     */
+    private String ocr(String fileName, byte[] bytes, String ext) {
+        java.nio.file.Path dir = null;
+        try {
+            dir = java.nio.file.Files.createTempDirectory("rag-ocr-");
+            java.nio.file.Path src = dir.resolve("input." + ext);
+            java.nio.file.Files.write(src, bytes);
+            java.util.List<java.nio.file.Path> images = new java.util.ArrayList<>();
+            if ("pdf".equals(ext)) {
+                // pdftoppm -r 200 -png input.pdf page → page-1.png / page-2.png …
+                run(dir, "pdftoppm", "-r", "200", "-png", src.toString(), dir.resolve("page").toString());
+                try (java.util.stream.Stream<java.nio.file.Path> s = java.nio.file.Files.list(dir)) {
+                    s.filter(p -> p.getFileName().toString().startsWith("page-")
+                            && p.getFileName().toString().endsWith(".png")).forEach(images::add);
+                }
+            } else {
+                images.add(src);
+            }
+            images.sort(java.util.Comparator.comparing(p -> p.getFileName().toString()));
+            StringBuilder sb = new StringBuilder();
+            for (java.nio.file.Path img : images) {
+                String txt = run(dir, "tesseract", img.toString(), "stdout", "-l", "chi_sim+eng", "--psm", "6");
+                if (txt != null && !txt.isBlank()) sb.append(txt).append('\n');
+                // 扫描件页数多时限制总量，避免一次上传卡死
+                if (sb.length() > 2_000_000) break;
+            }
+            log.info("OCR 完成：{}，识别 {} 页 / {} 字", fileName, images.size(), sb.length());
+            return sb.toString();
+        } catch (Exception e) {
+            log.warn("OCR 失败：{}（{}）", fileName, e.getMessage());
+            return "";
+        } finally {
+            if (dir != null) {
+                try (java.util.stream.Stream<java.nio.file.Path> s = java.nio.file.Files.list(dir)) {
+                    s.forEach(p -> { try { java.nio.file.Files.deleteIfExists(p); } catch (Exception ignored) {} });
+                } catch (Exception ignored) { }
+                try { java.nio.file.Files.deleteIfExists(dir); } catch (Exception ignored) { }
+            }
+        }
+    }
+
+    /** 执行外部命令并取 stdout；非 0 退出码视为失败 */
+    private String run(java.nio.file.Path dir, String... cmd) throws Exception {
+        ProcessBuilder pb = new ProcessBuilder(cmd).directory(dir.toFile()).redirectErrorStream(true);
+        Process proc = pb.start();
+        String out = new String(proc.getInputStream().readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
+        int code = proc.waitFor();
+        if (code != 0) throw new IllegalStateException(cmd[0] + " 退出码 " + code + "：" + out.trim());
+        return out;
     }
 
     /**

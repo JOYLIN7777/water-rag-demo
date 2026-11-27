@@ -16,8 +16,10 @@ FROM pgvector/pgvector:pg16
 WORKDIR /app
 
 # 安装 JRE（Debian 12 官方源，国内直连可用）
+# tesseract-ocr + 中文语言包 + poppler-utils：扫描版 PDF / 图片上传时做 OCR
 RUN apt-get update -qq && \
-    apt-get install -y -qq --no-install-recommends openjdk-17-jre-headless && \
+    apt-get install -y -qq --no-install-recommends openjdk-17-jre-headless \
+    tesseract-ocr tesseract-ocr-chi-sim poppler-utils && \
     rm -rf /var/lib/apt/lists/*
 
 # jar 名与 pom.xml 的 artifactId/version 对应

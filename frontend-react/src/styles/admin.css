@@ -445,3 +445,7 @@
   .pick-tag.err{background:#fff0f2;color:#c74457}
   .pick-scope{display:flex;align-items:center;gap:7px;margin-top:12px;font-size:12px;
     color:var(--ink-2);cursor:pointer}
+  .msg-tabs{display:flex;gap:6px;margin-bottom:12px;border-bottom:1px solid var(--line)}
+  .msg-tabs button{border:0;background:transparent;padding:7px 12px;font-size:12.5px;color:var(--muted);
+    cursor:pointer;border-bottom:2px solid transparent}
+  .msg-tabs button.on{color:var(--primary);font-weight:600;border-bottom-color:var(--primary)}

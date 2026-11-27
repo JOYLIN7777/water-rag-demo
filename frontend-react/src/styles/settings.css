@@ -28,3 +28,4 @@
   .help-steps{padding:8px 2px 12px}
   .help-steps p{margin:8px 0;font-size:12.5px;line-height:1.8;color:var(--ink-2)}
   .help-steps b{color:var(--primary);margin-right:6px}
+  .settings-back{display:inline-block;margin-top:8px}

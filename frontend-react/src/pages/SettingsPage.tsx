@@ -1,6 +1,6 @@
 /** 设置页：DOM/class 与旧版 settings.html 1:1 */
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { useAuthStore } from '@/store/auth'
 import { Icon } from '@/components/Icon'
 import '@/styles/settings.css'
@@ -22,6 +22,8 @@ const PREFS = [
 ]
 
 export default function SettingsPage() {
+  const [params] = useSearchParams()
+  const backToProfile = params.get('from') === 'profile'
   const auth = useAuthStore()
   const visible = SETTINGS.filter(s => auth.has(s.perm))
   const [prefs, setPrefs] = useState<Record<string, boolean>>(() => {
@@ -45,6 +47,7 @@ export default function SettingsPage() {
         <div className="page-head">
           <h1 className="page-title">设置</h1>
           <p className="page-desc">更多功能都放在这里，按需使用即可。只显示当前账号有权使用的功能。</p>
+          {backToProfile && <Link to="/profile.html" className="op-btn settings-back">← 返回个人中心</Link>}
         </div>
         {/* 没有可用设置项时整块不渲染，不再摆一个「暂无权限」空框给用户看 */}
         {visible.length > 0 && <div className="setting-grid">

@@ -72,7 +72,10 @@ public class ModelRegistry {
      * 用户按次指定模型时被跳过的同样跳过，保证坏模型不会卡住任何一次提问。
      */
     public ModelConfig firstHealthyChat(Long requestedId) {
-        java.util.List<ModelConfig> all = repository.findAll();
+        java.util.List<ModelConfig> all = new java.util.ArrayList<>(repository.findAll());
+        // 与全局默认口径一致：最后激活的优先
+        all.sort(java.util.Comparator.comparing(ModelConfig::getUpdatedAt,
+                java.util.Comparator.nullsFirst(java.util.Comparator.reverseOrder())));
         if (requestedId != null) {
             for (ModelConfig c : all) {
                 if (c.getId() != null && c.getId().equals(requestedId) && c.isEnabled() && !isSkipped(c.getId())) return c;
@@ -201,6 +204,7 @@ public class ModelRegistry {
     public synchronized void invalidate() {
         chatCache.clear();
         embeddingCache.clear();
+        chatHealth.clear();   // 配置变更后清掉「跳过」标记，不用等 60 秒
         refreshDelegates();
     }
 
