@@ -26,6 +26,7 @@ public final class Permission {
     public static final String MODEL_WRITE = "model:write";     // 修改模型配置
     public static final String AUDIT_READ = "audit:read";       // 查看审计日志
     public static final String USAGE_READ = "usage:read";       // 查看模型用量
+    public static final String TOOL_WATER_QUERY = "tool:water_query"; // 调用实时水情工具
     public static final String USER_READ = "user:read";         // 查看用户
     public static final String USER_WRITE = "user:write";       // 管理用户
     public static final String ORG_READ = "org:read";           // 组织架构（后台独立面板）
@@ -47,7 +48,7 @@ public final class Permission {
             DOC_DELETE, DOC_CHUNKS,
             SEARCH_USE, TREE_USE, USER_READ, USER_WRITE, USER_RESETPWD, USER_RESETCODE, USER_EXPORT,
             ORG_READ, ROLE_READ, PERM_READ, ADMIN_DOCS, MODEL_READ, MODEL_WRITE,
-            LOGINLOG_READ, LOGINLOG_EXPORT, AUDIT_READ, AUDIT_EXPORT, USAGE_READ);
+            LOGINLOG_READ, LOGINLOG_EXPORT, AUDIT_READ, AUDIT_EXPORT, USAGE_READ, TOOL_WATER_QUERY);
 
     private Permission() { }
 }

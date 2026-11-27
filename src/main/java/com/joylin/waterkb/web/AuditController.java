@@ -3,6 +3,7 @@ package com.joylin.waterkb.web;
 import com.joylin.waterkb.audit.AuditService;
 import com.joylin.waterkb.security.OrgStore;
 import com.joylin.waterkb.security.Permission;
+import com.joylin.waterkb.security.RolePermissions;
 import com.joylin.waterkb.security.RequirePermission;
 import com.joylin.waterkb.security.UserContext;
 import org.springframework.http.HttpHeaders;
@@ -35,17 +36,17 @@ public class AuditController {
 
     private final AuditService audit;
     private final OrgStore orgStore;
+    private final RolePermissions rolePermissions;
 
-    public AuditController(AuditService audit, OrgStore orgStore) {
+    public AuditController(AuditService audit, OrgStore orgStore, RolePermissions rolePermissions) {
         this.audit = audit;
         this.orgStore = orgStore;
+        this.rolePermissions = rolePermissions;
     }
 
-    /** 审计部门 = 组织名含「审计」或账号带 audit 角色；二者都不满足则只看本部门 */
+    /** 能否看全库审计日志：只看 audit:read 权限码，不再靠组名或组织名子串猜 */
     private boolean isAuditDepartment(UserContext.CurrentUser user) {
-        if (user.hasGroup("admin") || user.hasGroup("audit")) return true;
-        String orgName = orgStore.nameMap().getOrDefault(user.tenantId(), "");
-        return orgName.contains("审计");
+        return rolePermissions.permissionsOf(user).contains(Permission.AUDIT_READ);
     }
 
     @GetMapping("/logs")

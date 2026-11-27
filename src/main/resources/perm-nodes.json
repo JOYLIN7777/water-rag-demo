@@ -114,6 +114,27 @@
       "order": 14
     },
     {
+      "code": "tool:water_query",
+      "name": "实时水情工具",
+      "type": "btn",
+      "module": "工作台",
+      "desc": "调用实时水情查询工具（敏感运行数据）",
+      "parent": "workbench:root",
+      "route": "",
+      "order": 16
+    },
+    {
+      "code": "profile:read",
+      "name": "个人中心",
+      "type": "menu",
+      "module": "工作台",
+      "desc": "查看与编辑本人资料",
+      "parent": "workbench:root",
+      "route": "/profile.html",
+      "order": 15,
+      "icon": "◉"
+    },
+    {
       "code": "system:root",
       "name": "管理后台",
       "type": "directory",

@@ -1,12 +1,93 @@
 {
   "_comment": "角色种子：首次启动写入 role_definitions（名称）与 role_permissions（默认权限）。之后以库为准，后台角色定义页可直接增删改名/改权限，无需改代码。admin 不在此配置权限（恒全权限）。",
   "roles": [
-    {"code": "admin", "name": "系统管理员", "permissions": ["*"]},
-    {"code": "analyst", "name": "水利分析员", "permissions": ["chat:use", "doc:read", "doc:write", "doc:write_chat", "doc:write_batch", "doc:write_admin", "doc:delete", "doc:chunks", "search:use", "tree:use", "usage:read"]},
-    {"code": "viewer", "name": "只读用户", "permissions": ["chat:use", "doc:read", "search:use", "tree:use"]},
-    {"code": "water-dept", "name": "水利业务组", "permissions": ["chat:use", "doc:read", "doc:write", "doc:write_chat", "doc:write_batch", "doc:write_admin", "doc:delete", "doc:chunks", "search:use", "tree:use", "usage:read"]},
-    {"code": "audit", "name": "审计部", "permissions": ["doc:read", "doc:write", "chat:use", "usage:read"]},
-    {"code": "user", "name": "普通用户", "permissions": ["chat:use", "doc:read", "search:use", "tree:use"]},
-    {"code": "ops", "name": "运维人员", "permissions": ["chat:use", "doc:read", "search:use", "tree:use"]}
+    {
+      "code": "admin",
+      "name": "系统管理员",
+      "permissions": [
+        "*"
+      ]
+    },
+    {
+      "code": "analyst",
+      "name": "水利分析员",
+      "permissions": [
+        "chat:use",
+        "doc:read",
+        "doc:write",
+        "doc:write_chat",
+        "doc:write_batch",
+        "doc:write_admin",
+        "doc:delete",
+        "doc:chunks",
+        "search:use",
+        "tree:use",
+        "usage:read",
+        "tool:water_query"
+      ]
+    },
+    {
+      "code": "viewer",
+      "name": "只读用户",
+      "permissions": [
+        "chat:use",
+        "doc:read",
+        "search:use",
+        "tree:use",
+        "tool:water_query"
+      ]
+    },
+    {
+      "code": "water-dept",
+      "name": "水利业务组",
+      "permissions": [
+        "chat:use",
+        "doc:read",
+        "doc:write",
+        "doc:write_chat",
+        "doc:write_batch",
+        "doc:write_admin",
+        "doc:delete",
+        "doc:chunks",
+        "search:use",
+        "tree:use",
+        "usage:read",
+        "tool:water_query"
+      ]
+    },
+    {
+      "code": "audit",
+      "name": "审计部",
+      "permissions": [
+        "doc:read",
+        "doc:write",
+        "chat:use",
+        "usage:read",
+        "tool:water_query",
+        "audit:read",
+        "loginlog:read"
+      ]
+    },
+    {
+      "code": "user",
+      "name": "普通用户",
+      "permissions": [
+        "chat:use",
+        "doc:read",
+        "search:use",
+        "tree:use",
+        "tool:water_query"
+      ]
+    },
+    {
+      "code": "ops",
+      "name": "运维人员",
+      "permissions": [
+        "chat:use",
+        "doc:read",
+        "search:use",
+        "tree:use"
+      ]
+    }
   ]
 }

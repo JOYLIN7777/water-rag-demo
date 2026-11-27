@@ -39,7 +39,8 @@ public class PermissionService {
                 String route = String.valueOf(n.getOrDefault("routePath", ""));
                 if (!"menu".equals(type) || route.isEmpty() || "null".equals(route)) continue;
                 String code = String.valueOf(n.getOrDefault("code", ""));
-                List<String> required = (!code.isEmpty() && !"null".equals(code))
+                // 个人中心对所有已登录用户开放，不参与权限码判定
+                List<String> required = (!code.isEmpty() && !"null".equals(code) && !"profile:read".equals(code))
                         ? List.of(code) : List.of();
                 Map<String, Object> item = menu(String.valueOf(n.getOrDefault("name", code)), route, required);
                 String parent = String.valueOf(n.getOrDefault("parentCode", ""));
@@ -51,7 +52,7 @@ public class PermissionService {
         } catch (Exception ignored) {
             // 目录不可用时返回空菜单，不编造
         }
-        out.add(menu("个人中心", "profile.html", List.of()));
+        // 个人中心已在 perm-nodes.json 里作为菜单节点，不再代码追加
         return out;
     }
 
@@ -92,7 +93,7 @@ public class PermissionService {
             for (Map<String, Object> n : permCatalog.list()) {
                 if (!"directory".equals(String.valueOf(n.getOrDefault("nodeType", "")))) continue;
                 String code = String.valueOf(n.getOrDefault("code", ""));
-                if (!code.startsWith("console.")) continue;  // 只取后台侧栏分组目录
+                if (code.isEmpty() || "null".equals(code)) continue;
                 Map<String, Object> g = new LinkedHashMap<>();
                 g.put("code", code);
                 g.put("name", n.getOrDefault("name", code));

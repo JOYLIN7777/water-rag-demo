@@ -11,10 +11,10 @@ import { Avatar, fmtTime } from '@/components/Avatar'
 
 /** 后台页路径：命中即切后台侧栏（与旧版 renderAdminEntry 的 inAdmin 判定一致） */
 const ADMIN_PATHS = /admin\.html|admin-profile\.html|users\.html|org\.html|roles\.html|perms\.html|docs\.html|models\.html|usage\.html|loginlogs\.html|audit\.html/
-const CHAT_NAV = [
-  { key: 'index', href: 'index.html', label: '智能问答', icon: 'chat', perm: 'chat:use' },
-  { key: 'manage', href: 'manage.html', label: '知识库文档', icon: 'doc', perm: 'doc:read' }
-]
+/** 工作台图标：服务端下发的是字符图标，映射到本地 Icon 组件名；未命中的用默认 */
+const WORKBENCH_ICONS: Record<string, string> = {
+  'index.html': 'chat', 'manage.html': 'doc', 'search.html': 'search', 'tree.html': 'tree'
+}
 
 export default function Shell({ children }: { children: React.ReactNode }) {
   const auth = useAuthStore()
@@ -135,6 +135,14 @@ export default function Shell({ children }: { children: React.ReactNode }) {
   const activeKey = location.pathname.replace(/^\//, '').replace('.html', '')
 
   /** 后台侧栏：console.* 分组，菜单图标/名称/权限全来自服务端（与旧版 renderAdminSidebar 一致） */
+  // 工作台菜单：服务端 workbench:root 分组驱动；权限未加载时退回最小兜底，避免侧栏空白
+  const workbenchFromServer = auth.menus.filter(m => m.allowed && m.group === 'workbench:root'
+    && String(m.href).replace(/^\//, '') !== 'profile.html')
+  const workbenchItems = workbenchFromServer.length ? workbenchFromServer : [
+    { href: 'index.html', name: '智能问答', allowed: auth.has('chat:use') },
+    { href: 'manage.html', name: '知识库文档', allowed: auth.has('doc:read') }
+  ].filter(m => m.allowed)
+
   const adminGroups = auth.navGroups
     .filter(g => g.code.startsWith('console.'))
     .map(g => ({
@@ -178,12 +186,14 @@ export default function Shell({ children }: { children: React.ReactNode }) {
           <>
         <div className="section-label" style={{ marginTop: 0 }}>工作台</div>
         <nav className="nav-list">
-          {CHAT_NAV.filter(n => auth.has(n.perm)).map(n => (
-            <Link key={n.key} to={`/${n.href}`} className={`nav-item${activeKey === n.key ? ' active' : ''}`}
-              title={n.label}>
-              <Icon name={n.icon} /><span>{n.label}</span>
+          {workbenchItems.map(m => {
+            const href = String(m.href).replace(/^\//, '')
+            const key = href.replace('.html', '')
+            return <Link key={href} to={`/${href}`} className={`nav-item${activeKey === key ? ' active' : ''}`}
+              title={m.name}>
+              <Icon name={WORKBENCH_ICONS[href] || 'chat'} /><span>{m.name}</span>
             </Link>
-          ))}
+          })}
         </nav>
 
         {auth.has('chat:use') && <>

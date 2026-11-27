@@ -38,11 +38,11 @@ public class ToolPermissionRegistry {
     /** 允许使用工具的问答角色；最终还要过功能权限码校验（见 denyReason） */
     private final Map<String, Rule> rules = Map.of(
             TOOL_WATER_QUERY, new Rule(
-                    Set.of("hydro-admin"),
-                    Set.of("water-dept", "analyst", "viewer"),
-                    Set.of(), // 不限租户
+                    Set.of(),  // 不再维护用户白名单，统一走权限码
+                    Set.of(),  // 不再维护角色组白名单
+                    Set.of(),  // 不限租户
                     "查询实时水情（含水位/流量，属敏感运行数据）",
-                    Permission.CHAT_USE));
+                    Permission.TOOL_WATER_QUERY));
 
     private final RolePermissions rolePermissions;
 
@@ -61,22 +61,12 @@ public class ToolPermissionRegistry {
 
         Rule rule = rules.get(tool);
         if (rule == null) return "工具未注册或已禁用：" + tool;
-        // 功能权限是硬门槛：能在后台问答，才有资格让工具代查实时数据。
-        // 角色权限改了立即生效（RolePermissions 内存缓存写时失效重建）。
-        if (!rolePermissions.permissionsOf(user).contains(rule.requiredPermission)) {
+        // 唯一门槛：工具专属权限码。取消旧的 hasGroup("admin") 短路与野组名白名单，
+        // 管理员要能调工具，也在角色权限里配 tool:water_query（admin 默认全权限天然包含）。
+        Set<String> owned = rolePermissions.permissionsOf(user);
+        if (!owned.contains(rule.requiredPermission)) {
             String reason = "当前账号未开通实时水情查询权限，请联系管理员开通（功能权限：" + rule.requiredPermission + "）";
             log.warn("工具权限拒绝：用户 {} 缺少 {}", user.userId(), rule.requiredPermission);
-            return reason;
-        }
-        if (user.hasGroup("admin")) return null; // 平台管理员对已注册工具全局放行
-
-        boolean ok = rule.allowUsers.contains(user.userId())
-                || rule.allowGroups.stream().anyMatch(user::hasGroup)
-                || (!rule.allowTenants.isEmpty() && rule.allowTenants.contains(user.tenantId()));
-        if (!ok) {
-            // 对外只说"未开通"，不泄露内部白名单（组名、用户标识属于实现细节）
-            String reason = "当前账号未开通实时水情查询权限，请联系管理员开通";
-            log.warn("工具权限拒绝：工具 {} 白名单未命中，用户 {} 组 {}", tool, user.userId(), user.groups());
             return reason;
         }
         return null;

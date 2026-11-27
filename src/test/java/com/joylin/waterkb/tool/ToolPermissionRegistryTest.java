@@ -8,7 +8,7 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-/** 工具权限：默认拒绝、组命中放行、管理员放行三条路径。 */
+/** 工具权限：统一走 tool:water_query 权限码，默认拒绝、授权角色放行、管理员全权限放行。 */
 class ToolPermissionRegistryTest {
 
     private final ToolPermissionRegistry registry = new ToolPermissionRegistry();
@@ -35,7 +35,7 @@ class ToolPermissionRegistryTest {
 
     @Test
     void viewer问答角色放行() {
-        // 只读用户有 chat:use，能问答就能查实时水情；组白名单也随之放开
+        // 只读角色在角色种子里配了 tool:water_query，按权限码放行
         UserContext.CURRENT_TEST(new UserContext.CurrentUser("test", List.of("viewer")));
         assertNull(registry.denyReason(ToolPermissionRegistry.TOOL_WATER_QUERY));
     }
