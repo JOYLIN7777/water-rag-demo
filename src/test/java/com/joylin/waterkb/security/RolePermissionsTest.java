@@ -48,7 +48,7 @@ class RolePermissionsTest {
         Set<String> owned = rp.permissionsOf(admin);
         assertTrue(owned.contains("custom:newfeature"), "目录新增的自定义码 admin 应自动拥有");
         assertTrue(owned.contains("doc:chunks"), "清单新增的细粒度码 admin 应自动拥有");
-        assertTrue(owned.containsAll(Permission.ALL), "注解层权限码仍需保留");
+        assertFalse(owned.containsAll(Permission.ALL), "权限码完全以表为准，不再并入Java常量兜底");
     }
 
     @Test

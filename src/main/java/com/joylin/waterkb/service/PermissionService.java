@@ -19,6 +19,8 @@ import com.joylin.waterkb.security.UserContext;
 @Service
 public class PermissionService {
 
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(PermissionService.class);
+
     private final ToolPermissionRegistry toolRegistry;
     private final RolePermissions rolePermissions;
     private final PermissionCatalog permCatalog;
@@ -120,18 +122,16 @@ public class PermissionService {
         result.put("anonymous", anonymous);
         result.put("admin", admin);
         result.put("permissions", owned);          // 前端按权限码控制入口显示
-        // 全量权限码 = 权限目录（数据库，含清单自动生成与自定义节点）为准，注解码兜底，
-        // 这样后台新增节点后无需改 Java 常量就能下发到前端编辑器
+        // 全量权限码以权限目录（数据库）为准，新增节点后无需改Java常量
         List<String> allPerms = new ArrayList<>();
         try {
             for (Map<String, Object> n : permCatalog.list()) {
                 String code = String.valueOf(n.getOrDefault("code", ""));
                 if (!code.isEmpty() && !"null".equals(code) && !allPerms.contains(code)) allPerms.add(code);
             }
-        } catch (Exception ignored) {
-            // 目录读取失败时退化为内置权限码
+        } catch (Exception e) {
+            log.warn("权限目录读取失败，全量权限码为空：{}", e.getMessage());
         }
-        for (String code : Permission.ALL) if (!allPerms.contains(code)) allPerms.add(code);
         result.put("allPermissions", allPerms);
         result.put("roleMatrix", rolePermissions.roleMatrix());
         result.put("menus", menus);

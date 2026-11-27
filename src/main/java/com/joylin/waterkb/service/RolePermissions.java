@@ -24,6 +24,8 @@ import com.joylin.waterkb.security.UserContext;
 @Service
 public class RolePermissions {
 
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(RolePermissions.class);
+
     /**
      * 角色种子从 roles.json 读取（仅首次启动写入 role_definitions / role_permissions），
      * 运行期一律以库为准：后台角色定义页可直接新增角色、改名、改权限，不需要改代码。
@@ -137,23 +139,20 @@ public class RolePermissions {
     }
 
     /**
-     * admin 拥有的全部权限码：以权限目录（数据库）为准，而不是写死的 Permission.ALL。
-     * 这样后台/清单里新增节点后，admin 自动拥有，不用改 Java 常量。
-     * 无 catalog 的单测环境回落到内置常量集。
+     * admin 拥有的全部权限码：以权限目录（数据库）为准，新增节点自动拥有。
      */
     private Set<String> adminPermissions() {
-        if (catalog == null) return java.util.Set.copyOf(Permission.ALL);
+        if (catalog == null) return java.util.Set.copyOf(Permission.ALL);  // 仅单测无数据库环境
         try {
             Set<String> fromDb = new LinkedHashSet<>();
             for (Map<String, Object> row : catalog.list()) {
                 String code = String.valueOf(row.getOrDefault("code", ""));
                 if (!code.isEmpty() && !"null".equals(code)) fromDb.add(code);
             }
-            // 注解层的接口权限码必须一并给 admin，哪怕目录暂时没同步到
-            fromDb.addAll(Permission.ALL);
             return Set.copyOf(fromDb);
         } catch (Exception e) {
-            return java.util.Set.copyOf(Permission.ALL);  // 目录暂不可用时 admin 仍需全权限
+            log.warn("权限目录读取失败，admin权限码为空：{}", e.getMessage());
+            return Set.of();
         }
     }
 
@@ -233,7 +232,7 @@ public class RolePermissions {
         if (name.isEmpty()) throw new IllegalArgumentException("角色名不能为空");
         if (name.equals("admin")) throw new IllegalArgumentException("管理员角色拥有全部权限，不可修改");
         if (permissions == null || permissions.stream().anyMatch(p ->
-                !Permission.ALL.contains(p) && (catalog == null || !catalog.exists(p)))) {
+                catalog == null ? !Permission.ALL.contains(p) : !catalog.exists(p))) {
             throw new IllegalArgumentException("存在不合法的权限码");
         }
         if (mapper == null) throw new IllegalStateException("当前环境无数据库，角色权限不可配置");

@@ -253,7 +253,7 @@
     text-align:center;white-space:nowrap}
   .model-pick-dropdown .ant-select-item-option-content{text-align:center;width:100%}
   .model-pick-dropdown .ant-select-item-option-selected{background:var(--primary-soft) !important;color:var(--primary) !important;font-weight:400}
-  .model-pick-dropdown.ant-select-dropdown{width:240px !important;padding:4px;background:#fff;
+  .model-pick-dropdown.ant-select-dropdown{padding:4px;background:#fff;
     border:1px solid var(--line);border-radius:10px;box-shadow:0 8px 24px rgba(20,40,80,.12)}
   /* 提问气泡：时间与复制按钮放在气泡下方，hover 才显示 */
   .ask-meta{margin-top:5px;display:flex;justify-content:flex-end;align-items:center;gap:8px;
@@ -284,7 +284,7 @@
   .ask-jump-item.msg-located{color:var(--ink);font-weight:600}
   .ask-jump-dash{display:inline-block;width:18px;height:1px;background:currentColor;opacity:.55;flex:none}
   /* 字数计数：输入框内右下角，接近上限才出现 */
-  .char-count{position:absolute;right:14px;bottom:52px;font-size:11px;color:var(--muted);
+  .char-count{position:absolute;right:14px;bottom:68px;font-size:11px;color:var(--muted);
     background:rgba(255,255,255,.92);padding:2px 6px;border-radius:5px;pointer-events:none;
     font-variant-numeric:tabular-nums}
   .char-count.warn{color:#e8890c}

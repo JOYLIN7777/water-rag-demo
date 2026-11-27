@@ -472,6 +472,10 @@ export default function IndexPage() {
   const msgs = chat.messages
   const hasMessages = msgs.length > 0
   const userMsgs = msgs.filter(m => m.role === 'user')
+  // 下拉宽度按最长模型名动态计算：中文按双宽估算，避免写死px导致截断或留白
+  const modelNames = ['默认模型', ...chatModels.map(m => m.name)]
+  const modelLabelWidth = Math.max(...modelNames.map(n => [...n].reduce((w, c) => w + (c.charCodeAt(0) > 255 ? 14 : 8), 0)), 120)
+  const dropdownWidth = Math.min(Math.max(modelLabelWidth + 44, 180), 460)
   const busy = chat.sending
   void force  // 流式重渲染触发器
 
@@ -520,7 +524,7 @@ export default function IndexPage() {
                       {m.usage && localStorage.getItem('wrk_pref_usage') !== '0' &&
                         <span className="ai-usage" title={usageTip(m.usage)}>{usageInner(m.usage)}</span>}
                       {!!m.sources?.length && <button className="icon-btn ai-cite-count" title="点击查看全部引用片段"
-                        onClick={() => {
+                        onClick={(e) => {
                           const groups = groupCites(m.sources || [])
                           const allOpen = groups.every((_, k) => openCites[`${i}-${k}`])
                           setOpenCites(s => {
@@ -528,7 +532,15 @@ export default function IndexPage() {
                             groups.forEach((_, k) => { next[`${i}-${k}`] = !allOpen })
                             return next
                           })
-                          // 展开/收起引用不滚动：保持在当前位置，避免跳到最新消息
+                          // 展开时滚到本卡片的引用区；收起时不滚动
+                          if (!allOpen) {
+                            const btn = e.currentTarget as HTMLElement
+                            setTimeout(() => {
+                              const card = btn.closest('.ai-card')
+                              const zone = card?.querySelector('.cite-zone') as HTMLElement | null
+                              zone?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+                            }, 60)
+                          }
                         }}>▤ {groupCites(m.sources).length} 文档 / {m.sources.length} 片段</button>}
                       <button className="icon-btn" title="复制回答到剪贴板"
                         onClick={() => { void navigator.clipboard.writeText(m.content); message.success('回答已复制') }}>复制</button>
@@ -615,7 +627,8 @@ export default function IndexPage() {
           <textarea id="question" rows={1} placeholder="输入你的问题，Enter 发送，Shift+Enter 换行"
             value={q} ref={inputRef}
             onChange={e => {
-              setQ(e.target.value)
+              // 超2000字主动截断，用户无需手动删
+              setQ(e.target.value.slice(0, 2000))
               // 按内容高度自适应，长问题完整显示（最多约 8 行）
               const el = e.target
               el.style.height = 'auto'
@@ -642,6 +655,7 @@ export default function IndexPage() {
               <Select className="model-pick" value={modelId || 0} title="选择本次回答使用的对话模型"
                 disabled={chatModels.length === 0} variant="borderless" size="small"
                 placement="topRight"
+                dropdownStyle={{ width: dropdownWidth }}
                 dropdownMatchSelectWidth={false}
                 popupClassName="model-pick-dropdown"
                 options={[{ value: 0, label: '默认模型' }, ...chatModels.map(m => ({ value: m.id, label: m.name }))]}
