@@ -2,7 +2,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { marked } from 'marked'
 import DOMPurify from 'dompurify'
-import { message } from 'antd'
+import { message, Select } from 'antd'
 import UploadPicker from '@/components/UploadPicker'
 import { useSearchParams } from 'react-router-dom'
 import { useChatStore, type ChatMessageExt } from '@/store/chat'
@@ -591,7 +591,7 @@ export default function IndexPage() {
             </span>)}
           </div>}
           <textarea id="question" rows={1} placeholder="输入你的问题，Enter 发送，Shift+Enter 换行"
-            maxLength={2000} value={q} ref={inputRef}
+            className={q.length > 2000 ? 'over-limit' : ''} value={q} ref={inputRef}
             onChange={e => {
               setQ(e.target.value)
               // 按内容高度自适应，长问题完整显示（最多约 8 行）
@@ -607,25 +607,20 @@ export default function IndexPage() {
               }
             }} />
           <div className="composer-bar">
-            {q.length > 1800 && <span className="composer-count">{q.length}/2000</span>}
             <span className="composer-tool" title="基于知识库检索作答"><span style={{ color: 'var(--primary)' }}>◈</span> 知识库问答</span>
             {auth.has('doc:write_chat') && <>
               <button className="composer-tool" onClick={() => fileInput.current?.click()} title="上传文档到知识库">⇪ 上传文档</button>
               <input ref={fileInput} type="file" multiple hidden onChange={e => { void uploadFiles(e.target.files); e.target.value = '' }} />
             </>}
             <span className="model-pick-slot">
-              {/* 原生 select：antd Select 的浮层 portal 到 body，靠近右边界会自动翻转成右对齐，
-                  在输入框下方看位置很怪；原生下拉由浏览器贴着控件展开，不会漂移。 */}
-              <select className="model-pick" value={modelId || 0} title="选择本次回答使用的对话模型"
-                disabled={chatModels.length === 0}
-                onChange={e => {
-                  const n = Number(e.target.value) || 0
+              <Select className="model-pick" value={modelId || 0} title="选择本次回答使用的对话模型"
+                disabled={chatModels.length === 0} variant="borderless" size="small"
+                popupClassName="model-pick-dropdown"
+                options={[{ value: 0, label: '默认模型' }, ...chatModels.map(m => ({ value: m.id, label: m.name }))]}
+                onChange={n => {
                   setModelId(n || null)
                   localStorage.setItem('wrk_chat_model', n ? String(n) : '')
-                }}>
-                <option value={0}>默认模型</option>
-                {chatModels.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
-              </select>
+                }} />
             </span>
             {busy && <button className="stop-btn" onClick={() => chat.aborters[chat.currentId]?.abort()}
               title="停止当前回答">■ 停止</button>}
