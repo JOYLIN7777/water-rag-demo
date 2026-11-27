@@ -44,6 +44,9 @@ public class RagChatService {
 
     private static final Logger log = LoggerFactory.getLogger(RagChatService.class);
 
+    /** 推荐问题缓存：模型整理一次管 10 分钟，避免每次打开首页都调模型 */
+    private volatile java.util.Map.Entry<Long, java.util.List<String>> suggestionCache;
+
     private final VectorStore vectorStore;
     private final ModelRegistry modelRegistry;
     private final ModelConfigRepository modelConfigRepository;
@@ -246,6 +249,84 @@ public class RagChatService {
                         log.warn("停止生成后的部分落库失败：{}", e.getMessage());
                     }
                 });
+    }
+
+    /**
+     * 让模型基于知识库真实片段整理推荐问题：覆盖多主题、句式多样，
+     * 结果缓存 30 分钟（首次调用需等模型整理，之后首页秒开）；失败返回空，由调用方回退规则生成。
+     */
+    public List<String> suggestQuestions(String[] seeds, int count) {
+        long now = System.currentTimeMillis();
+        if (suggestionCache != null && now - suggestionCache.getKey() < 30 * 60 * 1000
+                && suggestionCache.getValue() != null && !suggestionCache.getValue().isEmpty()) {
+            return suggestionCache.getValue();
+        }
+        try {
+            StringBuilder context = new StringBuilder();
+            context.append("知识库文档主题：\n");
+            for (Map<String, Object> d : visibleDocuments()) {
+                String name = String.valueOf(d.getOrDefault("fileName", "")).trim();
+                if (!name.isEmpty() && !"null".equals(name)) {
+                    context.append("- ").append(name.replaceAll("\\.[^.]+$", "")).append("\n");
+                }
+                if (context.length() > 1200) break;
+            }
+            // 再附少量真实片段，让模型知道文档里具体讲什么（避免只看标题瞎编）
+            int n = 0;
+            for (int i = 0; i < Math.min(3, seeds.length); i++) {
+                for (Document d : sampleChunks(seeds[i], 1)) {
+                    String text = String.valueOf(d.getText() == null ? "" : d.getText()).replaceAll("\\s+", " ").trim();
+                    if (text.isEmpty()) continue;
+                    context.append("片段：").append(text.length() > 160 ? text.substring(0, 160) : text).append("\n");
+                    n++;
+                }
+            }
+            if (context.length() < 40) return List.of();
+
+            // 推荐是辅助能力，用稳定可用的云端 CHAT；内网模型常不可达，别让它拖慢首页
+            com.joylin.waterkb.model.ModelConfig c = modelConfigRepository.findAll().stream()
+                    .filter(m -> "CHAT".equalsIgnoreCase(m.getType()) && m.isEnabled()
+                            && m.getBaseUrl() != null && m.getBaseUrl().contains("dashscope"))
+                    .findFirst().orElse(modelConfigRepository.findActive("CHAT"));
+            if (c == null) return List.of();
+            ChatClient client = modelRegistry.chatClientFor(c);
+            String prompt = "你是水利知识库的引导助手。下面是知识库真实文档的主题和片段。\n"
+                    + "请提出 " + count + " 个用户最可能关心的、面向文档整体内容的问题，帮助用户了解这个知识库能回答什么。\n"
+                    + "严格要求：\n"
+                    + "1. 围绕文档主题提问题，不要引用片段里的具体数字、行号、小节号或半截句子；\n"
+                    + "2. 覆盖不同主题，问法多样（是什么/有哪些要求/怎么操作/什么条件下/为什么）；\n"
+                    + "3. 每个问题 10-30 个字，通顺完整，以中文问号结尾；\n"
+                    + "4. 只输出问题本身，每行一个，不要编号、不要解释。\n\n"
+                    + context.toString();
+            String raw = client.prompt().system("你是问题生成助手，只输出问题列表。").user(prompt).call().content();
+            List<String> out = new ArrayList<>();
+            if (raw != null) {
+                for (String line : raw.split("\\r?\\n")) {
+                    String q = line.replaceAll("^\\s*\\d+[.、)]\\s*", "").replaceAll("^[-*•]\\s*", "")
+                            .replaceAll("[?？\\s]+$", "").trim();
+                    if (q.length() >= 8 && q.length() <= 40) out.add(q + "？");
+                    if (out.size() >= count) break;
+                }
+            }
+            if (!out.isEmpty()) suggestionCache = Map.entry(now, List.copyOf(out));
+            return out;
+        } catch (Exception e) {
+            log.warn("模型整理推荐问题失败，回退规则生成：{}", e.getMessage());
+            return List.of();
+        }
+    }
+
+    /** 按任意查询取真实片段（推荐问题用；复用同一套向量检索与权限过滤） */
+    public List<Document> sampleChunks(String query, int topK) {
+        if (query == null || query.isBlank()) return List.of();
+        try {
+            List<Document> result = vectorStore.similaritySearch(SearchRequest.builder()
+                    .query(query).topK(topK).similarityThreshold(0.0).build());
+            return result == null ? List.of() : result;
+        } catch (Exception e) {
+            log.warn("推荐问题取片段失败：{}", e.getMessage());
+            return List.of();
+        }
     }
 
     /** 当前账号可见的知识库文档（推荐问题用；沿用文档列表的租户/行级权限过滤） */

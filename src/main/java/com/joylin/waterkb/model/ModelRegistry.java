@@ -161,8 +161,15 @@ public class ModelRegistry {
     private OpenAiApi buildApi(ModelConfig c) {
         // 内网模型常不校验 Key，空 Key 用占位符避免 Spring AI 启动校验失败
         String key = c.getApiKey() == null || c.getApiKey().isBlank() ? "no-key-required" : c.getApiKey();
+        // Spring AI 会自己在 baseUrl 后拼 /v1/chat/completions。
+        // 有些内网模型配置时填了完整端点（…/v1/chat/completions），会被拼成两遍导致连接超时。
+        String base = String.valueOf(c.getBaseUrl() == null ? "" : c.getBaseUrl()).trim();
+        base = base.replaceAll("/v1/chat/completions/?$", "")
+                   .replaceAll("/chat/completions/?$", "")
+                   .replaceAll("/v1/?$", "");
+        if (base.isEmpty()) throw new IllegalArgumentException("模型服务地址不能为空");
         return OpenAiApi.builder()
-                .baseUrl(c.getBaseUrl())
+                .baseUrl(base)
                 .apiKey(key)
                 .restClientBuilder(RestClient.builder()
                         .requestFactory(new org.springframework.http.client.SimpleClientHttpRequestFactory() {{

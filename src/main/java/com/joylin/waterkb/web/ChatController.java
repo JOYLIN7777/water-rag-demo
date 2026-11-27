@@ -85,35 +85,65 @@ public class ChatController {
      * 首页推荐问题：从当前账号最近的提问里去重整理，不是写死的示例。
      * 没历史时返回空列表，由前端回退到默认引导语。
      */
+    /** 推荐问题的切入词：覆盖知识库常见主题，按时间轮换，避免每次都是那几条 */
+    private static final String[] SUGGEST_SEEDS = {
+            "水库调度 汛限水位 防洪限制", "监测设备 布设 运维 预警", "闸门 启闭 操作规程 流量",
+            "应急预案 响应 分级 处置", "水质 水生态 监测 评价", "工程 除险加固 设计 标准",
+            "巡视检查 安全监测 巡检路线", "降雨 洪水 预报 调度方案"
+    };
+
+    /** 从片段真实内容里提炼一个短主题，再套多样问法，避免千篇一律的「主要包含哪些内容」 */
+    private String questionFromChunk(String text, int variant) {
+        String t = String.valueOf(text == null ? "" : text)
+                .replaceAll("【片段[^】]*】", " ").replaceAll("\\s+", " ").trim();
+        if (t.length() < 12) return "";
+        // 取一个完整分句；全是数字/符号的片段（表格、参数行）直接丢弃
+        String[] parts = t.split("(?<=[。；！？])");
+        String clause = parts.length > 0 ? parts[0].trim() : t;
+        clause = clause.replaceAll("^[0-9一二三四五六七八九十、.．\\s]+", "").trim();
+        if (clause.length() > 34 || clause.replaceAll("[^\\u4e00-\\u9fa5]", "").length() < 8) return "";
+        if (clause.length() < 6) return "";
+        // 去掉句尾标点，按主题词长度择问法
+        String core = clause.replaceAll("[。；！？,，、]$", "");
+        String[] templates = {
+                "关于「%s」，具体是怎么规定的？",
+                "%s，需要满足哪些要求？",
+                "实际工作中如何处理「%s」？",
+                "「%s」涉及哪些关键要点？",
+                "%s的依据是什么？"
+        };
+        return String.format(templates[variant % templates.length], core);
+    }
+
     @GetMapping("/suggestions")
     public List<String> suggestions(@RequestParam(required = false, defaultValue = "4") int limit) {
-        // 新会话的推荐问题来自知识库文档，而不是上一轮提问的回放。
-        // 取当前账号可见文档的文件名生成可问的问题，让用户一进来就知道"这个库能问什么"。
+        // 优先让模型基于知识库真实片段整理问题（缓存 10 分钟，句式多样）
+        List<String> byModel = ragChatService.suggestQuestions(SUGGEST_SEEDS, Math.max(1, Math.min(limit, 8)));
+        if (!byModel.isEmpty()) return byModel;
+
+        // 模型不可用时回退规则：从真实片段提炼主题套不同问法，仍比只套标题好
         LinkedHashSet<String> out = new LinkedHashSet<>();
-        try {
+        int base = (int) (System.currentTimeMillis() / 60000) % SUGGEST_SEEDS.length;
+        int variant = (int) (System.currentTimeMillis() / 60000) % 5;
+        for (int k = 0; k < 3 && out.size() < limit; k++) {
+            String seed = SUGGEST_SEEDS[(base + k) % SUGGEST_SEEDS.length];
+            for (org.springframework.ai.document.Document d : ragChatService.sampleChunks(seed, 3)) {
+                String q = questionFromChunk(d.getText(), variant + out.size());
+                if (q != null && q.length() >= 10 && q.length() <= 60) out.add(q);
+                if (out.size() >= limit * 2) break;
+            }
+        }
+        // 片段不足时回退到文档标题（仍带不同问法），保证首页不空
+        if (out.size() < limit) {
             for (Map<String, Object> d : ragChatService.visibleDocuments()) {
                 String name = String.valueOf(d.getOrDefault("fileName", "")).trim();
                 if (name.isEmpty() || "null".equals(name)) continue;
-                String base = name.replaceAll("\\.[^.]+$", "").replaceAll("[_\\-]", " ").trim();
-                if (base.isEmpty()) continue;
-                out.add("《" + base + "》主要包含哪些内容？");
-                if (out.size() >= limit * 2) break;
+                String baseName = name.replaceAll("\\.[^.]+$", "").replaceAll("[_\\-]", " ").trim();
+                if (baseName.isEmpty()) continue;
+                out.add(String.format("《%s》中有哪些关键要求？", baseName));
+                if (out.size() >= limit) break;
             }
-        } catch (Exception ignored) { }
-        // 文档不足时用历史真实提问补足，最后再回退默认示例（由前端处理）
-        try {
-            for (Map<String, Object> s : sessionStore.list()) {
-                String sid = String.valueOf(s.getOrDefault("id", ""));
-                if (sid.isEmpty()) continue;
-                for (Map<String, Object> m : treeStore.historyList(sid)) {
-                    if (!"user".equals(String.valueOf(m.get("role")))) continue;
-                    String q = String.valueOf(m.getOrDefault("content", "")).trim();
-                    if (q.length() >= 5 && q.length() <= 60) out.add(q);
-                    if (out.size() >= limit * 3) break;
-                }
-                if (out.size() >= limit * 3) break;
-            }
-        } catch (Exception ignored) { }
+        }
         return new ArrayList<>(out).stream().limit(Math.max(1, Math.min(limit, 8))).toList();
     }
 

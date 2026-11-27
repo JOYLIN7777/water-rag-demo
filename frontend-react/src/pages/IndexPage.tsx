@@ -166,13 +166,26 @@ export default function IndexPage() {
   const [force, setForce] = useState(0)   // 触发重渲染（流式增量）
   const [initializing, setInitializing] = useState(true)  // 刷新时先不渲染欢迎页，避免闪一下
 
+  /** 只有用户本来就贴着底部时才自动跟随；手动上滚看历史时绝不拉回来 */
   function scrollBottom(forceScroll = false) {
     if (localStorage.getItem('wrk_pref_autoscroll') === '0') return
+    // 用户手动上滚过就锁定，直到自己滚回底部（由 scroll-area 的 onScroll 解锁）
+    if (userScrolledUp.current && !forceScroll) return
     requestAnimationFrame(() => {
       const el = scrollRef.current
-      if (el) el.scrollTop = el.scrollHeight
-      void forceScroll
+      if (!el) return
+      if (!forceScroll) {
+        const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 120
+        if (!nearBottom) return
+      }
+      el.scrollTop = el.scrollHeight
     })
+  }
+  const userScrolledUp = useRef(false)
+  function onScrollArea() {
+    const el = scrollRef.current
+    if (!el) return
+    userScrolledUp.current = el.scrollHeight - el.scrollTop - el.clientHeight > 120
   }
 
   useEffect(() => {
@@ -265,7 +278,10 @@ export default function IndexPage() {
     const ai: ChatMessageExt = { role: 'assistant', content: '', sources: [], streaming: true, ts: at }
     const next = [...store, um, ai]
     chat.cacheMessages(ownerId, next)
-    if (chat.currentId === ownerId) { setForce(x => x + 1); scrollBottom(true) }
+    if (chat.currentId === ownerId) {
+      userScrolledUp.current = false   // 自己发的新问题，理应看到最新
+      setForce(x => x + 1); scrollBottom(true)
+    }
 
     let finished = false
     try {
@@ -385,7 +401,7 @@ export default function IndexPage() {
         <div className="topbar-left"><div className="topbar-title">知识库问答</div></div>
         <div className="topbar-nav"><AdminEntry /></div>
       </header>
-      <div className="scroll-area" id="scrollArea" ref={scrollRef}>
+      <div className="scroll-area" id="scrollArea" ref={scrollRef} onScroll={onScrollArea}>
         {!hasMessages && !initializing ? (
           <div className="welcome" id="welcome">
             <div className="welcome-mark has-logo"><img className="brand-logo" src="/assets/logo.svg" alt="" /></div>
@@ -482,16 +498,18 @@ export default function IndexPage() {
         <div className="composer">
           {queuedList.length > 0 && <div className="queue-bar">
             <span className="queue-label">待发送</span>
-            {queuedList.map((text, idx) => <span className="queue-chip" key={idx}
-              title="点击撤回这条问题到输入框重新编辑"
-              onClick={() => {
-                setQ(text)
-                dequeueAt(idx)
-                setTimeout(() => inputRef.current?.focus(), 50)
-              }}>
-              <span className="queue-no">{idx + 1}</span>
-              <span className="queue-text">{text}</span>
-              <span className="queue-undo">↩</span>
+            {queuedList.map((text, idx) => <span className="queue-chip" key={idx}>
+              <span className="queue-main" title="点击撤回这条问题到输入框重新编辑"
+                onClick={() => {
+                  setQ(text)
+                  dequeueAt(idx)
+                  setTimeout(() => inputRef.current?.focus(), 50)
+                }}>
+                <span className="queue-no">{idx + 1}</span>
+                <span className="queue-text">{text}</span>
+                <span className="queue-undo">↩</span>
+              </span>
+              <button className="queue-del" title="直接删除这条排队" onClick={() => dequeueAt(idx)}>×</button>
             </span>)}
           </div>}
           <textarea id="question" rows={1} placeholder="输入你的问题，Enter 发送，Shift+Enter 换行"
