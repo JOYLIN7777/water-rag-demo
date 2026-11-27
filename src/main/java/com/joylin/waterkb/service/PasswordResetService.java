@@ -4,11 +4,9 @@ import com.joylin.waterkb.mapper.PasswordResetMapper;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
-import jakarta.annotation.PostConstruct;
 import java.security.SecureRandom;
 import java.sql.Timestamp;
 import java.time.LocalDateTime;
@@ -44,7 +42,6 @@ public class PasswordResetService {
     private static final int MAX_ATTEMPTS = 5;
     private static final SecureRandom RANDOM = new SecureRandom();
 
-    private final JdbcTemplate jdbc;
     private final PasswordResetMapper mapper;
     private final UserStore users;
     private final PasswordHasher hasher;
@@ -52,34 +49,17 @@ public class PasswordResetService {
     /**
      * 兼容单测：不接数据库。
      */
-    public PasswordResetService(JdbcTemplate jdbc, UserStore users, PasswordHasher hasher) {
-        this(jdbc, users, hasher, null);
+    public PasswordResetService(UserStore users, PasswordHasher hasher) {
+        this(users, hasher, null);
     }
 
     @Autowired
-    public PasswordResetService(JdbcTemplate jdbc, UserStore users, PasswordHasher hasher, PasswordResetMapper mapper) {
-        this.jdbc = jdbc;
+    public PasswordResetService(UserStore users, PasswordHasher hasher, PasswordResetMapper mapper) {
         this.users = users;
         this.hasher = hasher;
         this.mapper = mapper;
     }
 
-    @PostConstruct
-    public void init() {
-        try {
-            jdbc.execute("CREATE TABLE IF NOT EXISTS password_reset_request ("
-                    + "id BIGSERIAL PRIMARY KEY, username VARCHAR(64) NOT NULL, "
-                    + "status VARCHAR(16) NOT NULL DEFAULT 'PENDING', code_hash TEXT, "
-                    + "attempts INT NOT NULL DEFAULT 0, request_ip VARCHAR(64), "
-                    + "requested_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, "
-                    + "approved_by VARCHAR(64), approved_at TIMESTAMP, "
-                    + "expires_at TIMESTAMP, used_at TIMESTAMP)");
-            jdbc.execute("CREATE INDEX IF NOT EXISTS idx_prr_status ON password_reset_request(status)");
-            jdbc.execute("CREATE INDEX IF NOT EXISTS idx_prr_user ON password_reset_request(username)");
-        } catch (Exception e) {
-            log.warn("密码重置表初始化失败，忘记密码功能不可用：{}", e.getMessage());
-        }
-    }
 
     /**
      * 提交重置申请。

@@ -4,7 +4,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.support.PathMatchingResourcePatternResolver;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
 import java.io.BufferedReader;
@@ -38,12 +37,12 @@ public class UnregisteredPermScanner {
     private static final Pattern VUE_PERM = Pattern.compile("has\\(['\"]([a-z][a-z0-9_.:-]*)['\"]\\)");
     private static final Pattern CODE = Pattern.compile("^[a-z][a-z0-9_.-]*:[a-z][a-z0-9_.-]*$");
 
-    private final JdbcTemplate jdbc;
+    private final com.joylin.waterkb.mapper.PermissionNodeMapper permissionNodeMapper;
     private final org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerMapping mapping;
 
-    public UnregisteredPermScanner(JdbcTemplate jdbc,
+    public UnregisteredPermScanner(com.joylin.waterkb.mapper.PermissionNodeMapper permissionNodeMapper,
                                    org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerMapping mapping) {
-        this.jdbc = jdbc;
+        this.permissionNodeMapper = permissionNodeMapper;
         this.mapping = mapping;
     }
 
@@ -88,8 +87,7 @@ public class UnregisteredPermScanner {
 
         Set<String> registered;
         try {
-            registered = new TreeSet<>(jdbc.queryForList(
-                    "SELECT code FROM perm_node WHERE COALESCE(retired,FALSE)=FALSE", String.class));
+            registered = new TreeSet<>(permissionNodeMapper.listAllCodes());
         } catch (Exception e) {
             log.warn("已注册权限码读取失败，跳过扫描：{}", e.getMessage());
             return List.of();

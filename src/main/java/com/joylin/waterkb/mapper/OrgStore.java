@@ -4,7 +4,6 @@ import jakarta.annotation.PostConstruct;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayDeque;
@@ -36,14 +35,14 @@ public class OrgStore {
     private static final Logger log = LoggerFactory.getLogger(OrgStore.class);
     public static final String DEFAULT_KEY = "default";
 
-    private final JdbcTemplate jdbc;
     private final OrgMapper mapper;
+    private final SchemaSeedMapper seedMapper;
     private volatile boolean ready;
 
-    public OrgStore(JdbcTemplate jdbc) { this(jdbc, null); }
+    public OrgStore() { this(null, null); }
 
     @Autowired
-    public OrgStore(JdbcTemplate jdbc, OrgMapper mapper) { this.jdbc = jdbc; this.mapper = mapper; }
+    public OrgStore(OrgMapper mapper, SchemaSeedMapper seedMapper) { this.mapper = mapper; this.seedMapper = seedMapper; }
 
     @PostConstruct
     public void init() { ensure(); }
@@ -54,22 +53,14 @@ public class OrgStore {
         synchronized (this) {
             if (ready) return;
             try {
-                jdbc.execute("CREATE TABLE IF NOT EXISTS org_unit ("
-                        + "org_key VARCHAR(64) PRIMARY KEY, name VARCHAR(64) NOT NULL, "
-                        + "parent_key VARCHAR(64), created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)");
-                // 老库升级：上一版表里没有 parent_key，缺列时补上（历史组织全部落在顶层）
-                jdbc.execute("ALTER TABLE org_unit ADD COLUMN IF NOT EXISTS parent_key VARCHAR(64)");
                 // 只在一条组织都没有时建第一个顶层组织。
                 // 不再专门造一个叫「默认组织」的内置项：组织就是组织，
                 // 第一个组织叫什么、要不要改名、最后要不要删，都由使用者决定，
                 // 系统只守住一条底线——不能删到一个都不剩（账号必须有归属）。
-                jdbc.update("INSERT INTO org_unit(org_key,name,parent_key) "
-                        + "SELECT ?,?,NULL WHERE NOT EXISTS (SELECT 1 FROM org_unit)",
-                        DEFAULT_KEY, "顶层组织");
+                seedMapper.seedTopOrg(DEFAULT_KEY, "顶层组织");
                 // 旧数据兜底：账号里出现过但组织表没有的 tenant，按标识名补一条，
                 // 否则这些账号在"所属组织"下拉里会凭空消失。
-                jdbc.update("INSERT INTO org_unit(org_key,name,parent_key) "
-                        + "SELECT DISTINCT tenant, tenant, NULL FROM app_users ON CONFLICT (org_key) DO NOTHING");
+                seedMapper.seedOrgsFromUsers();
                 ready = true;
             } catch (Exception e) {
                 // app_users 可能还没建（Bean 初始化顺序），下次调用再试

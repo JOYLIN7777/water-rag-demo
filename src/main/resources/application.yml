@@ -21,6 +21,13 @@ spring:
       max-file-size: 500MB
       max-request-size: 500MB
 
+  # 启动时执行幂等 DDL：所有建表/ALTER/索引集中到 schema.sql，业务代码不碰 JdbcTemplate
+  sql:
+    init:
+      mode: always
+      schema-locations: classpath:schema.sql
+      continue-on-error: true
+
   # ============ PostgreSQL（含 pgvector 扩展） ============
   # 本地启动：localhost；Docker 容器内：由 compose 传 DB_HOST=postgres（服务名）
   datasource:

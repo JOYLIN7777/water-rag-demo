@@ -1,7 +1,7 @@
 package com.joylin.waterkb.controller;
 
 import com.joylin.waterkb.service.EsIndexService;
-import org.springframework.jdbc.core.JdbcTemplate;
+import com.joylin.waterkb.mapper.SchemaSeedMapper;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -19,12 +19,12 @@ import java.util.Map;
 public class HealthController {
 
     private final EsIndexService es;
-    private final JdbcTemplate jdbc;
+    private final SchemaSeedMapper seedMapper;
     private final StringRedisTemplate redis;
 
-    public HealthController(EsIndexService es, JdbcTemplate jdbc, StringRedisTemplate redis) {
+    public HealthController(EsIndexService es, SchemaSeedMapper seedMapper, StringRedisTemplate redis) {
         this.es = es;
-        this.jdbc = jdbc;
+        this.seedMapper = seedMapper;
         this.redis = redis;
     }
 
@@ -33,8 +33,7 @@ public class HealthController {
         Map<String, Object> components = new LinkedHashMap<>();
         components.put("es", probe(es::healthy));
         components.put("db", probe(() -> {
-            Integer n = jdbc.queryForObject("SELECT 1", Integer.class);
-            return n != null && n == 1;
+            return seedMapper.ping() == 1;
         }));
         components.put("redis", probe(() -> {
             redis.hasKey("__health_probe__");

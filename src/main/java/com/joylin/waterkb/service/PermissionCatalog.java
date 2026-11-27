@@ -1,13 +1,13 @@
 package com.joylin.waterkb.service;
 
 import com.joylin.waterkb.mapper.PermissionNodeMapper;
+import com.joylin.waterkb.mapper.SchemaSeedMapper;
 
 import jakarta.annotation.PostConstruct;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.annotation.DependsOn;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
@@ -80,50 +80,29 @@ public class PermissionCatalog {
             "user:read", new String[]{"用户查看", "用户管理"},
             "audit:read", new String[]{"审计日志", "操作日志"});
 
-    private final JdbcTemplate jdbc;
     private final PermissionNodeMapper mapper;
+    private final SchemaSeedMapper seedMapper;
 
-    public PermissionCatalog(JdbcTemplate jdbc) { this(jdbc, null); }
+    public PermissionCatalog() { this(null, null); }
 
     @Autowired
-    public PermissionCatalog(JdbcTemplate jdbc, PermissionNodeMapper mapper) {
-        this.jdbc = jdbc;
+    public PermissionCatalog(PermissionNodeMapper mapper, SchemaSeedMapper seedMapper) {
         this.mapper = mapper;
+        this.seedMapper = seedMapper;
     }
 
     @PostConstruct
     public void init() {
-        jdbc.execute("CREATE TABLE IF NOT EXISTS perm_node ("
-                + "code VARCHAR(64) PRIMARY KEY, name VARCHAR(64) NOT NULL, "
-                + "node_type VARCHAR(16) NOT NULL DEFAULT 'menu', module VARCHAR(32) NOT NULL, "
-                + "description VARCHAR(256), builtin BOOLEAN NOT NULL DEFAULT FALSE, "
-                + "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)");
-        // 若依风格三级树字段：平滑升级，旧库也能直接启动
-        jdbc.execute("ALTER TABLE perm_node ADD COLUMN IF NOT EXISTS parent_code VARCHAR(64) DEFAULT ''");
-        jdbc.execute("ALTER TABLE perm_node ADD COLUMN IF NOT EXISTS route_path VARCHAR(128) DEFAULT ''");
-        jdbc.execute("ALTER TABLE perm_node ADD COLUMN IF NOT EXISTS order_num INT DEFAULT 0");
-        jdbc.execute("ALTER TABLE perm_node ADD COLUMN IF NOT EXISTS last_seen_at TIMESTAMP");
-        jdbc.execute("ALTER TABLE perm_node ADD COLUMN IF NOT EXISTS retired BOOLEAN DEFAULT FALSE");
-        jdbc.execute("ALTER TABLE perm_node ADD COLUMN IF NOT EXISTS icon VARCHAR(32) DEFAULT ''");
-        // 内置节点首次初始化写入，之后以库为准（用户改过的显示信息不会被启动覆盖）
         List<Map<String, Object>> builtins = builtInNodes();
         for (Map<String, Object> n : builtins) {
-            jdbc.update("INSERT INTO perm_node(code,name,node_type,module,description,builtin,parent_code,route_path,order_num,icon) "
-                            + "VALUES(?,?,?,?,?,TRUE,?,?,?,?) ON CONFLICT (code) DO NOTHING",
-                    n.get("code"), n.get("name"), n.get("type"), n.get("module"), n.get("desc"),
-                    n.get("parent"), n.get("route"), n.get("order"), n.get("icon"));
+            seedMapper.seedPermissionNode(n);
         }
         // 存量内置节点按真实导航重排（结构字段以种子为准，避免老库层级对不上页面）；
         // 名称只在仍是旧名时改，管理员改过的显示名保留。
         for (Map<String, Object> n : builtins) {
-            jdbc.update("UPDATE perm_node SET parent_code=?, route_path=?, order_num=?, node_type=?, module=?, icon=? "
-                            + "WHERE code=? AND builtin=TRUE",
-                    n.get("parent"), n.get("route"), n.get("order"), n.get("type"), n.get("module"),
-                    n.get("icon"), n.get("code"));
+            seedMapper.syncPermissionNode(n);
         }
-        RENAMES.forEach((code, pair) -> jdbc.update(
-                "UPDATE perm_node SET name=? WHERE code=? AND builtin=TRUE AND name=?",
-                pair[1], code, pair[0]));
+        RENAMES.forEach((code, pair) -> seedMapper.renamePermissionNode(code, pair[0], pair[1]));
     }
 
     /** 全部权限节点（内置 + 自定义），按模块与内置顺序排列 */

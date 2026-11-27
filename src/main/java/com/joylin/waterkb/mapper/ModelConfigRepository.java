@@ -3,8 +3,6 @@ package com.joylin.waterkb.mapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Repository;
 
 import jakarta.annotation.PostConstruct;
@@ -13,18 +11,15 @@ import java.util.Map;
 import com.joylin.waterkb.model.ModelConfig;
 
 /**
- * 模型配置仓库：JdbcTemplate 直接建表 + CRUD。
+ * 模型配置仓库。
  *
- * <p>与 VectorStoreAdminRepository 同一套风格——不引入 JPA/MyBatis，
- * 一个 Demo 作品不需要 ORM，SQL 直白可查。表在启动时自动建（幂等），
- * 首次启动为空时从环境变量种子导入现有 DashScope 配置，保证 Docker 部署零改动。</p>
  */
 @Repository
 public class ModelConfigRepository {
 
     private static final Logger log = LoggerFactory.getLogger(ModelConfigRepository.class);
 
-    private final JdbcTemplate jdbc;
+    private final SchemaSeedMapper seedMapper;
     private final ModelConfigMapper mapper;
     // 种子配置：与 application.yml 的 AI_* 环境变量保持一致
     private final String seedApiKey;
@@ -33,14 +28,14 @@ public class ModelConfigRepository {
     private final String seedEmbeddingModel;
     private final int seedDimensions;
 
-    public ModelConfigRepository(JdbcTemplate jdbc, ModelConfigMapper mapper,
+    public ModelConfigRepository(ModelConfigMapper mapper, SchemaSeedMapper seedMapper,
                                  @Value("${spring.ai.openai.api-key:}") String seedApiKey,
                                  @Value("${spring.ai.openai.base-url:https://dashscope.aliyuncs.com/compatible-mode}") String seedBaseUrl,
                                  @Value("${spring.ai.openai.chat.options.model:qwen-plus}") String seedChatModel,
                                  @Value("${spring.ai.openai.embedding.options.model:text-embedding-v3}") String seedEmbeddingModel,
                                  @Value("${spring.ai.vectorstore.pgvector.dimensions:1024}") int seedDimensions) {
-        this.jdbc = jdbc;
         this.mapper = mapper;
+        this.seedMapper = seedMapper;
         this.seedApiKey = seedApiKey;
         this.seedBaseUrl = seedBaseUrl;
         this.seedChatModel = seedChatModel;
@@ -48,55 +43,17 @@ public class ModelConfigRepository {
         this.seedDimensions = seedDimensions;
     }
 
-    private static final RowMapper<ModelConfig> MAPPER = (rs, i) -> {
-        ModelConfig c = new ModelConfig();
-        c.setId(rs.getLong("id"));
-        c.setName(rs.getString("name"));
-        c.setType(rs.getString("type"));
-        c.setBaseUrl(rs.getString("base_url"));
-        c.setApiKey(rs.getString("api_key"));
-        c.setModel(rs.getString("model_name"));
-        c.setDimensions((Integer) rs.getObject("dimensions"));
-        c.setEnabled(rs.getBoolean("enabled"));
-        c.setActive(rs.getBoolean("is_active"));
-        c.setDefault(rs.getBoolean("is_default"));
-        c.setCreatedAt(rs.getString("created_at"));
-        c.setUpdatedAt(rs.getString("updated_at"));
-        return c;
-    };
 
+
+    /**
+     * 首次启动导入环境变量配置。
+     */
     @PostConstruct
-    public void init() {
-        jdbc.execute("""
-            CREATE TABLE IF NOT EXISTS model_config (
-                id BIGSERIAL PRIMARY KEY,
-                name VARCHAR(200) NOT NULL,
-                type VARCHAR(20) NOT NULL CHECK (type IN ('CHAT','EMBEDDING')),
-                base_url VARCHAR(500) NOT NULL,
-                api_key VARCHAR(1000),
-                model_name VARCHAR(200) NOT NULL,
-                dimensions INTEGER,
-                enabled BOOLEAN NOT NULL DEFAULT TRUE,
-                is_active BOOLEAN NOT NULL DEFAULT FALSE,
-                is_default BOOLEAN NOT NULL DEFAULT FALSE,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-            """);
-        jdbc.execute("ALTER TABLE model_config ADD COLUMN IF NOT EXISTS is_default BOOLEAN NOT NULL DEFAULT FALSE");
-        // 每种类型至多一个 active：partial unique index 保证数据一致性
-        // CHAT 支持多个同时激活（提问框可选），只有 EMBEDDING 必须唯一（向量库维度只能有一套）
-        jdbc.execute("CREATE UNIQUE INDEX IF NOT EXISTS uk_model_active_embedding " +
-                "ON model_config(type) WHERE is_active = TRUE AND type = 'EMBEDDING'");
-        seedIfEmpty();
-    }
-
-    /** 首次启动（表空）时导入环境变量配置，保持原有 Docker 部署无需额外配置 */
     private void seedIfEmpty() {
         Integer count = mapper.count();
         if (count != null && count > 0) return;
-        insert("DashScope · " + seedChatModel, "CHAT", seedBaseUrl, seedApiKey, seedChatModel, null, true);
-        insert("DashScope · " + seedEmbeddingModel, "EMBEDDING", seedBaseUrl, seedApiKey, seedEmbeddingModel, seedDimensions, true);
+        seedMapper.seedModel("DashScope · " + seedChatModel, "CHAT", seedBaseUrl, seedApiKey, seedChatModel, null);
+        seedMapper.seedModel("DashScope · " + seedEmbeddingModel, "EMBEDDING", seedBaseUrl, seedApiKey, seedEmbeddingModel, seedDimensions);
         log.info("模型配置表为空，已从环境变量导入种子配置（chat={}, embedding={}, dims={}）",
                 seedChatModel, seedEmbeddingModel, seedDimensions);
     }

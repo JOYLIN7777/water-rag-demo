@@ -42,7 +42,7 @@ class RolePermissionsTest {
         PermissionCatalog catalog = org.mockito.Mockito.mock(PermissionCatalog.class);
         org.mockito.Mockito.when(catalog.list()).thenReturn(List.of(
                 Map.of("code", "custom:newfeature"), Map.of("code", "doc:chunks")));
-        RolePermissions rp = new RolePermissions(null, catalog);
+        RolePermissions rp = new RolePermissions(catalog);
         UserContext.CurrentUser admin =
                 new UserContext.CurrentUser("admin", List.of("admin"), "default", "jwt");
         Set<String> owned = rp.permissionsOf(admin);

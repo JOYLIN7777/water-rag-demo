@@ -4,7 +4,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 
 import jakarta.annotation.PostConstruct;
@@ -35,29 +34,22 @@ public class UserStore {
     private final String configuredUsers;
     private final PasswordHasher hasher;
     /** 可为 null：单测与无数据库环境只走内存用户库 */
-    private final JdbcTemplate jdbc;
     private final UserMapper mapper;
     private final Map<String, UserAccount> users = new LinkedHashMap<>();
 
     /** 兼容单测：不接数据库，纯内存 */
     public UserStore(PasswordHasher hasher,
                      @Value("${security.auth.users:}") String configuredUsers) {
-        this(hasher, configuredUsers, null, null);
+        this(hasher, configuredUsers, null);
     }
-
-    /** 兼容旧调用（单测） */
-    public UserStore(PasswordHasher hasher,
-                     @Value("${security.auth.users:}") String configuredUsers,
-                     JdbcTemplate jdbc) { this(hasher, configuredUsers, jdbc, null); }
 
     /** 生产构造：后台维护的账号写入 app_users，重启后仍生效 */
     @Autowired
     public UserStore(PasswordHasher hasher,
                      @Value("${security.auth.users:}") String configuredUsers,
-                     JdbcTemplate jdbc, UserMapper mapper) {
+                     UserMapper mapper) {
         this.hasher = hasher;
         this.configuredUsers = configuredUsers == null ? "" : configuredUsers;
-        this.jdbc = jdbc;
         this.mapper = mapper;
     }
 
@@ -88,18 +80,8 @@ public class UserStore {
 
     /** 数据库账号覆盖同名的配置账号，保证后台编辑的结果重启后不丢失 */
     private void loadFromDatabase() {
-        if (jdbc == null) return;
+        if (mapper == null) return;
         try {
-            jdbc.execute("CREATE TABLE IF NOT EXISTS app_users ("
-                    + "username VARCHAR(64) PRIMARY KEY, password_hash TEXT NOT NULL, "
-                    + "groups TEXT NOT NULL, tenant VARCHAR(64) NOT NULL, "
-                    + "display_name VARCHAR(128), enabled BOOLEAN NOT NULL DEFAULT TRUE, "
-                    + "updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)");
-            // 个人资料扩展：性别、手机号（可登录）、头像（data URL 或预设标识）
-            jdbc.execute("ALTER TABLE app_users ADD COLUMN IF NOT EXISTS gender VARCHAR(16) DEFAULT ''");
-            jdbc.execute("ALTER TABLE app_users ADD COLUMN IF NOT EXISTS phone VARCHAR(32) DEFAULT ''");
-            jdbc.execute("ALTER TABLE app_users ADD COLUMN IF NOT EXISTS avatar TEXT DEFAULT ''");
-            jdbc.execute("CREATE UNIQUE INDEX IF NOT EXISTS uq_app_users_phone ON app_users(phone) WHERE phone <> ''");
             for (Map<String, Object> row : mapper.listAll()) {
                 String username = String.valueOf(row.get("username")).trim().toLowerCase();
                 List<String> groups = Arrays.stream(String.valueOf(row.get("groups")).split(","))
@@ -119,7 +101,7 @@ public class UserStore {
     private static String nvl(String s) { return s == null ? "" : s.trim(); }
 
     private void persist(UserAccount u) {
-        if (jdbc == null) return;
+        if (mapper == null) return;
         try {
             mapper.upsert(u.username(), u.passwordHash(), String.join(",", u.groups()), u.tenant(),
                     u.displayName(), u.enabled(), nvl(u.gender()), nvl(u.phone()), nvl(u.avatar()));
@@ -177,7 +159,7 @@ public class UserStore {
         String name = username == null ? "" : username.trim().toLowerCase();
         if (!users.containsKey(name)) return false;
         users.remove(name);
-        if (jdbc != null) {
+        if (mapper != null) {
             try { mapper.delete(name); }
             catch (Exception e) { throw new IllegalStateException("账号删除失败：" + e.getMessage(), e); }
         }

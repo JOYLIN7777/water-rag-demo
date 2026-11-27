@@ -1,7 +1,7 @@
 package com.joylin.waterkb.security;
 
 import org.junit.jupiter.api.Test;
-import org.springframework.jdbc.core.JdbcTemplate;
+import com.joylin.waterkb.mapper.PermissionNodeMapper;
 import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerMapping;
 
 import java.util.List;
@@ -16,23 +16,23 @@ class UnregisteredPermScannerTest {
 
     @Test
     void 已注册权限码不出现在快捷列表() {
-        JdbcTemplate jdbc = mock(JdbcTemplate.class);
+        PermissionNodeMapper mapper = mock(PermissionNodeMapper.class);
         RequestMappingHandlerMapping mapping = mock(RequestMappingHandlerMapping.class);
         when(mapping.getHandlerMethods()).thenReturn(Map.of());
 
         // 动态取"代码里实际在用的全部权限码"作为已注册集合——新增权限码时测试不用跟着改
-        java.util.Set<String> used = new UnregisteredPermScanner(jdbc, mapping).allUsedCodes();
-        when(jdbc.queryForList(anyString(), eq(String.class))).thenReturn(new java.util.ArrayList<>(used));
-        assertTrue(new UnregisteredPermScanner(jdbc, mapping).scan().isEmpty(), "全部在用码已注册时应为空");
+        java.util.Set<String> used = new UnregisteredPermScanner(mapper, mapping).allUsedCodes();
+        when(mapper.listAllCodes()).thenReturn(new java.util.ArrayList<>(used));
+        assertTrue(new UnregisteredPermScanner(mapper, mapping).scan().isEmpty(), "全部在用码已注册时应为空");
     }
 
     @Test
     void 未注册的在用码会被列出并带来源() {
-        JdbcTemplate jdbc = mock(JdbcTemplate.class);
-        when(jdbc.queryForList(anyString(), eq(String.class))).thenReturn(List.of());
+        PermissionNodeMapper mapper = mock(PermissionNodeMapper.class);
+        when(mapper.listAllCodes()).thenReturn(List.of());
         RequestMappingHandlerMapping mapping = mock(RequestMappingHandlerMapping.class);
         when(mapping.getHandlerMethods()).thenReturn(Map.of());
-        List<Map<String, Object>> list = new UnregisteredPermScanner(jdbc, mapping).scan();
+        List<Map<String, Object>> list = new UnregisteredPermScanner(mapper, mapping).scan();
         assertFalse(list.isEmpty(), "无任何已注册码时应扫出 React 组件里的权限声明");
         assertTrue(list.stream().anyMatch(x -> String.valueOf(x.get("code")).startsWith("doc:write")),
                 "应包含问答页上传按钮的 doc:write 系列权限码");

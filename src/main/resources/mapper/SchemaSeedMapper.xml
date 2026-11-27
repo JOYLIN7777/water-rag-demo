@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.joylin.waterkb.mapper.SchemaSeedMapper">
+
+    <insert id="seedPermissionNode">
+        INSERT INTO perm_node(code,name,node_type,module,description,builtin,parent_code,route_path,order_num,icon)
+        VALUES(#{code},#{name},#{type},#{module},#{desc},TRUE,#{parent},#{route},#{order},#{icon})
+        ON CONFLICT (code) DO NOTHING
+    </insert>
+
+    <update id="syncPermissionNode">
+        UPDATE perm_node SET parent_code=#{parent}, route_path=#{route}, order_num=#{order},
+            node_type=#{type}, module=#{module}, icon=#{icon}
+        WHERE code=#{code} AND builtin=TRUE
+    </update>
+
+    <update id="renamePermissionNode">
+        UPDATE perm_node SET name=#{newName} WHERE code=#{code} AND builtin=TRUE AND name=#{oldName}
+    </update>
+
+    <insert id="seedRoleName">
+        INSERT INTO role_definitions(role, role_name) VALUES(#{role}, #{name})
+        ON CONFLICT (role) DO NOTHING
+    </insert>
+
+    <insert id="seedRolePermission">
+        INSERT INTO role_permissions(role, permission) VALUES(#{role}, #{permission})
+        ON CONFLICT (role, permission) DO NOTHING
+    </insert>
+
+    <insert id="seedTopOrg">
+        INSERT INTO org_unit(org_key,name,parent_key)
+        SELECT #{key},#{name},NULL WHERE NOT EXISTS (SELECT 1 FROM org_unit)
+    </insert>
+
+    <insert id="seedOrgsFromUsers">
+        INSERT INTO org_unit(org_key,name,parent_key)
+        SELECT DISTINCT tenant, tenant, NULL FROM app_users ON CONFLICT (org_key) DO NOTHING
+    </insert>
+
+    <insert id="seedModel">
+        INSERT INTO model_config(name,type,base_url,api_key,model_name,dimensions,is_active)
+        VALUES(#{name},#{type},#{baseUrl},#{apiKey},#{model},#{dimensions},TRUE)
+    </insert>
+
+    <select id="hasMigration" resultType="int">
+        SELECT COUNT(*) FROM seed_migration WHERE version=#{version}
+    </select>
+
+    <update id="retireNode">UPDATE perm_node SET retired=TRUE WHERE code=#{code}</update>
+
+    <delete id="deleteRolePermission">
+        DELETE FROM role_permissions WHERE role=#{role} AND permission=#{permission}
+    </delete>
+
+    <insert id="markMigration">INSERT INTO seed_migration(version) VALUES(#{version})</insert>
+
+    <select id="ping" resultType="int">SELECT 1</select>
+</mapper>

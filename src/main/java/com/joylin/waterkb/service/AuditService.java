@@ -2,10 +2,8 @@ package com.joylin.waterkb.service;
 
 import com.joylin.waterkb.mapper.AuditMapper;
 
-import jakarta.annotation.PostConstruct;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -16,7 +14,7 @@ import java.util.Map;
 import com.joylin.waterkb.model.AuditLog;
 
 /**
- * 审计日志仓库：PostgreSQL 落库（模型配置同款 JdbcTemplate 方案，零新增依赖）。
+ * 审计日志仓库。
  *
  * <p>为什么必须落库而不是只打日志：日志会被滚动清理、无法结构化查询；
  * 审计是合规刚需——谁在什么时候删了知识文档、谁越权调了工具，必须可追溯、
@@ -29,48 +27,15 @@ import com.joylin.waterkb.model.AuditLog;
 public class AuditService {
 
     private static final Logger log = LoggerFactory.getLogger(AuditService.class);
-    private final JdbcTemplate jdbc;
     private final AuditMapper mapper;
 
-    public AuditService(JdbcTemplate jdbc) { this(jdbc, null); }
+    public AuditService() { this(null); }
 
     @Autowired
-    public AuditService(JdbcTemplate jdbc, AuditMapper mapper) {
-        this.jdbc = jdbc;
+    public AuditService(AuditMapper mapper) {
         this.mapper = mapper;
     }
 
-    @PostConstruct
-    public void init() {
-        try {
-            jdbc.execute("""
-                CREATE TABLE IF NOT EXISTS audit_log (
-                  id BIGSERIAL PRIMARY KEY,
-                  ts TIMESTAMP NOT NULL,
-                  tenant_id VARCHAR(100) NOT NULL,
-                  user_id VARCHAR(100) NOT NULL,
-                  groups TEXT,
-                  action VARCHAR(200) NOT NULL,
-                  resource VARCHAR(500),
-                  detail TEXT,
-                  ip VARCHAR(100),
-                  status INT,
-                  duration_ms BIGINT,
-                  result VARCHAR(20)
-                )
-                """);
-            jdbc.execute("CREATE INDEX IF NOT EXISTS idx_audit_tenant_ts ON audit_log(tenant_id, ts DESC)");
-            jdbc.execute("CREATE INDEX IF NOT EXISTS idx_audit_user ON audit_log(user_id, ts DESC)");
-            // 登录日志只占审计表极小一部分（实测 165 万行里最近 100 条要过滤掉 159 万行，耗时约 1 秒）。
-            // 部分索引只为 login/refresh 建 tenant+ts 倒序，查询条件与这里的谓词完全一致，
-            // 规划器直接走这个几千行的小索引，不再全量倒扫业务日志。
-            jdbc.execute("CREATE INDEX IF NOT EXISTS idx_audit_login_ts ON audit_log(tenant_id, ts DESC) "
-                    + "WHERE action LIKE '%/api/auth/login%' OR action LIKE '%/api/auth/refresh%'");
-            log.info("审计表 audit_log 已就绪");
-        } catch (Exception e) {
-            log.error("审计表初始化失败，审计功能不可用：{}", e.getMessage());
-        }
-    }
 
     /** 写一条审计（失败只告警，不影响主流程） */
     public void record(AuditLog entry) {

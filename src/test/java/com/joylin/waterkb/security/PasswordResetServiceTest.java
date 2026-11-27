@@ -24,7 +24,7 @@ class PasswordResetServiceTest {
 
     /** 不调 init()、jdbc 传 null：校验分支都在碰数据库之前返回 */
     private PasswordResetService svc() {
-        return new PasswordResetService(null, users, hasher);
+        return new PasswordResetService(users, hasher);
     }
 
     @Test

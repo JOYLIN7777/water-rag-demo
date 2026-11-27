@@ -294,6 +294,8 @@ export default function IndexPage() {
     const state = useChatStore.getState()
     const ownerId = state.currentId || state.newSession()
     if (!query || useChatStore.getState().busyIds.has(ownerId)) return
+    // 后端 @Size(max=2000)：前端提前拦，避免发一半才报 400
+    if (query.length > 2000) { message.warning('问题长度不能超过 2000 字'); return }
     const now = Date.now()
     if (lastSendRef.current && lastSendRef.current.q === query && now - lastSendRef.current.at < 1500) return
     lastSendRef.current = { q: query, at: now }
@@ -335,7 +337,17 @@ export default function IndexPage() {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ sessionId: ownerId, question: query, modelId: modelId || undefined }), signal: ac.signal
         })
-        if (!r.ok) throw new Error('请求失败（HTTP ' + r.status + '）')
+        if (!r.ok) {
+          // 客户端错误（400/401/403）不重试：重试也只会重复失败，直接把服务端提示给用户
+          let detail = '请求失败（HTTP ' + r.status + '）'
+          try {
+            const j = await r.json()
+            if (j?.message) detail = j.message
+          } catch { /* 响应不是 JSON 时用默认提示 */ }
+          const err = new Error(detail) as Error & { client?: boolean }
+          err.client = r.status >= 400 && r.status < 500
+          throw err
+        }
         const reader = r.body!.getReader()
         const dec = new TextDecoder()
         let buf = ''
@@ -378,6 +390,8 @@ export default function IndexPage() {
             if (finished) break
           }
         } catch (err) {
+          // 客户端错误不重试，直接抛给外层显示具体原因
+          if ((err as { client?: boolean })?.client) throw err
           // 网络层中断，进入下一次重试；用户主动停止则跳出
           if (ac.signal.aborted || attempt >= MAX_RETRY) throw err
           broken = true
@@ -388,8 +402,14 @@ export default function IndexPage() {
     } catch (e: any) {
       const aborted = ac.signal.aborted
       if (!finished && !aborted && !ai.content) {
-        ai.content = '（回答生成失败，请稍后重试）'
-        setError('连接中断，请检查网络后重试')
+        if ((e as { client?: boolean })?.client) {
+          // 客户端错误：显示服务端原始提示（如"问题长度不能超过 2000 字"）
+          ai.content = '（' + String(e?.message || '请求有误') + '）'
+          setError(String(e?.message || '请求有误'))
+        } else {
+          ai.content = '（回答生成失败，请稍后重试）'
+          setError('连接中断，请检查网络后重试')
+        }
       } else if (aborted) {
         message.info('已停止生成，已收到的部分保留')
       }
@@ -570,8 +590,8 @@ export default function IndexPage() {
               <button className="queue-del" title="直接删除这条排队" onClick={() => dequeueAt(idx)}>×</button>
             </span>)}
           </div>}
-          <textarea id="question" rows={1} placeholder="输入你的问题，Enter 发送，Shift+Enter 换行"
-            value={q} ref={inputRef}
+          <textarea id="question" rows={1} placeholder="输入你的问题（最多 2000 字），Enter 发送，Shift+Enter 换行"
+            maxLength={2000} value={q} ref={inputRef}
             onChange={e => {
               setQ(e.target.value)
               // 按内容高度自适应，长问题完整显示（最多约 8 行）

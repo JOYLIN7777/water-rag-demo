@@ -1,10 +1,8 @@
 package com.joylin.waterkb.mapper;
 
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
-import jakarta.annotation.PostConstruct;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.ArrayList;
@@ -26,34 +24,13 @@ public class UsageRecorder {
 
     private static final ZoneId ZONE = ZoneId.of("Asia/Shanghai");
 
-    private final JdbcTemplate jdbc;
     private final UsageMapper mapper;
 
-    public UsageRecorder(JdbcTemplate jdbc) { this(jdbc, null); }
+    public UsageRecorder() { this(null); }
 
     @Autowired
-    public UsageRecorder(JdbcTemplate jdbc, UsageMapper mapper) { this.jdbc = jdbc; this.mapper = mapper; }
+    public UsageRecorder(UsageMapper mapper) { this.mapper = mapper; }
 
-    @PostConstruct
-    public void init() {
-        try {
-            jdbc.execute("CREATE TABLE IF NOT EXISTS model_usage ("
-                    + "id BIGSERIAL PRIMARY KEY, ts TIMESTAMP DEFAULT CURRENT_TIMESTAMP, "
-                    + "user_id VARCHAR(64), model VARCHAR(128), "
-                    + "prompt_tokens BIGINT DEFAULT 0, completion_tokens BIGINT DEFAULT 0, "
-                    + "duration_ms BIGINT DEFAULT 0)");
-            // 后加的两列：只汇总总量看不出"钱花在哪一次提问上"，明细要能对上问题。
-            // 用 ADD COLUMN IF NOT EXISTS 增量升级，不动历史行（老数据 question 为空，明细里显示"—"）。
-            jdbc.execute("ALTER TABLE model_usage ADD COLUMN IF NOT EXISTS session_id VARCHAR(128)");
-            jdbc.execute("ALTER TABLE model_usage ADD COLUMN IF NOT EXISTS question TEXT");
-            // 用量明细里带提问原文，必须按租户隔离，否则 analyst 能翻到其他部门的提问
-            jdbc.execute("ALTER TABLE model_usage ADD COLUMN IF NOT EXISTS tenant_id VARCHAR(64)");
-            jdbc.execute("CREATE INDEX IF NOT EXISTS idx_model_usage_ts ON model_usage(ts DESC)");
-            jdbc.execute("CREATE INDEX IF NOT EXISTS idx_model_usage_tenant_ts ON model_usage(tenant_id, ts DESC)");
-        } catch (Exception ignored) {
-            // 表建不出来（如无 DB）只影响本地用量，主链路不受影响
-        }
-    }
 
     /** 记录一次真实模型调用；任何失败都静默吞掉，绝不影响问答主链路 */
     public void record(String userId, String model, long promptTokens, long completionTokens, long durationMs) {

@@ -13,6 +13,11 @@ import java.util.Map;
 public interface PermissionNodeMapper {
 
     /**
+     * 查询全部权限码。
+     */
+    List<String> listAllCodes();
+
+    /**
      * 查询全部有效节点。
      */
     List<Map<String, Object>> listAll();

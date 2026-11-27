@@ -4,7 +4,6 @@ import com.joylin.waterkb.security.UserContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
@@ -35,78 +34,19 @@ public class ChatSessionStore {
 
     private static final Logger log = LoggerFactory.getLogger(ChatSessionStore.class);
 
-    private final JdbcTemplate jdbc;
     private final ChatSessionMapper mapper;
     /** 建表只尝试一次，失败后不再反复刷日志 */
-    private volatile boolean schemaReady = false;
     /** 旧三元组主键的一次性迁移是否已完成 */
     private volatile boolean migrationDone = false;
 
     /** 兼容旧调用（单测） */
-    public ChatSessionStore(JdbcTemplate jdbc) { this(jdbc, null); }
-
     /** 生产构造：注入数据源与 Mapper */
     @Autowired
-    public ChatSessionStore(JdbcTemplate jdbc, ChatSessionMapper mapper) {
-        this.jdbc = jdbc;
-        this.mapper = mapper;
-    }
+    public ChatSessionStore(ChatSessionMapper mapper) { this.mapper = mapper; }
 
     /** 兼容单测：无数据库 */
     public ChatSessionStore() {
-        this(null, null);
-    }
-
-    private void ensureSchema() {
-        if (schemaReady || jdbc == null) return;
-        synchronized (this) {
-            if (schemaReady) return;
-            try {
-                jdbc.execute("CREATE TABLE IF NOT EXISTS chat_session ("
-                        + "session_id VARCHAR(80) NOT NULL, "
-                        + "user_id VARCHAR(64) NOT NULL, "
-                        + "tenant_id VARCHAR(64), "
-                        + "title VARCHAR(200), "
-                        + "created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP, "
-                        + "updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP, "
-                        + "PRIMARY KEY (user_id, session_id))");
-                migrateToUserKeyed();
-                jdbc.execute("DROP INDEX IF EXISTS idx_chat_session_owner");
-                jdbc.execute("CREATE INDEX IF NOT EXISTS idx_chat_session_owner_v2 "
-                        + "ON chat_session(user_id, updated_at DESC)");
-                schemaReady = true;
-            } catch (Exception e) {
-                log.warn("会话清单表不可用，会话列表仅保存在浏览器本地：{}", e.getMessage());
-            }
-        }
-    }
-
-    /**
-     * 旧三元组主键 (tenant_id,user_id,session_id) 的一次性迁移。
-     *
-     * <p>先去重（同一账号同一 sessionId 在多个租户下各有一行时保留最新），
-     * 再把主键换成 (user_id, session_id)。失败不阻塞启动，下次再试。</p>
-     */
-    private void migrateToUserKeyed() {
-        if (migrationDone) return;
-        try {
-            Boolean oldPk = jdbc.queryForObject(
-                    "SELECT COUNT(*) > 0 FROM pg_constraint c JOIN pg_class t ON c.conrelid = t.oid "
-                            + "WHERE t.relname = 'chat_session' AND c.contype = 'p' "
-                            + "AND pg_get_constraintdef(c.oid) LIKE '%tenant_id%'", Boolean.class);
-            if (!Boolean.TRUE.equals(oldPk)) { migrationDone = true; return; }
-            // 同一账号同一 sessionId 多租户各行：保留 updated_at 最新的一行
-            jdbc.update("DELETE FROM chat_session a USING chat_session b "
-                    + "WHERE a.user_id = b.user_id AND a.session_id = b.session_id "
-                    + "AND (a.updated_at < b.updated_at "
-                    + "OR (a.updated_at = b.updated_at AND a.tenant_id < b.tenant_id))");
-            jdbc.execute("ALTER TABLE chat_session DROP CONSTRAINT chat_session_pkey");
-            jdbc.execute("ALTER TABLE chat_session ADD PRIMARY KEY (user_id, session_id)");
-            migrationDone = true;
-            log.info("chat_session 主键已迁移为 (user_id, session_id)：会话跟随账号，不再随组织漂移");
-        } catch (Exception e) {
-            log.warn("会话清单主键迁移未完成（下次启动重试）：{}", e.getMessage());
-        }
+        this(null);
     }
 
     private static String tenant() {
@@ -132,9 +72,7 @@ public class ChatSessionStore {
      */
     public List<Map<String, Object>> list() {
         List<Map<String, Object>> out = new ArrayList<>();
-        if (jdbc == null) return out;
-        ensureSchema();
-        if (!schemaReady) return out;
+        if (mapper == null) return out;
         try {
             // 时间戳一定要走 JDBC 的 getTimestamp().getTime()，不要在 SQL 里 EXTRACT(EPOCH FROM ...)。
             // created_at/updated_at 是「无时区 TIMESTAMP」，写入时按 JVM 时区落的是本地墙上时间；
@@ -162,9 +100,7 @@ public class ChatSessionStore {
      * 某个组织名下的会话条数（删除组织前盘家底用）。
      */
     public int countByTenant(String tenant) {
-        if (jdbc == null || tenant == null || tenant.isBlank()) return 0;
-        ensureSchema();
-        if (!schemaReady) return 0;
+        if (mapper == null || tenant == null || tenant.isBlank()) return 0;
         try {
             Long n = (long) mapper.countByTenant(tenant);
             return n == null ? 0 : n.intValue();
@@ -178,9 +114,7 @@ public class ChatSessionStore {
      * 旧组织一删，这些历史问答就跟着失联。</p>
      */
     public int migrateTenant(String from, String to) {
-        if (jdbc == null || from == null || from.isBlank() || to == null || to.isBlank() || from.equals(to)) return 0;
-        ensureSchema();
-        if (!schemaReady) return 0;
+        if (mapper == null || from == null || from.isBlank() || to == null || to.isBlank() || from.equals(to)) return 0;
         try {
             return mapper.migrateTenant(from, to);
         } catch (Exception e) {
@@ -196,9 +130,7 @@ public class ChatSessionStore {
      * @return 是否写入成功（数据库不可用时 false，前端靠本地缓存继续工作）
      */
     public boolean upsert(String sessionId, String title) {
-        if (jdbc == null || sessionId == null || sessionId.isBlank()) return false;
-        ensureSchema();
-        if (!schemaReady) return false;
+        if (mapper == null || sessionId == null || sessionId.isBlank()) return false;
         String t = title == null ? "" : title.trim();
         if (t.length() > 200) t = t.substring(0, 200);
         try {
@@ -215,7 +147,7 @@ public class ChatSessionStore {
     /** 改名（用户在会话列表里重命名时用） */
     /** 会话是否属于当前账号（显式归属校验用） */
     public boolean exists(String sessionId) {
-        if (sessionId == null || sessionId.isBlank() || jdbc == null) return false;
+        if (sessionId == null || sessionId.isBlank() || mapper == null) return false;
         try {
             Integer n = mapper.exists(user(), sessionId);
             return n != null && n > 0;
@@ -223,9 +155,7 @@ public class ChatSessionStore {
     }
 
     public boolean rename(String sessionId, String title) {
-        if (jdbc == null || sessionId == null || sessionId.isBlank()) return false;
-        ensureSchema();
-        if (!schemaReady) return false;
+        if (mapper == null || sessionId == null || sessionId.isBlank()) return false;
         String t = title == null ? "" : title.trim();
         if (t.length() > 200) t = t.substring(0, 200);
         try {
@@ -238,9 +168,7 @@ public class ChatSessionStore {
 
     /** 删除会话清单行 */
     public boolean delete(String sessionId) {
-        if (jdbc == null || sessionId == null || sessionId.isBlank()) return false;
-        ensureSchema();
-        if (!schemaReady) return false;
+        if (mapper == null || sessionId == null || sessionId.isBlank()) return false;
         try {
             return mapper.delete(user(), sessionId) > 0;
         } catch (Exception e) {

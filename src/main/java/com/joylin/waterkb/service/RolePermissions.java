@@ -1,11 +1,11 @@
 package com.joylin.waterkb.service;
 
 import com.joylin.waterkb.mapper.RolePermissionMapper;
+import com.joylin.waterkb.mapper.SchemaSeedMapper;
 
 import jakarta.annotation.PostConstruct;
 import org.springframework.context.annotation.DependsOn;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
@@ -62,8 +62,8 @@ public class RolePermissions {
     }
 
     /** 可为 null：单测与无数据库环境只用内置默认 */
-    private final JdbcTemplate jdbc;
     private final RolePermissionMapper mapper;
+    private final SchemaSeedMapper seedMapper;
     /** 权限节点目录：自定义权限码的合法性校验来源 */
     private final PermissionCatalog catalog;
 
@@ -75,7 +75,7 @@ public class RolePermissions {
 
     /** 无数据库环境（单测）：用 roles.json 种子初始化内存视图，不写库 */
     public RolePermissions() {
-        this.jdbc = null; this.catalog = null; this.mapper = null;
+        this.catalog = null; this.mapper = null; this.seedMapper = null;
         Map<String, Set<String>> fromSeed = new LinkedHashMap<>();
         Map<String, String> names = new LinkedHashMap<>();
         for (Seed seed : loadSeeds()) {
@@ -89,34 +89,25 @@ public class RolePermissions {
     /**
      * 兼容单测：不接 Mapper。
      */
-    public RolePermissions(JdbcTemplate jdbc, PermissionCatalog catalog) { this(jdbc, catalog, null); }
+    public RolePermissions(PermissionCatalog catalog) { this(catalog, null, null); }
 
     @Autowired
-    public RolePermissions(JdbcTemplate jdbc, PermissionCatalog catalog, RolePermissionMapper mapper) {
-        this.jdbc = jdbc;
+    public RolePermissions(PermissionCatalog catalog, RolePermissionMapper mapper, SchemaSeedMapper seedMapper) {
         this.catalog = catalog;
         this.mapper = mapper;
+        this.seedMapper = seedMapper;
     }
 
     @PostConstruct
     public void init() {
-        if (jdbc == null) return;
+        if (mapper == null) return;
         try {
-            jdbc.execute("CREATE TABLE IF NOT EXISTS role_permissions ("
-                    + "role VARCHAR(64) NOT NULL, permission VARCHAR(64) NOT NULL, "
-                    + "PRIMARY KEY (role, permission))");
-            // 角色名称单独一张表：权限表是 (role,permission) 多行结构，名称放这里会在
-            // 每个权限行重复一遍，改个显示名要更新所有行。
-            jdbc.execute("CREATE TABLE IF NOT EXISTS role_definitions ("
-                    + "role VARCHAR(64) NOT NULL PRIMARY KEY, role_name VARCHAR(128) NOT NULL)");
             // 种子仅首次写入：库里已有该角色就不覆盖（后台改过的名称/权限保留）
             for (Seed seed : loadSeeds()) {
-                jdbc.update("INSERT INTO role_definitions(role, role_name) VALUES(?,?) "
-                        + "ON CONFLICT (role) DO NOTHING", seed.code, seed.name);
+                seedMapper.seedRoleName(seed.code, seed.name);
                 if (!"admin".equals(seed.code) && !seed.permissions.contains("*")) {
                     for (String perm : seed.permissions) {
-                        jdbc.update("INSERT INTO role_permissions(role, permission) VALUES(?,?) "
-                                + "ON CONFLICT (role, permission) DO NOTHING", seed.code, perm);
+                        seedMapper.seedRolePermission(seed.code, perm);
                     }
                 }
             }
@@ -126,10 +117,11 @@ public class RolePermissions {
         }
     }
 
-    /** 从数据库重建最终视图：DB 有记录的角色【整体替换】内置默认（后台勾选清单即全部权限），无记录的回落内置默认 */
-    /** 从数据库整体重载角色权限到内存视图（启动、保存、节点删除后调用），一律以库为准 */
+    /**
+     * 从数据库整体重载角色权限到内存视图。
+     */
     public void refresh() {
-        if (jdbc == null) { effective = Map.of(); roleNames = Map.of(); return; }
+        if (mapper == null) { effective = Map.of(); roleNames = Map.of(); return; }
         Map<String, Set<String>> fromDb = new LinkedHashMap<>();
         for (Map<String, Object> row : mapper.listAllPermissions()) {
             fromDb.computeIfAbsent(String.valueOf(row.get("role")).trim(), k -> new LinkedHashSet<>())
@@ -233,7 +225,7 @@ public class RolePermissions {
                 !Permission.ALL.contains(p) && (catalog == null || !catalog.exists(p)))) {
             throw new IllegalArgumentException("存在不合法的权限码");
         }
-        if (jdbc == null) throw new IllegalStateException("当前环境无数据库，角色权限不可配置");
+        if (mapper == null) throw new IllegalStateException("当前环境无数据库，角色权限不可配置");
         mapper.deletePermissions(name);
         for (String p : new LinkedHashSet<>(permissions)) {
             mapper.insertPermission(name, p);
@@ -249,7 +241,7 @@ public class RolePermissions {
     public boolean deleteRole(String role) {
         String name = normalize(role);
         if (name.equals("admin")) throw new IllegalArgumentException("管理员角色不可删除");
-        if (jdbc == null) throw new IllegalStateException("当前环境无数据库，角色权限不可配置");
+        if (mapper == null) throw new IllegalStateException("当前环境无数据库，角色权限不可配置");
         int rows = mapper.deletePermissions(name);
         mapper.deleteName(name);
         refresh();

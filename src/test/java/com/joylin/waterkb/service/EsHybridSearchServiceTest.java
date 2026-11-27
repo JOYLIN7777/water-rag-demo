@@ -43,7 +43,7 @@ class EsHybridSearchServiceTest {
         // OrgStore 用 null JdbcTemplate：ensure() 吞掉异常后走 fallback（只剩 default 顶层组织，无层级），
         // 正好用来验证"无层级时的基础 filter"；层级下发的结构校验在 CDP 真库场景做
         service = new EsHybridSearchService(null, props, null,
-                new DocVisibilityService(new com.joylin.waterkb.mapper.OrgStore(null)));
+                new DocVisibilityService(new com.joylin.waterkb.mapper.OrgStore()));
     }
 
     @AfterEach
