@@ -210,14 +210,6 @@ export default function Shell({ children }: { children: React.ReactNode }) {
 
         {auth.has('chat:use') && <>
         <button className="new-chat" type="button" onClick={newChat}>＋ 新建会话</button>
-        {chat.currentId && <button className="session-copy-id" type="button" title="复制当前会话ID（用于会话结构页）"
-          onClick={() => {
-            const id = chat.currentId
-            void navigator.clipboard.writeText(id).then(() => message.success('会话ID已复制')).catch(() => {
-              // 非安全上下文降级：prompt 让用户手动复制
-              window.prompt('复制会话ID：', id)
-            })
-          }}>⧉ 复制会话ID</button>}
         <div className="section-label">历史会话</div>
         <div className="session-list" id="sessionList">
           {sessions.length === 0
@@ -229,6 +221,13 @@ export default function Shell({ children }: { children: React.ReactNode }) {
                   data-sid={s.id} title={s.title || ''} onClick={() => pickSession(s.id)}>
                   <span className="session-name">{s.title || ('会话 ' + short)}</span>
                   <span className="session-time">{fmtTime(s.updatedAt)}</span>
+                  <button className="session-copy" type="button" title="复制会话ID"
+                    onClick={e => {
+                      e.stopPropagation()
+                      void navigator.clipboard.writeText(s.id).then(() => message.success('会话ID已复制')).catch(() => {
+                        window.prompt('复制会话ID：', s.id)
+                      })
+                    }}>⧉</button>
                   <button className="session-delete" type="button" title="删除会话"
                     onClick={e => { e.stopPropagation(); removeSession(s.id) }}>×</button>
                 </div>

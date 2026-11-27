@@ -452,3 +452,8 @@
   .tag.err{background:#fff0f2;color:#c74457}
   .tag.off{background:#f2f4f7;color:#8792a3}
   .msg-list-scroll{max-height:420px;overflow-y:auto;padding-right:6px}
+  .tree-session-select{min-width:260px;max-width:420px;padding:7px 10px;border:1px solid var(--line);
+    border-radius:8px;background:#fff;color:var(--ink-2);font-size:12.5px}
+  .tree-sid-advanced{margin-left:auto;font-size:11.5px;color:var(--muted)}
+  .tree-sid-advanced summary{cursor:pointer}
+  .tree-sid-advanced input{width:240px;padding:6px 8px;margin:8px 6px 0 0;border:1px solid var(--line);border-radius:7px;font-size:12px}

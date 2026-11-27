@@ -481,7 +481,6 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,te
   text-decoration:none;border:1px solid transparent}
 .perm-denied-primary{background:var(--primary,#2f6bff);color:#fff}
 .perm-denied-secondary{background:#fff;border-color:var(--line,#e4e9f2);color:var(--ink-2,#475467)}
-  .session-copy-id{display:block;width:calc(100% - 28px);margin:6px 14px 0;padding:6px 10px;border-radius:7px;
-    border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.05);color:#cbd6ec;
-    font-size:11.5px;cursor:pointer;text-align:center}
-  .session-copy-id:hover{background:rgba(255,255,255,.1);color:#fff}
+.sidebar .session-copy{border:0;background:transparent;color:#8fa0c0;font-size:13px;opacity:.42;padding:0 2px;line-height:1;flex:0 0 auto;transition:all .15s}
+.sidebar .session-item:hover .session-copy{opacity:1}
+.sidebar .session-copy:hover{color:#7cc6ff}

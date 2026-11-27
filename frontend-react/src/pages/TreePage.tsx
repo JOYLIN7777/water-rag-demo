@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { message } from 'antd'
 import { http } from '@/api/http'
+import { chatApi } from '@/api'
 import { useAuthStore } from '@/store/auth'
 import '@/styles/tree.css'
 import TopbarNav from '@/components/TopbarNav'
@@ -60,6 +61,7 @@ export default function TreePage() {
   const [branchName, setBranchName] = useState('')
   const [tip, setTip] = useState('')
   const [tipOk, setTipOk] = useState(true)
+  const [sessions, setSessions] = useState<Array<{ id: string; title?: string }>>([])
 
   function showTip(text: string, ok: boolean) { setTip(text); setTipOk(ok) }
 
@@ -75,6 +77,7 @@ export default function TreePage() {
 
   // 带 ?sid= 进来直接加载（问答页"还有其它分支"链接）
   useEffect(() => {
+    void chatApi.sessions().then(list => setSessions(Array.isArray(list) ? list : [])).catch(() => setSessions([]))
     const id = params.get('sid')
     if (id) { setSid(id); void load(id) }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -170,11 +173,18 @@ export default function TreePage() {
         </div>
 
         <div className="toolbar">
-          <label>会话ID</label>
-          <input type="text" id="sid" placeholder="问答页左侧栏「复制会话ID」按钮" value={sid} onChange={e => setSid(e.target.value)} />
-          <button className="btn" onClick={() => void load()}>加载会话树</button>
-          <button className="btn" onClick={() => location.reload()}>刷新</button>
+          <label>选择会话</label>
+          <select className="tree-session-select" value={sessions.some(x => x.id === sid) ? sid : ''}
+            onChange={e => { const id = e.target.value; setSid(id); if (id) void load(id) }}>
+            <option value="">请选择一个会话…</option>
+            {sessions.map(x => <option key={x.id} value={x.id}>{x.title || x.id.slice(0, 20)}</option>)}
+          </select>
+          <button className="btn" onClick={() => void load()}>刷新结构</button>
           <span id="stat">{tree ? `${tree.nodes.length} 个节点 · ${branches.length} 个命名分支` : ''}</span>
+          <details className="tree-sid-advanced"><summary>手动输入会话ID</summary>
+            <input type="text" id="sid" placeholder="粘贴会话ID" value={sid} onChange={e => setSid(e.target.value)} />
+            <button className="btn" onClick={() => void load()}>加载</button>
+          </details>
         </div>
 
         <div className={`msg${tip ? ' show' : ''} ${tipOk ? 'ok' : 'err'}`} id="msg">{tip}</div>
@@ -185,7 +195,7 @@ export default function TreePage() {
             <div id="tree">
               {tree
                 ? (tree.nodes.length ? buildTree('root', 0) : <div className="empty">该会话还没有消息</div>)
-                : <div className="empty">输入会话ID后加载</div>}
+                : <div className="empty">从上方下拉选择一个会话，即可看到它的消息分支</div>}
             </div>
             <div className="legend">
               <i style={{ background: '#60a5fa' }} />用户消息　<i style={{ background: 'var(--violet)' }} />助手回答　
