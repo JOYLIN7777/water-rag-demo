@@ -3,24 +3,42 @@
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.joylin.waterkb.mapper.ModelConfigMapper">
 
+    <!-- 显式列映射：model_name→model、is_active→active、is_default→isDefault。
+         只靠 map-underscore-to-camel-case 会得到 modelName/active 等不匹配属性，
+         曾导致提问时 model 为空、DashScope 报 "you must provide a model parameter"。 -->
+    <resultMap id="modelMap" type="com.joylin.waterkb.model.ModelConfig">
+        <id column="id" property="id"/>
+        <result column="name" property="name"/>
+        <result column="type" property="type"/>
+        <result column="base_url" property="baseUrl"/>
+        <result column="api_key" property="apiKey"/>
+        <result column="model_name" property="model"/>
+        <result column="dimensions" property="dimensions"/>
+        <result column="enabled" property="enabled"/>
+        <result column="is_active" property="active"/>
+        <result column="is_default" property="isDefault"/>
+        <result column="created_at" property="createdAt"/>
+        <result column="updated_at" property="updatedAt"/>
+    </resultMap>
+
     <sql id="cols">id, name, type, base_url, api_key, model_name, dimensions,
         enabled, is_active, is_default, created_at, updated_at</sql>
 
-    <select id="findAll" resultType="com.joylin.waterkb.model.ModelConfig">
+    <select id="findAll" resultMap="modelMap">
         SELECT <include refid="cols"/> FROM model_config ORDER BY id
     </select>
 
-    <select id="findById" resultType="com.joylin.waterkb.model.ModelConfig">
+    <select id="findById" resultMap="modelMap">
         SELECT <include refid="cols"/> FROM model_config WHERE id = #{id}
     </select>
 
-    <select id="findActive" resultType="com.joylin.waterkb.model.ModelConfig">
+    <select id="findActive" resultMap="modelMap">
         SELECT <include refid="cols"/> FROM model_config
         WHERE type = #{type} AND is_active = TRUE AND enabled = TRUE
         ORDER BY updated_at DESC, id DESC
     </select>
 
-    <select id="findDefault" resultType="com.joylin.waterkb.model.ModelConfig">
+    <select id="findDefault" resultMap="modelMap">
         SELECT <include refid="cols"/> FROM model_config
         WHERE type = #{type} AND enabled = TRUE
         ORDER BY is_default DESC, is_active DESC, updated_at DESC, id DESC
