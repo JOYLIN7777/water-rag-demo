@@ -72,7 +72,6 @@ public class PermissionCatalog {
     private static final Map<String, String[]> RENAMES = Map.of(
             "system:root", new String[]{"系统管理", "管理后台"},
             "admin:access", new String[]{"管理后台", "进入管理后台"},
-            "tree:use", new String[]{"问答分支", "会话结构"},
             "user:read", new String[]{"用户查看", "用户管理"},
             "audit:read", new String[]{"审计日志", "操作日志"});
 

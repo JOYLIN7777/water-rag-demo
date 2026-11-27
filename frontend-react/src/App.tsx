@@ -5,7 +5,6 @@ import LoginPage from './pages/LoginPage'
 import SettingsPage from './pages/SettingsPage'
 import ProfilePage from './pages/ProfilePage'
 import SearchPage from './pages/SearchPage'
-import TreePage from './pages/TreePage'
 import ManagePage from './pages/ManagePage'
 import IndexPage from './pages/IndexPage'
 import AdminLayout from './layouts/AdminLayout'
@@ -49,7 +48,6 @@ export default function App() {
       <Route path="/settings.html" element={<WithShell><SettingsPage /></WithShell>} />
       <Route path="/profile.html" element={<WithShell><ProfilePage /></WithShell>} />
       <Route path="/search.html" element={<WithShell perm="search:use"><SearchPage /></WithShell>} />
-      <Route path="/tree.html" element={<WithShell perm="tree:use"><TreePage /></WithShell>} />
       <Route path="/index.html" element={<WithShell perm="chat:use"><IndexPage /></WithShell>} />
       <Route path="/manage.html" element={<WithShell perm="doc:read"><ManagePage /></WithShell>} />
       {/* 后台 9 个面板 */}

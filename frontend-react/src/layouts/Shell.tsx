@@ -14,7 +14,7 @@ import { Avatar, fmtTime } from '@/components/Avatar'
 const ADMIN_PATHS = /admin\.html|admin-profile\.html|users\.html|org\.html|roles\.html|perms\.html|docs\.html|models\.html|usage\.html|loginlogs\.html|audit\.html/
 /** 工作台图标：服务端下发的是字符图标，映射到本地 Icon 组件名；未命中的用默认 */
 const WORKBENCH_ICONS: Record<string, string> = {
-  'index.html': 'chat', 'manage.html': 'doc', 'search.html': 'search', 'tree.html': 'tree'
+  'index.html': 'chat', 'manage.html': 'doc', 'search.html': 'search'
 }
 
 export default function Shell({ children }: { children: React.ReactNode }) {
@@ -139,7 +139,7 @@ export default function Shell({ children }: { children: React.ReactNode }) {
   /** 后台侧栏：console.* 分组，菜单图标/名称/权限全来自服务端（与旧版 renderAdminSidebar 一致） */
   // 工作台菜单：服务端 workbench:root 分组驱动；权限未加载时退回最小兜底，避免侧栏空白
   // 检索对比/会话结构属于「设置」里的工具入口，不在左栏重复露出
-  const TOOL_PAGES = ['/search.html', '/tree.html']
+  const TOOL_PAGES = ['/search.html']
   const workbenchFromServer = auth.menus.filter(m => m.allowed && m.group === 'workbench:root'
     && String(m.href).replace(/^\//, '') !== 'profile.html'
     && !TOOL_PAGES.includes(String(m.href)))

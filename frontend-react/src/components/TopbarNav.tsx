@@ -6,7 +6,6 @@ import { useAuthStore } from '@/store/auth'
 const PAGE_NAV: Record<string, { label: string; parent?: string; parentLabel?: string; back?: string; backText?: string }> = {
   'settings.html': { label: '设置', back: 'index.html' },
   'search.html': { label: '检索对比', parent: 'settings.html', parentLabel: '设置' },
-  'tree.html': { label: '会话结构', parent: 'settings.html', parentLabel: '设置' },
   'profile.html': { label: '个人中心', back: 'index.html' },
   'manage.html': { label: '知识库文档', back: 'index.html' }
 }

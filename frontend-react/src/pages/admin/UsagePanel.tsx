@@ -21,6 +21,7 @@ interface Record0 {
 export default function UsagePanel() {
   const navigate = useNavigate()
   const [sum, setSum] = useState<Summary | null>(null)
+  const [scopeLabel, setScopeLabel] = useState('')
   const [hint, setHint] = useState('')
   const [err, setErr] = useState('')
   const [drill, setDrill] = useState<'today' | 'month' | null>(null)

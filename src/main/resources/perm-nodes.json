@@ -104,16 +104,6 @@
       "order": 13
     },
     {
-      "code": "tree:use",
-      "name": "会话结构",
-      "type": "menu",
-      "module": "工作台",
-      "desc": "查看与切换问答分支",
-      "parent": "workbench:root",
-      "route": "/tree.html",
-      "order": 14
-    },
-    {
       "code": "tool:water_query",
       "name": "实时水情工具",
       "type": "btn",

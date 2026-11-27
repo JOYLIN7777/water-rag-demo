@@ -21,7 +21,6 @@
         "doc:delete",
         "doc:chunks",
         "search:use",
-        "tree:use",
         "usage:read",
         "tool:water_query"
       ]
@@ -33,7 +32,6 @@
         "chat:use",
         "doc:read",
         "search:use",
-        "tree:use",
         "tool:water_query"
       ]
     },
@@ -50,7 +48,6 @@
         "doc:delete",
         "doc:chunks",
         "search:use",
-        "tree:use",
         "usage:read",
         "tool:water_query"
       ]
@@ -75,7 +72,6 @@
         "chat:use",
         "doc:read",
         "search:use",
-        "tree:use",
         "tool:water_query"
       ]
     },
@@ -85,8 +81,7 @@
       "permissions": [
         "chat:use",
         "doc:read",
-        "search:use",
-        "tree:use"
+        "search:use"
       ]
     }
   ]

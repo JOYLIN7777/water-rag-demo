@@ -257,3 +257,9 @@
     background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%23677' fill='none'/%3E%3C/svg%3E");
     background-repeat:no-repeat;background-position:right 9px center}
   .model-pick-slot select.model-pick:disabled{opacity:.6;cursor:not-allowed}
+  /* 提问气泡：时间与复制按钮放在气泡下方，hover 才显示 */
+  .ask-meta{margin-top:5px;display:flex;justify-content:flex-end;align-items:center;gap:8px;
+    opacity:0;transition:opacity .15s}
+  .user-ask:hover .ask-meta{opacity:1}
+  .ask-copy{border:0;background:transparent;color:#94a2b8;font-size:11px;cursor:pointer;padding:1px 4px}
+  .ask-copy:hover{color:var(--primary)}

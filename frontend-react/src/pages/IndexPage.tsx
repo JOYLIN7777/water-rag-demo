@@ -354,6 +354,8 @@ export default function IndexPage() {
               else if (ev === 'message') ai.content += data
               else if (ev === 'done') {
                 finished = true
+                // 回答卡片时间用「回答完成」的时刻，不是提问发出的时刻
+                ai.finishedAt = Date.now()
                 if (data.startsWith('{')) {
                   try {
                     const d = JSON.parse(data)
@@ -465,8 +467,12 @@ export default function IndexPage() {
               <div className="msg-group user" key={i}>
                 {m.branchSeal && <div className="branch-seal"><span>↳ 接着这一轮换了个问法 · 以下为新分支（上面的原对话保留）</span></div>}
                 <div className="user-ask">
-                  <div className="ask-meta"><span className="ask-time">{fullTime(m.ts)}</span></div>
                   <div className="user-bubble">{m.content}</div>
+                  <div className="ask-meta">
+                    <span className="ask-time">{fullTime(m.ts)}</span>
+                    <button className="ask-copy" type="button" title="复制这条提问"
+                      onClick={() => { void navigator.clipboard.writeText(m.content); message.success('提问已复制') }}>⧉ 复制</button>
+                  </div>
                 </div>
               </div>
             ) : (
@@ -478,7 +484,7 @@ export default function IndexPage() {
                     <span className="ai-badge">水</span><span className="ai-card-name">水利知识库助手</span>
                     {m.branch && <span className="branch-chip">分支</span>}
                     {m.streaming && <span className="ai-state" style={{ color: 'var(--primary)' }}>生成中…</span>}
-                    <span className="ai-time">{fullTime(m.ts)}</span>
+                    <span className="ai-time">{fullTime(m.finishedAt || m.ts)}</span>
                     <span className="ai-card-actions">
                       {m.usage && localStorage.getItem('wrk_pref_usage') !== '0' &&
                         <span className="ai-usage" title={usageTip(m.usage)}>{usageInner(m.usage)}</span>}

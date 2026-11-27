@@ -10,9 +10,7 @@ import AdminEntry from '@/components/AdminEntry'
 /** ShellSettings（与 app.js 一致），只显示有权限的 */
 const SETTINGS = [
   { key: 'search', href: '/search.html', label: '检索对比', icon: 'search', perm: 'search:use',
-    desc: '对比关键词检索、语义检索和融合检索的结果，帮助找到更准的答案' },
-  { key: 'tree', href: '/tree.html', label: '会话结构', icon: 'tree', perm: 'tree:use',
-    desc: '查看当前会话的消息树与命名分支，可切回任意历史节点' }
+    desc: '对比关键词检索、语义检索和融合检索的结果，帮助找到更准的答案' }
 ]
 
 /** 问答偏好：本地生效，刷新/切页后保留；对应 IndexPage 里的读取点 */
@@ -26,7 +24,7 @@ export default function SettingsPage() {
   const backToProfile = params.get('from') === 'profile'
   const auth = useAuthStore()
   // 设置项从服务端菜单取：名称、顺序、是否可见全由后台权限配置决定；SETTINGS 只作兜底
-  const serverItems = auth.menus.filter(m => m.allowed && ['/search.html', '/tree.html'].includes(String(m.href)))
+  const serverItems = auth.menus.filter(m => m.allowed && ['/search.html'].includes(String(m.href)))
   const visible = serverItems.length
     ? serverItems.map(m => ({ key: String(m.href).replace(/^\//, '').replace('.html', ''),
         href: String(m.href), label: m.name, icon: m.icon || 'doc',

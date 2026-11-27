@@ -106,8 +106,6 @@ export const chatApi = {
   createSession: (sessionId: string, title = '') =>
     http.post('/api/chat/sessions', { sessionId, title }),
   clearSession: (id: string) => http.delete(`/api/chat/sessions/${encodeURIComponent(id)}`),
-  fork: (body: unknown) => http.post('/api/chat/fork', body),
-  rewind: (body: unknown) => http.post('/api/chat/rewind', body),
   suggestions: () => http.get<string[]>('/api/chat/suggestions')
 }
 

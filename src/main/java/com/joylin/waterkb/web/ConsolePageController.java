@@ -22,7 +22,7 @@ public class ConsolePageController {
             "/login.html", "/index.html",
             "/users.html", "/org.html", "/roles.html", "/perms.html",
             "/docs.html", "/models.html", "/usage.html", "/loginlogs.html", "/audit.html",
-            "/manage.html", "/search.html", "/tree.html", "/settings.html", "/profile.html",
+            "/manage.html", "/search.html", "/settings.html", "/profile.html",
             "/forgot.html", "/admin.html"
     })
     public ResponseEntity<byte[]> spaFallback() throws IOException {

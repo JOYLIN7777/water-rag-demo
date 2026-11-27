@@ -10,6 +10,8 @@ export interface ChatMessageExt extends ChatMessage {
   branchSeal?: boolean
   /** 问答时间（毫秒时间戳）：后端 history 的 ts 字段，本地新发消息用 Date.now() */
   ts?: number
+  /** 回答完成的时刻（毫秒时间戳）：与提问时刻 ts 区分 */
+  finishedAt?: number
   usage?: Record<string, any> & { durationMs?: number }
 }
 
