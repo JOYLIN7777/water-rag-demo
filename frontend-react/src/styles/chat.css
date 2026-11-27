@@ -253,7 +253,7 @@
     text-align:center;white-space:nowrap}
   .model-pick-dropdown .ant-select-item-option-content{text-align:center;width:100%}
   .model-pick-dropdown .ant-select-item-option-selected{background:var(--primary-soft) !important;color:var(--primary) !important;font-weight:400}
-  .model-pick-dropdown.ant-select-dropdown{width:280px !important;padding:4px;background:#fff;
+  .model-pick-dropdown.ant-select-dropdown{width:240px !important;padding:4px;background:#fff;
     border:1px solid var(--line);border-radius:10px;box-shadow:0 8px 24px rgba(20,40,80,.12)}
   /* 提问气泡：时间与复制按钮放在气泡下方，hover 才显示 */
   .ask-meta{margin-top:5px;display:flex;justify-content:flex-end;align-items:center;gap:8px;

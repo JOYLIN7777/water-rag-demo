@@ -528,7 +528,7 @@ export default function IndexPage() {
                             groups.forEach((_, k) => { next[`${i}-${k}`] = !allOpen })
                             return next
                           })
-                          setTimeout(() => scrollBottom(true), 120)
+                          // 展开/收起引用不滚动：保持在当前位置，避免跳到最新消息
                         }}>▤ {groupCites(m.sources).length} 文档 / {m.sources.length} 片段</button>}
                       <button className="icon-btn" title="复制回答到剪贴板"
                         onClick={() => { void navigator.clipboard.writeText(m.content); message.success('回答已复制') }}>复制</button>
