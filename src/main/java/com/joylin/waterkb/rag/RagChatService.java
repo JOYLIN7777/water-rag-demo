@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.joylin.waterkb.config.RagProperties;
 import com.joylin.waterkb.memory.ConversationTreeStore;
 import com.joylin.waterkb.memory.TreeNode;
+import com.joylin.waterkb.model.ModelConfig;
 import com.joylin.waterkb.model.ModelConfigRepository;
 import com.joylin.waterkb.model.ModelRegistry;
 import com.joylin.waterkb.resilience.LlmCircuitBreaker;
@@ -146,15 +147,17 @@ public class RagChatService {
         boolean[] degraded = {false};
         Flux<String> tokens;
 
-        if (!breaker.allowCall()) {
-            // 熔断打开期：明确提示模型服务异常，不再用检索原文冒充模型回答
+        // 先按健康状态挑一个可用模型；某个模型失败会被标记跳过，自动切到下一个，
+        // 不再出现「内网模型不通 → 全局熔断 → 健康模型也用不了」。
+        ModelConfig healthy = modelRegistry.firstHealthyChat(modelId);
+        if (healthy == null) {
             degraded[0] = true;
-            String fallback = modelErrorMessage("AI 服务处于熔断保护中，暂时无法生成回答，请稍后重试");
+            String fallback = modelErrorMessage("所有对话模型暂时不可用，请检查模型配置或稍后重试");
             answerBuf.append(fallback);
             tokens = Flux.just(fallback);
         } else {
             // 每次调用动态取当前激活的 Chat 模型（含 Tool Calling 工具注册）
-            tokens = buildTokens(question, systemPrompt, answerBuf, degraded, hits, usageRef, modelId);
+            tokens = buildTokens(question, systemPrompt, answerBuf, degraded, hits, usageRef, modelId, healthy);
         }
 
         // 统一收尾：先落库（同步、可观测），再发 done。所有分支（正常/熔断/降级）都经过这里。
@@ -168,7 +171,10 @@ public class RagChatService {
         AtomicBoolean persisted = new AtomicBoolean(false);
         Mono<String> persistThenDone = Mono.fromCallable(() -> {
             if (!persisted.compareAndSet(false, true)) return "[DONE]";
-            if (!degraded[0]) breaker.recordSuccess();
+            if (!degraded[0]) {
+                breaker.recordSuccess();
+                if (healthy != null && healthy.getId() != null) modelRegistry.markSuccess(healthy.getId());
+            }
             long durationMs = System.currentTimeMillis() - startAt;
 
             // 先把本轮消耗算出来，再落库。两个用途共用这一份数据：
@@ -354,18 +360,17 @@ public class RagChatService {
      */
     private Flux<String> buildTokens(String question, String systemPrompt, StringBuilder answerBuf,
                                      boolean[] degraded, List<Document> hits, AtomicReference<Usage> usageRef,
-                                     Long modelId) {
+                                     Long modelId, ModelConfig healthy) {
         ChatClient chatClient;
+        ModelConfig chosen = healthy;
         try {
-            // 按次选择的模型优先；不切换全局激活配置，只影响本次回答
-            com.joylin.waterkb.model.ModelConfig chosen = modelId == null
-                    ? modelConfigRepository.findActive("CHAT") : modelConfigRepository.findById(modelId);
             if (chosen == null || !chosen.isEnabled()) {
                 throw new IllegalStateException("所选 CHAT 模型不可用");
             }
             chatClient = modelRegistry.chatClientFor(chosen, waterInfoTool);
         } catch (Exception ex) {
             breaker.recordFailure();
+            if (chosen != null && chosen.getId() != null) modelRegistry.markFailure(chosen.getId());
             degraded[0] = true;
             log.error("Chat 模型构建失败：{}", ex.getMessage());
             String fallback = modelErrorMessage("模型配置异常，无法生成回答，请联系管理员检查模型设置");
@@ -394,6 +399,7 @@ public class RagChatService {
                         ? resp.getResult().getOutput().getText() : "")
                 .onErrorResume(ex -> {
                     breaker.recordFailure();
+                    if (chosen != null && chosen.getId() != null) modelRegistry.markFailure(chosen.getId());
                     degraded[0] = true;
                     log.error("模型调用失败：{}", ex.getMessage());
                     String fallback = modelErrorMessage("模型服务异常，本次回答生成失败，请稍后重试");

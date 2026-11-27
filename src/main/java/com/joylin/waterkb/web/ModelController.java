@@ -131,7 +131,11 @@ public class ModelController {
     public Map<String, Object> test(@PathVariable long id) {
         ModelConfig c = repository.findById(id);
         if (c == null) throw new IllegalArgumentException("模型配置不存在：" + id);
-        return Map.of("name", c.getName(), "type", c.getType(), "result", registry.test(c));
+        String result = registry.test(c);
+        // 测试成功即解除跳过；测试失败立即标记，后续提问直接走其它可用模型
+        if (result != null && result.startsWith("OK")) registry.markSuccess(id);
+        else registry.markFailure(id);
+        return Map.of("name", c.getName(), "type", c.getType(), "result", result);
     }
 
     private void validate(ModelConfig c) {

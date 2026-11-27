@@ -39,6 +39,52 @@ public class ModelRegistry {
     /** 缓存：fingerprint → 模型实例 */
     private final Map<String, ChatModel> chatCache = new ConcurrentHashMap<>();
     private final Map<String, EmbeddingModel> embeddingCache = new ConcurrentHashMap<>();
+    /** 模型健康状态：某个模型连续失败后短暂跳过，不让一个坏模型拖垮全部问答 */
+    private final Map<Long, ModelHealth> chatHealth = new ConcurrentHashMap<>();
+    private static final long SKIP_MS = 60_000L;
+
+    private static class ModelHealth {
+        volatile int failures;
+        volatile long skipUntil;
+    }
+
+    /** 该模型是否处于「暂时跳过」状态 */
+    public boolean isSkipped(long modelId) {
+        ModelHealth h = chatHealth.get(modelId);
+        return h != null && System.currentTimeMillis() < h.skipUntil;
+    }
+
+    /** 调用失败：第一次失败就跳过 60 秒，快速切到下一个可用模型 */
+    public void markFailure(long modelId) {
+        ModelHealth h = chatHealth.computeIfAbsent(modelId, k -> new ModelHealth());
+        h.failures++;
+        h.skipUntil = System.currentTimeMillis() + SKIP_MS;
+        log.warn("模型 {} 调用失败（第 {} 次），跳过 {} 秒", modelId, h.failures, SKIP_MS / 1000);
+    }
+
+    /** 调用成功：清掉跳过标记 */
+    public void markSuccess(long modelId) {
+        chatHealth.remove(modelId);
+    }
+
+    /**
+     * 返回当前可用的 CHAT 模型：在激活且启用的模型里挑第一个没被跳过的。
+     * 用户按次指定模型时被跳过的同样跳过，保证坏模型不会卡住任何一次提问。
+     */
+    public ModelConfig firstHealthyChat(Long requestedId) {
+        java.util.List<ModelConfig> all = repository.findAll();
+        if (requestedId != null) {
+            for (ModelConfig c : all) {
+                if (c.getId() != null && c.getId().equals(requestedId) && c.isEnabled() && !isSkipped(c.getId())) return c;
+            }
+        }
+        for (ModelConfig c : all) {
+            if ("CHAT".equalsIgnoreCase(c.getType()) && c.isActive() && c.isEnabled() && !isSkipped(c.getId())) {
+                return c;
+            }
+        }
+        return null;
+    }
 
     public ModelRegistry(ModelConfigRepository repository, DelegatingEmbeddingModel delegatingEmbeddingModel) {
         this.repository = repository;
@@ -173,7 +219,9 @@ public class ModelRegistry {
                 .apiKey(key)
                 .restClientBuilder(RestClient.builder()
                         .requestFactory(new org.springframework.http.client.SimpleClientHttpRequestFactory() {{
-                            setConnectTimeout(Duration.ofSeconds(10));
+                            // 连接超时 3 秒：内网模型不可达时能快速失败并跳到下一个，
+                            // 不再让每次提问都干等 10-30 秒。读超时保留 60 秒给正常的长回答。
+                            setConnectTimeout(Duration.ofSeconds(3));
                             setReadTimeout(Duration.ofSeconds(60));
                         }}))
                 .build();
