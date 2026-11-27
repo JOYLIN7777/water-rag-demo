@@ -57,7 +57,6 @@
       "name": "审计部",
       "permissions": [
         "doc:read",
-        "doc:write",
         "chat:use",
         "usage:read",
         "tool:water_query",
