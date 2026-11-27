@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.joylin.waterkb.mapper.RolePermissionMapper">
+
+    <select id="listAllPermissions" resultType="java.util.LinkedHashMap">
+        SELECT role, permission FROM role_permissions ORDER BY role, permission
+    </select>
+
+    <select id="listAllNames" resultType="java.util.LinkedHashMap">
+        SELECT role, role_name AS "roleName" FROM role_definitions
+    </select>
+
+    <delete id="deletePermissions">DELETE FROM role_permissions WHERE role=#{role}</delete>
+
+    <insert id="insertPermission">
+        INSERT INTO role_permissions(role, permission) VALUES(#{role}, #{permission})
+    </insert>
+
+    <insert id="upsertName">
+        INSERT INTO role_definitions(role, role_name) VALUES(#{role}, #{name})
+        ON CONFLICT(role) DO UPDATE SET role_name=excluded.role_name
+    </insert>
+
+    <delete id="deleteName">DELETE FROM role_definitions WHERE role=#{role}</delete>
+</mapper>

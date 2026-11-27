@@ -1,5 +1,7 @@
 package com.joylin.waterkb.service;
 
+import com.joylin.waterkb.mapper.RolePermissionMapper;
+
 import jakarta.annotation.PostConstruct;
 import org.springframework.context.annotation.DependsOn;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -61,6 +63,7 @@ public class RolePermissions {
 
     /** 可为 null：单测与无数据库环境只用内置默认 */
     private final JdbcTemplate jdbc;
+    private final RolePermissionMapper mapper;
     /** 权限节点目录：自定义权限码的合法性校验来源 */
     private final PermissionCatalog catalog;
 
@@ -72,7 +75,7 @@ public class RolePermissions {
 
     /** 无数据库环境（单测）：用 roles.json 种子初始化内存视图，不写库 */
     public RolePermissions() {
-        this.jdbc = null; this.catalog = null;
+        this.jdbc = null; this.catalog = null; this.mapper = null;
         Map<String, Set<String>> fromSeed = new LinkedHashMap<>();
         Map<String, String> names = new LinkedHashMap<>();
         for (Seed seed : loadSeeds()) {
@@ -83,10 +86,16 @@ public class RolePermissions {
         this.roleNames = Map.copyOf(names);
     }
 
+    /**
+     * 兼容单测：不接 Mapper。
+     */
+    public RolePermissions(JdbcTemplate jdbc, PermissionCatalog catalog) { this(jdbc, catalog, null); }
+
     @Autowired
-    public RolePermissions(JdbcTemplate jdbc, PermissionCatalog catalog) {
+    public RolePermissions(JdbcTemplate jdbc, PermissionCatalog catalog, RolePermissionMapper mapper) {
         this.jdbc = jdbc;
         this.catalog = catalog;
+        this.mapper = mapper;
     }
 
     @PostConstruct
@@ -122,15 +131,15 @@ public class RolePermissions {
     public void refresh() {
         if (jdbc == null) { effective = Map.of(); roleNames = Map.of(); return; }
         Map<String, Set<String>> fromDb = new LinkedHashMap<>();
-        jdbc.query("SELECT role, permission FROM role_permissions ORDER BY role, permission", rs -> {
-            fromDb.computeIfAbsent(rs.getString("role").trim(), k -> new LinkedHashSet<>())
-                    .add(rs.getString("permission").trim());
-        });
+        for (Map<String, Object> row : mapper.listAllPermissions()) {
+            fromDb.computeIfAbsent(String.valueOf(row.get("role")).trim(), k -> new LinkedHashSet<>())
+                    .add(String.valueOf(row.get("permission")).trim());
+        }
         effective = Map.copyOf(fromDb);
         Map<String, String> names = new LinkedHashMap<>();
-        jdbc.query("SELECT role, role_name FROM role_definitions", rs -> {
-            names.put(rs.getString("role").trim(), rs.getString("role_name").trim());
-        });
+        for (Map<String, Object> row : mapper.listAllNames()) {
+            names.put(String.valueOf(row.get("role")).trim(), String.valueOf(row.get("roleName")).trim());
+        }
         roleNames = Map.copyOf(names);
     }
 
@@ -225,14 +234,13 @@ public class RolePermissions {
             throw new IllegalArgumentException("存在不合法的权限码");
         }
         if (jdbc == null) throw new IllegalStateException("当前环境无数据库，角色权限不可配置");
-        jdbc.update("DELETE FROM role_permissions WHERE role=?", name);
+        mapper.deletePermissions(name);
         for (String p : new LinkedHashSet<>(permissions)) {
-            jdbc.update("INSERT INTO role_permissions(role,permission) VALUES(?,?)", name, p);
+            mapper.insertPermission(name, p);
         }
         String label = displayName == null ? "" : displayName.trim();
         if (!label.isEmpty()) {
-            jdbc.update("INSERT INTO role_definitions(role,role_name) VALUES(?,?) "
-                    + "ON CONFLICT(role) DO UPDATE SET role_name=excluded.role_name", name, label);
+            mapper.upsertName(name, label);
         }
         refresh();
     }
@@ -242,8 +250,8 @@ public class RolePermissions {
         String name = normalize(role);
         if (name.equals("admin")) throw new IllegalArgumentException("管理员角色不可删除");
         if (jdbc == null) throw new IllegalStateException("当前环境无数据库，角色权限不可配置");
-        int rows = jdbc.update("DELETE FROM role_permissions WHERE role=?", name);
-        jdbc.update("DELETE FROM role_definitions WHERE role=?", name);
+        int rows = mapper.deletePermissions(name);
+        mapper.deleteName(name);
         refresh();
         return rows > 0;
     }
