@@ -25,6 +25,7 @@ public class ModelConfigRepository {
     private static final Logger log = LoggerFactory.getLogger(ModelConfigRepository.class);
 
     private final JdbcTemplate jdbc;
+    private final ModelConfigMapper mapper;
     // 种子配置：与 application.yml 的 AI_* 环境变量保持一致
     private final String seedApiKey;
     private final String seedBaseUrl;
@@ -32,13 +33,14 @@ public class ModelConfigRepository {
     private final String seedEmbeddingModel;
     private final int seedDimensions;
 
-    public ModelConfigRepository(JdbcTemplate jdbc,
+    public ModelConfigRepository(JdbcTemplate jdbc, ModelConfigMapper mapper,
                                  @Value("${spring.ai.openai.api-key:}") String seedApiKey,
                                  @Value("${spring.ai.openai.base-url:https://dashscope.aliyuncs.com/compatible-mode}") String seedBaseUrl,
                                  @Value("${spring.ai.openai.chat.options.model:qwen-plus}") String seedChatModel,
                                  @Value("${spring.ai.openai.embedding.options.model:text-embedding-v3}") String seedEmbeddingModel,
                                  @Value("${spring.ai.vectorstore.pgvector.dimensions:1024}") int seedDimensions) {
         this.jdbc = jdbc;
+        this.mapper = mapper;
         this.seedApiKey = seedApiKey;
         this.seedBaseUrl = seedBaseUrl;
         this.seedChatModel = seedChatModel;
@@ -91,7 +93,7 @@ public class ModelConfigRepository {
 
     /** 首次启动（表空）时导入环境变量配置，保持原有 Docker 部署无需额外配置 */
     private void seedIfEmpty() {
-        Integer count = jdbc.queryForObject("SELECT COUNT(*) FROM model_config", Integer.class);
+        Integer count = mapper.count();
         if (count != null && count > 0) return;
         insert("DashScope · " + seedChatModel, "CHAT", seedBaseUrl, seedApiKey, seedChatModel, null, true);
         insert("DashScope · " + seedEmbeddingModel, "EMBEDDING", seedBaseUrl, seedApiKey, seedEmbeddingModel, seedDimensions, true);
@@ -99,26 +101,19 @@ public class ModelConfigRepository {
                 seedChatModel, seedEmbeddingModel, seedDimensions);
     }
 
-    public List<ModelConfig> findAll() {
-        return jdbc.query("SELECT * FROM model_config ORDER BY id", MAPPER);
-    }
+    public List<ModelConfig> findAll() { return mapper.findAll(); }
 
-    public ModelConfig findById(long id) {
-        List<ModelConfig> list = jdbc.query("SELECT * FROM model_config WHERE id=?", MAPPER, id);
-        return list.isEmpty() ? null : list.get(0);
-    }
+    public ModelConfig findById(long id) { return mapper.findById(id); }
 
     public ModelConfig findActive(String type) {
         // 最后激活的作为全局默认模型，对所有角色生效（多模型同时激活时按 updated_at 倒序）
-        List<ModelConfig> list = jdbc.query("SELECT * FROM model_config WHERE type=? AND is_active=TRUE AND enabled=TRUE "
-                + "ORDER BY updated_at DESC, id DESC", MAPPER, type);
+        List<ModelConfig> list = mapper.findActive(type);
         return list.isEmpty() ? null : list.get(0);
     }
 
     /** 全局默认模型：显式 is_default 优先；历史数据没有默认时回落到最后激活的 */
     public ModelConfig findDefault(String type) {
-        List<ModelConfig> list = jdbc.query("SELECT * FROM model_config WHERE type=? AND enabled=TRUE "
-                + "ORDER BY is_default DESC, is_active DESC, updated_at DESC, id DESC", MAPPER, type);
+        List<ModelConfig> list = mapper.findDefault(type);
         return list.isEmpty() ? null : list.get(0);
     }
 
@@ -126,8 +121,8 @@ public class ModelConfigRepository {
     public int setDefault(long id) {
         ModelConfig c = findById(id);
         if (c == null) return 0;
-        jdbc.update("UPDATE model_config SET is_default=FALSE WHERE type=?", c.getType());
-        jdbc.update("UPDATE model_config SET is_active=TRUE, is_default=TRUE, updated_at=CURRENT_TIMESTAMP WHERE id=?", id);
+        mapper.clearDefault(c.getType());
+        mapper.setDefault(id);
         return 1;
     }
 
@@ -136,19 +131,18 @@ public class ModelConfigRepository {
         ModelConfig c = findById(id);
         if (c == null) return 0;
         if ("EMBEDDING".equalsIgnoreCase(c.getType())) {
-            jdbc.update("UPDATE model_config SET is_active=FALSE, updated_at=CURRENT_TIMESTAMP WHERE type=?", c.getType());
+            mapper.clearActiveByType(c.getType());
         }
-        return jdbc.update("UPDATE model_config SET is_active=TRUE, updated_at=CURRENT_TIMESTAMP WHERE id=?", id);
+        return mapper.activate(id);
     }
 
     /** 禁用配置时一并取消激活，否则列表还显示「使用中」，代理仍在调一个已禁用的模型 */
     public int deactivate(long id) {
-        return jdbc.update("UPDATE model_config SET is_active=FALSE, updated_at=CURRENT_TIMESTAMP WHERE id=?", id);
+        return mapper.deactivate(id);
     }
 
     public int insert(String name, String type, String baseUrl, String apiKey, String model, Integer dimensions, boolean active) {
-        return jdbc.update("INSERT INTO model_config(name,type,base_url,api_key,model_name,dimensions,is_active) " +
-                        "VALUES(?,?,?,?,?,?,?)", name, type, baseUrl, apiKey == null ? "" : apiKey, model, dimensions, active);
+        return mapper.insert(name, type, baseUrl, apiKey == null ? "" : apiKey, model, dimensions, active);
     }
 
     /** 更新（API Key 传 null 表示保持原值，便于脱敏回显后编辑不改 Key） */
@@ -157,12 +151,11 @@ public class ModelConfigRepository {
         if (old == null) return 0;
         // 空值或脱敏串（含 ****）都表示保持原 Key，避免把掩码写回数据库
         String key = (apiKey == null || apiKey.isEmpty() || apiKey.contains("****")) ? old.getApiKey() : apiKey;
-        return jdbc.update("UPDATE model_config SET name=?,type=?,base_url=?,api_key=?,model_name=?,dimensions=?,enabled=?,updated_at=CURRENT_TIMESTAMP WHERE id=?",
-                name, type, baseUrl, key, model, dimensions, enabled, id);
+        return mapper.update(id, name, type, baseUrl, key, model, dimensions, enabled);
     }
 
     public int delete(long id) {
-        return jdbc.update("DELETE FROM model_config WHERE id=?", id);
+        return mapper.delete(id);
     }
 
     /** ES 索引维度（来自 es.dimensions 配置），用于校验 embedding 切换兼容性 */
