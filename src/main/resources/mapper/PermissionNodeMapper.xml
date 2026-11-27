@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.joylin.waterkb.mapper.PermissionNodeMapper">
+
+    <select id="listAll" resultType="java.util.LinkedHashMap">
+        SELECT code, name, node_type AS "nodeType", module, description,
+               builtin, parent_code AS "parentCode", route_path AS "routePath",
+               order_num AS "orderNum", icon
+        FROM perm_node
+        WHERE COALESCE(retired,FALSE)=FALSE
+        ORDER BY builtin DESC, order_num, code
+    </select>
+
+    <select id="exists" resultType="boolean">
+        SELECT COUNT(*) &gt; 0 FROM perm_node WHERE code=#{code}
+    </select>
+
+    <update id="discoverRoute">
+        UPDATE perm_node SET
+            route_path=CASE WHEN #{route}='' OR (builtin=TRUE AND route_path&lt;&gt;'') THEN route_path ELSE #{route} END,
+            last_seen_at=CURRENT_TIMESTAMP
+        WHERE code=#{code}
+    </update>
+
+    <insert id="discoverInsert">
+        INSERT INTO perm_node(code,name,node_type,module,description,builtin,parent_code,route_path,order_num,last_seen_at)
+        VALUES(#{code},#{name},#{type},#{module},'页面自动发现',FALSE,#{parent},#{route},0,CURRENT_TIMESTAMP)
+    </insert>
+
+    <update id="touch">UPDATE perm_node SET last_seen_at=CURRENT_TIMESTAMP WHERE code=#{code}</update>
+
+    <update id="syncBuiltin">
+        UPDATE perm_node SET name=#{name}, node_type=#{type}, route_path=#{route}, order_num=#{order},
+            module=CASE WHEN #{module}='' THEN module ELSE #{module} END,
+            retired=FALSE, last_seen_at=CURRENT_TIMESTAMP
+        WHERE code=#{code} AND builtin=TRUE
+    </update>
+
+    <insert id="syncInsert">
+        INSERT INTO perm_node(code,name,node_type,module,description,builtin,parent_code,route_path,order_num,last_seen_at)
+        VALUES(#{code},#{name},#{type},#{module},'页面清单定义',TRUE,'',#{route},#{order},CURRENT_TIMESTAMP)
+    </insert>
+
+    <update id="setParent">UPDATE perm_node SET parent_code=#{parent} WHERE code=#{code} AND builtin=TRUE</update>
+
+    <select id="listActiveBuiltins" resultType="string">
+        SELECT code FROM perm_node WHERE builtin=TRUE AND retired=FALSE
+    </select>
+
+    <update id="retire">UPDATE perm_node SET retired=TRUE WHERE code=#{code}</update>
+
+    <insert id="create">
+        INSERT INTO perm_node(code,name,node_type,module,description,builtin,parent_code,route_path,order_num)
+        VALUES(#{code},#{name},#{type},#{module},#{desc},FALSE,#{parentCode},#{routePath},#{orderNum})
+    </insert>
+
+    <update id="update">
+        UPDATE perm_node SET name=#{name}, node_type=#{type}, module=#{module}, description=#{desc},
+            parent_code=#{parentCode}, route_path=#{routePath}, order_num=#{orderNum}
+        WHERE code=#{code}
+    </update>
+
+    <select id="isBuiltin" resultType="boolean">SELECT builtin FROM perm_node WHERE code=#{code}</select>
+
+    <delete id="delete">DELETE FROM perm_node WHERE code=#{code}</delete>
+
+    <delete id="deleteFromRoles">DELETE FROM role_permissions WHERE permission=#{code}</delete>
+</mapper>

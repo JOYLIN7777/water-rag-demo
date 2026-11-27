@@ -1,5 +1,7 @@
 package com.joylin.waterkb.service;
 
+import com.joylin.waterkb.mapper.PermissionNodeMapper;
+
 import jakarta.annotation.PostConstruct;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -79,8 +81,15 @@ public class PermissionCatalog {
             "audit:read", new String[]{"审计日志", "操作日志"});
 
     private final JdbcTemplate jdbc;
+    private final PermissionNodeMapper mapper;
 
-    public PermissionCatalog(JdbcTemplate jdbc) { this.jdbc = jdbc; }
+    public PermissionCatalog(JdbcTemplate jdbc) { this(jdbc, null); }
+
+    @Autowired
+    public PermissionCatalog(JdbcTemplate jdbc, PermissionNodeMapper mapper) {
+        this.jdbc = jdbc;
+        this.mapper = mapper;
+    }
 
     @PostConstruct
     public void init() {
@@ -120,30 +129,26 @@ public class PermissionCatalog {
     /** 全部权限节点（内置 + 自定义），按模块与内置顺序排列 */
     public List<Map<String, Object>> list() {
         List<Map<String, Object>> out = new ArrayList<>();
-        jdbc.query("SELECT code,name,node_type,module,description,builtin,parent_code,route_path,order_num,icon "
-                + "FROM perm_node WHERE COALESCE(retired,FALSE)=FALSE ORDER BY builtin DESC, order_num, code", rs -> {
+        for (Map<String, Object> row : mapper.listAll()) {
             Map<String, Object> m = new LinkedHashMap<>();
-            m.put("code", rs.getString("code"));
-            m.put("name", rs.getString("name"));
-            m.put("nodeType", rs.getString("node_type"));
-            m.put("module", rs.getString("module"));
-            m.put("description", rs.getString("description"));
-            m.put("builtin", rs.getBoolean("builtin"));
-            m.put("parentCode", rs.getString("parent_code") == null ? "" : rs.getString("parent_code"));
-            m.put("routePath", rs.getString("route_path") == null ? "" : rs.getString("route_path"));
-            m.put("orderNum", rs.getInt("order_num"));
-            String icon = rs.getString("icon");
-            m.put("icon", icon == null ? "" : icon);
+            m.put("code", row.get("code"));
+            m.put("name", row.get("name"));
+            m.put("nodeType", row.get("nodeType"));
+            m.put("module", row.get("module"));
+            m.put("description", row.get("description"));
+            m.put("builtin", row.get("builtin"));
+            m.put("parentCode", row.get("parentCode") == null ? "" : row.get("parentCode"));
+            m.put("routePath", row.get("routePath") == null ? "" : row.get("routePath"));
+            m.put("orderNum", row.get("orderNum"));
+            m.put("icon", row.get("icon") == null ? "" : row.get("icon"));
             out.add(m);
-        });
+        }
         return out;
     }
 
     /** 权限标识是否存在于目录（角色保存时的合法性校验用） */
     public boolean exists(String code) {
-        Boolean hit = jdbc.queryForObject(
-                "SELECT COUNT(*) > 0 FROM perm_node WHERE code=?", Boolean.class, code);
-        return Boolean.TRUE.equals(hit);
+        return mapper.exists(code);
     }
 
     /**
@@ -171,21 +176,15 @@ public class PermissionCatalog {
                 if (exists(code)) {
                     // 内置节点的规范路由由目录定义，页面出现在哪里都不覆盖；
                     // 自定义节点才按页面声明补齐路由
-                    jdbc.update("UPDATE perm_node SET route_path=CASE "
-                                    + "WHEN ?='' OR (builtin=TRUE AND route_path<>'') THEN route_path ELSE ? END, "
-                                    + "last_seen_at=CURRENT_TIMESTAMP WHERE code=?",
-                            route, route, code);
+                    mapper.discoverRoute(route, code);
                     updated++;
                 } else {
-                    jdbc.update("INSERT INTO perm_node(code,name,node_type,module,description,builtin,"
-                                    + "parent_code,route_path,order_num,last_seen_at) "
-                                    + "VALUES(?,?,?,?,?,FALSE,?,?,0,CURRENT_TIMESTAMP)",
-                            code, name, type, module, "页面自动发现", parent, route);
+                    mapper.discoverInsert(code, name, type, module, parent, route);
                     added.add(code);
                 }
             } catch (org.springframework.dao.DuplicateKeyException e) {
                 // 并发上报：另一请求已建好，视为更新即可
-                jdbc.update("UPDATE perm_node SET last_seen_at=CURRENT_TIMESTAMP WHERE code=?", code);
+                mapper.touch(code);
                 updated++;
             }
         }
@@ -218,16 +217,10 @@ public class PermissionCatalog {
             try {
                 if (exists(code)) {
                     // 只同步内置节点；同名自定义节点保留管理员的手工配置
-                    jdbc.update("UPDATE perm_node SET name=?,node_type=?,route_path=?,order_num=?,"
-                                    + "module=CASE WHEN ?='' THEN module ELSE ? END,retired=FALSE,last_seen_at=CURRENT_TIMESTAMP "
-                                    + "WHERE code=? AND builtin=TRUE",
-                            name, type, route, order, module, module, code);
+                    mapper.syncBuiltin(name, type, route, order, module, code);
                     updated.add(code);
                 } else {
-                    jdbc.update("INSERT INTO perm_node(code,name,node_type,module,description,builtin,"
-                                    + "parent_code,route_path,order_num,last_seen_at) "
-                                    + "VALUES(?,?,?,?,'页面清单定义',TRUE,'',?,?,CURRENT_TIMESTAMP)",
-                            code, name, type, module.isEmpty() ? "自定义" : module, route, order);
+                    mapper.syncInsert(code, name, type, module.isEmpty() ? "自定义" : module, route, order);
                     added.add(code);
                 }
             } catch (org.springframework.dao.DuplicateKeyException e) {
@@ -240,15 +233,14 @@ public class PermissionCatalog {
             String parent = s(item.get("parentCode"));
             if (code.isEmpty() || parent.isEmpty()) continue;
             if (!codes.contains(parent) && !exists(parent)) continue;
-            jdbc.update("UPDATE perm_node SET parent_code=? WHERE code=? AND builtin=TRUE", parent, code);
+            mapper.setParent(parent, code);
         }
         // 清单中消失的内置节点：标记下线，不删除
         try {
-            List<String> builtins = jdbc.queryForList(
-                    "SELECT code FROM perm_node WHERE builtin=TRUE AND retired=FALSE", String.class);
+            List<String> builtins = mapper.listActiveBuiltins();
             for (String code : builtins) {
                 if (codes.contains(code)) continue;
-                jdbc.update("UPDATE perm_node SET retired=TRUE WHERE code=?", code);
+                mapper.retire(code);
                 retired.add(code);
             }
         } catch (Exception e) {
@@ -271,9 +263,7 @@ public class PermissionCatalog {
         if (name == null || name.isBlank()) throw new IllegalArgumentException("权限名称不能为空");
         String t = normalizeType(type);
         try {
-            jdbc.update("INSERT INTO perm_node(code,name,node_type,module,description,builtin,parent_code,route_path,order_num) "
-                            + "VALUES(?,?,?,?,?,FALSE,?,?,?)",
-                    code.trim(), name.trim(), t,
+            mapper.create(code.trim(), name.trim(), t,
                     module == null || module.isBlank() ? "自定义" : module.trim(),
                     desc == null ? "" : desc.trim(),
                     parentCode == null ? "" : parentCode.trim(),
@@ -294,12 +284,11 @@ public class PermissionCatalog {
         if (!exists(code)) throw new IllegalArgumentException("权限节点不存在：" + code);
         if (name == null || name.isBlank()) throw new IllegalArgumentException("权限名称不能为空");
         String t = normalizeType(type);
-        jdbc.update("UPDATE perm_node SET name=?, node_type=?, module=?, description=?, parent_code=?, route_path=?, order_num=? WHERE code=?",
-                name.trim(), t,
+        mapper.update(code, name.trim(), t,
                 module == null || module.isBlank() ? "自定义" : module.trim(),
                 desc == null ? "" : desc.trim(),
                 parentCode == null ? "" : parentCode.trim(),
-                routePath == null ? "" : routePath.trim(), orderNum, code);
+                routePath == null ? "" : routePath.trim(), orderNum);
     }
 
     private String normalizeType(String type) {
@@ -309,14 +298,12 @@ public class PermissionCatalog {
     /** 删除节点：内置节点是接口校验契约，不允许删除 */
     public void delete(String code) {
         if (!exists(code)) throw new IllegalArgumentException("权限节点不存在：" + code);
-        Boolean builtin = jdbc.queryForObject("SELECT builtin FROM perm_node WHERE code=?",
-                Boolean.class, code);
+        Boolean builtin = mapper.isBuiltin(code);
         if (Boolean.TRUE.equals(builtin)) {
             throw new IllegalArgumentException("内置权限节点不可删除（它是接口校验的绑定契约）");
         }
-        jdbc.update("DELETE FROM perm_node WHERE code=?", code);
-        // 目录里删掉的权限码，各角色配置里也要同步清理
-        jdbc.update("DELETE FROM role_permissions WHERE permission=?", code);
+        mapper.delete(code);
+        mapper.deleteFromRoles(code);
     }
 
     /** code 只允许小写字母/数字/下划线/连字符，且必须带一个冒号分层（如 report:view） */
