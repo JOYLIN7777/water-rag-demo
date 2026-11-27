@@ -1,7 +1,7 @@
 /** 知识库文档管理：DOM/class 与旧版 manage.html 1:1，上传/分片/删除/分页全功能 */
 import { useEffect, useRef, useState } from 'react'
 import { message } from 'antd'
-import WbModal from '@/components/WbModal'
+import UploadPicker from '@/components/UploadPicker'
 import ChunkPreview from '@/components/ChunkPreview'
 import { confirmDialog } from '@/lib/ui'
 import { http } from '@/api/http'
@@ -49,7 +49,6 @@ export default function ManagePage() {
   const [chunkFile, setChunkFile] = useState<string | null>(null)
   const [scopeOpen, setScopeOpen] = useState(false)
   const [pendingFiles, setPendingFiles] = useState<File[]>([])
-  const [includeSubtree, setIncludeSubtree] = useState(false)
 
   /** 进度仍留在页面内联条；成功/失败统一走 AntD message，不再各页自绘提示框 */
   function showMsg(type: string, text: string) {
@@ -144,12 +143,10 @@ export default function ManagePage() {
     const list = Array.from(files || [])
     if (!list.length) return
     setPendingFiles(list)
-    setIncludeSubtree(false)
     setScopeOpen(true)
   }
 
-  async function doUpload() {
-    const list = pendingFiles
+  async function doUpload(list: File[], subtree: boolean) {
     setScopeOpen(false)
     setPendingFiles([])
     let ok = 0, fail = 0, totalChunks = 0
@@ -158,7 +155,7 @@ export default function ManagePage() {
       showMsg('', `[${i + 1}/${list.length}] 正在解析 ${f.name} …`)
       const started = Date.now()
       try {
-        const j = await uploadDocument(f, undefined, includeSubtree)
+        const j = await uploadDocument(f, undefined, subtree)
         ok++; totalChunks += j.chunks
         const secs = ((Date.now() - started) / 1000).toFixed(1)
         showMsg('', `[${i + 1}/${list.length}] ✓ ${f.name}：${j.chunks} 片（${j.chars} 字，${secs} 秒）`)
@@ -282,26 +279,11 @@ export default function ManagePage() {
         </div>
       </div>
 
-      {/* 上传前确认可见范围（旧版 askVisibility 弹框） */}
-      <WbModal size="md" title="文档可见范围" open={scopeOpen} okText="确认上传" cancelText="取消"
-        onCancel={() => { setScopeOpen(false); setPendingFiles([]) }} onOk={() => { if (pendingFiles.length) void doUpload() }}>
-        <p style={{ margin: '0 0 8px' }}>已选择 {pendingFiles.length} 个文件，请确认文档可见范围：</p>
-        <div className="upload-file-list">
-          {pendingFiles.map((f, i) => <div className="upload-file-item" key={i}>
-            <span className="upload-file-no">{i + 1}</span>
-            <span className="upload-file-name" title={f.name}>{f.name}</span>
-            <span className="upload-file-size">{(f.size / 1024).toFixed(0)}KB</span>
-          </div>)}
-        </div>
-        <label style={{ display: 'flex', gap: 8, alignItems: 'flex-start', marginBottom: 10, cursor: 'pointer' }}>
-          <input type="radio" name="visScope" checked={!includeSubtree} onChange={() => setIncludeSubtree(false)} />
-          <span><b>仅本部门 + 上级</b><div style={{ fontSize: 11.5, color: 'var(--muted)' }}>只有本部门及上级组织能看到、检索到这些文档</div></span>
-        </label>
-        <label style={{ display: 'flex', gap: 8, alignItems: 'flex-start', cursor: 'pointer' }}>
-          <input type="radio" name="visScope" checked={includeSubtree} onChange={() => setIncludeSubtree(true)} />
-          <span><b>含下级部门可见</b><div style={{ fontSize: 11.5, color: 'var(--muted)' }}>本部门及其下级组织都能看到、检索到这些文档</div></span>
-        </label>
-      </WbModal>
+      {/* 批量上传清单：默认全选，可逐条核对后上传 */}
+      <UploadPicker open={scopeOpen} files={pendingFiles} supportedExts={actualExts}
+        maxBytes={500 * 1024 * 1024}
+        onCancel={() => { setScopeOpen(false); setPendingFiles([]) }}
+        onConfirm={(list, subtree) => { void doUpload(list, subtree) }} />
 
       <ChunkPreview fileName={chunkFile} onClose={() => setChunkFile(null)} />
     </>

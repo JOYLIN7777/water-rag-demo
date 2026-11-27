@@ -426,3 +426,22 @@
     background:var(--primary);color:#fff;font-size:10px;font-weight:600}
   .upload-file-name{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .upload-file-size{flex:0 0 auto;color:var(--muted);font-size:11px}
+  /* 批量上传清单：对齐旧版 openUploadPicker */
+  .pick-summary{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:10px;
+    padding-bottom:9px;border-bottom:1px solid var(--line);font-size:12px;color:var(--ink-2)}
+  .pick-all{display:inline-flex;align-items:center;gap:6px;font-weight:600;cursor:pointer;color:var(--ink)}
+  .pick-count{color:var(--primary);font-weight:600}
+  .pick-tip{color:var(--muted);font-size:11.5px}
+  .pick-list{max-height:320px;overflow:auto;border:1px solid var(--line);border-radius:9px;background:#fbfcfe;padding:3px 8px}
+  .pick-row{display:flex;align-items:center;gap:9px;padding:7px 4px;border-bottom:1px dashed #e8edf5;
+    font-size:12px;cursor:pointer;color:var(--ink-2)}
+  .pick-row:last-child{border-bottom:0}
+  .pick-row.skip{opacity:.55;cursor:not-allowed}
+  .pick-cb{flex:0 0 auto;cursor:pointer}
+  .pick-name{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .pick-size{flex:0 0 auto;color:var(--muted);font-size:11px}
+  .pick-tag{flex:0 0 auto;font-size:10.5px;padding:2px 6px;border-radius:5px;background:#eef4ff;color:#25469b}
+  .pick-tag.ok{background:#e9f8f0;color:#0e9f6e}
+  .pick-tag.err{background:#fff0f2;color:#c74457}
+  .pick-scope{display:flex;align-items:center;gap:7px;margin-top:12px;font-size:12px;
+    color:var(--ink-2);cursor:pointer}

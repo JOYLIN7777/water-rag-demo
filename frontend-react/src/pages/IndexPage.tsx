@@ -2,7 +2,8 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { marked } from 'marked'
 import DOMPurify from 'dompurify'
-import { message, Modal, Select } from 'antd'
+import { message, Select } from 'antd'
+import UploadPicker from '@/components/UploadPicker'
 import { useSearchParams } from 'react-router-dom'
 import { useChatStore, type ChatMessageExt } from '@/store/chat'
 import { useAuthStore } from '@/store/auth'
@@ -139,6 +140,9 @@ export default function IndexPage() {
   const [error, setError] = useState('')
   const [openCites, setOpenCites] = useState<Record<string, boolean>>({})
   const [uploadMsg, setUploadMsg] = useState<{ type: string; text: string } | null>(null)
+  const [pickerOpen, setPickerOpen] = useState(false)
+  const [pickerFiles, setPickerFiles] = useState<File[]>([])
+  const [supportedExts, setSupportedExts] = useState<string[]>([])
   const [chunkDetail, setChunkDetail] = useState<{ fileName: string; index: number; content: string } | null>(null)
   /** 当前点开的引用片段：回答结束后也能看到选中态 */
   const [activeCite, setActiveCite] = useState<string>('')
@@ -197,6 +201,9 @@ export default function IndexPage() {
           .filter(m => m.type === 'CHAT' && m.active === true && m.enabled !== false)
           .map(m => ({ id: m.id, name: m.name, model: m.model, active: m.active }))))
         .catch(() => setChatModels([]))
+      void http.get<{ extensions: string[] }>('/api/docs/formats')
+        .then(d => setSupportedExts(Array.isArray(d?.extensions) ? d.extensions : []))
+        .catch(() => setSupportedExts([]))
       // 读最新 store：挂载到 syncSessions 返回期间用户可能已经提问，
       // 这时候再用旧闭包里的 currentId/会话列表去 switchSession 会把新消息冲掉。
       const state = useChatStore.getState()
@@ -357,36 +364,18 @@ export default function IndexPage() {
     useChatStore.setState({ busyIds: ids, sending: ids.has(s.currentId) })
   }
 
-  async function uploadFiles(files: FileList | File[] | null) {
+  function uploadFiles(files: FileList | File[] | null) {
     const list = Array.from(files || [])
     if (!list.length) return
-    // 旧版：文档页有勾选框则直接用；否则弹确认框。问答页无勾选框 → 弹框
-    const ok = await new Promise<boolean | null>(resolve => {
-      let choice = false
-      Modal.confirm({
-        title: '文档可见范围', okText: '确认上传', cancelText: '取消',
-        content: <div>
-          <p style={{ margin: '0 0 8px' }}>已选择 {list.length} 个文件，请确认文档可见范围：</p>
-          <div className="upload-file-list">
-            {list.map((f, i) => <div className="upload-file-item" key={i}>
-              <span className="upload-file-no">{i + 1}</span>
-              <span className="upload-file-name" title={f.name}>{f.name}</span>
-              <span className="upload-file-size">{(f.size / 1024).toFixed(0)}KB</span>
-            </div>)}
-          </div>
-          <label style={{ display: 'flex', gap: 8, alignItems: 'flex-start', marginBottom: 10 }}>
-            <input type="radio" name="chatVis" defaultChecked onChange={() => { choice = false }} />
-            <span><b>仅本部门 + 上级</b><div style={{ fontSize: 11.5, color: 'var(--muted)' }}>只有本部门及上级组织能看到</div></span>
-          </label>
-          <label style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
-            <input type="radio" name="chatVis" onChange={() => { choice = true }} />
-            <span><b>含下级部门可见</b><div style={{ fontSize: 11.5, color: 'var(--muted)' }}>本部门及下级组织都能看到</div></span>
-          </label>
-        </div>,
-        onOk: () => resolve(choice), onCancel: () => resolve(null)
-      })
-    })
-    if (ok === null) return
+    setPickerFiles(list)
+    setPickerOpen(true)
+  }
+
+  /** 清单确认后真正上传（可见范围由清单里的勾选决定） */
+  async function doUploadPicked(list: File[], subtree: boolean) {
+    setPickerOpen(false)
+    setPickerFiles([])
+    const ok = subtree
     let success = 0
     for (let i = 0; i < list.length; i++) {
       setUploadMsg({ type: '', text: `[${i + 1}/${list.length}] 正在解析 ${list[i].name} …` })
@@ -574,6 +563,11 @@ export default function IndexPage() {
         <div className="composer-tip">回答基于知识库生成，关键数据请以正式规程为准</div>
         {uploadMsg && <div className={`upload-msg ${uploadMsg.type}`}>{uploadMsg.text}</div>}
       </div>
+
+      <UploadPicker open={pickerOpen} files={pickerFiles} supportedExts={supportedExts}
+        maxBytes={500 * 1024 * 1024}
+        onCancel={() => { setPickerOpen(false); setPickerFiles([]) }}
+        onConfirm={(list, subtree) => { void doUploadPicked(list, subtree) }} />
 
       <WbModal size="chunk"
         title={chunkDetail ? `原文详情 · ${chunkDetail.fileName} · 第${chunkDetail.index + 1}段` : '原文详情'}
