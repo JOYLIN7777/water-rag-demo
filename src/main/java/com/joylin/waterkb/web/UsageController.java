@@ -85,6 +85,9 @@ public class UsageController {
         Map<String, Object> local = admin ? recorder.summary(null)
                 : dept ? recorder.summary(UserContext.get().tenantId())
                 : recorder.summaryOfUser(UserContext.get().userId());
+        // 明确告诉前端当前查询范围，避免用户误以为看到的是全站数据
+        local.put("scope", admin ? "all" : dept ? "department" : "self");
+        local.put("scopeLabel", admin ? "全部账号" : dept ? "本部门" : "仅本人");
         // 未配置官方工作空间：直接用本地真实调用记录
         if (workspaceId.isBlank() || apiKey == null || apiKey.isBlank()) {
             return local;
@@ -115,6 +118,8 @@ public class UsageController {
                 result.put("configured", true);
                 result.put("localTotals", local.get("totals"));   // 本系统口径供对照
                 result.put("hint", "数据来自阿里云百炼官方用量（工作空间级，含全部来源，可能有分钟级延迟）；本系统的真实调用记录见上方对照。");
+                result.put("scope", "workspace");
+                result.put("scopeLabel", "工作空间全部来源（官方口径）");
                 return result;
             }
 
@@ -147,6 +152,8 @@ public class UsageController {
         result.put("records", rows);
         result.put("count", rows.size());
         result.put("source", "local");
+        result.put("scope", admin ? "all" : dept ? "department" : "self");
+        result.put("scopeLabel", admin ? "全部账号" : dept ? "本部门" : "仅本人");
         return result;
     }
 

@@ -42,8 +42,13 @@ export default function Shell({ children }: { children: React.ReactNode }) {
     lastAccount.current = accountKey
   }, [accountKey, auth.loaded, chat])
 
-  // 会话数据由问答页首屏 bootstrap 统一拉取；这里不再重复 syncSessions，
-  // 避免两处请求交错覆盖。账号切换的 reset 已在上面处理。
+  // 设置页等非问答域也需要左栏历史会话；只在清单为空时补拉一次，
+  // 问答页自己的 bootstrap 仍负责首屏，避免两处请求交错覆盖。
+  useEffect(() => {
+    if (!isLoggedIn() || inAdmin || !auth.loaded) return
+    if (useChatStore.getState().sessions.length === 0) void chat.bootstrap()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.pathname, auth.loaded, accountKey])
 
   const user = auth.user
   const tenant = user?.tenant || 'default'
@@ -133,8 +138,11 @@ export default function Shell({ children }: { children: React.ReactNode }) {
 
   /** 后台侧栏：console.* 分组，菜单图标/名称/权限全来自服务端（与旧版 renderAdminSidebar 一致） */
   // 工作台菜单：服务端 workbench:root 分组驱动；权限未加载时退回最小兜底，避免侧栏空白
+  // 检索对比/会话结构属于「设置」里的工具入口，不在左栏重复露出
+  const TOOL_PAGES = ['/search.html', '/tree.html']
   const workbenchFromServer = auth.menus.filter(m => m.allowed && m.group === 'workbench:root'
-    && String(m.href).replace(/^\//, '') !== 'profile.html')
+    && String(m.href).replace(/^\//, '') !== 'profile.html'
+    && !TOOL_PAGES.includes(String(m.href)))
   const workbenchItems = workbenchFromServer.length ? workbenchFromServer : [
     { href: 'index.html', name: '智能问答', allowed: auth.has('chat:use') },
     { href: 'manage.html', name: '知识库文档', allowed: auth.has('doc:read') }
@@ -202,6 +210,14 @@ export default function Shell({ children }: { children: React.ReactNode }) {
 
         {auth.has('chat:use') && <>
         <button className="new-chat" type="button" onClick={newChat}>＋ 新建会话</button>
+        {chat.currentId && <button className="session-copy-id" type="button" title="复制当前会话ID（用于会话结构页）"
+          onClick={() => {
+            const id = chat.currentId
+            void navigator.clipboard.writeText(id).then(() => message.success('会话ID已复制')).catch(() => {
+              // 非安全上下文降级：prompt 让用户手动复制
+              window.prompt('复制会话ID：', id)
+            })
+          }}>⧉ 复制会话ID</button>}
         <div className="section-label">历史会话</div>
         <div className="session-list" id="sessionList">
           {sessions.length === 0

@@ -2,7 +2,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { marked } from 'marked'
 import DOMPurify from 'dompurify'
-import { message, Select } from 'antd'
+import { message } from 'antd'
 import UploadPicker from '@/components/UploadPicker'
 import { useSearchParams } from 'react-router-dom'
 import { useChatStore, type ChatMessageExt } from '@/store/chat'
@@ -235,6 +235,14 @@ export default function IndexPage() {
     })()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  // 从侧栏点击历史会话：默认定位到最新一条消息的结尾
+  useEffect(() => {
+    if (initializing || !chat.currentId) return
+    const t = setTimeout(() => scrollBottom(true), 180)
+    return () => clearTimeout(t)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chat.currentId])
 
   // 草稿按会话隔离：切会话时存旧草稿、载新草稿
   /** 防同一问题在 1.5 秒内被 Enter/点击重复触发，产生多条同名会话 */
@@ -574,20 +582,18 @@ export default function IndexPage() {
               <input ref={fileInput} type="file" multiple hidden onChange={e => { void uploadFiles(e.target.files); e.target.value = '' }} />
             </>}
             <span className="model-pick-slot">
-              <Select className="model-pick" value={modelId || undefined} size="small"
-                placement="topLeft" popupMatchSelectWidth={false}
-                popupClassName="model-pick-dropdown"
-                placeholder="默认模型" title="选择本次回答使用的对话模型"
+              {/* 原生 select：antd Select 的浮层 portal 到 body，靠近右边界会自动翻转成右对齐，
+                  在输入框下方看位置很怪；原生下拉由浏览器贴着控件展开，不会漂移。 */}
+              <select className="model-pick" value={modelId || 0} title="选择本次回答使用的对话模型"
                 disabled={chatModels.length === 0}
-                options={[
-                  { value: 0, label: '默认模型' },
-                  ...chatModels.map(m => ({ value: m.id, label: m.name }))
-                ]}
-                onChange={v => {
-                  const n = Number(v) || 0
+                onChange={e => {
+                  const n = Number(e.target.value) || 0
                   setModelId(n || null)
                   localStorage.setItem('wrk_chat_model', n ? String(n) : '')
-                }} />
+                }}>
+                <option value={0}>默认模型</option>
+                {chatModels.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+              </select>
             </span>
             {busy && <button className="stop-btn" onClick={() => chat.aborters[chat.currentId]?.abort()}
               title="停止当前回答">■ 停止</button>}

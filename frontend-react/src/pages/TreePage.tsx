@@ -171,7 +171,7 @@ export default function TreePage() {
 
         <div className="toolbar">
           <label>会话ID</label>
-          <input type="text" id="sid" placeholder="从问答页复制会话ID" value={sid} onChange={e => setSid(e.target.value)} />
+          <input type="text" id="sid" placeholder="问答页左侧栏「复制会话ID」按钮" value={sid} onChange={e => setSid(e.target.value)} />
           <button className="btn" onClick={() => void load()}>加载会话树</button>
           <button className="btn" onClick={() => location.reload()}>刷新</button>
           <span id="stat">{tree ? `${tree.nodes.length} 个节点 · ${branches.length} 个命名分支` : ''}</span>
