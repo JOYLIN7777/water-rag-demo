@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.joylin.waterkb.mapper.UserMapper">
+
+    <select id="listAll" resultType="java.util.HashMap">
+        SELECT username, password_hash AS "passwordHash", groups, tenant,
+               display_name AS "displayName", enabled, gender, phone, avatar
+        FROM app_users
+    </select>
+
+    <insert id="upsert">
+        INSERT INTO app_users(username, password_hash, groups, tenant, display_name, enabled,
+                              gender, phone, avatar, updated_at)
+        VALUES (#{username}, #{passwordHash}, #{groups}, #{tenant}, #{displayName}, #{enabled},
+                #{gender}, #{phone}, #{avatar}, CURRENT_TIMESTAMP)
+        ON CONFLICT(username) DO UPDATE SET
+            password_hash = EXCLUDED.password_hash, groups = EXCLUDED.groups,
+            tenant = EXCLUDED.tenant, display_name = EXCLUDED.display_name,
+            enabled = EXCLUDED.enabled, gender = EXCLUDED.gender, phone = EXCLUDED.phone,
+            avatar = EXCLUDED.avatar, updated_at = CURRENT_TIMESTAMP
+    </insert>
+
+    <delete id="delete">DELETE FROM app_users WHERE username = #{username}</delete>
+</mapper>

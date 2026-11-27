@@ -195,9 +195,13 @@ export default function IndexPage() {
   }
 
   useEffect(() => {
+    // 兜底：任何网络异常/挂起都不能让主区永久空白
+    const guard = setTimeout(() => setInitializing(false), 2000)
     void (async () => {
+      // 关键路径：只等会话清单 + 当前会话历史（实测 <100ms）。
+      // 推荐词/模型列表/格式列表都是非关键数据，并行拉取不阻塞首屏渲染。
       await chat.bootstrap()
-      await chat.loadSuggestions()
+      void chat.loadSuggestions()
       // 所有角色都能拿可选模型列表；可选哪些由管理员在模型设置里配置
       void http.get<Array<{ id: number; name: string; model: string; active?: boolean; isDefault?: boolean }>>('/api/chat/models')
         .then(list => setChatModels((Array.isArray(list) ? list : [])
@@ -231,6 +235,7 @@ export default function IndexPage() {
           } else scrollBottom(true)
         }, 220)
       } else setTimeout(() => scrollBottom(true), 150)
+      clearTimeout(guard)
       setInitializing(false)
     })()
     // eslint-disable-next-line react-hooks/exhaustive-deps

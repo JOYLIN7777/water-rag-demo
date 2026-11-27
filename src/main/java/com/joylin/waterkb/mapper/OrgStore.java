@@ -3,6 +3,7 @@ package com.joylin.waterkb.mapper;
 import jakarta.annotation.PostConstruct;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
@@ -36,9 +37,13 @@ public class OrgStore {
     public static final String DEFAULT_KEY = "default";
 
     private final JdbcTemplate jdbc;
+    private final OrgMapper mapper;
     private volatile boolean ready;
 
-    public OrgStore(JdbcTemplate jdbc) { this.jdbc = jdbc; }
+    public OrgStore(JdbcTemplate jdbc) { this(jdbc, null); }
+
+    @Autowired
+    public OrgStore(JdbcTemplate jdbc, OrgMapper mapper) { this.jdbc = jdbc; this.mapper = mapper; }
 
     @PostConstruct
     public void init() { ensure(); }
@@ -84,18 +89,14 @@ public class OrgStore {
         List<Map<String, Object>> out = new ArrayList<>();
         try {
             // 按创建先后排：第一个建的自然在最上面，不再把某个 key 特殊排前
-            jdbc.query("SELECT org_key,name,parent_key FROM org_unit ORDER BY created_at, org_key", rs -> {
+            for (Map<String, Object> row : mapper.list()) {
                 Map<String, Object> m = new LinkedHashMap<>();
-                String key = rs.getString("org_key");
-                m.put("key", key);
-                m.put("name", rs.getString("name"));
-                String parent = rs.getString("parent_key");
-                m.put("parentKey", parent == null ? "" : parent);
-                // builtin 字段保留但恒为 false：老前端仍在读它，留着免得 undefined 判断出岔子；
-                // 语义上已经不存在"内置不可删"的组织。
+                m.put("key", row.get("key"));
+                m.put("name", row.get("name"));
+                m.put("parentKey", row.get("parentKey") == null ? "" : row.get("parentKey"));
                 m.put("builtin", false);
                 out.add(m);
-            });
+            }
         } catch (Exception e) {
             log.warn("读取组织清单失败：{}", e.getMessage());
         }
@@ -114,7 +115,7 @@ public class OrgStore {
         ensure();
         if (key == null || key.isBlank()) return false;
         try {
-            Long n = jdbc.queryForObject("SELECT COUNT(*) FROM org_unit WHERE org_key=?", Long.class, key.trim());
+            Long n = (long) mapper.exists(key.trim());
             return n != null && n > 0;
         } catch (Exception e) { return false; }
     }
@@ -151,8 +152,7 @@ public class OrgStore {
         }
         if (parent.equals(k)) throw new IllegalArgumentException("上级组织不能是自己");
         try {
-            jdbc.update("INSERT INTO org_unit(org_key,name,parent_key) VALUES(?,?,?)",
-                    k, n, parent.isEmpty() ? null : parent);
+            mapper.insert(k, n, parent.isEmpty() ? null : parent);
         } catch (Exception e) {
             throw new IllegalStateException("组织创建失败：" + e.getMessage());
         }
@@ -177,7 +177,7 @@ public class OrgStore {
         String n = name == null ? "" : name.trim();
         if (n.length() < 2 || n.length() > 20) throw new IllegalArgumentException("组织名称需 2-20 个字");
         try {
-            return jdbc.update("UPDATE org_unit SET name=? WHERE org_key=?", n, key) > 0;
+            return mapper.rename(n, key) > 0;
         } catch (Exception e) {
             throw new IllegalStateException("组织改名失败：" + e.getMessage());
         }
@@ -198,8 +198,7 @@ public class OrgStore {
             if (!exists(parent)) throw new IllegalArgumentException("上级组织不存在：" + parent);
             if (subtreeKeys(key).contains(parent)) throw new IllegalArgumentException("不能把组织挪到自己的下级里");
         }
-        jdbc.update("UPDATE org_unit SET parent_key=? WHERE org_key=?",
-                parent.isEmpty() ? null : parent, key);
+        mapper.setParent(parent.isEmpty() ? null : parent, key);
     }
 
     /**
@@ -252,7 +251,7 @@ public class OrgStore {
     public int childCount(String key) {
         ensure();
         try {
-            Long n = jdbc.queryForObject("SELECT COUNT(*) FROM org_unit WHERE parent_key=?", Long.class, key);
+            Long n = (long) mapper.childCount(key);
             return n == null ? 0 : n.intValue();
         } catch (Exception e) { return 0; }
     }
@@ -261,7 +260,7 @@ public class OrgStore {
     public int count() {
         ensure();
         try {
-            Long n = jdbc.queryForObject("SELECT COUNT(*) FROM org_unit", Long.class);
+            Long n = (long) mapper.count();
             return n == null ? 0 : n.intValue();
         } catch (Exception e) { return 0; }
     }
@@ -281,7 +280,7 @@ public class OrgStore {
         if (members > 0) throw new IllegalArgumentException("该组织还有 " + members + " 个成员，请先把成员移到其它组织");
         if (count() <= 1) throw new IllegalArgumentException("至少要保留一个组织：账号必须有归属单位，删掉最后一个组织相当于让所有人无处可去");
         try {
-            jdbc.update("DELETE FROM org_unit WHERE org_key=?", key);
+            mapper.delete(key);
         } catch (Exception e) {
             throw new IllegalStateException("组织删除失败：" + e.getMessage());
         }

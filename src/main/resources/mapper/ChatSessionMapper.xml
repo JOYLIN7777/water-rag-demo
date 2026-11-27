@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.joylin.waterkb.mapper.ChatSessionMapper">
+
+    <!-- 时间戳原样返回 Timestamp，由 Store 转毫秒（避免 SQL EXTRACT 的时区陷阱） -->
+    <select id="listByUser" resultType="java.util.HashMap">
+        SELECT session_id AS "id", title AS "title",
+               created_at AS "createdAt", updated_at AS "updatedAt"
+        FROM chat_session
+        WHERE user_id = #{userId} AND title IS NOT NULL AND title &lt;&gt; ''
+        ORDER BY updated_at DESC
+    </select>
+
+    <select id="countByTenant" resultType="int">
+        SELECT COUNT(*) FROM chat_session WHERE tenant_id = #{tenant}
+    </select>
+
+    <update id="migrateTenant">UPDATE chat_session SET tenant_id = #{to} WHERE tenant_id = #{from}</update>
+
+    <insert id="upsert">
+        INSERT INTO chat_session(session_id, user_id, tenant_id, title, created_at, updated_at)
+        VALUES (#{sessionId}, #{userId}, #{tenant}, #{title}, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        ON CONFLICT(user_id, session_id) DO UPDATE SET
+            title = CASE WHEN chat_session.title IS NULL OR chat_session.title = ''
+                THEN EXCLUDED.title ELSE chat_session.title END,
+            updated_at = CURRENT_TIMESTAMP
+    </insert>
+
+    <select id="exists" resultType="int">
+        SELECT COUNT(*) FROM chat_session WHERE user_id = #{userId} AND session_id = #{sessionId}
+    </select>
+
+    <update id="rename">
+        UPDATE chat_session SET title = #{title}, updated_at = CURRENT_TIMESTAMP
+        WHERE user_id = #{userId} AND session_id = #{sessionId}
+    </update>
+
+    <delete id="delete">
+        DELETE FROM chat_session WHERE user_id = #{userId} AND session_id = #{sessionId}
+    </delete>
+</mapper>

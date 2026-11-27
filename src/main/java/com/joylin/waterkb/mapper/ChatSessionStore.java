@@ -36,20 +36,25 @@ public class ChatSessionStore {
     private static final Logger log = LoggerFactory.getLogger(ChatSessionStore.class);
 
     private final JdbcTemplate jdbc;
+    private final ChatSessionMapper mapper;
     /** 建表只尝试一次，失败后不再反复刷日志 */
     private volatile boolean schemaReady = false;
     /** 旧三元组主键的一次性迁移是否已完成 */
     private volatile boolean migrationDone = false;
 
-    /** 生产构造：注入数据源。两个构造器必须显式标 @Autowired，否则 Spring 会挑无参那个，jdbc 恒为 null */
+    /** 兼容旧调用（单测） */
+    public ChatSessionStore(JdbcTemplate jdbc) { this(jdbc, null); }
+
+    /** 生产构造：注入数据源与 Mapper */
     @Autowired
-    public ChatSessionStore(JdbcTemplate jdbc) {
+    public ChatSessionStore(JdbcTemplate jdbc, ChatSessionMapper mapper) {
         this.jdbc = jdbc;
+        this.mapper = mapper;
     }
 
     /** 兼容单测：无数据库 */
     public ChatSessionStore() {
-        this(null);
+        this(null, null);
     }
 
     private void ensureSchema() {
@@ -137,20 +142,16 @@ public class ChatSessionStore {
             // 北京时间就被当成 UTC，凭空多出 8 小时——列表里刚聊过的会话显示成明天凌晨，
             // 排序自然全乱（"最新"被算成未来时刻排最前，真正刚聊的沉到最后）。
             // getTimestamp 由驱动按同一个 JVM 时区解释，与写入自洽。
-            jdbc.query("SELECT session_id, title, created_at, updated_at "
-                            + "FROM chat_session WHERE user_id=? "
-                            + "AND title IS NOT NULL AND title <> '' "
-                            + "ORDER BY updated_at DESC",
-                    rs -> {
-                        Map<String, Object> m = new LinkedHashMap<>();
-                        m.put("id", rs.getString("session_id"));
-                        m.put("title", rs.getString("title") == null ? "" : rs.getString("title"));
-                        java.sql.Timestamp created = rs.getTimestamp("created_at");
-                        java.sql.Timestamp updated = rs.getTimestamp("updated_at");
-                        m.put("createdAt", created == null ? 0L : created.getTime());
-                        m.put("updatedAt", updated == null ? 0L : updated.getTime());
-                        out.add(m);
-                    }, user());
+            for (Map<String, Object> row : mapper.listByUser(user())) {
+                Map<String, Object> m = new LinkedHashMap<>();
+                m.put("id", row.get("id"));
+                m.put("title", row.get("title") == null ? "" : row.get("title"));
+                java.sql.Timestamp created = (java.sql.Timestamp) row.get("createdAt");
+                java.sql.Timestamp updated = (java.sql.Timestamp) row.get("updatedAt");
+                m.put("createdAt", created == null ? 0L : created.getTime());
+                m.put("updatedAt", updated == null ? 0L : updated.getTime());
+                out.add(m);
+            }
         } catch (Exception e) {
             log.warn("读取会话清单失败：{}", e.getMessage());
         }
@@ -165,7 +166,7 @@ public class ChatSessionStore {
         ensureSchema();
         if (!schemaReady) return 0;
         try {
-            Long n = jdbc.queryForObject("SELECT COUNT(*) FROM chat_session WHERE tenant_id=?", Long.class, tenant);
+            Long n = (long) mapper.countByTenant(tenant);
             return n == null ? 0 : n.intValue();
         } catch (Exception e) { return 0; }
     }
@@ -181,7 +182,7 @@ public class ChatSessionStore {
         ensureSchema();
         if (!schemaReady) return 0;
         try {
-            return jdbc.update("UPDATE chat_session SET tenant_id=? WHERE tenant_id=?", to, from);
+            return mapper.migrateTenant(from, to);
         } catch (Exception e) {
             log.warn("会话迁移失败 {} → {}：{}", from, to, e.getMessage());
             return 0;
@@ -203,13 +204,7 @@ public class ChatSessionStore {
         try {
             // 标题只在原本为空时补写：首问之后用户可能已手动改过标题，
             // 不能每轮都被问题文本覆盖回去。tenant_id 只是记录值，不再参与主键与查询
-            jdbc.update("INSERT INTO chat_session(session_id,user_id,tenant_id,title,created_at,updated_at) "
-                            + "VALUES(?,?,?,?,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP) "
-                            + "ON CONFLICT(user_id, session_id) DO UPDATE SET "
-                            + "title=CASE WHEN chat_session.title IS NULL OR chat_session.title='' "
-                            + "THEN EXCLUDED.title ELSE chat_session.title END, "
-                            + "updated_at=CURRENT_TIMESTAMP",
-                    sessionId, user(), tenant(), t);
+            mapper.upsert(sessionId, user(), tenant(), t);
             return true;
         } catch (Exception e) {
             log.warn("写入会话清单失败：{}", e.getMessage());
@@ -222,8 +217,7 @@ public class ChatSessionStore {
     public boolean exists(String sessionId) {
         if (sessionId == null || sessionId.isBlank() || jdbc == null) return false;
         try {
-            Integer n = jdbc.queryForObject("SELECT COUNT(*) FROM chat_session WHERE user_id=? AND session_id=?",
-                    Integer.class, user(), sessionId);
+            Integer n = mapper.exists(user(), sessionId);
             return n != null && n > 0;
         } catch (Exception e) { return false; }
     }
@@ -235,8 +229,7 @@ public class ChatSessionStore {
         String t = title == null ? "" : title.trim();
         if (t.length() > 200) t = t.substring(0, 200);
         try {
-            return jdbc.update("UPDATE chat_session SET title=?, updated_at=CURRENT_TIMESTAMP "
-                    + "WHERE user_id=? AND session_id=?", t, user(), sessionId) > 0;
+            return mapper.rename(t, user(), sessionId) > 0;
         } catch (Exception e) {
             log.warn("重命名会话失败：{}", e.getMessage());
             return false;
@@ -249,8 +242,7 @@ public class ChatSessionStore {
         ensureSchema();
         if (!schemaReady) return false;
         try {
-            return jdbc.update("DELETE FROM chat_session WHERE user_id=? AND session_id=?",
-                    user(), sessionId) > 0;
+            return mapper.delete(user(), sessionId) > 0;
         } catch (Exception e) {
             log.warn("删除会话清单失败：{}", e.getMessage());
             return false;

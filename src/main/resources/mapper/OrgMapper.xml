@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.joylin.waterkb.mapper.OrgMapper">
+
+    <select id="list" resultType="java.util.HashMap">
+        SELECT org_key AS "key", name AS "name",
+               CASE WHEN parent_key IS NULL THEN '' ELSE parent_key END AS "parentKey"
+        FROM org_unit ORDER BY created_at, org_key
+    </select>
+
+    <select id="exists" resultType="int">SELECT COUNT(*) FROM org_unit WHERE org_key = #{key}</select>
+
+    <insert id="insert">
+        INSERT INTO org_unit(org_key, name, parent_key) VALUES (#{key}, #{name}, #{parent})
+    </insert>
+
+    <update id="rename">UPDATE org_unit SET name = #{name} WHERE org_key = #{key}</update>
+
+    <update id="setParent">UPDATE org_unit SET parent_key = #{parent} WHERE org_key = #{key}</update>
+
+    <select id="childCount" resultType="int">SELECT COUNT(*) FROM org_unit WHERE parent_key = #{key}</select>
+
+    <select id="count" resultType="int">SELECT COUNT(*) FROM org_unit</select>
+
+    <delete id="delete">DELETE FROM org_unit WHERE org_key = #{key}</delete>
+</mapper>

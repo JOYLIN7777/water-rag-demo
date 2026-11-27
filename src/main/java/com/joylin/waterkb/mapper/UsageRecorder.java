@@ -1,5 +1,6 @@
 package com.joylin.waterkb.mapper;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
@@ -26,8 +27,12 @@ public class UsageRecorder {
     private static final ZoneId ZONE = ZoneId.of("Asia/Shanghai");
 
     private final JdbcTemplate jdbc;
+    private final UsageMapper mapper;
 
-    public UsageRecorder(JdbcTemplate jdbc) { this.jdbc = jdbc; }
+    public UsageRecorder(JdbcTemplate jdbc) { this(jdbc, null); }
+
+    @Autowired
+    public UsageRecorder(JdbcTemplate jdbc, UsageMapper mapper) { this.jdbc = jdbc; this.mapper = mapper; }
 
     @PostConstruct
     public void init() {
@@ -70,8 +75,7 @@ public class UsageRecorder {
     public void record(String userId, String model, long promptTokens, long completionTokens,
                        long durationMs, String sessionId, String question, String tenantId) {
         try {
-            jdbc.update("INSERT INTO model_usage(user_id,model,prompt_tokens,completion_tokens,duration_ms,"
-                            + "session_id,question,tenant_id) VALUES(?,?,?,?,?,?,?,?)",
+            mapper.insert(
                     userId == null ? "anonymous" : userId,
                     model == null || model.isBlank() ? "unknown" : model,
                     Math.max(0, promptTokens), Math.max(0, completionTokens), Math.max(0, durationMs),
@@ -111,20 +115,22 @@ public class UsageRecorder {
         String where = "ts >= ?" + (scoped ? " AND tenant_id=?" : "") + (byUser ? " AND user_id=?" : "");
         List<Map<String, Object>> out = new ArrayList<>();
         try {
-            jdbc.query("SELECT ts,user_id,model,prompt_tokens,completion_tokens,duration_ms,session_id,question "
-                            + "FROM model_usage WHERE " + where + " ORDER BY ts DESC LIMIT ?", rs -> {
-                Map<String, Object> row = new LinkedHashMap<>();
-                row.put("ts", rs.getTimestamp("ts") == null ? null : rs.getTimestamp("ts").toLocalDateTime().toString());
-                row.put("user", rs.getString("user_id"));
-                row.put("model", rs.getString("model"));
-                row.put("promptTokens", rs.getLong("prompt_tokens"));
-                row.put("completionTokens", rs.getLong("completion_tokens"));
-                row.put("totalTokens", rs.getLong("prompt_tokens") + rs.getLong("completion_tokens"));
-                row.put("durationMs", rs.getLong("duration_ms"));
-                row.put("sessionId", rs.getString("session_id"));
-                row.put("question", rs.getString("question"));
-                out.add(row);
-            }, scoped ? new Object[]{start, tenant, cap} : byUser ? new Object[]{start, user, cap} : new Object[]{start, cap});
+            for (Map<String, Object> row : mapper.records(start, scoped ? tenant : null, byUser ? user : null, cap)) {
+                Map<String, Object> r = new LinkedHashMap<>();
+                java.sql.Timestamp ts = (java.sql.Timestamp) row.get("ts");
+                r.put("ts", ts == null ? null : ts.toLocalDateTime().toString());
+                r.put("user", row.get("user"));
+                r.put("model", row.get("model"));
+                long pt = ((Number) row.get("promptTokens")).longValue();
+                long ct = ((Number) row.get("completionTokens")).longValue();
+                r.put("promptTokens", pt);
+                r.put("completionTokens", ct);
+                r.put("totalTokens", pt + ct);
+                r.put("durationMs", row.get("durationMs"));
+                r.put("sessionId", row.get("sessionId"));
+                r.put("question", row.get("question"));
+                out.add(r);
+            }
         } catch (Exception ignored) { }
         return out;
     }
@@ -154,26 +160,24 @@ public class UsageRecorder {
         java.sql.Timestamp todayStart = java.sql.Timestamp.valueOf(today.atStartOfDay(ZONE).toLocalDateTime());
         Object[] todayArgs = byUser ? new Object[]{todayStart, user} : scoped ? new Object[]{todayStart, tenant} : new Object[]{todayStart};
         Map<String, Object> totals = new LinkedHashMap<>();
-        totals.put("todayRequests", count(todayWhere, todayArgs));
-        totals.put("todayTokens", tokens(todayWhere, todayArgs));
+        totals.put("todayRequests", count(todayStart, scoped ? tenant : null, byUser ? user : null));
+        totals.put("todayTokens", tokens(todayStart, scoped ? tenant : null, byUser ? user : null));
         java.sql.Timestamp monthStart = java.sql.Timestamp.valueOf(today.withDayOfMonth(1).atStartOfDay(ZONE).toLocalDateTime());
         String monthWhere = "ts >= ?" + extra;
         Object[] monthArgs = byUser ? new Object[]{monthStart, user} : scoped ? new Object[]{monthStart, tenant} : new Object[]{monthStart};
-        totals.put("monthRequests", count(monthWhere, monthArgs));
-        totals.put("monthTokens", tokens(monthWhere, monthArgs));
+        totals.put("monthRequests", count(monthStart, scoped ? tenant : null, byUser ? user : null));
+        totals.put("monthTokens", tokens(monthStart, scoped ? tenant : null, byUser ? user : null));
 
         List<Map<String, Object>> models = new ArrayList<>();
         try {
-            jdbc.query("SELECT model, COUNT(*) AS reqs, COALESCE(SUM(prompt_tokens),0) AS pt, "
-                            + "COALESCE(SUM(completion_tokens),0) AS ct FROM model_usage "
-                            + "WHERE " + monthWhere + " GROUP BY model ORDER BY reqs DESC", rs -> {
-                Map<String, Object> row = new LinkedHashMap<>();
-                row.put("model", rs.getString("model"));
-                row.put("requests", rs.getLong("reqs"));
-                row.put("inputTokens", rs.getLong("pt"));
-                row.put("outputTokens", rs.getLong("ct"));
-                models.add(row);
-            }, monthArgs);
+            for (Map<String, Object> row : mapper.modelRows(monthStart, scoped ? tenant : null, byUser ? user : null)) {
+                Map<String, Object> row2 = new LinkedHashMap<>();
+                row2.put("model", row.get("model"));
+                row2.put("requests", row.get("reqs"));
+                row2.put("inputTokens", row.get("pt"));
+                row2.put("outputTokens", row.get("ct"));
+                models.add(row2);
+            }
         } catch (Exception ignored) { }
 
         Map<String, Object> result = new LinkedHashMap<>();
@@ -186,19 +190,11 @@ public class UsageRecorder {
         return result;
     }
 
-    private long count(String where, Object... args) {
-        try {
-            Long n = jdbc.queryForObject("SELECT COUNT(*) FROM model_usage WHERE " + where, Long.class, args);
-            return n == null ? 0 : n;
-        } catch (Exception e) { return 0; }
+    private long count(java.sql.Timestamp start, String tenant, String user) {
+        try { return mapper.count(start, tenant, user); } catch (Exception e) { return 0; }
     }
 
-    private long tokens(String where, Object... args) {
-        try {
-            Long n = jdbc.queryForObject(
-                    "SELECT COALESCE(SUM(prompt_tokens+completion_tokens),0) FROM model_usage WHERE " + where,
-                    Long.class, args);
-            return n == null ? 0 : n;
-        } catch (Exception e) { return 0; }
+    private long tokens(java.sql.Timestamp start, String tenant, String user) {
+        try { return mapper.tokens(start, tenant, user); } catch (Exception e) { return 0; }
     }
 }

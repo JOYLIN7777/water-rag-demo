@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.joylin.waterkb.mapper.UsageMapper">
+
+    <sql id="scopeFilter">
+        ts &gt;= #{start}
+        <if test="tenant != null and tenant != ''"> AND tenant_id = #{tenant} </if>
+        <if test="user != null and user != ''"> AND user_id = #{user} </if>
+    </sql>
+
+    <insert id="insert">
+        INSERT INTO model_usage(user_id, model, prompt_tokens, completion_tokens, duration_ms,
+                                session_id, question, tenant_id)
+        VALUES (#{userId}, #{model}, #{promptTokens}, #{completionTokens}, #{durationMs},
+                #{sessionId}, #{question}, #{tenantId})
+    </insert>
+
+    <select id="records" resultType="java.util.HashMap">
+        SELECT ts, user_id AS "user", model, prompt_tokens AS "promptTokens",
+               completion_tokens AS "completionTokens", duration_ms AS "durationMs",
+               session_id AS "sessionId", question
+        FROM model_usage
+        WHERE <include refid="scopeFilter"/>
+        ORDER BY ts DESC LIMIT #{limit}
+    </select>
+
+    <select id="count" resultType="long">
+        SELECT COUNT(*) FROM model_usage WHERE <include refid="scopeFilter"/>
+    </select>
+
+    <select id="tokens" resultType="long">
+        SELECT COALESCE(SUM(prompt_tokens+completion_tokens),0) FROM model_usage
+        WHERE <include refid="scopeFilter"/>
+    </select>
+
+    <select id="modelRows" resultType="java.util.HashMap">
+        SELECT model, COUNT(*) AS reqs, COALESCE(SUM(prompt_tokens),0) AS pt,
+               COALESCE(SUM(completion_tokens),0) AS ct
+        FROM model_usage
+        WHERE <include refid="scopeFilter"/>
+        GROUP BY model ORDER BY reqs DESC
+    </select>
+</mapper>

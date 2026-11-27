@@ -36,22 +36,29 @@ public class UserStore {
     private final PasswordHasher hasher;
     /** 可为 null：单测与无数据库环境只走内存用户库 */
     private final JdbcTemplate jdbc;
+    private final UserMapper mapper;
     private final Map<String, UserAccount> users = new LinkedHashMap<>();
 
     /** 兼容单测：不接数据库，纯内存 */
     public UserStore(PasswordHasher hasher,
                      @Value("${security.auth.users:}") String configuredUsers) {
-        this(hasher, configuredUsers, null);
+        this(hasher, configuredUsers, null, null);
     }
+
+    /** 兼容旧调用（单测） */
+    public UserStore(PasswordHasher hasher,
+                     @Value("${security.auth.users:}") String configuredUsers,
+                     JdbcTemplate jdbc) { this(hasher, configuredUsers, jdbc, null); }
 
     /** 生产构造：后台维护的账号写入 app_users，重启后仍生效 */
     @Autowired
     public UserStore(PasswordHasher hasher,
                      @Value("${security.auth.users:}") String configuredUsers,
-                     JdbcTemplate jdbc) {
+                     JdbcTemplate jdbc, UserMapper mapper) {
         this.hasher = hasher;
         this.configuredUsers = configuredUsers == null ? "" : configuredUsers;
         this.jdbc = jdbc;
+        this.mapper = mapper;
     }
 
     @PostConstruct
@@ -93,14 +100,16 @@ public class UserStore {
             jdbc.execute("ALTER TABLE app_users ADD COLUMN IF NOT EXISTS phone VARCHAR(32) DEFAULT ''");
             jdbc.execute("ALTER TABLE app_users ADD COLUMN IF NOT EXISTS avatar TEXT DEFAULT ''");
             jdbc.execute("CREATE UNIQUE INDEX IF NOT EXISTS uq_app_users_phone ON app_users(phone) WHERE phone <> ''");
-            jdbc.query("SELECT username,password_hash,groups,tenant,display_name,enabled,gender,phone,avatar FROM app_users", rs -> {
-                String username = rs.getString("username").trim().toLowerCase();
-                List<String> groups = Arrays.stream(rs.getString("groups").split(","))
-                        .map(String::trim).filter(s -> !s.isEmpty()).toList();
-                users.put(username, new UserAccount(username, rs.getString("password_hash"), groups,
-                        rs.getString("tenant"), rs.getString("display_name"), rs.getBoolean("enabled"),
-                        nvl(rs.getString("gender")), nvl(rs.getString("phone")), nvl(rs.getString("avatar"))));
-            });
+            for (Map<String, Object> row : mapper.listAll()) {
+                String username = String.valueOf(row.get("username")).trim().toLowerCase();
+                List<String> groups = Arrays.stream(String.valueOf(row.get("groups")).split(","))
+                        .map(String::trim).filter(x -> !x.isEmpty()).toList();
+                users.put(username, new UserAccount(username, String.valueOf(row.get("passwordHash")), groups,
+                        String.valueOf(row.get("tenant")), String.valueOf(row.get("displayName")),
+                        Boolean.TRUE.equals(row.get("enabled")),
+                        nvl(String.valueOf(row.get("gender"))), nvl(String.valueOf(row.get("phone"))),
+                        nvl(String.valueOf(row.get("avatar")))));
+            }
             log.info("已从 app_users 载入账号，当前账号数 {}", users.size());
         } catch (Exception e) {
             log.warn("账号持久化表不可用，后台修改仅在本次运行生效：{}", e.getMessage());
@@ -112,13 +121,7 @@ public class UserStore {
     private void persist(UserAccount u) {
         if (jdbc == null) return;
         try {
-            jdbc.update("INSERT INTO app_users(username,password_hash,groups,tenant,display_name,enabled,gender,phone,avatar,updated_at) "
-                            + "VALUES(?,?,?,?,?,?,?,?,?,CURRENT_TIMESTAMP) ON CONFLICT(username) DO UPDATE SET "
-                            + "password_hash=EXCLUDED.password_hash, groups=EXCLUDED.groups, "
-                            + "tenant=EXCLUDED.tenant, display_name=EXCLUDED.display_name, "
-                            + "enabled=EXCLUDED.enabled, gender=EXCLUDED.gender, phone=EXCLUDED.phone, "
-                            + "avatar=EXCLUDED.avatar, updated_at=CURRENT_TIMESTAMP",
-                    u.username(), u.passwordHash(), String.join(",", u.groups()), u.tenant(),
+            mapper.upsert(u.username(), u.passwordHash(), String.join(",", u.groups()), u.tenant(),
                     u.displayName(), u.enabled(), nvl(u.gender()), nvl(u.phone()), nvl(u.avatar()));
         } catch (Exception e) {
             throw new IllegalStateException("账号保存失败：" + e.getMessage(), e);
@@ -175,7 +178,7 @@ public class UserStore {
         if (!users.containsKey(name)) return false;
         users.remove(name);
         if (jdbc != null) {
-            try { jdbc.update("DELETE FROM app_users WHERE username=?", name); }
+            try { mapper.delete(name); }
             catch (Exception e) { throw new IllegalStateException("账号删除失败：" + e.getMessage(), e); }
         }
         log.info("后台删除账号 {}", name);
