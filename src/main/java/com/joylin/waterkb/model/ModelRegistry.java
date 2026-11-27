@@ -73,9 +73,10 @@ public class ModelRegistry {
      */
     public ModelConfig firstHealthyChat(Long requestedId) {
         java.util.List<ModelConfig> all = new java.util.ArrayList<>(repository.findAll());
-        // 与全局默认口径一致：最后激活的优先
-        all.sort(java.util.Comparator.comparing(ModelConfig::getUpdatedAt,
-                java.util.Comparator.nullsFirst(java.util.Comparator.reverseOrder())));
+        // 显式 is_default 优先，其次最后激活的
+        all.sort(java.util.Comparator.comparing(ModelConfig::isDefault, java.util.Comparator.reverseOrder())
+                .thenComparing(ModelConfig::getUpdatedAt,
+                        java.util.Comparator.nullsFirst(java.util.Comparator.reverseOrder())));
         if (requestedId != null) {
             for (ModelConfig c : all) {
                 if (c.getId() != null && c.getId().equals(requestedId) && c.isEnabled() && !isSkipped(c.getId())) return c;

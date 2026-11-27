@@ -1,5 +1,7 @@
 package com.joylin.waterkb.model;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
+
 /**
  * 模型配置：一条记录描述一个 OpenAI 兼容端点上的 chat 或 embedding 模型。
  *
@@ -26,6 +28,8 @@ public class ModelConfig {
     private boolean enabled = true;
     /** 是否为该类型当前激活的配置 */
     private boolean active;
+    /** 是否为该类型的全局默认模型：所有角色未显式选择时都用这个 */
+    private boolean isDefault;
     private String createdAt;
     private String updatedAt;
 
@@ -47,6 +51,9 @@ public class ModelConfig {
     public void setEnabled(boolean enabled) { this.enabled = enabled; }
     public boolean isActive() { return active; }
     public void setActive(boolean active) { this.active = active; }
+    @JsonProperty("isDefault")
+    public boolean isDefault() { return isDefault; }
+    public void setDefault(boolean isDefault) { this.isDefault = isDefault; }
     public String getCreatedAt() { return createdAt; }
     public void setCreatedAt(String createdAt) { this.createdAt = createdAt; }
     public String getUpdatedAt() { return updatedAt; }

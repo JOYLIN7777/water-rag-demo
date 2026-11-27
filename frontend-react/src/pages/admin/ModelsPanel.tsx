@@ -8,7 +8,7 @@ import '@/styles/admin.css'
 
 interface Model {
   id: number; name: string; type: string; baseUrl: string; model: string
-  apiKey?: string; dimensions?: number | null; enabled?: boolean; active?: boolean
+  apiKey?: string; dimensions?: number | null; enabled?: boolean; active?: boolean; isDefault?: boolean
 }
 
 const EMPTY = { name: '', type: 'CHAT', baseUrl: '', model: '', apiKey: '', dimensions: '' }
@@ -83,6 +83,14 @@ export default function ModelsPanel() {
       message.success((j?.message || '已激活') + '（已即时生效，无需重启）')
       await load()
     } catch (e: any) { message.error('激活失败：' + (e?.message || '')) }
+  }
+
+  async function setDefaultModel(id: number) {
+    try {
+      const j = await http.post<{ message?: string }>('/api/models/' + id + '/set-default')
+      message.success(j?.message || '已设为全局默认')
+      await load()
+    } catch (e: any) { message.error('设置默认失败：' + (e?.message || '')) }
   }
 
   async function deactivate(id: number) {
@@ -200,6 +208,7 @@ export default function ModelsPanel() {
                     <span className={'tag ' + (m.active && m.enabled !== false ? 'active' : 'off')}>
                       {m.enabled === false ? '已禁用' : (m.active ? '使用中' : '待命')}
                     </span>
+                    {m.isDefault && <span className="tag active" style={{ marginLeft: 6 }}>全局默认</span>}
                     {tested[m.id] && <span className="tag ok" style={{ marginLeft: 6 }}>服务正常</span>}
                   </td>
                   <td>
@@ -210,6 +219,9 @@ export default function ModelsPanel() {
                         : m.active
                           ? <button className="btn btn-sm" title="点击取消激活" onClick={() => void deactivate(m.id)}>已激活</button>
                           : <button className="btn btn-sm" onClick={() => void activate(m.id)}>激活</button>}
+                      {m.type === 'CHAT' && !m.isDefault && m.enabled !== false &&
+                        <button className="btn btn-sm" title="所有用户未指定模型时都用这个"
+                          onClick={() => void setDefaultModel(m.id)}>设为默认</button>}
                       <button className="btn btn-sm" disabled={testing === m.id} onClick={() => void test(m.id)}>
                         {testing === m.id ? '测试中…' : '测试'}
                       </button>

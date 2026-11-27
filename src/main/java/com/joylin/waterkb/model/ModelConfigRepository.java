@@ -56,6 +56,7 @@ public class ModelConfigRepository {
         c.setDimensions((Integer) rs.getObject("dimensions"));
         c.setEnabled(rs.getBoolean("enabled"));
         c.setActive(rs.getBoolean("is_active"));
+        c.setDefault(rs.getBoolean("is_default"));
         c.setCreatedAt(rs.getString("created_at"));
         c.setUpdatedAt(rs.getString("updated_at"));
         return c;
@@ -74,10 +75,12 @@ public class ModelConfigRepository {
                 dimensions INTEGER,
                 enabled BOOLEAN NOT NULL DEFAULT TRUE,
                 is_active BOOLEAN NOT NULL DEFAULT FALSE,
+                is_default BOOLEAN NOT NULL DEFAULT FALSE,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
             """);
+        jdbc.execute("ALTER TABLE model_config ADD COLUMN IF NOT EXISTS is_default BOOLEAN NOT NULL DEFAULT FALSE");
         // 每种类型至多一个 active：partial unique index 保证数据一致性
         // CHAT 支持多个同时激活（提问框可选），只有 EMBEDDING 必须唯一（向量库维度只能有一套）
         jdbc.execute("CREATE UNIQUE INDEX IF NOT EXISTS uk_model_active_embedding " +
@@ -109,6 +112,22 @@ public class ModelConfigRepository {
         List<ModelConfig> list = jdbc.query("SELECT * FROM model_config WHERE type=? AND is_active=TRUE AND enabled=TRUE "
                 + "ORDER BY updated_at DESC, id DESC", MAPPER, type);
         return list.isEmpty() ? null : list.get(0);
+    }
+
+    /** 全局默认模型：显式 is_default 优先；历史数据没有默认时回落到最后激活的 */
+    public ModelConfig findDefault(String type) {
+        List<ModelConfig> list = jdbc.query("SELECT * FROM model_config WHERE type=? AND enabled=TRUE "
+                + "ORDER BY is_default DESC, is_active DESC, updated_at DESC, id DESC", MAPPER, type);
+        return list.isEmpty() ? null : list.get(0);
+    }
+
+    /** 设为默认：同类型先清旧默认，再设置目标并顺带激活 */
+    public int setDefault(long id) {
+        ModelConfig c = findById(id);
+        if (c == null) return 0;
+        jdbc.update("UPDATE model_config SET is_default=FALSE WHERE type=?", c.getType());
+        jdbc.update("UPDATE model_config SET is_active=TRUE, is_default=TRUE, updated_at=CURRENT_TIMESTAMP WHERE id=?", id);
+        return 1;
     }
 
     /** 激活指定配置：先把同类型全部取消激活，再激活目标（事务由调用方保证或单条更新即可） */

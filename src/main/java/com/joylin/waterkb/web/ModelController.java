@@ -59,6 +59,7 @@ public class ModelController {
         c.setDimensions(src.getDimensions());
         c.setEnabled(src.isEnabled());
         c.setActive(src.isActive());
+        c.setDefault(src.isDefault());
         c.setCreatedAt(src.getCreatedAt());
         c.setUpdatedAt(src.getUpdatedAt());
         return c;
@@ -112,6 +113,18 @@ public class ModelController {
         if (repository.activate(id) == 0) throw new IllegalArgumentException("激活失败：" + id);
         registry.invalidate();
         return Map.of("message", "已激活：" + c.getName(), "type", c.getType());
+    }
+
+    /** 设为全局默认：所有未显式选模型的用户都用这个 */
+    @PostMapping("/{id}/set-default")
+    @RequirePermission(Permission.MODEL_WRITE)
+    public Map<String, Object> setDefault(@PathVariable long id) {
+        ModelConfig c = repository.findById(id);
+        if (c == null) throw new IllegalArgumentException("模型配置不存在：" + id);
+        if (!c.isEnabled()) throw new IllegalArgumentException("已禁用的模型不能设为默认");
+        if (repository.setDefault(id) == 0) throw new IllegalArgumentException("设置失败：" + id);
+        registry.invalidate();
+        return Map.of("message", "已设为全局默认：" + c.getName(), "id", id);
     }
 
     /** 取消激活：只改 active、保留 enabled，清缓存并让代理回落其它激活配置 */
