@@ -256,7 +256,7 @@
   /* 表格密度：表头 11.5 / 单元格 12.5，行高约 42px */
   .data-table th{padding:9px 12px;font-size:11.5px;background:#f8fafc}
   .data-table td{padding:9px 12px;font-size:12.5px}
-  .data-table .name{font-size:12.5px}
+  .data-table .name{font-size:12.5px;font-weight:400;color:var(--ink)}
   /* 用量明细：固定列宽 + 长文本单行截断，避免时间/数字被提问列挤成多行 */
   .usage-detail{table-layout:fixed;width:100%}
   .usage-detail th,.usage-detail td{padding:8px 10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}

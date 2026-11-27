@@ -21,7 +21,7 @@
   .upload-msg{margin:0 0 16px;background:#f7f9fc;border:1px solid var(--line);color:var(--ink-2)}
   .toolbar{display:flex;gap:12px;margin-bottom:14px;align-items:center;flex-wrap:wrap}
   .search{max-width:320px}
-  .doc-name{max-width:380px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600;color:var(--ink)}
+  .doc-name{max-width:380px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--ink)}
   /* 部门可见范围徽标：本部门/含下级/来自上级 三态，浅色底细边不抢眼 */
   .scope{display:inline-flex;align-items:center;gap:4px;border:1px solid var(--line);border-radius:20px;padding:1px 8px;font-size:10.5px;color:var(--ink-2);background:#f7f9fc;white-space:nowrap}
   .scope.sub{border-color:#cfe3d6;background:#f2f9f4;color:#2f7a4d}

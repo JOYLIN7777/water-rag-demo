@@ -126,7 +126,7 @@ export default function DocsPanel() {
               {rows.length === 0
                 ? <tr><td colSpan={6} className="empty">知识库暂无文档</td></tr>
                 : rows.map(d => <tr key={(d.tenantId || '') + d.fileName}>
-                  <td className="name" title={d.fileName}>{d.displayName || d.fileName}</td>
+                  <td className="name">{d.displayName || d.fileName}</td>
                   <td><span className="tag" title="文档归属部门与可见范围">
                     {orgName(d.tenantId)}{d.visibleSubtree ? ' · 含下级' : ' · 仅本部门+上级'}
                   </span></td>

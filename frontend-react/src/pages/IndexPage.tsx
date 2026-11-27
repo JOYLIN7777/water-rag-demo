@@ -509,7 +509,7 @@ export default function IndexPage() {
                     <span className="ai-badge">水</span><span className="ai-card-name">水利知识库助手</span>
                     {m.branch && <span className="branch-chip">分支</span>}
                     {m.streaming && <span className="ai-state" style={{ color: 'var(--primary)' }}>生成中…</span>}
-                    <span className="ai-time">{fullTime(m.finishedAt || m.ts)}</span>
+                    {m.finishedAt && <span className="ai-time">{fullTime(m.finishedAt)}</span>}
                     <span className="ai-card-actions">
                       {m.usage && localStorage.getItem('wrk_pref_usage') !== '0' &&
                         <span className="ai-usage" title={usageTip(m.usage)}>{usageInner(m.usage)}</span>}
@@ -590,7 +590,7 @@ export default function IndexPage() {
               <button className="queue-del" title="直接删除这条排队" onClick={() => dequeueAt(idx)}>×</button>
             </span>)}
           </div>}
-          <textarea id="question" rows={1} placeholder="输入你的问题（最多 2000 字），Enter 发送，Shift+Enter 换行"
+          <textarea id="question" rows={1} placeholder="输入你的问题，Enter 发送，Shift+Enter 换行"
             maxLength={2000} value={q} ref={inputRef}
             onChange={e => {
               setQ(e.target.value)
@@ -607,6 +607,7 @@ export default function IndexPage() {
               }
             }} />
           <div className="composer-bar">
+            {q.length > 1800 && <span className="composer-count">{q.length}/2000</span>}
             <span className="composer-tool" title="基于知识库检索作答"><span style={{ color: 'var(--primary)' }}>◈</span> 知识库问答</span>
             {auth.has('doc:write_chat') && <>
               <button className="composer-tool" onClick={() => fileInput.current?.click()} title="上传文档到知识库">⇪ 上传文档</button>
