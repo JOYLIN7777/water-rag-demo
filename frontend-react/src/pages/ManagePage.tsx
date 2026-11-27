@@ -239,7 +239,7 @@ export default function ManagePage() {
                 ? <tr><td colSpan={canOps ? 5 : 4} className="empty">{search ? '无匹配文档' : (canUpload ? '知识库暂无文档，先上传一份吧' : '知识库暂无文档')}</td></tr>
                 : slice.map(d => (
                   <tr key={d.fileName + (d.tenantId || '')}>
-                    <td className="doc-name" title={d.fileName}>{d.fileName}</td>
+                    <td className="doc-name" title={d.fileName}>{d.fileName.split('/').pop() || d.fileName}</td>
                     <td>{scopeBadge(d)}</td>
                     <td><span className="tag">{d.chunks} 片</span></td>
                     <td>{fmtTime(d.uploadedAt)}</td>

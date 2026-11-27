@@ -251,11 +251,13 @@
   .model-pick-dropdown .ant-select-item-option{font-size:12px;min-width:210px}
   .model-pick-dropdown.ant-select-dropdown{padding:4px}
   /* 原生模型下拉：与按钮同高、贴着控件展开，避免 portal 浮层漂移 */
-  .model-pick-slot select.model-pick{height:30px;max-width:190px;padding:0 26px 0 10px;
-    border:1px solid var(--line);border-radius:8px;background:#fff;color:var(--ink-2);
+  .model-pick-slot select.model-pick{height:30px;max-width:190px;padding:0 24px 0 10px;
+    border:0;border-radius:8px;background:transparent;color:var(--muted);
     font-size:12px;cursor:pointer;appearance:none;
-    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%23677' fill='none'/%3E%3C/svg%3E");
-    background-repeat:no-repeat;background-position:right 9px center}
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%2399a' fill='none'/%3E%3C/svg%3E");
+    background-repeat:no-repeat;background-position:right 8px center}
+  .model-pick-slot select.model-pick:hover{background-color:var(--primary-soft);color:var(--primary)}
+  .model-pick-slot select.model-pick:focus{outline:none;background-color:var(--primary-soft)}
   .model-pick-slot select.model-pick:disabled{opacity:.6;cursor:not-allowed}
   /* 提问气泡：时间与复制按钮放在气泡下方，hover 才显示 */
   .ask-meta{margin-top:5px;display:flex;justify-content:flex-end;align-items:center;gap:8px;
