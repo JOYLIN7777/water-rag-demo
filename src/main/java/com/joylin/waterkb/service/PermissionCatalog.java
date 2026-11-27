@@ -65,9 +65,7 @@ public class PermissionCatalog {
     }
 
     /**
-
      * 内置节点改名（旧名 → 新名）：只改仍用旧名的行，用户自定义的名称不覆盖
-
      */
     private static final Map<String, String[]> RENAMES = Map.of(
             "system:root", new String[]{"系统管理", "管理后台"},
@@ -101,9 +99,7 @@ public class PermissionCatalog {
     }
 
     /**
-
      * 全部权限节点（内置 + 自定义），按模块与内置顺序排列
-
      */
     public List<Map<String, Object>> list() {
         List<Map<String, Object>> out = new ArrayList<>();
@@ -125,9 +121,7 @@ public class PermissionCatalog {
     }
 
     /**
-
      * 权限标识是否存在于目录（角色保存时的合法性校验用）
-
      */
     public boolean exists(String code) {
         return mapper.exists(code);
@@ -234,18 +228,14 @@ public class PermissionCatalog {
     private static String s(Object v) { return v == null ? "" : String.valueOf(v).trim(); }
 
     /**
-
      * 新增自定义节点：标识格式 xxx:yyy 且不与现有节点冲突（兼容旧 5 参调用）
-
      */
     public void create(String code, String name, String type, String module, String desc) {
         create(code, name, type, module, desc, "", "", 0);
     }
 
     /**
-
      * 若依风格新增：带上级节点、路由路径、显示顺序
-
      */
     public void create(String code, String name, String type, String module, String desc,
                        String parentCode, String routePath, int orderNum) {
@@ -264,18 +254,14 @@ public class PermissionCatalog {
     }
 
     /**
-
      * 编辑节点：内置节点只能改显示信息（code 不可变、不可删）；自定义节点全可改（兼容旧 5 参调用）
-
      */
     public void update(String code, String name, String type, String module, String desc) {
         update(code, name, type, module, desc, "", "", 0);
     }
 
     /**
-
      * 若依风格编辑：可改上级节点、路由路径、显示顺序
-
      */
     public void update(String code, String name, String type, String module, String desc,
                        String parentCode, String routePath, int orderNum) {
@@ -294,9 +280,7 @@ public class PermissionCatalog {
     }
 
     /**
-
      * 删除节点：内置节点是接口校验契约，不允许删除
-
      */
     public void delete(String code) {
         if (!exists(code)) throw new IllegalArgumentException("权限节点不存在：" + code);
@@ -309,9 +293,7 @@ public class PermissionCatalog {
     }
 
     /**
-
      * code 只允许小写字母/数字/下划线/连字符，且必须带一个冒号分层（如 report:view）
-
      */
     private void validateCode(String code) {
         if (code == null || !code.matches("^[a-z][a-z0-9_-]*:[a-z][a-z0-9_-]*$")) {

@@ -29,11 +29,7 @@ public class UsageRecorder {
 
 
     /**
-
-
      * 记录一次真实模型调用；任何失败都静默吞掉，绝不影响问答主链路
-
-
      */
     public void record(String userId, String model, long promptTokens, long completionTokens, long durationMs) {
         record(userId, model, promptTokens, completionTokens, durationMs, null, null);
@@ -49,9 +45,7 @@ public class UsageRecorder {
     }
 
     /**
-
      * tenantId 参与写入，查询时才能按部门过滤（admin 传 null 表示看全库）
-
      */
     public void record(String userId, String model, long promptTokens, long completionTokens,
                        long durationMs, String sessionId, String question, String tenantId) {
@@ -75,18 +69,14 @@ public class UsageRecorder {
     }
 
     /**
-
      * 只看某个账号的明细（非 admin 用）
-
      */
     public List<Map<String, Object>> recordsOfUser(String scope, int limit, String user) {
         return records(scope, limit, null, user);
     }
 
     /**
-
      * tenant 非空时只返回本部门明细；admin 传 null 看全库
-
      */
     public List<Map<String, Object>> records(String scope, int limit, String tenant) {
         return records(scope, limit, tenant, null);
@@ -129,18 +119,14 @@ public class UsageRecorder {
     public Map<String, Object> summary() { return summary(null); }
 
     /**
-
      * 只看某个账号的汇总（非 admin 用）
-
      */
     public Map<String, Object> summaryOfUser(String user) {
         return summary(null, user);
     }
 
     /**
-
      * tenant 非空时只统计本部门；admin 传 null 看全库
-
      */
     public Map<String, Object> summary(String tenant) {
         return summary(tenant, null);

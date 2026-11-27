@@ -32,9 +32,7 @@ public class RefreshTokenStore {
     }
 
     /**
-
      * 保存 refresh token（jti -> username），带过期
-
      */
     public void saveRefresh(String jti, String username, long ttlSeconds) {
         tryRedis(() -> redis.opsForValue().set(REFRESH_PREFIX + jti, username, Duration.ofSeconds(ttlSeconds)));
@@ -42,9 +40,7 @@ public class RefreshTokenStore {
     }
 
     /**
-
      * 校验 refresh token 的 jti 是否有效且属于该用户
-
      */
     public boolean isRefreshValid(String jti, String username) {
         if (jti == null || jti.isBlank()) return false;
@@ -60,9 +56,7 @@ public class RefreshTokenStore {
     }
 
     /**
-
      * 删除 refresh token（刷新时轮换 / 登出）
-
      */
     public void removeRefresh(String jti) {
         tryRedis(() -> redis.delete(REFRESH_PREFIX + jti));
@@ -70,9 +64,7 @@ public class RefreshTokenStore {
     }
 
     /**
-
      * 拉黑 access token，直到其自然过期（ttl<=0 不拉黑）
-
      */
     public void blacklist(String jti, long ttlSeconds) {
         if (jti == null || jti.isBlank() || ttlSeconds <= 0) return;
@@ -81,9 +73,7 @@ public class RefreshTokenStore {
     }
 
     /**
-
      * access token 是否已被登出拉黑
-
      */
     public boolean isBlacklisted(String jti) {
         if (jti == null || jti.isBlank()) return false;

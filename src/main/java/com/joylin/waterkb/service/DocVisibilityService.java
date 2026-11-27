@@ -42,9 +42,7 @@ public class DocVisibilityService {
     }
 
     /**
-
      * 单测用：无权限服务时按无 admin 权限处理
-
      */
     public DocVisibilityService(OrgStore orgStore) { this(orgStore, new RolePermissions()); }
 
@@ -96,9 +94,7 @@ public class DocVisibilityService {
     }
 
     /**
-
      * 本部门子句：default 兼容历史无 tenantId 的老数据
-
      */
     private String orgClause(String org) {
         if (OrgStore.DEFAULT_KEY.equals(org)) {

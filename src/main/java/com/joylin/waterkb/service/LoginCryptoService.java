@@ -61,9 +61,7 @@ public class LoginCryptoService {
     }
 
     /**
-
      * 从 PKCS#8 RSA 私钥推导公钥（CRT 参数含模数与指数）
-
      */
     private PublicKey derivePublicKey(PrivateKey priv) throws Exception {
         if (priv instanceof RSAPrivateCrtKey crt) {
@@ -74,16 +72,12 @@ public class LoginCryptoService {
     }
 
     /**
-
      * DER(SubjectPublicKeyInfo) 的 Base64，前端 importKey('spki') 直接用
-
      */
     public String publicKey() { return publicKeyBase64; }
 
     /**
-
      * 前端加密后的 Base64 密文 → 明文；空值返回空串
-
      */
     public String decrypt(String cipherBase64) {
         if (cipherBase64 == null || cipherBase64.isBlank()) return "";

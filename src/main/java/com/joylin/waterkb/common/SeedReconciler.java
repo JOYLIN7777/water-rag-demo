@@ -19,23 +19,17 @@ public class SeedReconciler {
     private final SchemaSeedMapper mapper;
 
     /**
-
      * 版本号：每次新增废弃项时 +1
-
      */
     private static final String VERSION = "2026-11-27-tree-and-docwrite";
 
     /**
-
      * 已废弃的内置权限节点：菜单不再显示
-
      */
     private static final List<String> RETIRED_NODES = List.of("tree:use");
 
     /**
-
      * 已废弃的内置角色默认权限：(角色, 权限)
-
      */
     private static final List<String[]> REMOVED_ROLE_PERMS = List.<String[]>of(
             new String[]{"audit", "doc:write"});

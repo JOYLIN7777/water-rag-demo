@@ -32,9 +32,7 @@ public class ChatSessionStore {
     private volatile boolean migrationDone = false;
 
     /**
-
      * 兼容旧调用（单测）
-
      */
     /**
      * 生产构造：注入数据源与 Mapper
@@ -43,9 +41,7 @@ public class ChatSessionStore {
     public ChatSessionStore(ChatSessionMapper mapper) { this.mapper = mapper; }
 
     /**
-
      * 兼容单测：无数据库
-
      */
     public ChatSessionStore() {
         this(null);
@@ -139,9 +135,7 @@ public class ChatSessionStore {
     }
 
     /**
-
      * 改名（用户在会话列表里重命名时用）
-
      */
     /**
      * 会话是否属于当前账号（显式归属校验用）
@@ -167,9 +161,7 @@ public class ChatSessionStore {
     }
 
     /**
-
      * 删除会话清单行
-
      */
     public boolean delete(String sessionId) {
         if (mapper == null || sessionId == null || sessionId.isBlank()) return false;

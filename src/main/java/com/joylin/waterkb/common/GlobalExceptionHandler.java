@@ -27,9 +27,7 @@ public class GlobalExceptionHandler {
     private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
     /**
-
      * multipart 配置（用于超限提示动态显示真实上限，避免提示文案与配置脱节）
-
      */
     private final MultipartProperties multipartProperties;
 
@@ -38,9 +36,7 @@ public class GlobalExceptionHandler {
     }
 
     /**
-
      * 业务校验类错误：400
-
      */
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<Map<String, Object>> handleBadRequest(IllegalArgumentException e) {
@@ -48,9 +44,7 @@ public class GlobalExceptionHandler {
     }
 
     /**
-
      * 参数校验失败：400（取首条校验消息，避免前端拿到一堆字段错误）
-
      */
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<Map<String, Object>> handleValid(MethodArgumentNotValidException e) {
@@ -60,9 +54,7 @@ public class GlobalExceptionHandler {
     }
 
     /**
-
      * 参数绑定失败：400
-
      */
     @ExceptionHandler(BindException.class)
     public ResponseEntity<Map<String, Object>> handleBind(BindException e) {
@@ -72,9 +64,7 @@ public class GlobalExceptionHandler {
     }
 
     /**
-
      * 状态冲突：409（Service 层 IllegalStateException 明确表达业务状态不对）
-
      */
     @ExceptionHandler(IllegalStateException.class)
     public ResponseEntity<Map<String, Object>> handleState(IllegalStateException e) {
@@ -83,9 +73,7 @@ public class GlobalExceptionHandler {
     }
 
     /**
-
      * 数据完整性冲突：409（唯一约束、外键约束等）
-
      */
     @ExceptionHandler(DataIntegrityViolationException.class)
     public ResponseEntity<Map<String, Object>> handleIntegrity(DataIntegrityViolationException e) {
@@ -95,9 +83,7 @@ public class GlobalExceptionHandler {
     }
 
     /**
-
      * 上传文件超限：413（上限文案动态读取并格式化为可读单位，避免出现 524288000B 这种原始字节数）
-
      */
     @ExceptionHandler(MaxUploadSizeExceededException.class)
     public ResponseEntity<Map<String, Object>> handleMaxUpload(MaxUploadSizeExceededException e) {
@@ -119,9 +105,7 @@ public class GlobalExceptionHandler {
     }
 
     /**
-
      * 静态资源不存在（例如已删除的旧页面）应返回 404，不要被兜底成 500
-
      */
     @ExceptionHandler(org.springframework.web.servlet.resource.NoResourceFoundException.class)
     public ResponseEntity<Map<String, Object>> handleNoResource(Exception e) {
@@ -130,9 +114,7 @@ public class GlobalExceptionHandler {
     }
 
     /**
-
      * 兜底：500（必须把异常打进日志，否则排查时无迹可循）
-
      */
     @ExceptionHandler(Exception.class)
     public ResponseEntity<Map<String, Object>> handleOther(Exception e) {

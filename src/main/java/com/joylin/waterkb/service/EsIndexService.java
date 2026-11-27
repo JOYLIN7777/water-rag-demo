@@ -52,9 +52,7 @@ public class EsIndexService {
     }
 
     /**
-
      * 启动时确保索引存在且含租户/可见范围字段（幂等，兼容老索引平滑升级）
-
      */
     @PostConstruct
     public void init() {
@@ -178,18 +176,14 @@ public class EsIndexService {
     }
 
     /**
-
      * 通用 POST 查询：返回 ES 原始 JSON，由调用方解析
-
      */
     public JsonNode search(String index, String dsl) {
         return postJson("/" + index + "/_search", dsl);
     }
 
     /**
-
      * 统一的 JSON POST：请求和响应都显式 UTF-8
-
      */
     private JsonNode postJson(String uri, String body) {
         byte[] raw = client.post().uri(uri)
@@ -200,9 +194,7 @@ public class EsIndexService {
     }
 
     /**
-
      * bulk 写入：items 是 {indexName, id, sourceMap} 列表
-
      */
     public int bulkIndex(List<Map<String, Object>> docs) {
         if (docs.isEmpty()) return 0;
@@ -230,9 +222,7 @@ public class EsIndexService {
     }
 
     /**
-
      * 按文档 id 列表删除（VectorStore 接口要求）
-
      */
     public int deleteByIds(List<String> ids) {
         if (ids.isEmpty()) return 0;

@@ -14,16 +14,12 @@ import java.util.concurrent.atomic.AtomicInteger;
 public class LlmCircuitBreaker {
 
     /**
-
      * 连续失败计数
-
      */
     private final AtomicInteger consecutiveFailures = new AtomicInteger();
 
     /**
-
      * 熔断打开的截止时间戳（毫秒），0 表示从未熔断
-
      */
     private volatile long openUntilEpochMs = 0L;
 
@@ -42,9 +38,7 @@ public class LlmCircuitBreaker {
     }
 
     /**
-
      * 调用成功：清零失败计数，回到关闭状态
-
      */
     public void recordSuccess() {
         consecutiveFailures.set(0);
@@ -63,9 +57,7 @@ public class LlmCircuitBreaker {
     }
 
     /**
-
      * 是否处于熔断打开期（供监控/日志使用）
-
      */
     public boolean isOpen() {
         return System.currentTimeMillis() < openUntilEpochMs;

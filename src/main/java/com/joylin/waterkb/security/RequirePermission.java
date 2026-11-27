@@ -16,16 +16,12 @@ import java.lang.annotation.Target;
 public @interface RequirePermission {
 
     /**
-
      * 需要的权限码，满足其中任意一个即可（除非 all=true）
-
      */
     String[] value();
 
     /**
-
      * 是否要求全部权限都满足
-
      */
     boolean all() default false;
 }

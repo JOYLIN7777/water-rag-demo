@@ -25,9 +25,7 @@ public class PasswordHasher {
     private static final Base64.Decoder B64D = Base64.getDecoder();
 
     /**
-
      * 对明文密码生成自描述哈希串（注册/初始化账号时用）
-
      */
     public String hash(String rawPassword) {
         byte[] salt = new byte[SALT_BYTES];
@@ -37,9 +35,7 @@ public class PasswordHasher {
     }
 
     /**
-
      * 校验明文密码与存储的哈希是否匹配；任何格式异常都当作不匹配（不抛给调用方）
-
      */
     public boolean matches(String rawPassword, String stored) {
         try {

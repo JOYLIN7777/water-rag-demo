@@ -51,9 +51,7 @@ public class ModelRegistry {
     }
 
     /**
-
      * 该模型是否处于「暂时跳过」状态
-
      */
     public boolean isSkipped(long modelId) {
         ModelHealth h = chatHealth.get(modelId);
@@ -61,9 +59,7 @@ public class ModelRegistry {
     }
 
     /**
-
      * 调用失败：第一次失败就跳过 60 秒，快速切到下一个可用模型
-
      */
     public void markFailure(long modelId) {
         ModelHealth h = chatHealth.computeIfAbsent(modelId, k -> new ModelHealth());
@@ -73,9 +69,7 @@ public class ModelRegistry {
     }
 
     /**
-
      * 调用成功：清掉跳过标记
-
      */
     public void markSuccess(long modelId) {
         chatHealth.remove(modelId);
@@ -112,9 +106,7 @@ public class ModelRegistry {
     }
 
     /**
-
      * 配置变更后刷新：重建缓存 + 切换代理 delegate
-
      */
     public synchronized void refreshDelegates() {
         ModelConfig emb = repository.findActive("EMBEDDING");
@@ -127,9 +119,7 @@ public class ModelRegistry {
     }
 
     /**
-
      * 当前激活的 ChatModel（不存在时抛异常，错误由全局处理器转成可读信息）
-
      */
     public ChatModel currentChatModel() {
         ModelConfig c = repository.findActive("CHAT");
@@ -138,9 +128,7 @@ public class ModelRegistry {
     }
 
     /**
-
      * 当前激活的 ChatClient（每次调用构建，工具由调用方注册）
-
      */
     public ChatClient currentChatClient(Object... tools) {
         ChatClient.Builder builder = ChatClient.builder(currentChatModel());
@@ -149,9 +137,7 @@ public class ModelRegistry {
     }
 
     /**
-
      * 按指定配置构造 ChatClient：提问框按次选模型时用，不改全局激活配置
-
      */
     public ChatClient chatClientFor(ModelConfig c, Object... tools) {
         ChatClient.Builder builder = ChatClient.builder(chatModel(c));
@@ -160,9 +146,7 @@ public class ModelRegistry {
     }
 
     /**
-
      * 按配置构造并缓存 ChatModel
-
      */
     public ChatModel chatModel(ModelConfig c) {
         String fp = fingerprint(c);
@@ -181,9 +165,7 @@ public class ModelRegistry {
     }
 
     /**
-
      * 按配置构造并缓存 EmbeddingModel
-
      */
     public EmbeddingModel embeddingModel(ModelConfig c) {
         String fp = fingerprint(c);
@@ -240,9 +222,7 @@ public class ModelRegistry {
     }
 
     /**
-
      * 配置变更（新增/编辑/删除/激活）后调用：清缓存并刷新代理
-
      */
     public synchronized void invalidate() {
         chatCache.clear();
@@ -275,9 +255,7 @@ public class ModelRegistry {
     }
 
     /**
-
      * 配置指纹：任一影响调用的字段变化都会生成新实例
-
      */
     private String fingerprint(ModelConfig c) {
         return c.getType() + "|" + c.getBaseUrl() + "|" + c.getApiKey() + "|" + c.getModel() + "|" + c.getDimensions();

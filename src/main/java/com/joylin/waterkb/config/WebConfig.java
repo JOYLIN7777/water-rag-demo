@@ -8,28 +8,30 @@ import org.springframework.web.servlet.config.annotation.ResourceHandlerRegistry
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
 /**
-
- * 注册权限拦截器，覆盖所有 API 请求（静态页面不拦截）
-
+ * 注册权限拦截器与静态资源缓存策略。
  */
 @Configuration
 public class WebConfig implements WebMvcConfigurer {
 
     private final PermissionInterceptor permissionInterceptor;
 
+    /**
+     * 构造Web配置。
+     */
     public WebConfig(PermissionInterceptor permissionInterceptor) {
         this.permissionInterceptor = permissionInterceptor;
     }
 
+    /**
+     * 注册权限拦截器。
+     */
     @Override
     public void addInterceptors(InterceptorRegistry registry) {
         registry.addInterceptor(permissionInterceptor).addPathPatterns("/api/**");
     }
 
     /**
-
-     * 前端页面与脚本不缓存，避免改版后浏览器继续用旧 DOM 导致"闪回用户管理"
-
+     * 配置静态资源不缓存。
      */
     @Override
     public void addResourceHandlers(ResourceHandlerRegistry registry) {

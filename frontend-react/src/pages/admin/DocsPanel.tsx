@@ -10,7 +10,7 @@ import { useAuthStore } from '@/store/auth'
 import '@/styles/admin.css'
 import '@/styles/manage.css'
 
-interface Doc { fileName: string; chunks: number; uploadedAt?: string; ownerUser?: string; tenantId?: string; visibleSubtree?: boolean }
+interface Doc { fileName: string; displayName?: string; chunks: number; uploadedAt?: string; ownerUser?: string; tenantId?: string; visibleSubtree?: boolean }
 interface Org { key: string; name: string }
 
 const PAGE_SIZE = 10
@@ -80,7 +80,7 @@ export default function DocsPanel() {
       danger: true,
       okText: '确认删除',
       content: <>
-        <p style={{ margin: 0 }}>确定删除「{d.fileName}」及其全部 {d.chunks} 个片段吗？删除后无法恢复。</p>
+        <p style={{ margin: 0 }}>确定删除「{d.displayName || d.fileName}」及其全部 {d.chunks} 个片段吗？删除后无法恢复。</p>
         {d.tenantId && <p style={{ margin: '6px 0 0', color: 'var(--muted)', fontSize: 12 }}>
           仅删除「{orgName(d.tenantId)}」部门下的同名文档，不影响其他部门。
         </p>}
@@ -126,7 +126,7 @@ export default function DocsPanel() {
               {rows.length === 0
                 ? <tr><td colSpan={6} className="empty">知识库暂无文档</td></tr>
                 : rows.map(d => <tr key={(d.tenantId || '') + d.fileName}>
-                  <td className="name">{d.fileName}</td>
+                  <td className="name" title={d.fileName}>{d.displayName || d.fileName}</td>
                   <td><span className="tag" title="文档归属部门与可见范围">
                     {orgName(d.tenantId)}{d.visibleSubtree ? ' · 含下级' : ' · 仅本部门+上级'}
                   </span></td>

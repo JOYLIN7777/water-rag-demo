@@ -31,9 +31,7 @@ public class AuditFilter extends OncePerRequestFilter {
     }
 
     /**
-
      * 高频/无审计价值的端点跳过（健康检查、审计自身查询，避免审计表自我放大）
-
      */
     private static final Set<String> SKIP = Set.of(
             "/api/search/health", "/api/health", "/api/audit/logs", "/api/audit/stats",
@@ -79,9 +77,7 @@ public class AuditFilter extends OncePerRequestFilter {
     }
 
     /**
-
      * 查询串脱敏：API Key / token 等敏感参数值一律打码
-
      */
     private String sanitize(String query) {
         if (query == null || query.isBlank()) return "";

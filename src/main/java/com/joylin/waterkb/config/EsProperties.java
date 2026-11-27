@@ -10,9 +10,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 public class EsProperties {
 
     /**
-
      * ES 服务地址（容器内用服务名 http://elasticsearch:9200）
-
      */
     private String url = "http://localhost:9200";
     private String index = "water_knowledge";
@@ -22,9 +20,7 @@ public class EsProperties {
     private int dimensions = 1024;
 
     /**
-
      * kNN 候选数（HNSW ef_search 概念，越大越准越慢）
-
      */
     private int knnCandidates = 100;
     /**
@@ -40,18 +36,88 @@ public class EsProperties {
      */
     private double minScore = 0;
 
-    public String getUrl() { return url; }
-    public void setUrl(String url) { this.url = url; }
-    public String getIndex() { return index; }
-    public void setIndex(String index) { this.index = index; }
-    public int getDimensions() { return dimensions; }
-    public void setDimensions(int dimensions) { this.dimensions = dimensions; }
-    public int getKnnCandidates() { return knnCandidates; }
-    public void setKnnCandidates(int knnCandidates) { this.knnCandidates = knnCandidates; }
-    public int getTopK() { return topK; }
-    public void setTopK(int topK) { this.topK = topK; }
-    public int getRrfRankConstant() { return rrfRankConstant; }
-    public void setRrfRankConstant(int rrfRankConstant) { this.rrfRankConstant = rrfRankConstant; }
-    public double getMinScore() { return minScore; }
-    public void setMinScore(double minScore) { this.minScore = minScore; }
+    /**
+     * 获取Url。
+     */
+    public String getUrl() {
+        return url;
+    }
+    /**
+     * 设置Url。
+     */
+    public void setUrl(String url) {
+        this.url = url;
+    }
+    /**
+     * 获取Index。
+     */
+    public String getIndex() {
+        return index;
+    }
+    /**
+     * 设置Index。
+     */
+    public void setIndex(String index) {
+        this.index = index;
+    }
+    /**
+     * 获取Dimensions。
+     */
+    public int getDimensions() {
+        return dimensions;
+    }
+    /**
+     * 设置Dimensions。
+     */
+    public void setDimensions(int dimensions) {
+        this.dimensions = dimensions;
+    }
+    /**
+     * 获取KnnCandidates。
+     */
+    public int getKnnCandidates() {
+        return knnCandidates;
+    }
+    /**
+     * 设置KnnCandidates。
+     */
+    public void setKnnCandidates(int knnCandidates) {
+        this.knnCandidates = knnCandidates;
+    }
+    /**
+     * 获取TopK。
+     */
+    public int getTopK() {
+        return topK;
+    }
+    /**
+     * 设置TopK。
+     */
+    public void setTopK(int topK) {
+        this.topK = topK;
+    }
+    /**
+     * 获取RrfRankConstant。
+     */
+    public int getRrfRankConstant() {
+        return rrfRankConstant;
+    }
+    /**
+     * 设置RrfRankConstant。
+     */
+    public void setRrfRankConstant(int rrfRankConstant) {
+        this.rrfRankConstant = rrfRankConstant;
+    }
+    /**
+     * 获取MinScore。
+     */
+    public double getMinScore() {
+        return minScore;
+    }
+    /**
+     * 设置MinScore。
+     */
+    public void setMinScore(double minScore) {
+        this.minScore = minScore;
+    }
 }

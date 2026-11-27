@@ -7,9 +7,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
-
  * 会话清单 Mapper（MyBatis）：chat_session 表的 DML。DDL 由 ChatSessionStore 负责。
-
  */
 @Mapper
 public interface ChatSessionMapper {

@@ -64,18 +64,14 @@ public class VectorStoreAdminRepository {
     }
 
     /**
-
      * 可见范围内查文件归属部门（删除失败时区分"不存在"与"归属别部门"）
-
      */
     public String findDocTenant(String fileName) {
         return es.findDocTenant(fileName);
     }
 
     /**
-
      * 单份文档的全部切片（供分片树状预览）
-
      */
     public Map<String, Object> listChunks(String fileName) {
         try {

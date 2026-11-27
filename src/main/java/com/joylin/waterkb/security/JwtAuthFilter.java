@@ -31,9 +31,7 @@ import com.joylin.waterkb.service.JwtService;
 public class JwtAuthFilter extends OncePerRequestFilter {
 
     /**
-
      * 无需登录即可访问的路径前缀
-
      */
     private static final Set<String> WHITE_LIST = Set.of(
             "/api/auth/login", "/api/auth/refresh", "/api/auth/public-key", "/api/search/health", "/api/health", "/", "/index.html", "/login.html",

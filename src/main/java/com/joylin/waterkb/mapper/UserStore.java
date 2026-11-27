@@ -37,9 +37,7 @@ public class UserStore {
     private final Map<String, UserAccount> users = new LinkedHashMap<>();
 
     /**
-
      * 兼容单测：不接数据库，纯内存
-
      */
     public UserStore(PasswordHasher hasher,
                      @Value("${security.auth.users:}") String configuredUsers) {
@@ -47,9 +45,7 @@ public class UserStore {
     }
 
     /**
-
      * 生产构造：后台维护的账号写入 app_users，重启后仍生效
-
      */
     @Autowired
     public UserStore(PasswordHasher hasher,
@@ -86,9 +82,7 @@ public class UserStore {
     }
 
     /**
-
      * 数据库账号覆盖同名的配置账号，保证后台编辑的结果重启后不丢失
-
      */
     private void loadFromDatabase() {
         if (mapper == null) return;
@@ -122,9 +116,7 @@ public class UserStore {
     }
 
     /**
-
      * 后台新增账号；用户名小写唯一，初始密码至少 8 位
-
      */
     public boolean create(String username, String rawPassword, List<String> groups,
                           String tenant, String displayName) {
@@ -142,9 +134,7 @@ public class UserStore {
     }
 
     /**
-
      * 后台编辑：显示名、角色组、租户、启用状态（不改密码）
-
      */
     public boolean update(String username, String displayName, List<String> groups,
                           String tenant, boolean enabled) {
@@ -163,9 +153,7 @@ public class UserStore {
     }
 
     /**
-
      * 启用/停用账号（新增时可创建即停用）
-
      */
     public boolean setEnabled(String username, boolean enabled) {
         String name = username == null ? "" : username.trim().toLowerCase();
@@ -178,9 +166,7 @@ public class UserStore {
     }
 
     /**
-
      * 后台删除账号；禁止删除自己由接口层校验
-
      */
     public boolean delete(String username) {
         String name = username == null ? "" : username.trim().toLowerCase();
@@ -195,9 +181,7 @@ public class UserStore {
     }
 
     /**
-
      * 后台重置密码（不校验原密码）
-
      */
     public boolean resetPassword(String username, String newPassword) {
         String name = username == null ? "" : username.trim().toLowerCase();
@@ -212,9 +196,7 @@ public class UserStore {
     }
 
     /**
-
      * 校验用户名/手机号 + 密码，成功返回账号。手机号只按精确匹配，且必须是完整 11 位。
-
      */
     public UserAccount authenticate(String username, String password) {
         if (username == null || password == null) return null;
@@ -228,9 +210,7 @@ public class UserStore {
     }
 
     /**
-
      * 个人资料：性别、手机号、头像；手机号全局唯一，避免一人多号混用
-
      */
     public boolean updateProfile(String username, String gender, String phone, String avatar) {
         String name = username == null ? "" : username.trim().toLowerCase();
@@ -278,9 +258,7 @@ public class UserStore {
     }
 
     /**
-
      * 不可变账号值对象：绝不暴露密码哈希给外部（toString 里也不含）
-
      */
     public record UserAccount(String username, String passwordHash, List<String> groups,
                               String tenant, String displayName, boolean enabled,

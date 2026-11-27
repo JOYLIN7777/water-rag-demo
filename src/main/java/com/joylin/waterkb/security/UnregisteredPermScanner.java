@@ -46,9 +46,7 @@ public class UnregisteredPermScanner {
     }
 
     /**
-
      * 汇总所有来源：React TSX 源码 + 注解
-
      */
     private Map<String, List<String>> collectSources() {
         Map<String, List<String>> out = new LinkedHashMap<>();
@@ -58,9 +56,7 @@ public class UnregisteredPermScanner {
     }
 
     /**
-
      * 扫描工程内源码（React TSX 不在 jar 里，从文件系统读）
-
      */
     private void scanFileSystem(String root, Pattern re, Map<String, List<String>> out) {
         java.io.File dir = new java.io.File(root);
@@ -82,9 +78,7 @@ public class UnregisteredPermScanner {
     }
 
     /**
-
      * 代码里所有在用的权限码（含已注册），用于校验手工填写的码是否真的会生效
-
      */
     public Set<String> allUsedCodes() {
         Set<String> out = new TreeSet<>();
@@ -93,9 +87,7 @@ public class UnregisteredPermScanner {
     }
 
     /**
-
      * code → 来源描述（多个来源合并）
-
      */
     public List<Map<String, Object>> scan() {
         Map<String, List<String>> sources = collectSources();
@@ -146,9 +138,7 @@ public class UnregisteredPermScanner {
     }
 
     /**
-
      * 通过反射读 Controller 上的 @RequirePermission，只收真正会拦截请求的权限码
-
      */
     private void scanAnnotations(Map<String, List<String>> out) {
         try {
@@ -173,9 +163,7 @@ public class UnregisteredPermScanner {
     }
 
     /**
-
      * 从权限码猜一个中文名，用户可改
-
      */
     private String suggestName(String code) {
         String action = code.substring(code.indexOf(':') + 1);

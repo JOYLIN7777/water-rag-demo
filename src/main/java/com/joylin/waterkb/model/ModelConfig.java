@@ -104,123 +104,171 @@ public class ModelConfig {
     /**
      * 获取主键。
      */
-    public Long getId() { return id; }
+    public Long getId() {
+        return id;
+    }
 
     /**
      * 设置主键。
      */
-    public void setId(Long id) { this.id = id; }
+    public void setId(Long id) {
+        this.id = id;
+    }
 
     /**
      * 获取展示名称。
      */
-    public String getName() { return name; }
+    public String getName() {
+        return name;
+    }
 
     /**
      * 设置展示名称。
      */
-    public void setName(String name) { this.name = name; }
+    public void setName(String name) {
+        this.name = name;
+    }
 
     /**
      * 获取模型类型。
      */
-    public String getType() { return type; }
+    public String getType() {
+        return type;
+    }
 
     /**
      * 设置模型类型。
      */
-    public void setType(String type) { this.type = type; }
+    public void setType(String type) {
+        this.type = type;
+    }
 
     /**
      * 获取接口地址。
      */
-    public String getBaseUrl() { return baseUrl; }
+    public String getBaseUrl() {
+        return baseUrl;
+    }
 
     /**
      * 设置接口地址。
      */
-    public void setBaseUrl(String baseUrl) { this.baseUrl = baseUrl; }
+    public void setBaseUrl(String baseUrl) {
+        this.baseUrl = baseUrl;
+    }
 
     /**
      * 获取接口密钥。
      */
-    public String getApiKey() { return apiKey; }
+    public String getApiKey() {
+        return apiKey;
+    }
 
     /**
      * 设置接口密钥。
      */
-    public void setApiKey(String apiKey) { this.apiKey = apiKey; }
+    public void setApiKey(String apiKey) {
+        this.apiKey = apiKey;
+    }
 
     /**
      * 获取模型标识。
      */
-    public String getModel() { return model; }
+    public String getModel() {
+        return model;
+    }
 
     /**
      * 设置模型标识。
      */
-    public void setModel(String model) { this.model = model; }
+    public void setModel(String model) {
+        this.model = model;
+    }
 
     /**
      * 获取向量维度。
      */
-    public Integer getDimensions() { return dimensions; }
+    public Integer getDimensions() {
+        return dimensions;
+    }
 
     /**
      * 设置向量维度。
      */
-    public void setDimensions(Integer dimensions) { this.dimensions = dimensions; }
+    public void setDimensions(Integer dimensions) {
+        this.dimensions = dimensions;
+    }
 
     /**
      * 获取启用标志。
      */
-    public boolean isEnabled() { return enabled; }
+    public boolean isEnabled() {
+        return enabled;
+    }
 
     /**
      * 设置启用标志。
      */
-    public void setEnabled(boolean enabled) { this.enabled = enabled; }
+    public void setEnabled(boolean enabled) {
+        this.enabled = enabled;
+    }
 
     /**
      * 获取激活标志。
      */
-    public boolean isActive() { return active; }
+    public boolean isActive() {
+        return active;
+    }
 
     /**
      * 设置激活标志。
      */
-    public void setActive(boolean active) { this.active = active; }
+    public void setActive(boolean active) {
+        this.active = active;
+    }
 
     /**
      * 获取默认标志。
      */
     @JsonProperty("isDefault")
-    public boolean isDefault() { return isDefault; }
+    public boolean isDefault() {
+        return isDefault;
+    }
 
     /**
      * 设置默认标志。
      */
-    public void setDefault(boolean isDefault) { this.isDefault = isDefault; }
+    public void setDefault(boolean isDefault) {
+        this.isDefault = isDefault;
+    }
 
     /**
      * 获取创建时间。
      */
-    public LocalDateTime getCreatedAt() { return createdAt; }
+    public LocalDateTime getCreatedAt() {
+        return createdAt;
+    }
 
     /**
      * 设置创建时间。
      */
-    public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
+    public void setCreatedAt(LocalDateTime createdAt) {
+        this.createdAt = createdAt;
+    }
 
     /**
      * 获取更新时间。
      */
-    public LocalDateTime getUpdatedAt() { return updatedAt; }
+    public LocalDateTime getUpdatedAt() {
+        return updatedAt;
+    }
 
     /**
      * 设置更新时间。
      */
-    public void setUpdatedAt(LocalDateTime updatedAt) { this.updatedAt = updatedAt; }
+    public void setUpdatedAt(LocalDateTime updatedAt) {
+        this.updatedAt = updatedAt;
+    }
 
     /**
      * 获取脱敏密钥。

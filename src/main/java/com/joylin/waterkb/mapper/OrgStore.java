@@ -40,9 +40,7 @@ public class OrgStore {
     public void init() { ensure(); }
 
     /**
-
      * 建表 + 补 parent_key 列 + 补默认组织 + 把历史账号里出现过的 tenant 补登记（幂等）
-
      */
     private void ensure() {
         if (ready) return;
@@ -142,9 +140,7 @@ public class OrgStore {
     }
 
     /**
-
      * 兼容旧调用：建在顶层
-
      */
     public String create(String name, String key) {
         return create(name, key, null);
@@ -158,9 +154,7 @@ public class OrgStore {
     }
 
     /**
-
      * 重命名组织：只改显示名，组织键与上级关系都不动
-
      */
     public boolean rename(String key, String name) {
         ensure();
@@ -213,9 +207,7 @@ public class OrgStore {
     }
 
     /**
-
      * key 自身 + 所有子孙的键（BFS；一次读全表，组织规模在几十上百，没必要递归查库）
-
      */
     public Set<String> subtreeKeys(String key) {
         ensure();
@@ -237,9 +229,7 @@ public class OrgStore {
     }
 
     /**
-
      * 下级组织个数（不含自身）
-
      */
     public int childCount(String key) {
         ensure();
@@ -250,9 +240,7 @@ public class OrgStore {
     }
 
     /**
-
      * 组织总数（用于守住"不能删到一个都不剩"）
-
      */
     public int count() {
         ensure();
@@ -280,9 +268,7 @@ public class OrgStore {
     }
 
     /**
-
      * 组织键 → 名称（取不到就回键本身，界面不会空着）
-
      */
     public Map<String, String> nameMap() {
         Map<String, String> out = new LinkedHashMap<>();

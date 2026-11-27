@@ -42,16 +42,12 @@ public class EsHybridSearchService {
     }
 
     /**
-
      * 检索模式：用于 A/B 对比演示
-
      */
     public enum Mode { BM25, KNN, HYBRID }
 
     /**
-
      * 混合检索（默认 HYBRID）。权限过滤强制注入，调用方无法关闭。
-
      */
     public List<Document> search(String question) {
         return search(question, Mode.HYBRID);
@@ -85,9 +81,7 @@ public class EsHybridSearchService {
     }
 
     /**
-
      * 兼容旧调用/单测的统一入口：HYBRID 模式返回其中一路 DSL（融合逻辑在 Java 侧）
-
      */
     String buildDsl(String question, float[] vector, Mode mode) {
         String filter = buildPermissionFilter();
@@ -104,9 +98,7 @@ public class EsHybridSearchService {
     }
 
     /**
-
      * 纯向量 DSL：ES 8.13 的 knn 是顶层字段，不能塞进 query。
-
      */
     String buildKnnDsl(float[] vector, String filter, int window) {
         return "{\"size\":" + window + ",\"knn\":{\"field\":\"embedding\",\"query_vector\":["
@@ -159,9 +151,7 @@ public class EsHybridSearchService {
     }
 
     /**
-
      * 解析 ES hits → Spring AI Document（保留 esId 供 RRF 去重、fileName/chunkIndex 供引用溯源）
-
      */
     private List<Document> parseHits(JsonNode root) {
         List<Document> out = new ArrayList<>();

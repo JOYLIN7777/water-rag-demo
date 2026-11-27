@@ -43,9 +43,7 @@ public class RagChatService {
     private static final Logger log = LoggerFactory.getLogger(RagChatService.class);
 
     /**
-
      * 推荐问题缓存：模型整理一次管 10 分钟，避免每次打开首页都调模型
-
      */
     private volatile java.util.Map.Entry<Long, java.util.List<String>> suggestionCache;
 
@@ -331,9 +329,7 @@ public class RagChatService {
     }
 
     /**
-
      * 按任意查询取真实片段（推荐问题用；复用同一套向量检索与权限过滤）
-
      */
     public List<Document> sampleChunks(String query, int topK) {
         if (query == null || query.isBlank()) return List.of();
@@ -348,9 +344,7 @@ public class RagChatService {
     }
 
     /**
-
      * 当前账号可见的知识库文档（推荐问题用；沿用文档列表的租户/行级权限过滤）
-
      */
     public List<Map<String, Object>> visibleDocuments() {
         List<Map<String, Object>> docs = adminRepository.listDocuments();
@@ -358,9 +352,7 @@ public class RagChatService {
     }
 
     /**
-
      * 本次使用的对话模型名（用量记录用）：按次指定优先，否则当前激活；取不到回落 unknown
-
      */
     private String activeChatModelName(Long modelId) {
         try {
@@ -469,9 +461,7 @@ public class RagChatService {
     }
 
     /**
-
      * 直接问"当前/实时水位、流量"且提到已收录站点时，也走确定性工具执行
-
      */
     private static boolean isDirectWaterQuery(String question) {
         if (question == null || extractStation(question) == null) return false;
@@ -483,9 +473,7 @@ public class RagChatService {
     }
 
     /**
-
      * 从问题或历史里提取已收录的站点名（与 WaterInfoTool 的演示站点保持一致）
-
      */
     private static String extractStation(String text) {
         if (text == null) return null;
@@ -566,9 +554,7 @@ public class RagChatService {
     }
 
     /**
-
      * 把检索命中转成可存入节点 JSON 的来源片段（回显引用卡片用）
-
      */
     private List<Map<String, Object>> toSourceMaps(List<Document> hits) {
         List<Map<String, Object>> out = new ArrayList<>();
@@ -600,9 +586,7 @@ public class RagChatService {
     }
 
     /**
-
      * "有哪些文档"这类元问题：走真实文档清单，不走语义检索
-
      */
     private boolean isDocumentListQuestion(String question) {
         String q = String.valueOf(question == null ? "" : question).replaceAll("\\s", "");
@@ -610,9 +594,7 @@ public class RagChatService {
     }
 
     /**
-
      * 当前账号可见的全部文档名，按文档清单接口的同一份权限口径生成
-
      */
     private String documentListContext() {
         try {
@@ -654,9 +636,7 @@ public class RagChatService {
     }
 
     /**
-
      * 模型不可用时的明确错误提示：不再把检索原文包装成回答
-
      */
     private String modelErrorMessage(String message) {
         return "【模型异常】" + message;

@@ -113,9 +113,7 @@ public class ConversationTreeStore {
     }
 
     /**
-
      * 当前 head（null 表示会话还没有消息）
-
      */
     public String head(String sessionId) {
         UserContext.CurrentUser u = UserContext.get();
@@ -132,9 +130,7 @@ public class ConversationTreeStore {
     }
 
     /**
-
      * rewind：把 head 移到指定节点；节点必须存在，否则拒绝（防止指针悬空）。
-
      */
     public boolean rewind(String sessionId, String nodeId) {
         // 回退到会话开头：root 是虚拟节点、不存在于 Redis，直接删掉 head 指针即可。
@@ -151,9 +147,7 @@ public class ConversationTreeStore {
     }
 
     /**
-
      * 取单个节点
-
      */
     public java.util.Optional<TreeNode> get(String sessionId, String nodeId) {
         UserContext.CurrentUser u = UserContext.get();
@@ -189,18 +183,14 @@ public class ConversationTreeStore {
     }
 
     /**
-
      * 当前 head 所在分支的完整消息链
-
      */
     public List<TreeNode> path(String sessionId) {
         return pathTo(sessionId, null);
     }
 
     /**
-
      * 取整棵树的所有节点（供前端画树）
-
      */
     public List<TreeNode> allNodes(String sessionId) {
         Map<Object, Object> entries = redis.opsForHash().entries(key(TREE, sessionId));
@@ -217,9 +207,7 @@ public class ConversationTreeStore {
     }
 
     /**
-
      * 命名分支表：branchName → fork 起点 nodeId
-
      */
     public Map<String, String> branches(String sessionId) {
         Map<Object, Object> raw = redis.opsForHash().entries(key(BRANCH, sessionId));
@@ -229,9 +217,7 @@ public class ConversationTreeStore {
     }
 
     /**
-
      * 命名分支：把某个节点标记为新分支的起点（真正的分叉在下一次 append 发生）
-
      */
     public boolean fork(String sessionId, String fromNodeId, String branchName) {
         if (branchName == null || branchName.isBlank()) return false;
@@ -276,9 +262,7 @@ public class ConversationTreeStore {
     }
 
     /**
-
      * 清空整个会话（树、head、分支一起删）
-
      */
     public void clear(String sessionId) {
         redis.delete(java.util.List.of(key(TREE, sessionId), key(HEAD, sessionId), key(BRANCH, sessionId)));

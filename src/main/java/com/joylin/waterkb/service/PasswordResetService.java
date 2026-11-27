@@ -28,9 +28,7 @@ public class PasswordResetService {
     private static final Logger log = LoggerFactory.getLogger(PasswordResetService.class);
 
     /**
-
      * 重置码字符集：去掉 I/O/0/1 这类肉眼易混字符，管理员口述、用户手抄不易出错
-
      */
     private static final String ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
     private static final int CODE_LENGTH = 8;
@@ -86,9 +84,7 @@ public class PasswordResetService {
     }
 
     /**
-
      * 后台待办列表：待审批 + 已发码未使用（后者让管理员能回答"码给了怎么还没用"）
-
      */
     public List<Map<String, Object>> list() {
         List<Map<String, Object>> out = new ArrayList<>();
@@ -197,9 +193,7 @@ public class PasswordResetService {
     }
 
     /**
-
      * 生成重置码；用 SecureRandom 而非 Random，避免可预测序列
-
      */
     private static String randomCode() {
         StringBuilder sb = new StringBuilder(CODE_LENGTH);

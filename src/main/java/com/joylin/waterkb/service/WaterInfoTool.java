@@ -30,9 +30,7 @@ public class WaterInfoTool {
     }
 
     /**
-
      * 各站点水位/流量的基准值（模拟实时报值 = 基准值 + 随机抖动）
-
      */
     private static final Map<String, double[]> BASE = Map.of(
             "云溪水库", new double[]{45.10, 1200.0},

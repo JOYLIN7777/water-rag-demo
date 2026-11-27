@@ -66,9 +66,7 @@ public class PermissionService {
     }
 
     /**
-
      * 聚合当前用户权限视图
-
      */
     public Map<String, Object> currentPermissions() {
         UserContext.CurrentUser u = UserContext.get();

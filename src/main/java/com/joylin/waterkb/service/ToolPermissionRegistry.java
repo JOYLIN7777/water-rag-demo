@@ -23,9 +23,7 @@ public class ToolPermissionRegistry {
     public static final String TOOL_WATER_QUERY = "queryRealtimeWater";
 
     /**
-
      * 允许使用工具的问答角色；最终还要过功能权限码校验（见 denyReason）
-
      */
     private final Map<String, Rule> rules = Map.of(
             TOOL_WATER_QUERY, new Rule(
@@ -38,9 +36,7 @@ public class ToolPermissionRegistry {
     private final RolePermissions rolePermissions;
 
     /**
-
      * 单测用：不接数据库，只按内置角色默认权限判定
-
      */
     public ToolPermissionRegistry() { this(new RolePermissions()); }
 
@@ -50,9 +46,7 @@ public class ToolPermissionRegistry {
     }
 
     /**
-
      * 校验当前用户是否有权调用工具；拒绝返回可读原因，放行返回 null。
-
      */
     public String denyReason(String tool) {
         UserContext.CurrentUser user = UserContext.get();
@@ -72,9 +66,7 @@ public class ToolPermissionRegistry {
     }
 
     /**
-
      * 供前端展示工具清单 + 当前用户是否有权
-
      */
     public List<Map<String, Object>> listForCurrentUser() {
         UserContext.CurrentUser user = UserContext.get();

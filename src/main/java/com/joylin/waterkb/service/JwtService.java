@@ -46,9 +46,7 @@ public class JwtService {
     public boolean enabled() { return enabled; }
 
     /**
-
      * 签一个演示 token（生产环境由 IdP 签发，此端点应关闭）。默认 access 类型，兼容旧调用。
-
      */
     public String issue(String user, List<String> groups, String tenant, long ttlSeconds) {
         return issue(user, groups, tenant, ttlSeconds, "access", java.util.UUID.randomUUID().toString());
@@ -85,9 +83,7 @@ public class JwtService {
     }
 
     /**
-
      * 解析 token 的 claims（仅供登录链路内部使用，调用方必须先验签）
-
      */
     public JsonNode parseClaimsUnverified(String token) {
         if (token == null) return null;

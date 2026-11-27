@@ -15,9 +15,7 @@ public final class ErrorCode {
     public static final int SERVICE_UNAVAILABLE = 503;
 
     /**
-
      * 工具业务拒绝码：应用层错误，HTTP 仍为 200，靠此码区分
-
      */
     public static final String TOOL_PERMISSION_DENIED = "PERMISSION_DENIED";
 

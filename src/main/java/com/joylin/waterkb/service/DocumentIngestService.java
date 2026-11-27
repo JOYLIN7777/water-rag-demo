@@ -57,49 +57,37 @@ public class DocumentIngestService {
     }
 
     /**
-
      * 纯文本类：直接按 UTF-8 读，无需解析器（geojson/topojson 本质是 JSON 文本）
-
      */
     private static final Set<String> PLAIN_TEXT_EXTENSIONS = Set.of(
             "txt", "md", "markdown", "json", "geojson", "topojson", "xml", "yaml", "yml",
             "sql", "log", "ini", "properties", "java", "py", "js", "ts", "css");
 
     /**
-
      * 表格类：走表头语义解析（csv/tsv 手写，xls/xlsx 走 POI）
-
      */
     private static final Set<String> TABLE_EXTENSIONS = Set.of("xls", "xlsx", "csv", "tsv");
 
     /**
-
      * Tika 解析类：富文本与办公文档
-
      */
     private static final Set<String> TIKA_EXTENSIONS = Set.of(
             "pdf", "doc", "docx", "ppt", "pptx", "rtf", "odt", "ods", "odp",
             "html", "htm", "epub", "msg", "eml");
 
     /**
-
      * 图片：Tika 拿不到文本，走 OCR
-
      */
     private static final Set<String> IMAGE_EXTENSIONS = Set.of(
             "png", "jpg", "jpeg", "bmp", "tif", "tiff", "gif", "webp");
 
     /**
-
      * 单工作表最多读取行数，防止超大表格把内存打爆
-
      */
     private static final int MAX_SHEET_ROWS = 5000;
 
     /**
-
      * 单元格文本最长保留字符数
-
      */
     private static final int MAX_CELL_CHARS = 500;
 
@@ -117,9 +105,7 @@ public class DocumentIngestService {
     }
 
     /**
-
      * 对外暴露支持的格式集合（供接口层校验与前端展示，避免两处硬编码不一致）
-
      */
     public static Set<String> getSupportedExtensions() {
         Set<String> all = new LinkedHashSet<>(PLAIN_TEXT_EXTENSIONS);
@@ -130,9 +116,7 @@ public class DocumentIngestService {
     }
 
     /**
-
      * 兼容旧调用（单测/演示脚本）：默认可见范围=本部门+上级，不下发子树
-
      */
     public UploadResult ingest(String fileName, byte[] bytes) throws IOException {
         return ingest(fileName, bytes, false);
@@ -285,9 +269,7 @@ public class DocumentIngestService {
     }
 
     /**
-
      * 带引号的 CSV 行解析（"" 表示一个字面双引号）
-
      */
     private List<String> parseDelimitedLine(String line, char sep) {
         List<String> out = new ArrayList<>();
@@ -314,9 +296,7 @@ public class DocumentIngestService {
     }
 
     /**
-
      * 读取一行所有单元格（用 DataFormatter 保留数字/日期的显示值）
-
      */
     private List<String> readRow(Row row) {
         List<String> out = new ArrayList<>();
@@ -333,9 +313,7 @@ public class DocumentIngestService {
     }
 
     /**
-
      * 表头 + 值行拼接为"列名：值"文本
-
      */
     private String joinRow(List<String> headers, List<String> values) {
         StringBuilder line = new StringBuilder();
@@ -399,9 +377,7 @@ public class DocumentIngestService {
     }
 
     /**
-
      * 执行外部命令并取 stdout；非 0 退出码视为失败
-
      */
     private String run(java.nio.file.Path dir, String... cmd) throws Exception {
         ProcessBuilder pb = new ProcessBuilder(cmd).directory(dir.toFile()).redirectErrorStream(true);

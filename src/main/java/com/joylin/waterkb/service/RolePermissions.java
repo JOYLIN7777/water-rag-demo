@@ -53,9 +53,7 @@ public class RolePermissions {
     }
 
     /**
-
      * 可为 null：单测与无数据库环境只用内置默认
-
      */
     private final RolePermissionMapper mapper;
     private final SchemaSeedMapper seedMapper;
@@ -65,23 +63,17 @@ public class RolePermissions {
     private final PermissionCatalog catalog;
 
     /**
-
      * 运行期角色权限表（以库为准），volatile 保证并发读到最新快照
-
      */
     private volatile Map<String, Set<String>> effective = Map.of();
 
     /**
-
      * 角色中文显示名（role_definitions 表），与权限矩阵一起下发给后台页面
-
      */
     private volatile Map<String, String> roleNames = Map.of();
 
     /**
-
      * 无数据库环境（单测）：用 roles.json 种子初始化内存视图，不写库
-
      */
     public RolePermissions() {
         this.catalog = null; this.mapper = null; this.seedMapper = null;
@@ -166,9 +158,7 @@ public class RolePermissions {
     }
 
     /**
-
      * 获取某用户拥有的全部权限码（只读视图）
-
      */
     public Set<String> permissionsOf(UserContext.CurrentUser user) {
         if (user == null || user.isAnonymous()) return Set.of();
@@ -181,9 +171,7 @@ public class RolePermissions {
     }
 
     /**
-
      * 是否拥有其中任意一个权限；all=true 时要求全部拥有
-
      */
     public boolean allows(UserContext.CurrentUser user, String[] needed, boolean all) {
         if (needed == null || needed.length == 0) return true;
@@ -195,9 +183,7 @@ public class RolePermissions {
     }
 
     /**
-
      * 供前端展示：系统中所有角色及其权限（带中文显示名）
-
      */
     public List<Map<String, Object>> roleMatrix() {
         List<Map<String, Object>> out = new ArrayList<>();
@@ -224,9 +210,7 @@ public class RolePermissions {
     }
 
     /**
-
      * 角色中文显示名：DB 自定义名称优先，内置回落，未知角色原样返回
-
      */
     public String roleName(String role) {
         String key = normalize(role);
@@ -242,9 +226,7 @@ public class RolePermissions {
     }
 
     /**
-
      * displayName 非空时同时落角色名称，供后台列表/用户管理下拉统一显示
-
      */
     public void setPermissions(String role, List<String> permissions, String displayName) {
         String name = normalize(role);
@@ -267,9 +249,7 @@ public class RolePermissions {
     }
 
     /**
-
      * 删除角色定义：admin 不可删；DB 中没有记录的角色无需删除（内置默认不可移除）
-
      */
     public boolean deleteRole(String role) {
         String name = normalize(role);

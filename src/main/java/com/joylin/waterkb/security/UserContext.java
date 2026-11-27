@@ -23,9 +23,7 @@ import java.util.Set;
 public class UserContext extends OncePerRequestFilter {
 
     /**
-
      * JWT Filter 写入 request attribute 的身份对象键
-
      */
     public static final String JWT_PRINCIPAL = "water.rag.jwt.principal";
 
@@ -39,9 +37,7 @@ public class UserContext extends OncePerRequestFilter {
     public static void clear() { CURRENT.remove(); }
 
     /**
-
      * 供单测注入上下文（生产请求由 Filter 设置）
-
      */
     public static void CURRENT_TEST(CurrentUser user) { CURRENT.set(user); }
 
@@ -75,9 +71,7 @@ public class UserContext extends OncePerRequestFilter {
     }
 
     /**
-
      * 不可变的当前用户值对象。两参数构造保留兼容旧调用/单测（默认租户 default）。
-
      */
     public record CurrentUser(String userId, List<String> groups, String tenantId, String authType) {
 
@@ -88,7 +82,12 @@ public class UserContext extends OncePerRequestFilter {
         public static final CurrentUser ANONYMOUS =
                 new CurrentUser("anonymous", List.of(), "default", "anonymous");
 
-        public boolean isAnonymous() { return "anonymous".equals(userId); }
+        /**
+         * 获取Anonymous标志。
+         */
+        public boolean isAnonymous() {
+            return "anonymous".equals(userId);
+        }
 
         public boolean hasGroup(String group) { return groups.contains(group); }
     }
