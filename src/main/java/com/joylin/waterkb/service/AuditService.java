@@ -1,9 +1,12 @@
 package com.joylin.waterkb.service;
 
+import com.joylin.waterkb.mapper.AuditMapper;
+
 import jakarta.annotation.PostConstruct;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.sql.Timestamp;
@@ -27,9 +30,14 @@ public class AuditService {
 
     private static final Logger log = LoggerFactory.getLogger(AuditService.class);
     private final JdbcTemplate jdbc;
+    private final AuditMapper mapper;
 
-    public AuditService(JdbcTemplate jdbc) {
+    public AuditService(JdbcTemplate jdbc) { this(jdbc, null); }
+
+    @Autowired
+    public AuditService(JdbcTemplate jdbc, AuditMapper mapper) {
         this.jdbc = jdbc;
+        this.mapper = mapper;
     }
 
     @PostConstruct
@@ -67,12 +75,7 @@ public class AuditService {
     /** 写一条审计（失败只告警，不影响主流程） */
     public void record(AuditLog entry) {
         try {
-            jdbc.update("""
-                INSERT INTO audit_log(ts,tenant_id,user_id,groups,action,resource,detail,ip,status,duration_ms,result)
-                VALUES(?,?,?,?,?,?,?,?,?,?,?)
-                """,
-                    Timestamp.valueOf(entry.ts()),
-                    entry.tenantId(), entry.userId(), entry.groups(),
+            mapper.insert(Timestamp.valueOf(entry.ts()), entry.tenantId(), entry.userId(), entry.groups(),
                     entry.action(), entry.resource(), entry.detail(), entry.ip(),
                     entry.status(), entry.durationMs(), entry.result());
         } catch (Exception e) {
@@ -90,11 +93,7 @@ public class AuditService {
     /** 登录日志：直接在 SQL 层按登录/刷新动作过滤，避免高频业务日志把登录记录挤出最近 N 条 */
     public List<Map<String, Object>> loginLogs(String tenant, int limit) {
         try {
-            return jdbc.queryForList("""
-                SELECT ts,tenant_id,user_id,groups,action,resource,detail,ip,status,duration_ms,result
-                FROM audit_log WHERE tenant_id=? AND (action LIKE '%/api/auth/login%' OR action LIKE '%/api/auth/refresh%')
-                ORDER BY ts DESC LIMIT ?
-                """, tenant, Math.min(Math.max(limit, 1), 10000));
+            return mapper.loginLogs(tenant, Math.min(Math.max(limit, 1), 10000));
         } catch (Exception e) {
             log.warn("登录日志查询失败：{}", e.getMessage());
             return new ArrayList<>();
@@ -104,10 +103,7 @@ public class AuditService {
     /** 查询审计日志：按当前租户强制过滤，只返回最近 limit 条 */
     public List<Map<String, Object>> recent(String tenant, int limit) {
         try {
-            return jdbc.queryForList("""
-                SELECT ts,tenant_id,user_id,groups,action,resource,detail,ip,status,duration_ms,result
-                FROM audit_log WHERE tenant_id=? ORDER BY ts DESC LIMIT ?
-                """, tenant, Math.min(Math.max(limit, 1), 10000));
+            return mapper.recent(tenant, Math.min(Math.max(limit, 1), 10000));
         } catch (Exception e) {
             log.warn("审计查询失败：{}", e.getMessage());
             return new ArrayList<>();
@@ -117,10 +113,7 @@ public class AuditService {
     /** 查询全部审计日志（审计部门专用）：不限租户，只返回最近 limit 条 */
     public List<Map<String, Object>> recentAll(int limit) {
         try {
-            return jdbc.queryForList("""
-                SELECT ts,tenant_id,user_id,groups,action,resource,detail,ip,status,duration_ms,result
-                FROM audit_log ORDER BY ts DESC LIMIT ?
-                """, Math.min(Math.max(limit, 1), 10000));
+            return mapper.recentAll(Math.min(Math.max(limit, 1), 10000));
         } catch (Exception e) {
             log.warn("全量审计查询失败：{}", e.getMessage());
             return new ArrayList<>();
@@ -129,21 +122,8 @@ public class AuditService {
 
     /** 按类型导出：login=登录/登出/刷新令牌，operation=其余业务操作；审计部门不限租户 */
     public List<Map<String, Object>> export(String tenant, boolean all, String type, int limit) {
-        String loginCond = "(action LIKE '%/api/auth/login%' OR action LIKE '%/api/auth/logout%' "
-                + "OR action LIKE '%/api/auth/refresh%')";
-        StringBuilder sql = new StringBuilder(
-                "SELECT ts,tenant_id,user_id,groups,action,resource,detail,ip,status,duration_ms,result FROM audit_log");
-        List<Object> args = new ArrayList<>();
-        if (!all) { sql.append(" WHERE tenant_id=?"); args.add(tenant); }
-        if ("login".equals(type)) {
-            sql.append(all ? " WHERE " : " AND ").append(loginCond);
-        } else if ("operation".equals(type)) {
-            sql.append(all ? " WHERE NOT " : " AND NOT ").append(loginCond);
-        }
-        sql.append(" ORDER BY ts DESC LIMIT ?");
-        args.add(Math.min(Math.max(limit, 1), 5000));
         try {
-            return jdbc.queryForList(sql.toString(), args.toArray());
+            return mapper.export(tenant, all, type, Math.min(Math.max(limit, 1), 5000));
         } catch (Exception e) {
             log.warn("审计导出查询失败：{}", e.getMessage());
             return new ArrayList<>();
@@ -153,12 +133,7 @@ public class AuditService {
     /** 全量审计统计（审计部门专用） */
     public Map<String, Object> statsAll() {
         try {
-            return jdbc.queryForMap("""
-                SELECT COUNT(*) AS total,
-                       COUNT(*) FILTER (WHERE result='DENIED') AS denied,
-                       COUNT(*) FILTER (WHERE result='ERROR') AS errors
-                FROM audit_log
-                """);
+            return mapper.statsAll();
         } catch (Exception e) {
             log.warn("全量审计统计失败：{}", e.getMessage());
             return Map.of("total", 0L, "denied", 0L, "errors", 0L);
@@ -168,12 +143,7 @@ public class AuditService {
     /** 审计统计：总条数 / 拒绝数 / 错误数 */
     public Map<String, Object> stats(String tenant) {
         try {
-            return jdbc.queryForMap("""
-                SELECT COUNT(*) AS total,
-                       COUNT(*) FILTER (WHERE result='DENIED') AS denied,
-                       COUNT(*) FILTER (WHERE result='ERROR') AS errors
-                FROM audit_log WHERE tenant_id=?
-                """, tenant);
+            return mapper.stats(tenant);
         } catch (Exception e) {
             log.warn("审计统计失败：{}", e.getMessage());
             return Map.of("total", 0L, "denied", 0L, "errors", 0L);

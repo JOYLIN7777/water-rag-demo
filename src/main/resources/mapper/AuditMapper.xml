@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.joylin.waterkb.mapper.AuditMapper">
+
+    <sql id="cols">ts, tenant_id, user_id, groups, action, resource, detail, ip, status, duration_ms, result</sql>
+
+    <insert id="insert">
+        INSERT INTO audit_log(ts, tenant_id, user_id, groups, action, resource, detail, ip, status, duration_ms, result)
+        VALUES(#{ts}, #{tenantId}, #{userId}, #{groups}, #{action}, #{resource}, #{detail}, #{ip}, #{status}, #{durationMs}, #{result})
+    </insert>
+
+    <select id="loginLogs" resultType="java.util.LinkedHashMap">
+        SELECT <include refid="cols"/> FROM audit_log
+        WHERE tenant_id=#{tenant}
+          AND (action LIKE '%/api/auth/login%' OR action LIKE '%/api/auth/refresh%')
+        ORDER BY ts DESC LIMIT #{limit}
+    </select>
+
+    <select id="recent" resultType="java.util.LinkedHashMap">
+        SELECT <include refid="cols"/> FROM audit_log
+        WHERE tenant_id=#{tenant} ORDER BY ts DESC LIMIT #{limit}
+    </select>
+
+    <select id="recentAll" resultType="java.util.LinkedHashMap">
+        SELECT <include refid="cols"/> FROM audit_log ORDER BY ts DESC LIMIT #{limit}
+    </select>
+
+    <sql id="loginCond">(action LIKE '%/api/auth/login%' OR action LIKE '%/api/auth/logout%' OR action LIKE '%/api/auth/refresh%')</sql>
+
+    <select id="export" resultType="java.util.LinkedHashMap">
+        SELECT <include refid="cols"/> FROM audit_log
+        <where>
+            <if test="!all">tenant_id=#{tenant}</if>
+            <if test="type == 'login'">
+                <if test="!all">AND</if>
+                <include refid="loginCond"/>
+            </if>
+            <if test="type == 'operation'">
+                <if test="!all">AND</if>
+                NOT <include refid="loginCond"/>
+            </if>
+        </where>
+        ORDER BY ts DESC LIMIT #{limit}
+    </select>
+
+    <sql id="statCols">
+        COUNT(*) AS total,
+        COUNT(*) FILTER (WHERE result='DENIED') AS denied,
+        COUNT(*) FILTER (WHERE result='ERROR') AS errors
+    </sql>
+
+    <select id="stats" resultType="java.util.LinkedHashMap">
+        SELECT <include refid="statCols"/> FROM audit_log WHERE tenant_id=#{tenant}
+    </select>
+
+    <select id="statsAll" resultType="java.util.LinkedHashMap">
+        SELECT <include refid="statCols"/> FROM audit_log
+    </select>
+</mapper>
