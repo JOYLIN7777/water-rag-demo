@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom'
 import WbModal from '@/components/WbModal'
 import { num, tsLocal } from '@/lib/ui'
 import { http } from '@/api/http'
+import { getUser } from '@/api/auth'
 import '@/styles/admin.css'
 
 interface Summary {
@@ -184,12 +185,15 @@ export default function UsagePanel() {
                   <tbody>
                     {records.map((r, i) => {
                       const q = String(r.question || '').trim()
-                      return <tr key={i} className={r.sessionId ? 'usage-row-link' : ''}
-                        title={r.sessionId ? '点击跳转到该会话' : '历史记录未保存会话ID'}
+                      // 会话属于别的账号就不能跳：前端拦一道，后端也会按用户隔离会话
+                      const mine = String(r.user || '').toLowerCase() === String(getUser()?.user || '').toLowerCase()
+                      const canJump = !!r.sessionId && mine
+                      return <tr key={i} className={canJump ? 'usage-row-link' : ''}
+                        title={canJump ? '点击跳转到该会话' : mine ? '历史记录未保存会话ID' : '该提问属于其它账号，不能跳转'}
                         onClick={() => {
-                          if (!r.sessionId) return
+                          if (!canJump) return
                           setDrill(null)
-                          navigate('/index.html?sid=' + encodeURIComponent(r.sessionId))
+                          navigate('/index.html?sid=' + encodeURIComponent(r.sessionId!) + '&q=' + encodeURIComponent(q))
                         }}>
                         <td><span className="mono">{tsLocal(r.ts)}</span></td>
                         <td className={q ? 'q' : 'q dim'} title={q}>{q ? (q.length > 46 ? q.slice(0, 46) + '…' : q) : '—'}</td>

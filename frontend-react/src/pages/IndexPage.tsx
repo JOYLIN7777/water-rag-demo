@@ -217,8 +217,18 @@ export default function IndexPage() {
       }
       else if (state.sessions.length) await chat.switchSession(state.sessions[0].id)
       else await chat.switchSession(chat.newSession())
-      // 刷新/切会话后定位到最新一条消息，而不是停在最初提问的位置
-      setTimeout(() => scrollBottom(true), 150)
+      // 从用量明细跳转过来：定位到那条提问并高亮，否则停在最新消息
+      const targetQ = params.get('q')
+      if (targetQ) {
+        setTimeout(() => {
+          const bubbles = Array.from(document.querySelectorAll('.user-bubble'))
+          const hit = bubbles.find(function (el) { return (el.textContent || '').trim().indexOf(targetQ.slice(0, 18)) >= 0 })
+          if (hit) {
+            hit.closest('.msg-group')?.classList.add('msg-located')
+            hit.scrollIntoView({ block: 'center' })
+          } else scrollBottom(true)
+        }, 220)
+      } else setTimeout(() => scrollBottom(true), 150)
       setInitializing(false)
     })()
     // eslint-disable-next-line react-hooks/exhaustive-deps

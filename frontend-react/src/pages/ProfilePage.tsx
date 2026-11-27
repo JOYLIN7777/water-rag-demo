@@ -57,6 +57,7 @@ export default function ProfilePage() {
   const [pwdMsg, setPwdMsg] = useState('')
   const [pwdBusy, setPwdBusy] = useState(false)
   const [docsCount, setDocsCount] = useState(0)
+  const [myUsage, setMyUsage] = useState<{ todayRequests: number; todayTokens: number } | null>(null)
   // 个人资料：头像（上传 data URL 或预设 emoji）、性别、手机号
   const [profileOpen, setProfileOpen] = useState(false)
   const [gender, setGender] = useState('')
@@ -92,6 +93,9 @@ export default function ProfilePage() {
           .then(list => setDocsCount(Array.isArray(list) ? list.length : 0)).catch(() => setDocsCount(0))
       } catch { setLoadErr(true) }
     })()
+    void http.get<{ totals?: { todayRequests?: number; todayTokens?: number } }>('/api/usage/summary')
+      .then(j => setMyUsage({ todayRequests: Number(j?.totals?.todayRequests || 0), todayTokens: Number(j?.totals?.todayTokens || 0) }))
+      .catch(() => setMyUsage(null))
     const timer = setInterval(updateToken, 1000)
     return () => clearInterval(timer)
   }, [])
@@ -218,7 +222,10 @@ export default function ProfilePage() {
             <div><b>{chat.sessions.length}</b><span>历史会话</span></div>
             <div><b>{msgCount}</b><span>本机消息</span></div>
             <div><b>{docsCount}</b><span>可见文档</span></div>
+            <div><b>{myUsage?.todayRequests ?? '—'}</b><span>今日提问</span></div>
+            <div><b>{myUsage?.todayTokens ?? '—'}</b><span>今日 Token</span></div>
           </div>
+          <div className="form-hint" style={{ marginTop: 8 }}>用量只统计当前账号，与后台管理员查看的全站用量不同。</div>
         </div>
 
         <div className="card">

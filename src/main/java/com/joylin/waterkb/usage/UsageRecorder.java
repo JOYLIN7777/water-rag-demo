@@ -91,14 +91,24 @@ public class UsageRecorder {
         return records(scope, limit, null);
     }
 
+    /** 只看某个账号的明细（非 admin 用） */
+    public List<Map<String, Object>> recordsOfUser(String scope, int limit, String user) {
+        return records(scope, limit, null, user);
+    }
+
     /** tenant 非空时只返回本部门明细；admin 传 null 看全库 */
     public List<Map<String, Object>> records(String scope, int limit, String tenant) {
+        return records(scope, limit, tenant, null);
+    }
+
+    private List<Map<String, Object>> records(String scope, int limit, String tenant, String user) {
         int cap = Math.min(Math.max(limit <= 0 ? 200 : limit, 1), 500);
         LocalDate today = LocalDate.now(ZONE);
         LocalDate from = "month".equalsIgnoreCase(scope) ? today.withDayOfMonth(1) : today;
         java.sql.Timestamp start = java.sql.Timestamp.valueOf(from.atStartOfDay(ZONE).toLocalDateTime());
         boolean scoped = tenant != null && !tenant.isBlank();
-        String where = "ts >= ?" + (scoped ? " AND tenant_id=?" : "");
+        boolean byUser = user != null && !user.isBlank();
+        String where = "ts >= ?" + (scoped ? " AND tenant_id=?" : "") + (byUser ? " AND user_id=?" : "");
         List<Map<String, Object>> out = new ArrayList<>();
         try {
             jdbc.query("SELECT ts,user_id,model,prompt_tokens,completion_tokens,duration_ms,session_id,question "
@@ -114,7 +124,7 @@ public class UsageRecorder {
                 row.put("sessionId", rs.getString("session_id"));
                 row.put("question", rs.getString("question"));
                 out.add(row);
-            }, scoped ? new Object[]{start, tenant, cap} : new Object[]{start, cap});
+            }, scoped ? new Object[]{start, tenant, cap} : byUser ? new Object[]{start, user, cap} : new Object[]{start, cap});
         } catch (Exception ignored) { }
         return out;
     }
@@ -125,19 +135,30 @@ public class UsageRecorder {
      */
     public Map<String, Object> summary() { return summary(null); }
 
+    /** 只看某个账号的汇总（非 admin 用） */
+    public Map<String, Object> summaryOfUser(String user) {
+        return summary(null, user);
+    }
+
     /** tenant 非空时只统计本部门；admin 传 null 看全库 */
     public Map<String, Object> summary(String tenant) {
+        return summary(tenant, null);
+    }
+
+    private Map<String, Object> summary(String tenant, String user) {
         LocalDate today = LocalDate.now(ZONE);
         boolean scoped = tenant != null && !tenant.isBlank();
-        String todayWhere = "ts >= ?" + (scoped ? " AND tenant_id=?" : "");
-        Object[] todayArgs = scoped ? new Object[]{java.sql.Timestamp.valueOf(today.atStartOfDay(ZONE).toLocalDateTime()), tenant}
-                : new Object[]{java.sql.Timestamp.valueOf(today.atStartOfDay(ZONE).toLocalDateTime())};
+        boolean byUser = user != null && !user.isBlank();
+        String extra = (scoped ? " AND tenant_id=?" : "") + (byUser ? " AND user_id=?" : "");
+        String todayWhere = "ts >= ?" + extra;
+        java.sql.Timestamp todayStart = java.sql.Timestamp.valueOf(today.atStartOfDay(ZONE).toLocalDateTime());
+        Object[] todayArgs = byUser ? new Object[]{todayStart, user} : scoped ? new Object[]{todayStart, tenant} : new Object[]{todayStart};
         Map<String, Object> totals = new LinkedHashMap<>();
         totals.put("todayRequests", count(todayWhere, todayArgs));
         totals.put("todayTokens", tokens(todayWhere, todayArgs));
         java.sql.Timestamp monthStart = java.sql.Timestamp.valueOf(today.withDayOfMonth(1).atStartOfDay(ZONE).toLocalDateTime());
-        String monthWhere = "ts >= ?" + (scoped ? " AND tenant_id=?" : "");
-        Object[] monthArgs = scoped ? new Object[]{monthStart, tenant} : new Object[]{monthStart};
+        String monthWhere = "ts >= ?" + extra;
+        Object[] monthArgs = byUser ? new Object[]{monthStart, user} : scoped ? new Object[]{monthStart, tenant} : new Object[]{monthStart};
         totals.put("monthRequests", count(monthWhere, monthArgs));
         totals.put("monthTokens", tokens(monthWhere, monthArgs));
 

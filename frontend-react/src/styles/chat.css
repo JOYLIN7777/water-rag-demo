@@ -243,3 +243,7 @@
   .queue-del{border:0;background:transparent;color:var(--muted);font-size:15px;line-height:1;
     cursor:pointer;padding:0 2px 0 4px;border-radius:4px}
   .queue-del:hover{color:#e0245e;background:rgba(224,36,94,.08)}
+  /* 从用量明细跳转过来定位到的那条消息 */
+  .msg-group.msg-located .user-bubble{box-shadow:0 0 0 2px var(--primary),0 4px 14px rgba(59,110,245,.2)}
+  .msg-group.msg-located{animation:msgFlash 1.6s ease-out}
+  @keyframes msgFlash{0%,60%{background:rgba(59,110,245,.10)}100%{background:transparent}}

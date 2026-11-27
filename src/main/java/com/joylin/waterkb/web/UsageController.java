@@ -76,9 +76,10 @@ public class UsageController {
      */
     @GetMapping("/summary")
     public Map<String, Object> summary() {
-        // 用量明细里有提问原文，普通角色只能看本部门；admin 看全库
-        String scopeTenant = UserContext.get().hasGroup("admin") ? null : UserContext.get().tenantId();
-        Map<String, Object> local = recorder.summary(scopeTenant);
+        // 用量明细里有提问原文：admin 看全库，其它账号只能看自己（个人中心也是这个口径）
+        boolean admin = UserContext.get().hasGroup("admin");
+        Map<String, Object> local = admin ? recorder.summary(null)
+                : recorder.summaryOfUser(UserContext.get().userId());
         // 未配置官方工作空间：直接用本地真实调用记录
         if (workspaceId.isBlank() || apiKey == null || apiKey.isBlank()) {
             return local;
@@ -131,8 +132,9 @@ public class UsageController {
     @GetMapping("/records")
     public Map<String, Object> records(@RequestParam(defaultValue = "today") String scope,
                                        @RequestParam(defaultValue = "200") int limit) {
-        String scopeTenant = UserContext.get().hasGroup("admin") ? null : UserContext.get().tenantId();
-        List<Map<String, Object>> rows = recorder.records(scope, limit, scopeTenant);
+        boolean admin = UserContext.get().hasGroup("admin");
+        List<Map<String, Object>> rows = admin ? recorder.records(scope, limit, null)
+                : recorder.recordsOfUser(scope, limit, UserContext.get().userId());
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("scope", "month".equalsIgnoreCase(scope) ? "month" : "today");
         result.put("records", rows);
