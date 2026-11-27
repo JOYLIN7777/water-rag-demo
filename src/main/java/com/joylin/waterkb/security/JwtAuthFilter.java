@@ -1,5 +1,7 @@
 package com.joylin.waterkb.security;
 
+import static com.joylin.waterkb.common.ErrorCode.UNAUTHORIZED;
+
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.joylin.waterkb.audit.AuditService;
@@ -37,7 +39,7 @@ public class JwtAuthFilter extends OncePerRequestFilter {
 
     /** 无需登录即可访问的路径前缀 */
     private static final Set<String> WHITE_LIST = Set.of(
-            "/api/auth/login", "/api/auth/refresh", "/api/auth/public-key", "/api/search/health", "/", "/index.html", "/login.html",
+            "/api/auth/login", "/api/auth/refresh", "/api/auth/public-key", "/api/search/health", "/api/health", "/", "/index.html", "/login.html",
             // 忘记密码：用户还没登录才需要这两个接口和页面，必须放行
             "/api/auth/password-reset/request", "/api/auth/password-reset/confirm", "/forgot.html"
     );
@@ -84,7 +86,11 @@ public class JwtAuthFilter extends OncePerRequestFilter {
                     return;
                 }
                 request.setAttribute(UserContext.JWT_PRINCIPAL, principal);
-                chain.doFilter(request, response);
+                // 日志按人和租户可查
+                org.slf4j.MDC.put("userId", principal.userId());
+                org.slf4j.MDC.put("tenantId", principal.tenantId());
+                try { chain.doFilter(request, response); }
+                finally { org.slf4j.MDC.remove("userId"); org.slf4j.MDC.remove("tenantId"); }
                 return;
             }
             reject(request, response, "Authentication is disabled");
@@ -113,6 +119,6 @@ public class JwtAuthFilter extends OncePerRequestFilter {
         response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);
         response.setCharacterEncoding("UTF-8");
-        mapper.writeValue(response.getWriter(), Map.of("code", 401, "message", reason));
+        mapper.writeValue(response.getWriter(), Map.of("code", UNAUTHORIZED, "message", reason));
     }
 }

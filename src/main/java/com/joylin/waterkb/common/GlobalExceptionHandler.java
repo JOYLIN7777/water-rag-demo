@@ -1,5 +1,7 @@
 package com.joylin.waterkb.common;
 
+import static com.joylin.waterkb.common.ErrorCode.*;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.retry.NonTransientAiException;
@@ -34,7 +36,7 @@ public class GlobalExceptionHandler {
     /** 业务校验类错误：400 */
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<Map<String, Object>> handleBadRequest(IllegalArgumentException e) {
-        return ResponseEntity.badRequest().body(Map.of("code", 400, "message", e.getMessage()));
+        return ResponseEntity.badRequest().body(Map.of("code", INVALID_ARGUMENT, "message", e.getMessage()));
     }
 
     /** 上传文件超限：400（上限文案动态读取并格式化为可读单位，避免出现 524288000B 这种原始字节数） */
@@ -42,7 +44,7 @@ public class GlobalExceptionHandler {
     public ResponseEntity<Map<String, Object>> handleMaxUpload(MaxUploadSizeExceededException e) {
         var max = multipartProperties.getMaxFileSize();
         String readable = max.toGigabytes() >= 1 ? max.toGigabytes() + "GB" : max.toMegabytes() + "MB";
-        return ResponseEntity.badRequest().body(Map.of("code", 400,
+        return ResponseEntity.badRequest().body(Map.of("code", UPLOAD_TOO_LARGE,
                 "message", "文件超过大小限制（上限 " + readable + "）"));
     }
 
@@ -54,20 +56,23 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(NonTransientAiException.class)
     public ResponseEntity<Map<String, Object>> handleAiError(NonTransientAiException e) {
         return ResponseEntity.status(HttpStatus.BAD_GATEWAY)
-                .body(Map.of("code", 502, "message", "大模型接口调用失败：" + e.getMessage()));
+                .body(Map.of("code", AI_UPSTREAM, "message", "大模型接口调用失败：" + e.getMessage()));
     }
 
     /** 静态资源不存在（例如已删除的旧页面）应返回 404，不要被兜底成 500 */
     @ExceptionHandler(org.springframework.web.servlet.resource.NoResourceFoundException.class)
     public ResponseEntity<Map<String, Object>> handleNoResource(Exception e) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                .body(Map.of("code", 404, "message", "页面不存在或已下线"));
+                .body(Map.of("code", NOT_FOUND, "message", "页面不存在或已下线"));
     }
 
     /** 兜底：500（必须把异常打进日志，否则排查时无迹可循） */
     @ExceptionHandler(Exception.class)
     public ResponseEntity<Map<String, Object>> handleOther(Exception e) {
         log.error("未处理异常：{}", e.getMessage(), e);
-        return ResponseEntity.internalServerError().body(Map.of("code", 500, "message", "服务内部异常，请稍后重试"));
+        // 响应头带 requestId：用户报错时把它贴过来，就能查到对应日志与审计行
+        return ResponseEntity.internalServerError()
+                .header("X-Request-Id", org.slf4j.MDC.get("requestId") == null ? "" : org.slf4j.MDC.get("requestId"))
+                .body(Map.of("code", INTERNAL, "message", "服务内部异常，请稍后重试"));
     }
 }

@@ -33,7 +33,7 @@ public class AuditFilter extends OncePerRequestFilter {
 
     /** 高频/无审计价值的端点跳过（健康检查、审计自身查询，避免审计表自我放大） */
     private static final Set<String> SKIP = Set.of(
-            "/api/search/health", "/api/audit/logs", "/api/audit/stats",
+            "/api/search/health", "/api/health", "/api/audit/logs", "/api/audit/stats",
             // 工具直调由 WaterInfoTool 自己埋点：HTTP 恒 200 但业务可能 DENIED，
             // Filter 只看状态码会误记 SUCCESS，跳过避免重复/失真
             "/api/chat/tool/water");

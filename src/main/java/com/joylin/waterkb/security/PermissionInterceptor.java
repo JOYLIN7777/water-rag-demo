@@ -1,5 +1,7 @@
 package com.joylin.waterkb.security;
 
+import static com.joylin.waterkb.common.ErrorCode.FORBIDDEN;
+
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.joylin.waterkb.audit.AuditService;
 import jakarta.servlet.DispatcherType;
@@ -58,7 +60,7 @@ public class PermissionInterceptor implements HandlerInterceptor {
         response.setStatus(HttpServletResponse.SC_FORBIDDEN);
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);
         response.setCharacterEncoding("UTF-8");
-        mapper.writeValue(response.getWriter(), Map.of("code", 403, "message", "没有操作权限"));
+        mapper.writeValue(response.getWriter(), Map.of("code", FORBIDDEN, "message", "没有操作权限"));
         return false;
     }
 }
