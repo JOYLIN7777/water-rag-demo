@@ -41,12 +41,8 @@ export default function Shell({ children }: { children: React.ReactNode }) {
     lastAccount.current = accountKey
   }, [accountKey, auth.loaded, chat])
 
-  useEffect(() => {
-    if (!isLoggedIn() || inAdmin) return
-    void chat.syncSessions()
-    // 只在进入问答域时同步一次，避免每次会话状态变化都请求后端
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [inAdmin, auth.loaded, accountKey])
+  // 会话数据由问答页首屏 bootstrap 统一拉取；这里不再重复 syncSessions，
+  // 避免两处请求交错覆盖。账号切换的 reset 已在上面处理。
 
   const user = auth.user
   const tenant = user?.tenant || 'default'

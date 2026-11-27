@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Modal, message } from 'antd'
 import { http } from '@/api/http'
-import { getAccess, encryptPassword, logout, ensureFresh } from '@/api/auth'
+import { getAccess, encryptPassword, logout, ensureFresh, scope } from '@/api/auth'
 import { useAuthStore } from '@/store/auth'
 import { useChatStore } from '@/store/chat'
 import { useNavigate, Link } from 'react-router-dom'
@@ -167,7 +167,8 @@ export default function ProfilePage() {
   }
 
   function clearDrafts() {
-    const keys = Object.keys(localStorage).filter(k => k.startsWith('draft:'))
+    const prefix = `draft:${scope()}:`
+    const keys = Object.keys(localStorage).filter(k => k.startsWith(prefix))
     keys.forEach(k => localStorage.removeItem(k))
     message.success(keys.length ? `已清除 ${keys.length} 条未发送草稿` : '当前没有待清除的草稿')
   }

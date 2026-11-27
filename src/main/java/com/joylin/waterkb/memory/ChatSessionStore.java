@@ -218,6 +218,16 @@ public class ChatSessionStore {
     }
 
     /** 改名（用户在会话列表里重命名时用） */
+    /** 会话是否属于当前账号（显式归属校验用） */
+    public boolean exists(String sessionId) {
+        if (sessionId == null || sessionId.isBlank() || jdbc == null) return false;
+        try {
+            Integer n = jdbc.queryForObject("SELECT COUNT(*) FROM chat_session WHERE user_id=? AND session_id=?",
+                    Integer.class, user(), sessionId);
+            return n != null && n > 0;
+        } catch (Exception e) { return false; }
+    }
+
     public boolean rename(String sessionId, String title) {
         if (jdbc == null || sessionId == null || sessionId.isBlank()) return false;
         ensureSchema();

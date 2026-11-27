@@ -9,6 +9,7 @@ import { useChatStore, type ChatMessageExt } from '@/store/chat'
 import { useAuthStore } from '@/store/auth'
 import { tsLocal } from '@/lib/ui'
 import { http } from '@/api/http'
+import { scope } from '@/api/auth'
 import WbModal from '@/components/WbModal'
 import { streamChat, uploadDocument } from '@/api'
 import AdminEntry from '@/components/AdminEntry'
@@ -195,7 +196,7 @@ export default function IndexPage() {
 
   useEffect(() => {
     void (async () => {
-      await chat.syncSessions()
+      await chat.bootstrap()
       await chat.loadSuggestions()
       void http.get<Array<{ id: number; name: string; model: string; type: string; enabled?: boolean; active?: boolean }>>('/api/models')
         .then(list => setChatModels((Array.isArray(list) ? list : [])
@@ -254,11 +255,11 @@ export default function IndexPage() {
   useEffect(() => {
     const old = prevSid.current
     if (old && old !== chat.currentId) {
-      try { localStorage.setItem(`draft:${old}`, q) } catch { /* 隐私模式 */ }
+      try { localStorage.setItem(`draft:${scope()}:${old}`, q) } catch { /* 隐私模式 */ }
     }
     if (chat.currentId !== old) {
       let next = ''
-      try { next = localStorage.getItem(`draft:${chat.currentId}`) || '' } catch { /* 同上 */ }
+      try { next = localStorage.getItem(`draft:${scope()}:${chat.currentId}`) || '' } catch { /* 同上 */ }
       setQ(next)
       prevSid.current = chat.currentId
     }
@@ -286,7 +287,7 @@ export default function IndexPage() {
     setQ('')
     if (inputRef.current) inputRef.current.style.height = '38px' 
     setError('')
-    try { localStorage.removeItem(`draft:${ownerId}`) } catch { /* 同上 */ }
+    try { localStorage.removeItem(`draft:${scope()}:${ownerId}`) } catch { /* 同上 */ }
 
     chat.touchSession(ownerId, query.length > 18 ? query.slice(0, 18) + '…' : query, query)
     const ac = new AbortController()

@@ -240,6 +240,19 @@ public class RagChatService {
                 .concatWith(persistThenDone.map(payload -> sse("done", payload)))
                 .onErrorResume(ex -> {
                     log.error("SSE 流异常，已安全收尾", ex);
+                    // 异常路径也必须落库：否则服务端没有这轮提问，前端只剩本地缓存，
+                    // 一刷新就只剩空会话。与停止生成共用同一份兜底逻辑。
+                    if (persisted.compareAndSet(false, true)) {
+                        try {
+                            String partial = answerBuf.toString();
+                            String text = partial.isBlank()
+                                    ? "（回答生成异常）"
+                                    : partial + "（回答生成异常，以上为异常前已收到的部分）";
+                            appendExchange(sessionId, tenantAtStart, userAtStart, parentId, question, text, hits, null);
+                        } catch (Exception e) {
+                            log.warn("异常后的部分落库失败：{}", e.getMessage());
+                        }
+                    }
                     return Flux.just(sse("done", "{\"done\":true,\"error\":true}"));
                 })
                 .doOnCancel(() -> {

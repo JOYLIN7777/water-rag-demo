@@ -1,7 +1,6 @@
 /** 问答会话状态：多会话消息隔离，对齐旧版 storeOf(id)/cacheMessages */
 import { create } from 'zustand'
 import { chatApi } from '@/api'
-import { scopedKey } from './auth'
 import type { SessionItem, ChatMessage } from '@/types'
 
 export interface ChatMessageExt extends ChatMessage {
@@ -12,15 +11,6 @@ export interface ChatMessageExt extends ChatMessage {
   /** 问答时间（毫秒时间戳）：后端 history 的 ts 字段，本地新发消息用 Date.now() */
   ts?: number
   usage?: Record<string, any> & { durationMs?: number }
-}
-
-function loadLocal(): SessionItem[] {
-  try { return JSON.parse(localStorage.getItem(scopedKey('sessions')) || '[]') as SessionItem[] }
-  catch { return [] }
-}
-function loadMessages(id: string): ChatMessageExt[] {
-  try { return JSON.parse(localStorage.getItem(scopedKey('msgs:' + id)) || '[]') as ChatMessageExt[] }
-  catch { return [] }
 }
 
 /** 后端 history 返回的是 ISO 纳秒字符串（2026-11-26T10:56:55.233589571），
@@ -49,18 +39,18 @@ interface ChatState {
   sending: boolean
   suggestions: string[]
   syncSessions: () => Promise<void>
+  bootstrap: () => Promise<void>
   newSession: () => string
   switchSession: (id: string) => Promise<void>
   removeSession: (id: string) => Promise<void>
   touchSession: (id: string, title: string, fullQ: string) => void
   cacheMessages: (id: string, msgs: ChatMessageExt[]) => void
   loadSuggestions: () => Promise<void>
-  saveLocal: () => void
   reset: () => void
 }
 
 export const useChatStore = create<ChatState>((set, get) => ({
-  sessions: loadLocal(),
+  sessions: [],
   currentId: '',
   messages: [],
   bySession: {},
@@ -76,31 +66,40 @@ export const useChatStore = create<ChatState>((set, get) => ({
   sending: false,
   suggestions: [],
 
-  saveLocal: () => {
-    try { localStorage.setItem(scopedKey('sessions'), JSON.stringify(get().sessions)) }
-    catch { /* 隐私模式 */ }
-  },
-
   cacheMessages: (id, msgs) => {
-    // 当前会话必须同步更新 messages 视图，否则流式回答要切一次会话才显示
+    // 只更新内存：服务端是唯一持久化源，不再写 localStorage
     set(s => ({
       bySession: { ...s.bySession, [id]: msgs },
       messages: s.currentId === id ? [...msgs] : s.messages
     }))
-    try { localStorage.setItem(scopedKey('msgs:' + id), JSON.stringify(msgs)) }
-    catch { /* 同上 */ }
+  },
+
+  /** 首屏：一次拉会话清单 + 各会话消息，服务端为唯一数据源 */
+  bootstrap: async () => {
+    try {
+      const data = await chatApi.bootstrap(30)
+      if (!data) return
+      const bySession: Record<string, ChatMessageExt[]> = {}
+      for (const [sid, list] of Object.entries(data.histories || {})) {
+        bySession[sid] = (list || []).map((m, i) => ({
+          role: m.role === 'assistant' ? 'assistant' : 'user',
+          content: m.content || '', sources: m.sources,
+          usage: m.usage || undefined, nodeId: m.id, parentId: m.parentId,
+          branch: m.branch, branchSeal: m.branchSeal,
+          ts: normalizeTs(m.ts), id: `${sid}-${i}`
+        }))
+      }
+      const cur = get().currentId
+      set({ sessions: Array.isArray(data.sessions) ? data.sessions : [],
+            bySession, messages: cur ? (bySession[cur] || []) : [] })
+    } catch { /* 保留当前内存态，不回退本地缓存 */ }
   },
 
   syncSessions: async () => {
     try {
       const list = await chatApi.sessions()
-      // 服务端清单就是唯一权威：它已经按 user_id 过滤。
-      // 之前把首次挂载时读到的本地缓存并进来，切账号后就会把上一个账号的会话带过来。
-      if (Array.isArray(list)) {
-        set({ sessions: list })
-        get().saveLocal()
-      }
-    } catch { /* 用本地缓存 */ }
+      if (Array.isArray(list)) set({ sessions: list })
+    } catch { /* 服务端不可用时保留当前视图，不再清空 */ }
   },
 
   newSession: () => {
@@ -111,11 +110,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
   },
 
   switchSession: async (id: string) => {
-    set({ currentId: id, messages: get().bySession[id] || loadMessages(id) })
+    // 先用内存态做过渡（流式回答中切走再切回），随后一律以服务端为准
+    set({ currentId: id, messages: get().bySession[id] || [] })
     try {
       const list = await chatApi.history(id)
-      // 回答还没落库时切走再切回：后端 history 为空，别用它盖掉本地正在生成的消息
-      if ((!list || list.length === 0) && (get().bySession[id] || []).length > 0) return
       const msgs: ChatMessageExt[] = (list || []).map((m, i) => ({
         role: m.role === 'assistant' ? 'assistant' : 'user',
         content: m.content || '', sources: m.sources,
@@ -124,9 +122,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
         ts: normalizeTs((m as any).ts),
         id: `${id}-${i}`
       }))
+      // 服务端确实没有历史时，保留内存中的流式态；否则一律服务端覆盖
+      if (msgs.length === 0 && (get().bySession[id] || []).length > 0) return
       set(s => ({ messages: msgs, bySession: { ...s.bySession, [id]: msgs } }))
-      get().cacheMessages(id, msgs)
-    } catch { /* 用缓存 */ }
+    } catch { /* 服务端暂不可用，保留内存过渡态 */ }
   },
 
   removeSession: async (id: string) => {
@@ -139,11 +138,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
       // 删掉当前会话必须把视图切到新会话；之前写成 next === s.currentId，永远不成立
       return { sessions, currentId: nextId, messages: wasCurrent ? (bySession[nextId] || []) : s.messages, bySession }
     })
-    get().saveLocal()
-    try { localStorage.removeItem(scopedKey('msgs:' + id)) } catch { /* 隐私模式 */ }
-    void chatApi.clearSession(id).catch(() => {})
-    // 消息区也要跟着跳过去：loadMessages 只读本地缓存，没缓存过就是欢迎页。
-    // 调 switchSession 从服务端把下一会话的历史拉回来。
+    try { await chatApi.clearSession(id) } catch { /* 服务端删除失败时下个账号同步会纠正 */ }
+    // 消息区跟着跳过去：从服务端拉下一会话历史
     if (nextId) await get().switchSession(nextId)
     else set({ messages: [] })
   },
@@ -156,7 +152,6 @@ export const useChatStore = create<ChatState>((set, get) => ({
         : [{ id, title, updatedAt: Date.now() }, ...s.sessions]
       return { sessions }
     })
-    get().saveLocal()
     void chatApi.createSession(id, title).catch(() => {})
   },
 
@@ -170,5 +165,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
   reset: () => {
     set({ sessions: [], currentId: '', messages: [], bySession: {}, busyIds: new Set(), aborters: {}, sending: false })
+    // 一次性清理旧版会话缓存：服务端已是唯一数据源，本地残留只会造成"诈尸"/串号
+    try {
+      const keys = Object.keys(localStorage)
+      keys.filter(k => /:sessions$/.test(k) || /:msgs:/.test(k)).forEach(k => localStorage.removeItem(k))
+    } catch { /* 隐私模式 */ }
   }
 }))

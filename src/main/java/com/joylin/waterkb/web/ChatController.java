@@ -24,6 +24,7 @@ import org.springframework.web.bind.annotation.RestController;
 import reactor.core.publisher.Flux;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -85,6 +86,12 @@ public class ChatController {
      * 首页推荐问题：从当前账号最近的提问里去重整理，不是写死的示例。
      * 没历史时返回空列表，由前端回退到默认引导语。
      */
+    /** 显式校验会话归属：sessionId 必须属于当前账号，避免只靠 Redis key 隐式隔离 */
+    private void assertOwned(String sessionId) {
+        if (sessionId == null || sessionId.isBlank()) throw new IllegalArgumentException("sessionId 不能为空");
+        if (!sessionStore.exists(sessionId)) throw new IllegalArgumentException("会话不存在或不属于当前账号");
+    }
+
     /** 推荐问题的切入词：覆盖知识库常见主题，按时间轮换，避免每次都是那几条 */
     private static final String[] SUGGEST_SEEDS = {
             "水库调度 汛限水位 防洪限制", "监测设备 布设 运维 预警", "闸门 启闭 操作规程 流量",
@@ -152,6 +159,7 @@ public class ChatController {
      */
     @GetMapping("/history")
     public List<Map<String, Object>> history(@RequestParam String sessionId) {
+        assertOwned(sessionId);
         return treeStore.historyList(sessionId);
     }
 
@@ -207,6 +215,29 @@ public class ChatController {
     // ==================== 会话清单（永久存储） ====================
     // 侧栏的会话列表以前只存在浏览器 localStorage，换设备/清缓存就全没了。
     // 现在清单落 PostgreSQL，Redis 只负责消息内容：清缓存后清单还在、点开还能读回历史。
+
+    /**
+     * 首屏引导：一次返回会话清单 + 每个会话最近的历史消息。
+     * 前端不再依赖 localStorage 预热，服务端是唯一数据源；避免 N+1 请求。
+     */
+    @GetMapping("/bootstrap")
+    public Map<String, Object> bootstrap(@RequestParam(defaultValue = "30") int messagesPerSession) {
+        int cap = Math.max(1, Math.min(messagesPerSession, 200));
+        List<Map<String, Object>> sessions = sessionStore.list();
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("sessions", sessions);
+        Map<String, Object> histories = new LinkedHashMap<>();
+        for (Map<String, Object> s : sessions) {
+            String sid = String.valueOf(s.getOrDefault("id", ""));
+            if (sid.isEmpty()) continue;
+            List<Map<String, Object>> all = treeStore.historyList(sid);
+            // historyList 按时间正序，取最近 cap 条
+            if (all.size() > cap) all = new ArrayList<>(all.subList(all.size() - cap, all.size()));
+            histories.put(sid, all);
+        }
+        result.put("histories", histories);
+        return result;
+    }
 
     /** 当前账号的全部会话，按最近更新倒序 */
     @GetMapping("/sessions")
