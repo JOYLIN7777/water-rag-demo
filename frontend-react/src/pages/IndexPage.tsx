@@ -309,13 +309,16 @@ export default function IndexPage() {
     chat.setAborter(ownerId, ac)
     setBusy(ownerId, true)
 
-    const store = chat.bySession[ownerId] || chat.messages
+    // 必须读 store 最新值：排队问题由 setTimeout 闭包触发，闭包的 chat.bySession 是发起时的旧快照，
+    // 用它拼 next 会把已经完成的上一轮问答覆盖掉（表现为"推荐问题回答消失，刷新才回来"）
+    const latest = useChatStore.getState()
+    const store = latest.bySession[ownerId] || latest.messages
     const at = Date.now()
     const um: ChatMessageExt = { role: 'user', content: query, sources: [], ts: at }
     const ai: ChatMessageExt = { role: 'assistant', content: '', sources: [], streaming: true, ts: at }
     const next = [...store, um, ai]
     chat.cacheMessages(ownerId, next)
-    if (chat.currentId === ownerId) {
+    if (useChatStore.getState().currentId === ownerId) {
       userScrolledUp.current = false   // 自己发的新问题，理应看到最新
       setForce(x => x + 1); scrollBottom(true)
     }
@@ -386,7 +389,7 @@ export default function IndexPage() {
                 }
               }
             }
-            if (chat.currentId === ownerId) { setForce(x => x + 1); scrollBottom() }
+            if (useChatStore.getState().currentId === ownerId) { setForce(x => x + 1); scrollBottom() }
             if (finished) break
           }
         } catch (err) {
@@ -418,7 +421,7 @@ export default function IndexPage() {
       setBusy(ownerId, false)
       ai.streaming = false
       chat.cacheMessages(ownerId, next)
-      if (chat.currentId === ownerId) setForce(x => x + 1)
+      if (useChatStore.getState().currentId === ownerId) setForce(x => x + 1)
       const queued = queuedRef.current.shift()
       queuedRef.current = [...queuedRef.current]
       setQueuedList([...queuedRef.current])
