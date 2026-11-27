@@ -469,6 +469,7 @@ export default function IndexPage() {
 
   const msgs = chat.messages
   const hasMessages = msgs.length > 0
+  const userMsgs = msgs.filter(m => m.role === 'user')
   const busy = chat.sending
   void force  // 流式重渲染触发器
 
@@ -574,6 +575,22 @@ export default function IndexPage() {
           </div>
         )}
       </div>
+      {/* 右侧提问快捷跳转：默认最小化为竖条，hover展开历史提问列表 */}
+      {hasMessages && <div className="ask-jump" id="askJump">
+        <div className="ask-jump-hint">提问</div>
+        <div className="ask-jump-list">
+          {userMsgs.map((m, i) => (
+            <button key={i} className="ask-jump-item" title={m.content}
+              onClick={() => {
+                const el = document.querySelectorAll('.msg-group.user')[i] as HTMLElement | undefined
+                if (!el) return
+                el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+                el.classList.add('msg-located')
+                setTimeout(() => el.classList.remove('msg-located'), 1800)
+              }}>{m.content.length > 18 ? m.content.slice(0, 18) + '…' : m.content}<span className="ask-jump-dash">—</span></button>
+          ))}
+        </div>
+      </div>}
       <div className="composer-wrap">
         <div className={`error-bar${error ? ' show' : ''}`}>{error}</div>
         <div className="composer">
@@ -618,6 +635,7 @@ export default function IndexPage() {
             <span className="model-pick-slot">
               <Select className="model-pick" value={modelId || 0} title="选择本次回答使用的对话模型"
                 disabled={chatModels.length === 0} variant="borderless" size="small"
+                dropdownMatchSelectWidth={false}
                 popupClassName="model-pick-dropdown"
                 options={[{ value: 0, label: '默认模型' }, ...chatModels.map(m => ({ value: m.id, label: m.name }))]}
                 onChange={n => {

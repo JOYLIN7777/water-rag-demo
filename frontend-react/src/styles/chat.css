@@ -247,10 +247,14 @@
   .msg-group.msg-located .user-bubble{box-shadow:0 0 0 2px var(--primary),0 4px 14px rgba(59,110,245,.2)}
   .msg-group.msg-located{animation:msgFlash 1.6s ease-out}
   @keyframes msgFlash{0%,60%{background:rgba(59,110,245,.10)}100%{background:transparent}}
-  /* 模型下拉：左对齐触发器，不溢出容器右边界 */
-  .model-pick-dropdown .ant-select-item-option{font-size:12px;min-width:210px;padding:6px 10px;border-radius:6px}
+  /* 模型下拉：按最长模型名定宽，选项居中，不随触发器宽度收缩 */
+  .model-pick-dropdown .ant-select-dropdown-menu{width:280px !important}
+  .model-pick-dropdown .ant-select-item-option{font-size:12px;padding:7px 12px;border-radius:6px;
+    text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .model-pick-dropdown .ant-select-item-option-content{text-align:center;width:100%}
   .model-pick-dropdown .ant-select-item-option-selected{background:var(--primary-soft) !important;color:var(--primary) !important;font-weight:400}
-  .model-pick-dropdown.ant-select-dropdown{padding:4px;background:#fff;border:1px solid var(--line);border-radius:10px;box-shadow:0 8px 24px rgba(20,40,80,.12)}
+  .model-pick-dropdown.ant-select-dropdown{width:280px !important;padding:4px;background:#fff;
+    border:1px solid var(--line);border-radius:10px;box-shadow:0 8px 24px rgba(20,40,80,.12)}
   /* 提问气泡：时间与复制按钮放在气泡下方，hover 才显示 */
   .ask-meta{margin-top:5px;display:flex;justify-content:flex-end;align-items:center;gap:8px;
     opacity:0;transition:opacity .15s}
@@ -260,3 +264,22 @@
   /* 提问超长：字体变红并闪烁一次提示 */
   @keyframes questionOverLimit{0%,100%{color:var(--ink)}25%,75%{color:#e5484d}}
   #question.over-limit{color:#e5484d;animation:questionOverLimit .5s ease-in-out 2}
+  /* 右侧提问快捷跳转条：默认最小化，hover展开 */
+  .ask-jump{position:fixed;right:14px;top:50%;transform:translateY(-50%);z-index:60;
+    max-height:70vh;display:flex;flex-direction:column;align-items:flex-end;
+    background:rgba(255,255,255,.94);border:1px solid var(--line);border-radius:14px;
+    box-shadow:0 6px 28px rgba(20,40,80,.12);padding:8px 0;transition:all .18s ease;
+    width:30px;overflow:hidden}
+  .ask-jump:hover{width:auto;max-width:300px;align-items:flex-end;padding:10px 12px}
+  .ask-jump-hint{display:none}
+  .ask-jump-list{display:flex;flex-direction:column;gap:3px;max-height:64vh;overflow-y:auto;width:100%;align-items:flex-end}
+  .ask-jump-item{display:flex;align-items:center;justify-content:flex-end;gap:8px;
+    border:0;background:transparent;color:var(--muted);font-size:12px;cursor:pointer;
+    padding:4px 2px;white-space:nowrap;max-width:100%;overflow:hidden}
+  /* 最小化：文字收起只留短横线，效果类似WorkBuddy右侧竖条 */
+  .ask-jump:not(:hover) .ask-jump-item{font-size:0;gap:0;padding:4px 6px}
+  .ask-jump:not(:hover) .ask-jump-dash{width:16px}
+  .ask-jump:hover .ask-jump-item{font-size:12px}
+  .ask-jump-item:hover{color:var(--primary)}
+  .ask-jump-item.msg-located{color:var(--ink);font-weight:600}
+  .ask-jump-dash{display:inline-block;width:18px;height:1px;background:currentColor;opacity:.55;flex:none}
