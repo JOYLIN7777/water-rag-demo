@@ -135,7 +135,7 @@ export default function DocsPanel() {
                   <td>{String(d.uploadedAt || '').slice(0, 19).replace('T', ' ')}</td>
                   <td>
                     {auth.has('doc:chunks') &&
-                      <button className="op-btn" onClick={() => setChunkFile(d.fileName)}>查看分片</button>}
+                      <button className="btn btn-sm" onClick={() => setChunkFile(d.fileName)}>查看分片</button>}
                     {auth.has('doc:delete') &&
                       <button className="btn btn-sm btn-danger" style={{ marginLeft: 8 }} onClick={() => void remove(d)}>删除</button>}
                   </td>
