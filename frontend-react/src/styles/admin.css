@@ -416,3 +416,13 @@
   .field>label .req{color:#e0245e;margin-right:3px;font-weight:700}
   .usage-row-link{cursor:pointer}
   .usage-row-link:hover{background:var(--primary-soft)}
+  /* 上传确认弹框：列出所选文件 */
+  .upload-file-list{max-height:150px;overflow:auto;border:1px solid var(--line);border-radius:8px;
+    margin:0 0 14px;background:#f8fafc;padding:4px 8px}
+  .upload-file-item{display:flex;align-items:center;gap:8px;padding:5px 0;font-size:12px;color:var(--ink-2);
+    border-bottom:1px dashed #e8edf5}
+  .upload-file-item:last-child{border-bottom:0}
+  .upload-file-no{flex:0 0 18px;height:18px;line-height:18px;text-align:center;border-radius:5px;
+    background:var(--primary);color:#fff;font-size:10px;font-weight:600}
+  .upload-file-name{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .upload-file-size{flex:0 0 auto;color:var(--muted);font-size:11px}

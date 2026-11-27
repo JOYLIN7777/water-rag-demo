@@ -285,7 +285,14 @@ export default function ManagePage() {
       {/* 上传前确认可见范围（旧版 askVisibility 弹框） */}
       <WbModal size="md" title="文档可见范围" open={scopeOpen} okText="确认上传" cancelText="取消"
         onCancel={() => { setScopeOpen(false); setPendingFiles([]) }} onOk={() => { if (pendingFiles.length) void doUpload() }}>
-        <p style={{ margin: '0 0 12px' }}>已选择 {pendingFiles.length} 个文件，请确认文档可见范围：</p>
+        <p style={{ margin: '0 0 8px' }}>已选择 {pendingFiles.length} 个文件，请确认文档可见范围：</p>
+        <div className="upload-file-list">
+          {pendingFiles.map((f, i) => <div className="upload-file-item" key={i}>
+            <span className="upload-file-no">{i + 1}</span>
+            <span className="upload-file-name" title={f.name}>{f.name}</span>
+            <span className="upload-file-size">{(f.size / 1024).toFixed(0)}KB</span>
+          </div>)}
+        </div>
         <label style={{ display: 'flex', gap: 8, alignItems: 'flex-start', marginBottom: 10, cursor: 'pointer' }}>
           <input type="radio" name="visScope" checked={!includeSubtree} onChange={() => setIncludeSubtree(false)} />
           <span><b>仅本部门 + 上级</b><div style={{ fontSize: 11.5, color: 'var(--muted)' }}>只有本部门及上级组织能看到、检索到这些文档</div></span>

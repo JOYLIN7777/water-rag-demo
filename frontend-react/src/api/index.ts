@@ -1,5 +1,6 @@
 /** 后端接口封装：与旧版 app.js / admin.html 用的接口一一对应 */
 import { http } from './http'
+import { getAccess, ensureFresh } from './auth'
 import { AppError } from '@/types'
 
 export interface StreamEvent { event: string; data: string }
@@ -55,23 +56,34 @@ export function uploadDocument(
     const form = new FormData()
     form.append('file', file)
     if (includeSubtree) form.append('includeSubtree', 'true')
-    const xhr = new XMLHttpRequest()
-    xhr.open('POST', '/api/docs/upload')
-    xhr.upload.onprogress = e => {
-      if (e.lengthComputable && onProgress) onProgress(Math.round(e.loaded / e.total * 100))
-    }
-    xhr.onload = () => {
-      if (xhr.status >= 200 && xhr.status < 300) {
-        try { resolve(JSON.parse(xhr.responseText)) }
-        catch { reject(new AppError('服务返回了无法识别的结果')) }
-      } else {
+    // XHR 不经过 fetch 的鉴权补丁，必须自己带 token，否则后端返回 Login required
+    const doUpload = (retried: boolean) => {
+      const xhr = new XMLHttpRequest()
+      xhr.open('POST', '/api/docs/upload')
+      const token = getAccess()
+      if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`)
+      xhr.upload.onprogress = e => {
+        if (e.lengthComputable && onProgress) onProgress(Math.round(e.loaded / e.total * 100))
+      }
+      xhr.onload = async () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          try { resolve(JSON.parse(xhr.responseText)) }
+          catch { reject(new AppError('服务返回了无法识别的结果')) }
+          return
+        }
+        // 令牌过期：静默续期后重试一次
+        if (xhr.status === 401 && !retried && await ensureFresh()) {
+          doUpload(true)
+          return
+        }
         let m = '上传失败，请稍后重试'
         try { m = (JSON.parse(xhr.responseText).message as string) || m } catch { /* 非JSON */ }
         reject(new AppError(m, xhr.status))
       }
+      xhr.onerror = () => reject(new AppError('网络连接失败'))
+      xhr.send(form)
     }
-    xhr.onerror = () => reject(new AppError('网络连接失败'))
-    xhr.send(form)
+    doUpload(false)
   })
 }
 

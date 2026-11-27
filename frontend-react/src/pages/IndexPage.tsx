@@ -366,7 +366,14 @@ export default function IndexPage() {
       Modal.confirm({
         title: '文档可见范围', okText: '确认上传', cancelText: '取消',
         content: <div>
-          <p style={{ margin: '0 0 12px' }}>已选择 {list.length} 个文件，请确认文档可见范围：</p>
+          <p style={{ margin: '0 0 8px' }}>已选择 {list.length} 个文件，请确认文档可见范围：</p>
+          <div className="upload-file-list">
+            {list.map((f, i) => <div className="upload-file-item" key={i}>
+              <span className="upload-file-no">{i + 1}</span>
+              <span className="upload-file-name" title={f.name}>{f.name}</span>
+              <span className="upload-file-size">{(f.size / 1024).toFixed(0)}KB</span>
+            </div>)}
+          </div>
           <label style={{ display: 'flex', gap: 8, alignItems: 'flex-start', marginBottom: 10 }}>
             <input type="radio" name="chatVis" defaultChecked onChange={() => { choice = false }} />
             <span><b>仅本部门 + 上级</b><div style={{ fontSize: 11.5, color: 'var(--muted)' }}>只有本部门及上级组织能看到</div></span>
