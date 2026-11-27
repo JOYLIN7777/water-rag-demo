@@ -51,15 +51,19 @@ public class JwtAuthFilter extends OncePerRequestFilter {
     private final AuditService audit;
     private final RefreshTokenStore store;
     private final boolean requireLogin;
+    private final boolean prod;
     private final boolean jwtEnabled;
 
     public JwtAuthFilter(JwtService jwt, ObjectMapper mapper, AuditService audit, RefreshTokenStore store,
-                         @Value("${security.auth.require-login:true}") boolean requireLogin) {
+                         @Value("${security.auth.require-login:true}") boolean requireLogin,
+                         org.springframework.core.env.Environment env) {
         this.jwt = jwt;
         this.mapper = mapper;
         this.audit = audit;
         this.store = store;
-        this.requireLogin = requireLogin;
+        // 生产环境强制要求登录，忽略降级开关（防绕过认证）
+        this.prod = env.acceptsProfiles(org.springframework.core.env.Profiles.of("prod"));
+        this.requireLogin = requireLogin || prod;
         this.jwtEnabled = jwt.enabled();
     }
 

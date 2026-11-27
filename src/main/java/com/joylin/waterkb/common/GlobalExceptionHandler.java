@@ -8,9 +8,12 @@ import org.springframework.ai.retry.NonTransientAiException;
 import org.springframework.boot.autoconfigure.web.servlet.MultipartProperties;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.validation.BindException;
 
 import java.util.Map;
 
@@ -39,12 +42,43 @@ public class GlobalExceptionHandler {
         return ResponseEntity.badRequest().body(Map.of("code", INVALID_ARGUMENT, "message", e.getMessage()));
     }
 
-    /** 上传文件超限：400（上限文案动态读取并格式化为可读单位，避免出现 524288000B 这种原始字节数） */
+    /** 参数校验失败：400（取首条校验消息，避免前端拿到一堆字段错误） */
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    public ResponseEntity<Map<String, Object>> handleValid(MethodArgumentNotValidException e) {
+        String msg = e.getBindingResult().getAllErrors().isEmpty() ? "参数校验失败"
+                : e.getBindingResult().getAllErrors().get(0).getDefaultMessage();
+        return ResponseEntity.badRequest().body(Map.of("code", INVALID_ARGUMENT, "message", msg == null ? "参数校验失败" : msg));
+    }
+
+    /** 参数绑定失败：400 */
+    @ExceptionHandler(BindException.class)
+    public ResponseEntity<Map<String, Object>> handleBind(BindException e) {
+        String msg = e.getBindingResult().getAllErrors().isEmpty() ? "参数绑定失败"
+                : e.getBindingResult().getAllErrors().get(0).getDefaultMessage();
+        return ResponseEntity.badRequest().body(Map.of("code", INVALID_ARGUMENT, "message", msg == null ? "参数绑定失败" : msg));
+    }
+
+    /** 状态冲突：409（Service 层 IllegalStateException 明确表达业务状态不对） */
+    @ExceptionHandler(IllegalStateException.class)
+    public ResponseEntity<Map<String, Object>> handleState(IllegalStateException e) {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(Map.of("code", HttpStatus.CONFLICT.value(), "message", e.getMessage() == null ? "状态冲突" : e.getMessage()));
+    }
+
+    /** 数据完整性冲突：409（唯一约束、外键约束等） */
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ResponseEntity<Map<String, Object>> handleIntegrity(DataIntegrityViolationException e) {
+        log.warn("数据完整性冲突：{}", e.getMessage());
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(Map.of("code", HttpStatus.CONFLICT.value(), "message", "数据已存在或关联冲突"));
+    }
+
+    /** 上传文件超限：413（上限文案动态读取并格式化为可读单位，避免出现 524288000B 这种原始字节数） */
     @ExceptionHandler(MaxUploadSizeExceededException.class)
     public ResponseEntity<Map<String, Object>> handleMaxUpload(MaxUploadSizeExceededException e) {
         var max = multipartProperties.getMaxFileSize();
         String readable = max.toGigabytes() >= 1 ? max.toGigabytes() + "GB" : max.toMegabytes() + "MB";
-        return ResponseEntity.badRequest().body(Map.of("code", UPLOAD_TOO_LARGE,
+        return ResponseEntity.status(UPLOAD_TOO_LARGE).body(Map.of("code", UPLOAD_TOO_LARGE,
                 "message", "文件超过大小限制（上限 " + readable + "）"));
     }
 
