@@ -165,6 +165,7 @@
   .quote-text{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#41506b}
   .quote-x{border:0;background:transparent;color:#8a97b3;font-size:15px;cursor:pointer;padding:0 2px;line-height:1}
   .quote-x:hover{color:#e05a6d}
+  .composer{position:relative}
   .composer:focus-within{border-color:var(--primary);box-shadow:0 0 0 4px rgba(59,110,245,.1),var(--shadow-md)}
   .composer textarea{width:100%;resize:none;border:0;outline:0;font-size:15px;line-height:1.65;max-height:160px;min-height:28px;color:var(--ink);background:transparent;display:block}
   .composer-bar{display:flex;align-items:center;gap:8px;margin-top:11px;padding-top:10px;border-top:1px solid #f0f3f8}
@@ -248,9 +249,8 @@
   .msg-group.msg-located{animation:msgFlash 1.6s ease-out}
   @keyframes msgFlash{0%,60%{background:rgba(59,110,245,.10)}100%{background:transparent}}
   /* 模型下拉：按最长模型名定宽，选项居中，不随触发器宽度收缩 */
-  .model-pick-dropdown .ant-select-dropdown-menu{width:280px !important}
   .model-pick-dropdown .ant-select-item-option{font-size:12px;padding:7px 12px;border-radius:6px;
-    text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    text-align:center;white-space:nowrap}
   .model-pick-dropdown .ant-select-item-option-content{text-align:center;width:100%}
   .model-pick-dropdown .ant-select-item-option-selected{background:var(--primary-soft) !important;color:var(--primary) !important;font-weight:400}
   .model-pick-dropdown.ant-select-dropdown{width:280px !important;padding:4px;background:#fff;
@@ -283,3 +283,9 @@
   .ask-jump-item:hover{color:var(--primary)}
   .ask-jump-item.msg-located{color:var(--ink);font-weight:600}
   .ask-jump-dash{display:inline-block;width:18px;height:1px;background:currentColor;opacity:.55;flex:none}
+  /* 字数计数：输入框内右下角，接近上限才出现 */
+  .char-count{position:absolute;right:14px;bottom:52px;font-size:11px;color:var(--muted);
+    background:rgba(255,255,255,.92);padding:2px 6px;border-radius:5px;pointer-events:none;
+    font-variant-numeric:tabular-nums}
+  .char-count.warn{color:#e8890c}
+  .char-count.over{color:#e5484d;font-weight:600}

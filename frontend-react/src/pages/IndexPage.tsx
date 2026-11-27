@@ -170,7 +170,6 @@ export default function IndexPage() {
   const fileInput = useRef<HTMLInputElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const [force, setForce] = useState(0)   // 触发重渲染（流式增量）
-  const [flashLimit, setFlashLimit] = useState(false)
   const [initializing, setInitializing] = useState(true)  // 刷新时先不渲染欢迎页，避免闪一下
 
   /** 只有用户本来就贴着底部时才自动跟随；手动上滚看历史时绝不拉回来 */
@@ -614,17 +613,9 @@ export default function IndexPage() {
             </span>)}
           </div>}
           <textarea id="question" rows={1} placeholder="输入你的问题，Enter 发送，Shift+Enter 换行"
-            className={flashLimit ? 'over-limit' : ''} value={q} ref={inputRef}
+            value={q} ref={inputRef}
             onChange={e => {
-              const raw = e.target.value
-              // 超过上限主动截断，并短暂闪一下红提示（闪完恢复，不常驻红字）
-              if (raw.length > 2000) {
-                setQ(raw.slice(0, 2000))
-                setFlashLimit(true)
-                setTimeout(() => setFlashLimit(false), 600)
-              } else {
-                setQ(raw)
-              }
+              setQ(e.target.value)
               // 按内容高度自适应，长问题完整显示（最多约 8 行）
               const el = e.target
               el.style.height = 'auto'
@@ -637,6 +628,10 @@ export default function IndexPage() {
                 else void send()
               }
             }} />
+          {/* 接近上限才出现的字数计数：灰色→橙色→红色，不打扰短文本 */}
+          {q.length > 1600 && <span className={'char-count' + (q.length > 2000 ? ' over' : q.length > 1900 ? ' warn' : '')}>
+            {q.length}/2000
+          </span>}
           <div className="composer-bar">
             <span className="composer-tool" title="基于知识库检索作答"><span style={{ color: 'var(--primary)' }}>◈</span> 知识库问答</span>
             {auth.has('doc:write_chat') && <>
@@ -646,6 +641,7 @@ export default function IndexPage() {
             <span className="model-pick-slot">
               <Select className="model-pick" value={modelId || 0} title="选择本次回答使用的对话模型"
                 disabled={chatModels.length === 0} variant="borderless" size="small"
+                placement="topRight"
                 dropdownMatchSelectWidth={false}
                 popupClassName="model-pick-dropdown"
                 options={[{ value: 0, label: '默认模型' }, ...chatModels.map(m => ({ value: m.id, label: m.name }))]}
