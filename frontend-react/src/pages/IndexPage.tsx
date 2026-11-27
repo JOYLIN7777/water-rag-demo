@@ -476,7 +476,7 @@ export default function IndexPage() {
         <div className="topbar-nav"><AdminEntry /></div>
       </header>
       <div className="scroll-area" id="scrollArea" ref={scrollRef} onScroll={onScrollArea}>
-        {!hasMessages && !initializing ? (
+        {!hasMessages && !initializing && !chat.switching ? (
           <div className="welcome" id="welcome">
             <div className="welcome-mark has-logo"><img className="brand-logo" src="/assets/logo.svg" alt="" /></div>
             <h1>水利知识库智能问答</h1>

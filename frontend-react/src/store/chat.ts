@@ -39,6 +39,8 @@ interface ChatState {
   removeAborter: (id: string) => void
   abortSession: (id: string) => void
   sending: boolean
+  /** 切换会话加载历史中：避免空消息时闪欢迎页 */
+  switching: boolean
   suggestions: string[]
   syncSessions: () => Promise<void>
   bootstrap: () => Promise<void>
@@ -66,6 +68,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
     get().removeAborter(id)
   },
   sending: false,
+  switching: false,
   suggestions: [],
 
   cacheMessages: (id, msgs) => {
@@ -101,7 +104,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
   switchSession: async (id: string) => {
     // 先用内存态做过渡（流式回答中切走再切回），随后一律以服务端为准
-    set({ currentId: id, messages: get().bySession[id] || [] })
+    // 不清空 messages：切换期间保留旧会话内容，避免欢迎页或空白闪一下
+    set({ currentId: id, switching: true })
     try {
       const list = await chatApi.history(id)
       const msgs: ChatMessageExt[] = (list || []).map((m, i) => ({
@@ -116,6 +120,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       if (msgs.length === 0 && (get().bySession[id] || []).length > 0) return
       set(s => ({ messages: msgs, bySession: { ...s.bySession, [id]: msgs } }))
     } catch { /* 服务端暂不可用，保留内存过渡态 */ }
+    finally { set({ switching: false }) }
   },
 
   removeSession: async (id: string) => {
