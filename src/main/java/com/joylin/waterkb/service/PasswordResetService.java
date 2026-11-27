@@ -1,8 +1,11 @@
 package com.joylin.waterkb.service;
 
+import com.joylin.waterkb.mapper.PasswordResetMapper;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import jakarta.annotation.PostConstruct;
@@ -42,13 +45,23 @@ public class PasswordResetService {
     private static final SecureRandom RANDOM = new SecureRandom();
 
     private final JdbcTemplate jdbc;
+    private final PasswordResetMapper mapper;
     private final UserStore users;
     private final PasswordHasher hasher;
 
+    /**
+     * 兼容单测：不接数据库。
+     */
     public PasswordResetService(JdbcTemplate jdbc, UserStore users, PasswordHasher hasher) {
+        this(jdbc, users, hasher, null);
+    }
+
+    @Autowired
+    public PasswordResetService(JdbcTemplate jdbc, UserStore users, PasswordHasher hasher, PasswordResetMapper mapper) {
         this.jdbc = jdbc;
         this.users = users;
         this.hasher = hasher;
+        this.mapper = mapper;
     }
 
     @PostConstruct
@@ -82,10 +95,9 @@ public class PasswordResetService {
             return;
         }
         try {
-            int updated = jdbc.update("UPDATE password_reset_request SET requested_at=CURRENT_TIMESTAMP, "
-                    + "request_ip=? WHERE username=? AND status='PENDING'", ip, name);
+            int updated = mapper.touchPending(ip, name);
             if (updated == 0) {
-                jdbc.update("INSERT INTO password_reset_request(username,request_ip) VALUES(?,?)", name, ip);
+                mapper.insert(name, ip);
             }
             log.info("账号 {} 提交了密码重置申请（来源 {}）", name, ip);
         } catch (Exception e) {
@@ -97,23 +109,20 @@ public class PasswordResetService {
     public List<Map<String, Object>> list() {
         List<Map<String, Object>> out = new ArrayList<>();
         try {
-            jdbc.query("SELECT id,username,status,attempts,request_ip,requested_at,approved_by,approved_at,"
-                    + "expires_at,used_at FROM password_reset_request "
-                    + "WHERE status IN ('PENDING','APPROVED','REJECTED','USED') "
-                    + "ORDER BY CASE status WHEN 'PENDING' THEN 0 ELSE 1 END, requested_at DESC", rs -> {
+            for (Map<String, Object> row : mapper.listAll()) {
                 Map<String, Object> m = new LinkedHashMap<>();
-                m.put("id", rs.getLong("id"));
-                m.put("username", rs.getString("username"));
-                m.put("status", rs.getString("status"));
-                m.put("attempts", rs.getInt("attempts"));
-                m.put("requestIp", rs.getString("request_ip"));
-                m.put("requestedAt", toMillis(rs.getTimestamp("requested_at")));
-                m.put("approvedBy", rs.getString("approved_by"));
-                m.put("approvedAt", toMillis(rs.getTimestamp("approved_at")));
-                m.put("expiresAt", toMillis(rs.getTimestamp("expires_at")));
-                m.put("usedAt", toMillis(rs.getTimestamp("used_at")));
+                m.put("id", ((Number) row.get("id")).longValue());
+                m.put("username", row.get("username"));
+                m.put("status", row.get("status"));
+                m.put("attempts", row.get("attempts"));
+                m.put("requestIp", row.get("requestIp"));
+                m.put("requestedAt", toMillis((Timestamp) row.get("requestedAt")));
+                m.put("approvedBy", row.get("approvedBy"));
+                m.put("approvedAt", toMillis((Timestamp) row.get("approvedAt")));
+                m.put("expiresAt", toMillis((Timestamp) row.get("expiresAt")));
+                m.put("usedAt", toMillis((Timestamp) row.get("usedAt")));
                 out.add(m);
-            });
+            }
         } catch (Exception e) {
             log.warn("读取密码重置申请失败：{}", e.getMessage());
         }
@@ -129,18 +138,15 @@ public class PasswordResetService {
         if (status == null) throw new IllegalArgumentException("重置申请不存在，可能已被清理");
         if (!"PENDING".equals(status)) throw new IllegalArgumentException("该申请已处理过，不能重复发放重置码");
         String code = randomCode();
-        int n = jdbc.update("UPDATE password_reset_request SET status='APPROVED', code_hash=?, attempts=0, "
-                        + "approved_by=?, approved_at=LOCALTIMESTAMP, expires_at=? "
-                        + "WHERE id=? AND status='PENDING'",
-                hasher.hash(code), admin, Timestamp.valueOf(LocalDateTime.now().plusMinutes(TTL_MINUTES)), id);
+        int n = mapper.approve(id, hasher.hash(code), admin,
+                Timestamp.valueOf(LocalDateTime.now().plusMinutes(TTL_MINUTES)));
         if (n == 0) throw new IllegalArgumentException("该申请状态已变化，请刷新后重试");
         log.info("管理员 {} 为申请 #{} 发放了密码重置码", admin, id);
         return code;
     }
 
     public void reject(long id, String admin) {
-        int n = jdbc.update("UPDATE password_reset_request SET status='REJECTED', approved_by=?, "
-                + "approved_at=LOCALTIMESTAMP WHERE id=? AND status='PENDING'", admin, id);
+        int n = mapper.reject(id, admin);
         if (n == 0) throw new IllegalArgumentException("该申请已处理过或不存在");
         log.info("管理员 {} 驳回了密码重置申请 #{}", admin, id);
     }
@@ -158,15 +164,13 @@ public class PasswordResetService {
         String input = code.trim().toUpperCase();
         List<Map<String, Object>> rows = new ArrayList<>();
         try {
-            jdbc.query("SELECT id,code_hash,attempts FROM password_reset_request "
-                    + "WHERE username=? AND status='APPROVED' AND expires_at > LOCALTIMESTAMP "
-                    + "ORDER BY id DESC LIMIT 10", rs -> {
+            for (Map<String, Object> row : mapper.findValidCodes(name)) {
                 Map<String, Object> m = new LinkedHashMap<>();
-                m.put("id", rs.getLong("id"));
-                m.put("codeHash", rs.getString("code_hash"));
-                m.put("attempts", rs.getInt("attempts"));
+                m.put("id", ((Number) row.get("id")).longValue());
+                m.put("codeHash", row.get("codeHash"));
+                m.put("attempts", row.get("attempts"));
                 rows.add(m);
-            }, name);
+            }
         } catch (Exception e) {
             log.warn("校验重置码失败：{}", e.getMessage());
             return "重置服务暂时不可用，请稍后重试";
@@ -176,16 +180,13 @@ public class PasswordResetService {
             Object hash = row.get("codeHash");
             if (hash != null && hasher.matches(input, String.valueOf(hash))) {
                 if (!users.resetPassword(name, newPassword)) return "新密码不符合要求或账号不可用";
-                jdbc.update("UPDATE password_reset_request SET status='USED', used_at=LOCALTIMESTAMP WHERE id=?",
-                        row.get("id"));
+                mapper.markUsed(((Number) row.get("id")).longValue());
                 log.info("账号 {} 通过重置码完成了密码重置", name);
                 return null;
             }
             // 记一次失败；连续错满上限就把单子作废，防暴力猜码
             int attempts = ((Number) row.get("attempts")).intValue() + 1;
-            jdbc.update("UPDATE password_reset_request SET attempts=attempts+1, "
-                            + "status=CASE WHEN attempts+1>=? THEN 'REJECTED' ELSE status END WHERE id=?",
-                    MAX_ATTEMPTS, row.get("id"));
+            mapper.addAttempt(((Number) row.get("id")).longValue(), MAX_ATTEMPTS);
             if (attempts >= MAX_ATTEMPTS) {
                 log.warn("账号 {} 的重置申请 #{} 因连续输错已作废", name, row.get("id"));
                 return "重置码连续输错 " + MAX_ATTEMPTS + " 次，本次申请已作废，请重新提交申请";
@@ -197,9 +198,7 @@ public class PasswordResetService {
 
     private String queryStatus(long id) {
         try {
-            List<String> s = jdbc.query("SELECT status FROM password_reset_request WHERE id=?",
-                    (rs, i) -> rs.getString(1), id);
-            return s.isEmpty() ? null : s.get(0);
+            return mapper.queryStatus(id);
         } catch (Exception e) {
             return null;
         }
