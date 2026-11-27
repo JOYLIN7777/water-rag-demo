@@ -14,8 +14,6 @@ import java.util.Map;
 /**
  * 检索实验接口（作品集演示用）：同一问题跑三种检索模式对比 + 查看当前权限上下文。
  *
- * <p>面试可现场演示：BM25 命中关键词但语义弱、kNN 语义准但字面弱、
- * RRF 融合两者兼得；切换 X-User / X-Groups 头能看到行级权限生效。</p>
  */
 @RestController
 @RequestMapping("/api/search")
@@ -42,7 +40,11 @@ public class SearchController {
                 "hybrid", toHits(hybrid.search(q, EsHybridSearchService.Mode.HYBRID)));
     }
 
-    /** ES 健康与索引状态 */
+    /**
+
+     * ES 健康与索引状态
+
+     */
     @GetMapping("/health")
     public Map<String, Object> health() {
         return Map.of("healthy", es.healthy());

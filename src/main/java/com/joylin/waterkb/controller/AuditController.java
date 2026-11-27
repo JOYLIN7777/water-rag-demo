@@ -23,11 +23,6 @@ import java.util.Map;
 /**
  * 审计查询端点。
  *
- * <p>默认强制按当前租户过滤——部门账号只能看本部门审计，符合数据隔离。
- * 例外：<b>审计部门</b>（组织名含「审计」或账号带 audit 角色）要看全系统操作记录，
- * 这是合规审计的固有职责，否则审计部门查不到别的部门的操作就失去意义。
- * 能否进入本端点已由类级 {@code @RequirePermission(AUDIT_READ)} 把住，
- * 这里只决定"进来看多少"，不会让无审计权限的账号越权。</p>
  */
 @RestController
 @RequestMapping("/api/audit")
@@ -44,7 +39,11 @@ public class AuditController {
         this.rolePermissions = rolePermissions;
     }
 
-    /** 能否看全库审计日志：只看 audit:read 权限码，不再靠组名或组织名子串猜 */
+    /**
+
+     * 能否看全库审计日志：只看 audit:read 权限码，不再靠组名或组织名子串猜
+
+     */
     private boolean isAuditDepartment(UserContext.CurrentUser user) {
         return rolePermissions.permissionsOf(user).contains(Permission.AUDIT_READ);
     }
@@ -76,7 +75,11 @@ public class AuditController {
                 .body(("\ufeff" + csv).getBytes(StandardCharsets.UTF_8));
     }
 
-    /** CSV 转义：双引号翻倍，字段统一加引号，避免逗号/换行破坏列结构 */
+    /**
+
+     * CSV 转义：双引号翻倍，字段统一加引号，避免逗号/换行破坏列结构
+
+     */
     private String toCsv(List<Map<String, Object>> rows) {
         String[] keys = {"时间", "部门", "账号", "角色组", "动作", "资源", "状态", "耗时(ms)", "结果", "来源IP", "详情"};
         String[] fields = {"ts", "tenant_id", "user_id", "groups", "action", "resource",

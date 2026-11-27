@@ -23,19 +23,7 @@ import java.util.Map;
 /**
  * Elasticsearch 基础设施：索引初始化、健康检查、REST 调用封装。
  *
- * <p>索引设计（企业级混合检索的地基）：
- * <ul>
- *   <li>content：text 类型，standard analyzer（中文按字符切分，BM25 召回宽、精度低，
- *       正好由向量检索弥补——这是两路融合的意义）；</li>
- *   <li>embedding：dense_vector 1024 维 + HNSW 索引，余弦相似度；</li>
- *   <li>ownerUser / allowedGroups：行级权限字段——文档归谁、哪些组可见；</li>
- *   <li>fileName / chunkIndex：来源溯源，对应回答的引用片段。</li>
- * </ul></p>
  *
- * <p><b>编码坑（实测踩过）</b>：RestClient 的 body(String) 走 StringHttpMessageConverter，
- * 默认按 ISO-8859-1 编码，中文全部变成 '?'，导致写入 ES 的文档和查询 DSL 里的中文词
- * 都失真、BM25 恒返回 0。这里所有请求/响应统一用 byte[] + 显式 UTF-8，
- * 绕开 converter 默认字符集，保证中文语料和中文查询原样到达 ES。</p>
  */
 @Service
 public class EsIndexService {
@@ -63,7 +51,11 @@ public class EsIndexService {
                 .build();
     }
 
-    /** 启动时确保索引存在且含租户/可见范围字段（幂等，兼容老索引平滑升级） */
+    /**
+
+     * 启动时确保索引存在且含租户/可见范围字段（幂等，兼容老索引平滑升级）
+
+     */
     @PostConstruct
     public void init() {
         try {
@@ -185,12 +177,20 @@ public class EsIndexService {
                 .retrieve().toBodilessEntity();
     }
 
-    /** 通用 POST 查询：返回 ES 原始 JSON，由调用方解析 */
+    /**
+
+     * 通用 POST 查询：返回 ES 原始 JSON，由调用方解析
+
+     */
     public JsonNode search(String index, String dsl) {
         return postJson("/" + index + "/_search", dsl);
     }
 
-    /** 统一的 JSON POST：请求和响应都显式 UTF-8 */
+    /**
+
+     * 统一的 JSON POST：请求和响应都显式 UTF-8
+
+     */
     private JsonNode postJson(String uri, String body) {
         byte[] raw = client.post().uri(uri)
                 .contentType(JSON_UTF8)
@@ -199,7 +199,11 @@ public class EsIndexService {
         return parse(raw);
     }
 
-    /** bulk 写入：items 是 {indexName, id, sourceMap} 列表 */
+    /**
+
+     * bulk 写入：items 是 {indexName, id, sourceMap} 列表
+
+     */
     public int bulkIndex(List<Map<String, Object>> docs) {
         if (docs.isEmpty()) return 0;
         StringBuilder ndjson = new StringBuilder();
@@ -225,7 +229,11 @@ public class EsIndexService {
         }
     }
 
-    /** 按文档 id 列表删除（VectorStore 接口要求） */
+    /**
+
+     * 按文档 id 列表删除（VectorStore 接口要求）
+
+     */
     public int deleteByIds(List<String> ids) {
         if (ids.isEmpty()) return 0;
         String values = String.join(",", ids.stream().map(EsIndexService::quote).toList());
@@ -242,8 +250,6 @@ public class EsIndexService {
      * 范围由 {@link DocVisibilityService#deleteScopeFilter()} 决定：非 admin 只删本部门的同名文档，
      * 祖先下发的、兄弟部门的同名文档不会被误删（同名跨部门在列表里是独立条目）。
      *
-     * @param tenantId 可选：管理员在后台按列表行精确删除某部门的同名文档；
-     *                 非管理员忽略此参数（服务端强制本部门，防越权删别人部门）
      */
     public int deleteByFileName(String fileName, String tenantId) {
         // fileName 本身就是 keyword 类型，没有 .keyword 子字段
@@ -283,8 +289,6 @@ public class EsIndexService {
     /**
      * 某个组织名下的切片数。
      *
-     * <p>删除组织前必须问一句"这里还有没有东西"：只有账号、没有文档的组织可以直接删；
-     * 只要有文档，说明删掉就会有数据变成谁都看不见的孤儿。</p>
      */
     public long countByTenant(String tenant) {
         if (tenant == null || tenant.isBlank()) return 0;
@@ -300,9 +304,6 @@ public class EsIndexService {
     /**
      * 把某个组织名下的全部分片改挂到另一个组织（组织合并/删除时用）。
      *
-     * <p>为什么必须做这一步：账号的 tenant 迁走了，文档的 tenantId 还留着旧键，
-     * 而检索和文档清单都按 tenantId 过滤——旧组织一删，这批文档就变成"系统里有
-     * 但谁都看不到、也删不掉"的孤儿数据。实测踩过一次（3724 个分片失联）。</p>
      *
      * @return 实际改挂的切片数
      */
@@ -326,10 +327,6 @@ public class EsIndexService {
     /**
      * 文档清单：按（部门, 文件名）复合键聚合切片数与可见范围，只看当前账号可见的文档。
      *
-     * <p>为什么用 composite 聚合而不是单字段 terms：同名文档可能同时存在于两个部门
-     * （各自传各自的「手册.docx」），单字段聚合会把它们并成一条，删除时还会误伤别家。
-     * 复合键把"部门+文件名"当独立条目，列表里同名不同部门各占一行。
-     * missing_bucket 让历史无 tenantId 的老切片（default 部门）不被聚合丢弃。</p>
      */
     public JsonNode listDocuments() {
         String dsl = """
@@ -346,12 +343,7 @@ public class EsIndexService {
     /**
      * 某份文档的全部切片（按 chunkIndex 升序），供后台「分片预览」树状展开。
      *
-     * <p>一次取回而不是分页：单份文档切片数在几十到几百量级（按 300~500 字一片），
-     * 展开时才不用二次请求。上限 1000 片并回传真实总数，超大文档如实告诉调用方
-     * "共 N 片、只返回了 M 片"，不做伪分页。</p>
      *
-     * <p>权限：必须复用检索同一份 {@link #visibilityQuery()}，否则会出现
-     * "能通过后台看到别人文档的全文切片"的越权读——这比检索越权更直接。</p>
      */
     public java.util.Map<String, Object> listChunks(String fileName) {
         int limit = 1000;

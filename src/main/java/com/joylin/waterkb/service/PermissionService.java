@@ -15,12 +15,6 @@ import com.joylin.waterkb.security.UserContext;
  * 权限聚合服务：把散落在各处的权限规则聚合成一份"当前用户能做什么"的视图，
  * 供企业治理中心与个人中心可视化展示。
  *
- * <p>权限分三层，均为实时读取 UserContext（调用方无法伪造）：
- * <ol>
- *   <li><b>功能权限</b>：菜单/页面访问，按用户组决定；admin 组拥有全部；</li>
- *   <li><b>数据权限</b>：租户隔离 + 文档行级权限（owner / 组 / public）；</li>
- *   <li><b>工具权限</b>：Tool Calling 触发真实方法的白名单校验。</li>
- * </ol></p>
  */
 @Service
 public class PermissionService {
@@ -71,7 +65,11 @@ public class PermissionService {
         return m;
     }
 
-    /** 聚合当前用户权限视图 */
+    /**
+
+     * 聚合当前用户权限视图
+
+     */
     public Map<String, Object> currentPermissions() {
         UserContext.CurrentUser u = UserContext.get();
         boolean admin = u.hasGroup("admin");

@@ -15,6 +15,7 @@ import AdminEntry from '@/components/AdminEntry'
 
 interface DocItem {
   fileName: string
+  displayName?: string
   chunks: number
   chars?: number
   tenantId?: string
@@ -121,17 +122,17 @@ export default function ManagePage() {
   async function removeDoc(d: DocItem) {
     const ok = await confirmDialog({
       title: '删除文档',
-      content: <p style={{ margin: 0 }}>确定删除「{d.fileName}」及其全部 {d.chunks} 个片段吗？删除后相关内容将无法再被问答引用，且无法恢复。</p>,
+      content: <p style={{ margin: 0 }}>确定删除「{d.displayName || d.fileName}」及其全部 {d.chunks} 个片段吗？删除后相关内容将无法再被问答引用，且无法恢复。</p>,
       okText: '确认删除',
       danger: true
     })
     if (!ok) return
-    showMsg('', `正在删除 ${d.fileName} ...`)
+    showMsg('', `正在删除 ${d.displayName || d.fileName} ...`)
     try {
       const q = '?fileName=' + encodeURIComponent(d.fileName) + (d.tenantId ? '&tenantId=' + encodeURIComponent(d.tenantId) : '')
       const j = await http.delete<{ deletedChunks?: number; message?: string }>('/api/docs' + q)
       if (j.deletedChunks === undefined) throw new Error(j.message || '删除失败')
-      showMsg('ok', `已删除「${d.fileName}」（${j.deletedChunks} 个切片）`)
+      showMsg('ok', `已删除「${d.displayName || d.fileName}」（${j.deletedChunks} 个切片）`)
       await loadDocs()
     } catch (e: any) { showMsg('err', '✗ 删除失败：' + (e?.message || '')) }
   }
@@ -239,7 +240,7 @@ export default function ManagePage() {
                 ? <tr><td colSpan={canOps ? 5 : 4} className="empty">{search ? '无匹配文档' : (canUpload ? '知识库暂无文档，先上传一份吧' : '知识库暂无文档')}</td></tr>
                 : slice.map(d => (
                   <tr key={d.fileName + (d.tenantId || '')}>
-                    <td className="doc-name" title={d.fileName}>{d.fileName.split('/').pop() || d.fileName}</td>
+                    <td className="doc-name" title={d.fileName}>{d.displayName || d.fileName}</td>
                     <td>{scopeBadge(d)}</td>
                     <td><span className="tag">{d.chunks} 片</span></td>
                     <td>{fmtTime(d.uploadedAt)}</td>

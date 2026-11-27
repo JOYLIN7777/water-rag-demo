@@ -29,8 +29,6 @@ import java.util.UUID;
 /**
  * 认证端点：真实登录（用户名密码 → access + refresh）、刷新、登出、身份回显。
  *
- * <p>另保留 {@code /token} 演示签发端点（作品集现场一键复现 OIDC 链路用），
- * 可通过 {@code security.auth.issue-endpoint=false} 关闭。</p>
  */
 @RestController
 @RequestMapping("/api/auth")
@@ -65,20 +63,32 @@ public class AuthController {
         this.issueEndpoint = issueEndpoint;
     }
 
-    /** 前端取公钥加密密码（RSA-OAEP/SHA-256），无需登录 */
+    /**
+
+     * 前端取公钥加密密码（RSA-OAEP/SHA-256），无需登录
+
+     */
     @GetMapping("/public-key")
     public Map<String, String> publicKey() {
         return Map.of("publicKey", crypto.publicKey(), "algorithm", "RSA-OAEP-SHA256");
     }
 
-    /** 页面传 encrypted=true 时，密码字段是前端用公钥加密后的 Base64 密文 */
+    /**
+
+     * 页面传 encrypted=true 时，密码字段是前端用公钥加密后的 Base64 密文
+
+     */
     private String passwordOf(Map<String, String> body, String field) {
         if (body == null) return null;
         String value = body.get(field);
         return Boolean.parseBoolean(String.valueOf(body.get("encrypted"))) ? crypto.decrypt(value) : value;
     }
 
-    /** 登录：校验用户名密码，签发 access + refresh。密码错误与用户不存在返回同样错误，防用户枚举。 */
+    /**
+
+     * 登录：校验用户名密码，签发 access + refresh。密码错误与用户不存在返回同样错误，防用户枚举。
+
+     */
     @PostMapping("/login")
     public ResponseEntity<?> login(@RequestBody Map<String, String> body,
                                    jakarta.servlet.http.HttpServletRequest req) {
@@ -117,7 +127,11 @@ public class AuthController {
                 "tenant", u.tenant()));
     }
 
-    /** 刷新：refresh token 换新的 access + refresh（旧 refresh 立即作废，防重放） */
+    /**
+
+     * 刷新：refresh token 换新的 access + refresh（旧 refresh 立即作废，防重放）
+
+     */
     @PostMapping("/refresh")
     public ResponseEntity<?> refresh(@RequestBody Map<String, String> body) {
         String token = body == null ? null : body.get("refreshToken");
@@ -143,7 +157,11 @@ public class AuthController {
                 "tokenType", "Bearer", "expiresIn", accessTtl));
     }
 
-    /** 登出：拉黑当前 access 的 jti + 删除对应 refresh（需带当前 access token） */
+    /**
+
+     * 登出：拉黑当前 access 的 jti + 删除对应 refresh（需带当前 access token）
+
+     */
     @PostMapping("/logout")
     public ResponseEntity<?> logout(jakarta.servlet.http.HttpServletRequest req) {
         String auth = req.getHeader("Authorization");
@@ -162,7 +180,11 @@ public class AuthController {
         return ResponseEntity.ok(Map.of("message", "已退出登录"));
     }
 
-    /** 回显当前身份 */
+    /**
+
+     * 回显当前身份
+
+     */
     @GetMapping("/me")
     public Map<String, Object> me() {
         UserContext.CurrentUser u = UserContext.get();
@@ -182,7 +204,11 @@ public class AuthController {
         return m;
     }
 
-    /** 当前用户修改自己的资料：性别、手机号、头像（头像为 data URL 或预设标识） */
+    /**
+
+     * 当前用户修改自己的资料：性别、手机号、头像（头像为 data URL 或预设标识）
+
+     */
     @PutMapping("/profile")
     public Map<String, Object> updateProfile(@RequestBody Map<String, String> body) {
         String me = UserContext.get().userId();
@@ -192,13 +218,21 @@ public class AuthController {
         return Map.of("message", "个人资料已保存");
     }
 
-    /** 当前用户的完整权限视图：功能菜单 + 数据权限 + 工具权限 */
+    /**
+
+     * 当前用户的完整权限视图：功能菜单 + 数据权限 + 工具权限
+
+     */
     @GetMapping("/permissions")
     public Map<String, Object> permissions() {
         return permissions.currentPermissions();
     }
 
-    /** 修改密码：校验原密码，新密码至少 8 位；成功后旧 token 仍有效到过期（可主动登出） */
+    /**
+
+     * 修改密码：校验原密码，新密码至少 8 位；成功后旧 token 仍有效到过期（可主动登出）
+
+     */
     @PostMapping("/change-password")
     public ResponseEntity<?> changePassword(@RequestBody Map<String, String> body,
                                             jakarta.servlet.http.HttpServletRequest req) {
@@ -225,8 +259,6 @@ public class AuthController {
     /**
      * 忘记密码第一步：提交重置申请。
      *
-     * <p>这个端点免登录，所以对外话术必须与账号是否存在无关——否则就成了账号枚举器。
-     * 申请落到 password_reset_request 表，管理员在后台「用户管理」里能看到并核身发码。</p>
      */
     @PostMapping("/password-reset/request")
     public ResponseEntity<?> requestPasswordReset(@RequestBody Map<String, String> body,
@@ -242,7 +274,11 @@ public class AuthController {
                 "ttlMinutes", 30));
     }
 
-    /** 忘记密码第二步：凭一次性重置码设置新密码（成功即作废该码） */
+    /**
+
+     * 忘记密码第二步：凭一次性重置码设置新密码（成功即作废该码）
+
+     */
     @PostMapping("/password-reset/confirm")
     public ResponseEntity<?> confirmPasswordReset(@RequestBody Map<String, String> body,
                                                   jakarta.servlet.http.HttpServletRequest req) {
@@ -262,7 +298,11 @@ public class AuthController {
         return ResponseEntity.ok(Map.of("message", "密码已重置，请用新密码登录"));
     }
 
-    /** 演示 token 签发（默认关闭，作品集需要时打开） */
+    /**
+
+     * 演示 token 签发（默认关闭，作品集需要时打开）
+
+     */
     @PostMapping("/token")
     public ResponseEntity<?> token(@RequestParam String user,
                                    @RequestParam(required = false, defaultValue = "") String groups,

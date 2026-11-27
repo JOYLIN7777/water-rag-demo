@@ -11,11 +11,7 @@ import java.util.Base64;
 /**
  * 密码哈希工具：PBKDF2WithHmacSHA256（JDK 自带，零新增依赖）。
  *
- * <p>为什么不用 MD5/SHA：那是摘要不是密码哈希，可被彩虹表秒破。PBKDF2 带随机盐 +
- * 多轮迭代，专门为口令设计，是 NIST 推荐算法。作品集里坚持零依赖，用 JDK 自带实现
- * 就能讲清"加盐 + 慢哈希 + 常量时间比较"三件事；生产也可无缝换成 BCrypt/Argon2。</p>
  *
- * <p>存储格式：{@code pbkdf2$<迭代次数>$<saltBase64>$<hashBase64>}，单字段自描述，便于日后调整参数。</p>
  */
 @Component
 public class PasswordHasher {
@@ -28,7 +24,11 @@ public class PasswordHasher {
     private static final Base64.Encoder B64 = Base64.getEncoder();
     private static final Base64.Decoder B64D = Base64.getDecoder();
 
-    /** 对明文密码生成自描述哈希串（注册/初始化账号时用） */
+    /**
+
+     * 对明文密码生成自描述哈希串（注册/初始化账号时用）
+
+     */
     public String hash(String rawPassword) {
         byte[] salt = new byte[SALT_BYTES];
         RANDOM.nextBytes(salt);
@@ -36,7 +36,11 @@ public class PasswordHasher {
         return "pbkdf2$" + ITERATIONS + "$" + B64.encodeToString(salt) + "$" + B64.encodeToString(derived);
     }
 
-    /** 校验明文密码与存储的哈希是否匹配；任何格式异常都当作不匹配（不抛给调用方） */
+    /**
+
+     * 校验明文密码与存储的哈希是否匹配；任何格式异常都当作不匹配（不抛给调用方）
+
+     */
     public boolean matches(String rawPassword, String stored) {
         try {
             String[] p = stored.split("\\$", 4);

@@ -68,13 +68,21 @@ public class ModelConfigRepository {
         return list.isEmpty() ? null : list.get(0);
     }
 
-    /** 全局默认模型：显式 is_default 优先；历史数据没有默认时回落到最后激活的 */
+    /**
+
+     * 全局默认模型：显式 is_default 优先；历史数据没有默认时回落到最后激活的
+
+     */
     public ModelConfig findDefault(String type) {
         List<ModelConfig> list = mapper.findDefault(type);
         return list.isEmpty() ? null : list.get(0);
     }
 
-    /** 设为默认：同类型先清旧默认，再设置目标并顺带激活 */
+    /**
+
+     * 设为默认：同类型先清旧默认，再设置目标并顺带激活
+
+     */
     public int setDefault(long id) {
         ModelConfig c = findById(id);
         if (c == null) return 0;
@@ -83,7 +91,11 @@ public class ModelConfigRepository {
         return 1;
     }
 
-    /** 激活指定配置：先把同类型全部取消激活，再激活目标（事务由调用方保证或单条更新即可） */
+    /**
+
+     * 激活指定配置：先把同类型全部取消激活，再激活目标（事务由调用方保证或单条更新即可）
+
+     */
     public int activate(long id) {
         ModelConfig c = findById(id);
         if (c == null) return 0;
@@ -93,7 +105,11 @@ public class ModelConfigRepository {
         return mapper.activate(id);
     }
 
-    /** 禁用配置时一并取消激活，否则列表还显示「使用中」，代理仍在调一个已禁用的模型 */
+    /**
+
+     * 禁用配置时一并取消激活，否则列表还显示「使用中」，代理仍在调一个已禁用的模型
+
+     */
     public int deactivate(long id) {
         return mapper.deactivate(id);
     }
@@ -102,7 +118,11 @@ public class ModelConfigRepository {
         return mapper.insert(name, type, baseUrl, apiKey == null ? "" : apiKey, model, dimensions, active);
     }
 
-    /** 更新（API Key 传 null 表示保持原值，便于脱敏回显后编辑不改 Key） */
+    /**
+
+     * 更新（API Key 传 null 表示保持原值，便于脱敏回显后编辑不改 Key）
+
+     */
     public int update(long id, String name, String type, String baseUrl, String apiKey, String model, Integer dimensions, boolean enabled) {
         ModelConfig old = findById(id);
         if (old == null) return 0;
@@ -115,7 +135,11 @@ public class ModelConfigRepository {
         return mapper.delete(id);
     }
 
-    /** ES 索引维度（来自 es.dimensions 配置），用于校验 embedding 切换兼容性 */
+    /**
+
+     * ES 索引维度（来自 es.dimensions 配置），用于校验 embedding 切换兼容性
+
+     */
     public Integer vectorDimension() {
         return seedDimensions; // ES mapping 固定该维度，切不同维度模型必须拒绝
     }

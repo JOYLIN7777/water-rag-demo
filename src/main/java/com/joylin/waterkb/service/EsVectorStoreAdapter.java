@@ -22,13 +22,7 @@ import com.joylin.waterkb.config.RagProperties;
 /**
  * ES 向量存储适配器：实现 Spring AI 的 VectorStore 接口，底层完全走 ES。
  *
- * <p>为什么做适配器而不是改所有调用方：DocumentIngestService / RagChatService
- * 已经稳定跑通且单测完备，用 VectorStore 接口抽象它们与底层存储的解耦。
- * 这里实现同一接口、内部委托 ES，就完成了"完全替换为 ES"——
- * 上层代码零改动，单测零改动，切换成本只在这一层。</p>
  *
- * <p>入库时把 Document 转成 ES source（含向量 + 权限字段），
- * 检索时委托 EsHybridSearchService 做 BM25+kNN+RRF（权限过滤在那一层强制注入）。</p>
  */
 @Component
 public class EsVectorStoreAdapter implements VectorStore {

@@ -15,7 +15,6 @@ import java.util.Set;
 /**
  * 部门知识库可见范围：整个系统的唯一过滤规则，检索、文档清单、分片预览共用。
  *
- * <p>模型（2026-11 廖工定稿）——文档归属上传者的部门（tenantId=org_key）：</p>
  * <ul>
  *   <li><b>向上永远可见</b>：子部门上传的文档，所有上级部门默认能看到（上级看下级是管理常态）；</li>
  *   <li><b>向下要主动下发</b>：上传时勾选「含下级部门」（visibleSubtree=true）后，
@@ -28,9 +27,6 @@ import java.util.Set;
  *       所以数据可见性完全由部门规则 + owner 决定，allowedGroups 仅保留在元数据里不消费。</li>
  * </ul>
  *
- * <p>为什么抽成独立组件：检索（EsHybridSearchService）与清单/删除（EsIndexService）
- * 原来各自维护一份 filter 代码，改动规则要同步两处，漏一处就是越权或误删。
- * 现在规则只写一份，两个入口都从这里拿。</p>
  */
 @Service
 public class DocVisibilityService {
@@ -45,7 +41,11 @@ public class DocVisibilityService {
         this.rolePermissions = rolePermissions;
     }
 
-    /** 单测用：无权限服务时按无 admin 权限处理 */
+    /**
+
+     * 单测用：无权限服务时按无 admin 权限处理
+
+     */
     public DocVisibilityService(OrgStore orgStore) { this(orgStore, new RolePermissions()); }
 
     /**
@@ -95,7 +95,11 @@ public class DocVisibilityService {
         return "{\"term\":{\"tenantId\":" + quote(org) + "}}";
     }
 
-    /** 本部门子句：default 兼容历史无 tenantId 的老数据 */
+    /**
+
+     * 本部门子句：default 兼容历史无 tenantId 的老数据
+
+     */
     private String orgClause(String org) {
         if (OrgStore.DEFAULT_KEY.equals(org)) {
             return "{\"bool\":{\"should\":[{\"term\":{\"tenantId\":\"default\"}},"

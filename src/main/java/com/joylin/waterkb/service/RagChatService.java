@@ -36,17 +36,17 @@ import com.joylin.waterkb.mapper.VectorStoreAdminRepository;
 /**
  * RAG 问答核心服务：检索 → 拼装 Prompt → 流式生成（含熔断降级）。
  *
- * <p>设计决策（为什么手写 RAG 链路而不用 Spring AI 的 QuestionAnswerAdvisor）：
- * Advisor 一步到位但把"向量化、检索、拼装"都封装进黑盒，检索结果拿不到、
- * 来源没法溯源、降级做不了。手写链路每一步都可观测、可干预，工程化能力
- * （引用溯源、熔断降级）正是在这些缝隙里长出来的。</p>
  */
 @Service
 public class RagChatService {
 
     private static final Logger log = LoggerFactory.getLogger(RagChatService.class);
 
-    /** 推荐问题缓存：模型整理一次管 10 分钟，避免每次打开首页都调模型 */
+    /**
+
+     * 推荐问题缓存：模型整理一次管 10 分钟，避免每次打开首页都调模型
+
+     */
     private volatile java.util.Map.Entry<Long, java.util.List<String>> suggestionCache;
 
     private final VectorStore vectorStore;
@@ -94,12 +94,6 @@ public class RagChatService {
     /**
      * RAG 问答主链路，返回 SSE 事件流。
      *
-     * <p>事件类型约定：
-     * sources —— 本次回答引用的知识库片段（可溯源）；
-     * message —— 回答文本增量（逐 token 推送）；
-     * done —— 结束标记，载荷为 JSON：{@code {"done":true,"durationMs":1234,
-     * "usage":{"promptTokens":1194,"completionTokens":229,"totalTokens":1423,"model":"qwen-plus"}}}，
-     * 前端据此展示"本次调用的消耗"；降级/熔断分支带 {@code "degraded":true} 且无 usage。</p>
      */
     public Flux<ServerSentEvent<String>> chatStream(String sessionId, String question, String parentId, Long modelId) {
         // 同步捕获身份快照：SSE 的 doFinally 在 Reactor 异步线程执行，
@@ -336,7 +330,11 @@ public class RagChatService {
         }
     }
 
-    /** 按任意查询取真实片段（推荐问题用；复用同一套向量检索与权限过滤） */
+    /**
+
+     * 按任意查询取真实片段（推荐问题用；复用同一套向量检索与权限过滤）
+
+     */
     public List<Document> sampleChunks(String query, int topK) {
         if (query == null || query.isBlank()) return List.of();
         try {
@@ -349,13 +347,21 @@ public class RagChatService {
         }
     }
 
-    /** 当前账号可见的知识库文档（推荐问题用；沿用文档列表的租户/行级权限过滤） */
+    /**
+
+     * 当前账号可见的知识库文档（推荐问题用；沿用文档列表的租户/行级权限过滤）
+
+     */
     public List<Map<String, Object>> visibleDocuments() {
         List<Map<String, Object>> docs = adminRepository.listDocuments();
         return docs == null ? List.of() : docs;
     }
 
-    /** 本次使用的对话模型名（用量记录用）：按次指定优先，否则当前激活；取不到回落 unknown */
+    /**
+
+     * 本次使用的对话模型名（用量记录用）：按次指定优先，否则当前激活；取不到回落 unknown
+
+     */
     private String activeChatModelName(Long modelId) {
         try {
             com.joylin.waterkb.model.ModelConfig c = modelId == null
@@ -430,9 +436,6 @@ public class RagChatService {
     /**
      * 用户确认查询后，由后端直接执行工具并把真实结果塞进 Prompt。
      *
-     * <p>为什么不由模型自己调：工具调用是可选项，模型常把「需要」当成新问题重新做 RAG，
-     * 或者在工具返回权限错误后复述技术细节给用户。执行层做确定性兜底，
-     * 权限校验仍然走 ToolPermissionRegistry——提示词永远绕不过权限闸门。</p>
      */
     private String applyToolConfirmation(String systemPrompt, String question, String history) {
         String directive = toolConfirmDirective(question, history);
@@ -465,7 +468,11 @@ public class RagChatService {
         }
     }
 
-    /** 直接问"当前/实时水位、流量"且提到已收录站点时，也走确定性工具执行 */
+    /**
+
+     * 直接问"当前/实时水位、流量"且提到已收录站点时，也走确定性工具执行
+
+     */
     private static boolean isDirectWaterQuery(String question) {
         if (question == null || extractStation(question) == null) return false;
         boolean timeWord = question.contains("实时") || question.contains("当前") || question.contains("现在")
@@ -475,7 +482,11 @@ public class RagChatService {
         return timeWord && waterWord;
     }
 
-    /** 从问题或历史里提取已收录的站点名（与 WaterInfoTool 的演示站点保持一致） */
+    /**
+
+     * 从问题或历史里提取已收录的站点名（与 WaterInfoTool 的演示站点保持一致）
+
+     */
     private static String extractStation(String text) {
         if (text == null) return null;
         for (String s : new String[]{"云溪水库", "东风水库", "红旗闸站", "东溪闸", "西溪闸"}) {
@@ -554,7 +565,11 @@ public class RagChatService {
         return ids;
     }
 
-    /** 把检索命中转成可存入节点 JSON 的来源片段（回显引用卡片用） */
+    /**
+
+     * 把检索命中转成可存入节点 JSON 的来源片段（回显引用卡片用）
+
+     */
     private List<Map<String, Object>> toSourceMaps(List<Document> hits) {
         List<Map<String, Object>> out = new ArrayList<>();
         for (Document d : hits) {
@@ -584,13 +599,21 @@ public class RagChatService {
         }
     }
 
-    /** "有哪些文档"这类元问题：走真实文档清单，不走语义检索 */
+    /**
+
+     * "有哪些文档"这类元问题：走真实文档清单，不走语义检索
+
+     */
     private boolean isDocumentListQuestion(String question) {
         String q = String.valueOf(question == null ? "" : question).replaceAll("\\s", "");
         return q.matches(".*(哪些文档|什么文档|文档有哪些|文档清单|可检索.{0,6}文档|能检索.{0,6}文档|知识库.{0,6}文档).*");
     }
 
-    /** 当前账号可见的全部文档名，按文档清单接口的同一份权限口径生成 */
+    /**
+
+     * 当前账号可见的全部文档名，按文档清单接口的同一份权限口径生成
+
+     */
     private String documentListContext() {
         try {
             List<Map<String, Object>> docs = adminRepository.listDocuments();
@@ -630,7 +653,11 @@ public class RagChatService {
         return sb.toString();
     }
 
-    /** 模型不可用时的明确错误提示：不再把检索原文包装成回答 */
+    /**
+
+     * 模型不可用时的明确错误提示：不再把检索原文包装成回答
+
+     */
     private String modelErrorMessage(String message) {
         return "【模型异常】" + message;
     }

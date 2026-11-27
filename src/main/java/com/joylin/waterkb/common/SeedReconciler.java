@@ -11,8 +11,6 @@ import java.util.List;
 /**
  * 种子变更对账：解决「种子 JSON 改了，但数据库旧记录还在，重启后又从 DB 读回来」的问题。
  *
- * <p>只处理代码里显式声明的"已废弃项"，不碰管理员在后台的其它改动。
- * 每个版本只执行一次（seed_migration 表记录），升级后不会反复覆盖用户配置。</p>
  */
 @Component
 public class SeedReconciler {
@@ -20,13 +18,25 @@ public class SeedReconciler {
     private static final Logger log = LoggerFactory.getLogger(SeedReconciler.class);
     private final SchemaSeedMapper mapper;
 
-    /** 版本号：每次新增废弃项时 +1 */
+    /**
+
+     * 版本号：每次新增废弃项时 +1
+
+     */
     private static final String VERSION = "2026-11-27-tree-and-docwrite";
 
-    /** 已废弃的内置权限节点：菜单不再显示 */
+    /**
+
+     * 已废弃的内置权限节点：菜单不再显示
+
+     */
     private static final List<String> RETIRED_NODES = List.of("tree:use");
 
-    /** 已废弃的内置角色默认权限：(角色, 权限) */
+    /**
+
+     * 已废弃的内置角色默认权限：(角色, 权限)
+
+     */
     private static final List<String[]> REMOVED_ROLE_PERMS = List.<String[]>of(
             new String[]{"audit", "doc:write"});
 

@@ -15,15 +15,7 @@ import java.util.Objects;
 import com.joylin.waterkb.service.ModelRegistry;
 
 /**
- * 可切换的 EmbeddingModel 代理。
- *
- * <p>为什么需要代理：PgVectorStore 在启动时把 EmbeddingModel 作为 final 字段绑定，
- * 直接换 bean 不影响已构造的 VectorStore。这里用 @Primary 顶替自动配置的模型，
- * VectorStore 绑定的是这个代理；切换配置时 ModelRegistry 只替换内部 delegate，
- * 检索与入库立刻使用新模型，无需重建容器。</p>
- *
- * <p>初始 delegate 从环境变量构造，保证 ModelRegistry 刷新前（容器启动阶段）
- * VectorStore 调用 dimensions() 不会 NPE。</p>
+ * 可切换的向量模型代理。
  */
 @Primary
 @Component

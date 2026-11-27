@@ -20,18 +20,8 @@ import com.joylin.waterkb.security.UserContext;
 /**
  * ES 混合检索服务（作品集核心）：BM25 全文 + kNN 向量 + RRF 融合 + 行级权限强制过滤。
  *
- * <p>为什么用 RRF 而不是加权求和：BM25 分数与余弦相似度量纲完全不同，
- * 直接加权需要调权重且不稳定；RRF（Reciprocal Rank Fusion）只看排名不看分数，
- * 公式 score(d)=Σ 1/(k+rank_i)，无需调参就能稳定融合两路结果——
- * 这是 ES 官方推荐的 hybrid search 方案。</p>
  *
- * <p>为什么在应用层做 RRF：ES retriever API 从 8.15 才提供，项目镜像是 8.13.4；
- * 且应用层融合能跨版本、可直接看到两路中间结果（检索实验页的 A/B 对比），
- * 比黑盒 retriever 更可控。代价是两次 HTTP 往返，内网 ES 可忽略。</p>
  *
- * <p>权限不可绕过：每次查询都从 UserContext 强制读取当前用户，
- * 部门层级可见 filter（本部门 ∪ 上级下发 ∪ 下级默认 ∪ 自己上传 ∪ 组命中）由
- * {@link DocVisibilityService} 统一构造注入到两路检索的 query 中。调用方无法传参覆盖。</p>
  */
 @Service
 public class EsHybridSearchService {
@@ -51,10 +41,18 @@ public class EsHybridSearchService {
         this.visibility = visibility;
     }
 
-    /** 检索模式：用于 A/B 对比演示 */
+    /**
+
+     * 检索模式：用于 A/B 对比演示
+
+     */
     public enum Mode { BM25, KNN, HYBRID }
 
-    /** 混合检索（默认 HYBRID）。权限过滤强制注入，调用方无法关闭。 */
+    /**
+
+     * 混合检索（默认 HYBRID）。权限过滤强制注入，调用方无法关闭。
+
+     */
     public List<Document> search(String question) {
         return search(question, Mode.HYBRID);
     }
@@ -86,7 +84,11 @@ public class EsHybridSearchService {
         }
     }
 
-    /** 兼容旧调用/单测的统一入口：HYBRID 模式返回其中一路 DSL（融合逻辑在 Java 侧） */
+    /**
+
+     * 兼容旧调用/单测的统一入口：HYBRID 模式返回其中一路 DSL（融合逻辑在 Java 侧）
+
+     */
     String buildDsl(String question, float[] vector, Mode mode) {
         String filter = buildPermissionFilter();
         int window = Math.max(props.getTopK() * 4, 20);
@@ -101,7 +103,11 @@ public class EsHybridSearchService {
                 + jsonString(question) + "}}],\"filter\":[" + filter + "]}}}";
     }
 
-    /** 纯向量 DSL：ES 8.13 的 knn 是顶层字段，不能塞进 query。 */
+    /**
+
+     * 纯向量 DSL：ES 8.13 的 knn 是顶层字段，不能塞进 query。
+
+     */
     String buildKnnDsl(float[] vector, String filter, int window) {
         return "{\"size\":" + window + ",\"knn\":{\"field\":\"embedding\",\"query_vector\":["
                 + joinVector(vector) + "],\"k\":" + window + ",\"num_candidates\":"
@@ -152,7 +158,11 @@ public class EsHybridSearchService {
         return visibility.visibilityFilter();
     }
 
-    /** 解析 ES hits → Spring AI Document（保留 esId 供 RRF 去重、fileName/chunkIndex 供引用溯源） */
+    /**
+
+     * 解析 ES hits → Spring AI Document（保留 esId 供 RRF 去重、fileName/chunkIndex 供引用溯源）
+
+     */
     private List<Document> parseHits(JsonNode root) {
         List<Document> out = new ArrayList<>();
         JsonNode hits = root.path("hits").path("hits");

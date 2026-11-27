@@ -10,7 +10,6 @@ import org.springframework.stereotype.Component;
 /**
  * 生产配置守卫。
  *
- * <p>生产环境必须显式注入密钥与账号，演示降级开关只能在非生产开启。</p>
  */
 @Component
 public class ProductionConfigGuard {

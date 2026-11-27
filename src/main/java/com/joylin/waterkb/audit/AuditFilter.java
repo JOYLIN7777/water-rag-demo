@@ -18,11 +18,7 @@ import com.joylin.waterkb.service.WaterInfoTool;
 /**
  * 审计拦截器：所有 /api/** 请求自动落审计，无需在各 Controller 逐一埋点。
  *
- * <p>Order=3，在 JwtAuthFilter(1) 和 UserContext(2) 之后，
- * 因此能拿到解析好的租户/用户/组身份。</p>
  *
- * <p>SSE 流式问答也走这里：doFilter 返回时流可能还在推送，耗时记为首个事件前的时间，
- * 够用于审计"谁发起了问答"。sources/done 事件本身不单独记，避免刷屏。</p>
  */
 @Component
 @Order(3)
@@ -34,7 +30,11 @@ public class AuditFilter extends OncePerRequestFilter {
         this.audit = audit;
     }
 
-    /** 高频/无审计价值的端点跳过（健康检查、审计自身查询，避免审计表自我放大） */
+    /**
+
+     * 高频/无审计价值的端点跳过（健康检查、审计自身查询，避免审计表自我放大）
+
+     */
     private static final Set<String> SKIP = Set.of(
             "/api/search/health", "/api/health", "/api/audit/logs", "/api/audit/stats",
             // 工具直调由 WaterInfoTool 自己埋点：HTTP 恒 200 但业务可能 DENIED，
@@ -78,7 +78,11 @@ public class AuditFilter extends OncePerRequestFilter {
         }
     }
 
-    /** 查询串脱敏：API Key / token 等敏感参数值一律打码 */
+    /**
+
+     * 查询串脱敏：API Key / token 等敏感参数值一律打码
+
+     */
     private String sanitize(String query) {
         if (query == null || query.isBlank()) return "";
         return query.replaceAll("(?i)(api[_-]?key|token|secret|password)=[^&]*", "$1=***");

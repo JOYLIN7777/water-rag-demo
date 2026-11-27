@@ -23,13 +23,6 @@ import com.joylin.waterkb.model.ModelConfig;
 /**
  * 模型注册表：按数据库中的激活配置动态构造 ChatModel / EmbeddingModel，带缓存。
  *
- * <p>核心设计（作品集亮点）：
- * <ol>
- *   <li>公有云与内网私有模型统一走 OpenAI 兼容协议，换 base-url + model 即可切换；</li>
- *   <li>缓存 key = 配置全字段指纹，改配置自动失效重建，不需要重启容器；</li>
- *   <li>Embedding 切换前校验维度必须等于向量库现有维度，避免换模型后入库直接失败；</li>
- *   <li>连通性测试真实调用模型端点并计时，便于上线前验证内网可达性。</li>
- * </ol></p>
  */
 @Service
 public class ModelRegistry {
@@ -37,12 +30,18 @@ public class ModelRegistry {
     private static final Logger log = LoggerFactory.getLogger(ModelRegistry.class);
 
     private final ModelConfigRepository repository;
-    /** 代理 EmbeddingModel：VectorStore 启动时绑定它，切换配置只换内部 delegate */
+    /**
+     * 代理 EmbeddingModel：VectorStore 启动时绑定它，切换配置只换内部 delegate
+     */
     private final DelegatingEmbeddingModel delegatingEmbeddingModel;
-    /** 缓存：fingerprint → 模型实例 */
+    /**
+     * 缓存：fingerprint → 模型实例
+     */
     private final Map<String, ChatModel> chatCache = new ConcurrentHashMap<>();
     private final Map<String, EmbeddingModel> embeddingCache = new ConcurrentHashMap<>();
-    /** 模型健康状态：某个模型连续失败后短暂跳过，不让一个坏模型拖垮全部问答 */
+    /**
+     * 模型健康状态：某个模型连续失败后短暂跳过，不让一个坏模型拖垮全部问答
+     */
     private final Map<Long, ModelHealth> chatHealth = new ConcurrentHashMap<>();
     private static final long SKIP_MS = 60_000L;
 
@@ -51,13 +50,21 @@ public class ModelRegistry {
         volatile long skipUntil;
     }
 
-    /** 该模型是否处于「暂时跳过」状态 */
+    /**
+
+     * 该模型是否处于「暂时跳过」状态
+
+     */
     public boolean isSkipped(long modelId) {
         ModelHealth h = chatHealth.get(modelId);
         return h != null && System.currentTimeMillis() < h.skipUntil;
     }
 
-    /** 调用失败：第一次失败就跳过 60 秒，快速切到下一个可用模型 */
+    /**
+
+     * 调用失败：第一次失败就跳过 60 秒，快速切到下一个可用模型
+
+     */
     public void markFailure(long modelId) {
         ModelHealth h = chatHealth.computeIfAbsent(modelId, k -> new ModelHealth());
         h.failures++;
@@ -65,7 +72,11 @@ public class ModelRegistry {
         log.warn("模型 {} 调用失败（第 {} 次），跳过 {} 秒", modelId, h.failures, SKIP_MS / 1000);
     }
 
-    /** 调用成功：清掉跳过标记 */
+    /**
+
+     * 调用成功：清掉跳过标记
+
+     */
     public void markSuccess(long modelId) {
         chatHealth.remove(modelId);
     }
@@ -100,7 +111,11 @@ public class ModelRegistry {
         refreshDelegates();
     }
 
-    /** 配置变更后刷新：重建缓存 + 切换代理 delegate */
+    /**
+
+     * 配置变更后刷新：重建缓存 + 切换代理 delegate
+
+     */
     public synchronized void refreshDelegates() {
         ModelConfig emb = repository.findActive("EMBEDDING");
         if (emb != null) {
@@ -111,28 +126,44 @@ public class ModelRegistry {
         }
     }
 
-    /** 当前激活的 ChatModel（不存在时抛异常，错误由全局处理器转成可读信息） */
+    /**
+
+     * 当前激活的 ChatModel（不存在时抛异常，错误由全局处理器转成可读信息）
+
+     */
     public ChatModel currentChatModel() {
         ModelConfig c = repository.findActive("CHAT");
         if (c == null) throw new IllegalStateException("未配置激活的 CHAT 模型，请到「模型配置」页激活一个");
         return chatModel(c);
     }
 
-    /** 当前激活的 ChatClient（每次调用构建，工具由调用方注册） */
+    /**
+
+     * 当前激活的 ChatClient（每次调用构建，工具由调用方注册）
+
+     */
     public ChatClient currentChatClient(Object... tools) {
         ChatClient.Builder builder = ChatClient.builder(currentChatModel());
         if (tools.length > 0) builder.defaultTools(tools);
         return builder.build();
     }
 
-    /** 按指定配置构造 ChatClient：提问框按次选模型时用，不改全局激活配置 */
+    /**
+
+     * 按指定配置构造 ChatClient：提问框按次选模型时用，不改全局激活配置
+
+     */
     public ChatClient chatClientFor(ModelConfig c, Object... tools) {
         ChatClient.Builder builder = ChatClient.builder(chatModel(c));
         if (tools.length > 0) builder.defaultTools(tools);
         return builder.build();
     }
 
-    /** 按配置构造并缓存 ChatModel */
+    /**
+
+     * 按配置构造并缓存 ChatModel
+
+     */
     public ChatModel chatModel(ModelConfig c) {
         String fp = fingerprint(c);
         return chatCache.computeIfAbsent(fp, k -> {
@@ -149,7 +180,11 @@ public class ModelRegistry {
         });
     }
 
-    /** 按配置构造并缓存 EmbeddingModel */
+    /**
+
+     * 按配置构造并缓存 EmbeddingModel
+
+     */
     public EmbeddingModel embeddingModel(ModelConfig c) {
         String fp = fingerprint(c);
         return embeddingCache.computeIfAbsent(fp, k -> {
@@ -204,7 +239,11 @@ public class ModelRegistry {
         }
     }
 
-    /** 配置变更（新增/编辑/删除/激活）后调用：清缓存并刷新代理 */
+    /**
+
+     * 配置变更（新增/编辑/删除/激活）后调用：清缓存并刷新代理
+
+     */
     public synchronized void invalidate() {
         chatCache.clear();
         embeddingCache.clear();
@@ -235,7 +274,11 @@ public class ModelRegistry {
                 .build();
     }
 
-    /** 配置指纹：任一影响调用的字段变化都会生成新实例 */
+    /**
+
+     * 配置指纹：任一影响调用的字段变化都会生成新实例
+
+     */
     private String fingerprint(ModelConfig c) {
         return c.getType() + "|" + c.getBaseUrl() + "|" + c.getApiKey() + "|" + c.getModel() + "|" + c.getDimensions();
     }

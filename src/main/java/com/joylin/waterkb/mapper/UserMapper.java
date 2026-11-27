@@ -6,7 +6,11 @@ import org.apache.ibatis.annotations.Param;
 import java.util.List;
 import java.util.Map;
 
-/** 账号表 Mapper（MyBatis）：app_users 的 DML。DDL 由 UserStore 负责。 */
+/**
+
+ * 账号表 Mapper（MyBatis）：app_users 的 DML。DDL 由 UserStore 负责。
+
+ */
 @Mapper
 public interface UserMapper {
 

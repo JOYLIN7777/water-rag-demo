@@ -4,12 +4,7 @@ import com.joylin.waterkb.service.RolePermissions;
 /**
  * 企业级 RBAC 权限码。
  *
- * <p>每个敏感接口都对应一个明确权限码，由 {@link RequirePermission} 注解声明，
- * {@link PermissionInterceptor} 在 Controller 执行前强制校验。
- * 前端只按权限码决定"显不显示入口"，真正的访问控制永远在服务端。</p>
  *
- * <p>角色与权限的映射集中在 {@link RolePermissions}；admin 组拥有全部权限，
- * 不存在"前端藏了按钮但接口仍可调用"的伪权限。</p>
  */
 public final class Permission {
 
@@ -42,7 +37,11 @@ public final class Permission {
     public static final String LOGINLOG_EXPORT = "loginlog:export";   // 导出登录日志
     public static final String AUDIT_EXPORT = "audit:export";         // 导出操作日志
 
-    /** 全部权限码，按展示顺序排列，供权限矩阵与单测使用 */
+    /**
+
+     * 全部权限码，按展示顺序排列，供权限矩阵与单测使用
+
+     */
     public static final java.util.List<String> ALL = java.util.List.of(
             ADMIN_ACCESS, CHAT_USE, DOC_READ, DOC_WRITE, DOC_WRITE_CHAT, DOC_WRITE_BATCH, DOC_WRITE_ADMIN,
             DOC_DELETE, DOC_CHUNKS,

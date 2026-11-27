@@ -108,8 +108,7 @@ export default function UsagePanel() {
     <>
       <div className="page-head"><h1 className="page-title">用量统计</h1>
         <p className="page-desc">查看模型调用次数与用量；点消耗数字可查看每次调用对应的提问。
-          {scopeLabel && <b style={{ color: 'var(--primary)', marginLeft: 8 }}>当前查询范围：{scopeLabel}</b>}
-          （管理员查看全部、有用量统计权限的角色查看本部门，个人中心始终只看本人）</p></div>
+          {scopeLabel && <b style={{ color: 'var(--primary)', marginLeft: 8 }}>当前统计范围：{scopeLabel}</b>}</p></div>
       {err && <div className="msg err show">{err}</div>}
       <div className="stats" id="uStats">
         {card('todayReq')}{card('todayTok')}{card('monthReq')}{card('monthTok')}

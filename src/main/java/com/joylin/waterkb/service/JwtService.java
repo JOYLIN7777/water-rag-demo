@@ -22,18 +22,7 @@ import com.joylin.waterkb.security.UserContext;
 /**
  * 零依赖 JWT（HS256）签发与校验。
  *
- * <p>为什么手写而不引 jjwt / spring-security-oauth2-resource-server：
- * 项目已有一个精简的演示认证链路，只需要 OIDC 最核心的三件事——
- * 验签、过期检查、claims 提取（sub/groups/tenant）。手写约 150 行、
- * 零新增依赖、全程可控，作品集里还能讲清 JWT 的三段式原理；
- * 生产换真实 IdP 时把这里替换成 JWKS 远程验签即可，上层 Filter 不用动。</p>
  *
- * <p>安全底线：
- * <ul>
- *   <li>签名用 MessageDigest.isEqual 做常量时间比较，防时序侧信道；</li>
- *   <li>exp 必检，过期 token 拒绝；</li>
- *   <li>密钥从环境变量注入，禁止硬编码进代码/仓库。</li>
- * </ul></p>
  */
 @Service
 public class JwtService {
@@ -56,15 +45,17 @@ public class JwtService {
 
     public boolean enabled() { return enabled; }
 
-    /** 签一个演示 token（生产环境由 IdP 签发，此端点应关闭）。默认 access 类型，兼容旧调用。 */
+    /**
+
+     * 签一个演示 token（生产环境由 IdP 签发，此端点应关闭）。默认 access 类型，兼容旧调用。
+
+     */
     public String issue(String user, List<String> groups, String tenant, long ttlSeconds) {
         return issue(user, groups, tenant, ttlSeconds, "access", java.util.UUID.randomUUID().toString());
     }
 
     /**
      * 签发带类型与 jti 的 token。
-     * @param type access / refresh —— 刷新令牌只能用于换票，不能访问业务接口
-     * @param jti  令牌唯一 ID，登出时据此拉黑
      */
     public String issue(String user, List<String> groups, String tenant, long ttlSeconds,
                         String type, String jti) {
@@ -93,7 +84,11 @@ public class JwtService {
         }
     }
 
-    /** 解析 token 的 claims（仅供登录链路内部使用，调用方必须先验签） */
+    /**
+
+     * 解析 token 的 claims（仅供登录链路内部使用，调用方必须先验签）
+
+     */
     public JsonNode parseClaimsUnverified(String token) {
         if (token == null) return null;
         try {

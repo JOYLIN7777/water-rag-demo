@@ -5,43 +5,85 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 /**
  * RAG 相关可调参数，全部外置到 application.yml 的 rag 前缀下。
  *
- * <p>设计决策：切片大小、Top-K、阈值这类参数没有"标准答案"，必须结合
- * 实际文档反复调优，所以全部参数化，改配置即可实验，不用改代码。</p>
  */
 @ConfigurationProperties(prefix = "rag")
 public class RagProperties {
 
-    /** 检索返回的相似片段数 Top-K */
+    /**
+
+     * 检索返回的相似片段数 Top-K
+
+     */
     private int topK = 5;
 
-    /** 相似度阈值：低于该值的片段直接丢弃，防止低相关内容诱导模型幻觉 */
+    /**
+
+     * 相似度阈值：低于该值的片段直接丢弃，防止低相关内容诱导模型幻觉
+
+     */
     private double similarityThreshold = 0.4;
 
-    /** 单个切片最大字符数 */
+    /**
+
+     * 单个切片最大字符数
+
+     */
     private int chunkMaxChars = 600;
 
-    /** 相邻切片重叠字符数 */
+    /**
+
+     * 相邻切片重叠字符数
+
+     */
     private int chunkOverlap = 100;
 
-    /** 拼入 Prompt 的历史对话轮数（一轮 = 用户一问 + 助手一答） */
+    /**
+
+     * 拼入 Prompt 的历史对话轮数（一轮 = 用户一问 + 助手一答）
+
+     */
     private int historyMaxTurns = 6;
 
-    /** Redis 历史记录最多保留条数（超出后从头部裁剪） */
+    /**
+
+     * Redis 历史记录最多保留条数（超出后从头部裁剪）
+
+     */
     private int historyMaxEntries = 40;
 
-    /** Redis 历史过期时间（小时） */
+    /**
+
+     * Redis 历史过期时间（小时）
+
+     */
     private int historyTtlHours = 24;
 
-    /** 流式回答整体超时（秒） */
+    /**
+
+     * 流式回答整体超时（秒）
+
+     */
     private int streamTimeoutSeconds = 60;
 
-    /** 熔断阈值：连续失败多少次后打开熔断 */
+    /**
+
+     * 熔断阈值：连续失败多少次后打开熔断
+
+     */
     private int breakerFailureThreshold = 3;
 
-    /** 熔断打开后多少秒内直接降级（半开重试等待期） */
+    /**
+
+     * 熔断打开后多少秒内直接降级（半开重试等待期）
+
+     */
     private int breakerOpenSeconds = 30;
 
-    /** RAG 系统提示词模板位置（classpath 资源） */
+    /**
+
+     * RAG 系统提示词模板位置（classpath 资源）
+
+     */
     private String ragSystemPrompt = "classpath:prompts/rag-system.st";
 
     /**

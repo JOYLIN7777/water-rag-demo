@@ -17,9 +17,6 @@ import com.joylin.waterkb.security.PasswordHasher;
 /**
  * 内存用户库：启动时从配置加载账号，明文密码立即转成 PBKDF2 哈希，明文不驻留。
  *
- * <p>作品集定位：账号通过 {@code security.auth.users[*]} 配置（密码走环境变量注入），
- * 启动即哈希。生产环境应替换为数据库用户表 + 注册审批流，接口 {@link #authenticate} 保持不变，
- * 上层登录服务无需改动。</p>
  */
 @Component
 public class UserStore {
@@ -33,17 +30,27 @@ public class UserStore {
      */
     private final String configuredUsers;
     private final PasswordHasher hasher;
-    /** 可为 null：单测与无数据库环境只走内存用户库 */
+    /**
+     * 可为 null：单测与无数据库环境只走内存用户库
+     */
     private final UserMapper mapper;
     private final Map<String, UserAccount> users = new LinkedHashMap<>();
 
-    /** 兼容单测：不接数据库，纯内存 */
+    /**
+
+     * 兼容单测：不接数据库，纯内存
+
+     */
     public UserStore(PasswordHasher hasher,
                      @Value("${security.auth.users:}") String configuredUsers) {
         this(hasher, configuredUsers, null);
     }
 
-    /** 生产构造：后台维护的账号写入 app_users，重启后仍生效 */
+    /**
+
+     * 生产构造：后台维护的账号写入 app_users，重启后仍生效
+
+     */
     @Autowired
     public UserStore(PasswordHasher hasher,
                      @Value("${security.auth.users:}") String configuredUsers,
@@ -78,7 +85,11 @@ public class UserStore {
         loadFromDatabase();
     }
 
-    /** 数据库账号覆盖同名的配置账号，保证后台编辑的结果重启后不丢失 */
+    /**
+
+     * 数据库账号覆盖同名的配置账号，保证后台编辑的结果重启后不丢失
+
+     */
     private void loadFromDatabase() {
         if (mapper == null) return;
         try {
@@ -110,7 +121,11 @@ public class UserStore {
         }
     }
 
-    /** 后台新增账号；用户名小写唯一，初始密码至少 8 位 */
+    /**
+
+     * 后台新增账号；用户名小写唯一，初始密码至少 8 位
+
+     */
     public boolean create(String username, String rawPassword, List<String> groups,
                           String tenant, String displayName) {
         String name = username == null ? "" : username.trim().toLowerCase();
@@ -126,7 +141,11 @@ public class UserStore {
         return true;
     }
 
-    /** 后台编辑：显示名、角色组、租户、启用状态（不改密码） */
+    /**
+
+     * 后台编辑：显示名、角色组、租户、启用状态（不改密码）
+
+     */
     public boolean update(String username, String displayName, List<String> groups,
                           String tenant, boolean enabled) {
         String name = username == null ? "" : username.trim().toLowerCase();
@@ -143,7 +162,11 @@ public class UserStore {
         return true;
     }
 
-    /** 启用/停用账号（新增时可创建即停用） */
+    /**
+
+     * 启用/停用账号（新增时可创建即停用）
+
+     */
     public boolean setEnabled(String username, boolean enabled) {
         String name = username == null ? "" : username.trim().toLowerCase();
         UserAccount u = users.get(name);
@@ -154,7 +177,11 @@ public class UserStore {
         return true;
     }
 
-    /** 后台删除账号；禁止删除自己由接口层校验 */
+    /**
+
+     * 后台删除账号；禁止删除自己由接口层校验
+
+     */
     public boolean delete(String username) {
         String name = username == null ? "" : username.trim().toLowerCase();
         if (!users.containsKey(name)) return false;
@@ -167,7 +194,11 @@ public class UserStore {
         return true;
     }
 
-    /** 后台重置密码（不校验原密码） */
+    /**
+
+     * 后台重置密码（不校验原密码）
+
+     */
     public boolean resetPassword(String username, String newPassword) {
         String name = username == null ? "" : username.trim().toLowerCase();
         UserAccount u = users.get(name);
@@ -180,7 +211,11 @@ public class UserStore {
         return true;
     }
 
-    /** 校验用户名/手机号 + 密码，成功返回账号。手机号只按精确匹配，且必须是完整 11 位。 */
+    /**
+
+     * 校验用户名/手机号 + 密码，成功返回账号。手机号只按精确匹配，且必须是完整 11 位。
+
+     */
     public UserAccount authenticate(String username, String password) {
         if (username == null || password == null) return null;
         String key = username.trim();
@@ -192,7 +227,11 @@ public class UserStore {
         return hasher.matches(password, u.passwordHash()) ? u : null;
     }
 
-    /** 个人资料：性别、手机号、头像；手机号全局唯一，避免一人多号混用 */
+    /**
+
+     * 个人资料：性别、手机号、头像；手机号全局唯一，避免一人多号混用
+
+     */
     public boolean updateProfile(String username, String gender, String phone, String avatar) {
         String name = username == null ? "" : username.trim().toLowerCase();
         UserAccount u = users.get(name);
@@ -238,7 +277,11 @@ public class UserStore {
         return new ArrayList<>(users.values());
     }
 
-    /** 不可变账号值对象：绝不暴露密码哈希给外部（toString 里也不含） */
+    /**
+
+     * 不可变账号值对象：绝不暴露密码哈希给外部（toString 里也不含）
+
+     */
     public record UserAccount(String username, String passwordHash, List<String> groups,
                               String tenant, String displayName, boolean enabled,
                               String gender, String phone, String avatar) {

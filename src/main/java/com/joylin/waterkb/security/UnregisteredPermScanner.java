@@ -23,9 +23,6 @@ import java.util.regex.Pattern;
 /**
  * 扫描"代码里已经在用、但权限树里还没建"的权限码。
  *
- * <p>用户在新增权限弹窗里只能选这些码：选完立刻能控制前端按钮/后端接口，
- * 不会出现建了一个漂亮但没人用的权限码。来源两类：
- * ① 静态页与脚本里的 data-perm="xxx"；② Controller 上的 @RequirePermission("xxx")。</p>
  */
 @Service
 public class UnregisteredPermScanner {
@@ -33,7 +30,9 @@ public class UnregisteredPermScanner {
     private static final Logger log = LoggerFactory.getLogger(UnregisteredPermScanner.class);
     private static final Pattern HTML_PERM = Pattern.compile("data-perm=\"([a-z][a-z0-9_.:-]*)\"");
     private static final Pattern JS_PERM = Pattern.compile("data-perm:\\s*['\"]([a-z][a-z0-9_.:-]*)['\"]");
-    /** React 组件里的权限声明：auth.has('doc:write_chat') */
+    /**
+     * React 组件里的权限声明：auth.has('doc:write_chat')
+     */
     private static final Pattern VUE_PERM = Pattern.compile("has\\(['\"]([a-z][a-z0-9_.:-]*)['\"]\\)");
     private static final Pattern CODE = Pattern.compile("^[a-z][a-z0-9_.-]*:[a-z][a-z0-9_.-]*$");
 
@@ -46,7 +45,11 @@ public class UnregisteredPermScanner {
         this.mapping = mapping;
     }
 
-    /** 汇总所有来源：React TSX 源码 + 注解 */
+    /**
+
+     * 汇总所有来源：React TSX 源码 + 注解
+
+     */
     private Map<String, List<String>> collectSources() {
         Map<String, List<String>> out = new LinkedHashMap<>();
         scanFileSystem("frontend-react/src", VUE_PERM, out);
@@ -54,7 +57,11 @@ public class UnregisteredPermScanner {
         return out;
     }
 
-    /** 扫描工程内源码（React TSX 不在 jar 里，从文件系统读） */
+    /**
+
+     * 扫描工程内源码（React TSX 不在 jar 里，从文件系统读）
+
+     */
     private void scanFileSystem(String root, Pattern re, Map<String, List<String>> out) {
         java.io.File dir = new java.io.File(root);
         if (!dir.isDirectory()) return;
@@ -74,14 +81,22 @@ public class UnregisteredPermScanner {
         } catch (Exception e) { log.debug("React 源码扫描跳过：{}", e.getMessage()); }
     }
 
-    /** 代码里所有在用的权限码（含已注册），用于校验手工填写的码是否真的会生效 */
+    /**
+
+     * 代码里所有在用的权限码（含已注册），用于校验手工填写的码是否真的会生效
+
+     */
     public Set<String> allUsedCodes() {
         Set<String> out = new TreeSet<>();
         collectSources().keySet().forEach(code -> { if (CODE.matcher(code).matches()) out.add(code); });
         return out;
     }
 
-    /** code → 来源描述（多个来源合并） */
+    /**
+
+     * code → 来源描述（多个来源合并）
+
+     */
     public List<Map<String, Object>> scan() {
         Map<String, List<String>> sources = collectSources();
 
@@ -130,7 +145,11 @@ public class UnregisteredPermScanner {
         }
     }
 
-    /** 通过反射读 Controller 上的 @RequirePermission，只收真正会拦截请求的权限码 */
+    /**
+
+     * 通过反射读 Controller 上的 @RequirePermission，只收真正会拦截请求的权限码
+
+     */
     private void scanAnnotations(Map<String, List<String>> out) {
         try {
             mapping.getHandlerMethods().forEach((info, handler) -> {
@@ -153,7 +172,11 @@ public class UnregisteredPermScanner {
         }
     }
 
-    /** 从权限码猜一个中文名，用户可改 */
+    /**
+
+     * 从权限码猜一个中文名，用户可改
+
+     */
     private String suggestName(String code) {
         String action = code.substring(code.indexOf(':') + 1);
         Map<String, String> cn = Map.ofEntries(

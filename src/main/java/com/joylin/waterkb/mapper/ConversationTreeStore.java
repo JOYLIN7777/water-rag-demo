@@ -23,20 +23,8 @@ import com.joylin.waterkb.model.TreeNode;
 /**
  * 会话消息树存储（pi-mono 风格 fork/rewind 的地基）。
  *
- * <p>数据结构：一个会话 = 3 个 Redis key
- * <ul>
- *   <li>tree:{sid}——Hash，field=nodeId，value=节点 JSON（parentId 构成树）；</li>
- *   <li>head:{sid}——String，当前所在节点（回答从这里继续，rewind 改的就是它）；</li>
- *   <li>branches:{sid}——Hash，branchName=fork 起点 nodeId（命名分支）。</li>
- * </ul>
- * 根节点是虚拟的 "root"，不落 Redis。第一条消息的 parentId="root"。</p>
  *
- * <p>为什么不用线性 List：线性历史只能"删掉后面几条"来回退，一旦回退就永久丢失
- * 那条思路；树模型保留所有分叉，rewind 只移动 head 指针，随时能切回来继续——
- * 这正是 pi-mono 这类 coding agent 的 rewind 语义。注意工具副作用（如调外部 API）
- * 不会随 rewind 回滚，这里只回滚对话上下文。</p>
  *
- * <p>TTL 规则与旧线性历史一致：ttlHours<=0 表示永久（用户明确要求历史永久保存）。</p>
  */
 @Service
 public class ConversationTreeStore {
@@ -51,10 +39,6 @@ public class ConversationTreeStore {
     /**
      * Redis key = 前缀 + 租户 + 账号 + sessionId。
      *
-     * <p>账号必须进 key：只按租户隔离时，默认配置下所有账号同属 default 租户，
-     * 不同账号用同一个 sessionId 会读到同一棵树（可跨账号读、续写、删除）。
-     * 把 userId 作为 key 的一段后，sessionId 即使相同也天然落在各自命名空间，
-     * 无需额外的 sessionId↔用户绑定表，也不怕前端传可预测的 sessionId。</p>
      */
     private String key(String prefix, String sessionId) {
         UserContext.CurrentUser u = UserContext.get();
@@ -80,8 +64,6 @@ public class ConversationTreeStore {
     /**
      * 追加节点，返回新节点 ID。
      *
-     * @param parentId 父节点；null/"root" 表示挂到根
-     * @param branch   分支名（仅在该节点标记，可空）
      */
     public String append(String sessionId, String parentId, String role, String content,
                          List<Map<String, Object>> sources, String branch) {
@@ -102,8 +84,6 @@ public class ConversationTreeStore {
     /**
      * 带「本轮消耗」的追加（assistant 节点用）。
      *
-     * <p>usage 跟着节点落 Redis：以前只在前端内存里，切一次会话就没了——
-     * 用户看到的"本次 6034 tokens"是实时算的，回看历史就消失，很像是没记账。</p>
      */
     public String append(String sessionId, String tenant, String user, String parentId, String role,
                          String content, List<Map<String, Object>> sources, String branch,
@@ -132,7 +112,11 @@ public class ConversationTreeStore {
         return id;
     }
 
-    /** 当前 head（null 表示会话还没有消息） */
+    /**
+
+     * 当前 head（null 表示会话还没有消息）
+
+     */
     public String head(String sessionId) {
         UserContext.CurrentUser u = UserContext.get();
         return head(sessionId, u.tenantId(), u.userId());
@@ -147,7 +131,11 @@ public class ConversationTreeStore {
         }
     }
 
-    /** rewind：把 head 移到指定节点；节点必须存在，否则拒绝（防止指针悬空）。 */
+    /**
+
+     * rewind：把 head 移到指定节点；节点必须存在，否则拒绝（防止指针悬空）。
+
+     */
     public boolean rewind(String sessionId, String nodeId) {
         // 回退到会话开头：root 是虚拟节点、不存在于 Redis，直接删掉 head 指针即可。
         // 删掉之后 append(null) 会挂到 root 下，等同于"从第一问重新问一次"。
@@ -162,7 +150,11 @@ public class ConversationTreeStore {
         return true;
     }
 
-    /** 取单个节点 */
+    /**
+
+     * 取单个节点
+
+     */
     public java.util.Optional<TreeNode> get(String sessionId, String nodeId) {
         UserContext.CurrentUser u = UserContext.get();
         return get(sessionId, u.tenantId(), u.userId(), nodeId);
@@ -196,12 +188,20 @@ public class ConversationTreeStore {
         return new ArrayList<>(stack);
     }
 
-    /** 当前 head 所在分支的完整消息链 */
+    /**
+
+     * 当前 head 所在分支的完整消息链
+
+     */
     public List<TreeNode> path(String sessionId) {
         return pathTo(sessionId, null);
     }
 
-    /** 取整棵树的所有节点（供前端画树） */
+    /**
+
+     * 取整棵树的所有节点（供前端画树）
+
+     */
     public List<TreeNode> allNodes(String sessionId) {
         Map<Object, Object> entries = redis.opsForHash().entries(key(TREE, sessionId));
         List<TreeNode> out = new ArrayList<>(entries.size());
@@ -216,7 +216,11 @@ public class ConversationTreeStore {
         return out;
     }
 
-    /** 命名分支表：branchName → fork 起点 nodeId */
+    /**
+
+     * 命名分支表：branchName → fork 起点 nodeId
+
+     */
     public Map<String, String> branches(String sessionId) {
         Map<Object, Object> raw = redis.opsForHash().entries(key(BRANCH, sessionId));
         Map<String, String> out = new LinkedHashMap<>();
@@ -224,7 +228,11 @@ public class ConversationTreeStore {
         return out;
     }
 
-    /** 命名分支：把某个节点标记为新分支的起点（真正的分叉在下一次 append 发生） */
+    /**
+
+     * 命名分支：把某个节点标记为新分支的起点（真正的分叉在下一次 append 发生）
+
+     */
     public boolean fork(String sessionId, String fromNodeId, String branchName) {
         if (branchName == null || branchName.isBlank()) return false;
         if (!get(sessionId, fromNodeId).isPresent()) return false;
@@ -250,8 +258,6 @@ public class ConversationTreeStore {
     /**
      * 兼容旧接口：当前分支的线性消息列表。
      *
-     * <p>原来只回 role/content/ts/id/parentId，导致切会话后引用片段与本轮消耗全部丢失
-     * （它们只存在于前端内存）。这里把 sources 与 usage 一并带回去，重拉历史即可复原。</p>
      */
     public List<Map<String, Object>> historyList(String sessionId) {
         List<Map<String, Object>> out = new ArrayList<>();
@@ -269,7 +275,11 @@ public class ConversationTreeStore {
         return out;
     }
 
-    /** 清空整个会话（树、head、分支一起删） */
+    /**
+
+     * 清空整个会话（树、head、分支一起删）
+
+     */
     public void clear(String sessionId) {
         redis.delete(java.util.List.of(key(TREE, sessionId), key(HEAD, sessionId), key(BRANCH, sessionId)));
     }

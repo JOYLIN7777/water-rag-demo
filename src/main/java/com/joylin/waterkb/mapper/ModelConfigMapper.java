@@ -17,10 +17,18 @@ public interface ModelConfigMapper {
 
     ModelConfig findById(@Param("id") long id);
 
-    /** 激活的模型，最后激活的优先 */
+    /**
+
+     * 激活的模型，最后激活的优先
+
+     */
     List<ModelConfig> findActive(@Param("type") String type);
 
-    /** 全局默认优先，其次最后激活的 */
+    /**
+
+     * 全局默认优先，其次最后激活的
+
+     */
     List<ModelConfig> findDefault(@Param("type") String type);
 
     int clearDefault(@Param("type") String type);

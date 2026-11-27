@@ -15,16 +15,6 @@ import com.joylin.waterkb.audit.AuditFilter;
 /**
  * Tool Calling 示例：实时水情查询工具（mock 数据）。
  *
- * <p>设计决策：
- * <ul>
- *   <li>用 @Tool 注解向模型声明工具语义——何时调用完全由模型自主决策，
- *       这是 Tool Calling 的核心：模型输出"工具调用意图"，Spring AI 框架
- *       负责执行方法并把结果回填给模型继续生成；</li>
- *   <li>description 写清"什么场景该调用我"很关键，模型是靠这段描述判断
- *       是否调用的，写得越具体误触发越少；</li>
- *   <li>返回 JSON 字符串便于模型解析字段。真实场景里这里应替换为
- *       水文数据库查询或第三方水情接口调用。</li>
- * </ul></p>
  */
 @Component
 public class WaterInfoTool {
@@ -39,7 +29,11 @@ public class WaterInfoTool {
         this.audit = audit;
     }
 
-    /** 各站点水位/流量的基准值（模拟实时报值 = 基准值 + 随机抖动） */
+    /**
+
+     * 各站点水位/流量的基准值（模拟实时报值 = 基准值 + 随机抖动）
+
+     */
     private static final Map<String, double[]> BASE = Map.of(
             "云溪水库", new double[]{45.10, 1200.0},
             "东风水库", new double[]{28.35, 320.0},
@@ -49,7 +43,6 @@ public class WaterInfoTool {
     /**
      * 查询实时水情。工具方法本体，由大模型在需要时自动调用。
      *
-     * @param station 站点名称
      * @return JSON 格式的水情数据
      */
     @Tool(description = "查询指定站点（水库/河道/闸站）的实时水情，包含水位（米）、流量（立方米每秒）与数据时间。" +

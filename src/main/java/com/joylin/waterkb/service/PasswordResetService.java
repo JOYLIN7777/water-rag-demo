@@ -20,25 +20,27 @@ import com.joylin.waterkb.security.PasswordHasher;
 /**
  * 忘记密码：用户提交申请 → 管理员核身批准并发放一次性重置码 → 用户凭码自助设置新密码。
  *
- * <p>为什么不直接做"输账号就能改密码"的自助重置：本系统没有邮件/短信通道，
- * 无验证的自助重置等于把账号交出去。企业内网的通行做法是走审批：管理员核身后
- * 发一个一次性重置码（30 分钟有效、用一次即废、连续错 5 次作废），用户自己设新密码。
- * 关键是<b>管理员全程不经手明文密码</b>，只经手一个短期凭证，且全程留痕。</p>
  *
- * <p>重置码只存 PBKDF2 哈希（与登录密码同一套 {@link PasswordHasher}），
- * 库被读走也拿不到可用的码；明文只在批准的那一次响应里返回给管理员。</p>
  */
 @Service
 public class PasswordResetService {
 
     private static final Logger log = LoggerFactory.getLogger(PasswordResetService.class);
 
-    /** 重置码字符集：去掉 I/O/0/1 这类肉眼易混字符，管理员口述、用户手抄不易出错 */
+    /**
+
+     * 重置码字符集：去掉 I/O/0/1 这类肉眼易混字符，管理员口述、用户手抄不易出错
+
+     */
     private static final String ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
     private static final int CODE_LENGTH = 8;
-    /** 有效期：够用户找管理员要码并回来输入，又不至于长期挂着 */
+    /**
+     * 有效期：够用户找管理员要码并回来输入，又不至于长期挂着
+     */
     private static final int TTL_MINUTES = 30;
-    /** 连续错误上限：防止拿一个已批准的单子暴力猜码 */
+    /**
+     * 连续错误上限：防止拿一个已批准的单子暴力猜码
+     */
     private static final int MAX_ATTEMPTS = 5;
     private static final SecureRandom RANDOM = new SecureRandom();
 
@@ -64,8 +66,6 @@ public class PasswordResetService {
     /**
      * 提交重置申请。
      *
-     * <p>账号不存在时静默返回，接口对外始终是同一句提示——否则这个免登录接口
-     * 就成了账号枚举器。同一账号已有待审批申请时不重复插入，只刷新时间与来源 IP。</p>
      */
     public void request(String username, String ip) {
         String name = normalize(username);
@@ -85,7 +85,11 @@ public class PasswordResetService {
         }
     }
 
-    /** 后台待办列表：待审批 + 已发码未使用（后者让管理员能回答"码给了怎么还没用"） */
+    /**
+
+     * 后台待办列表：待审批 + 已发码未使用（后者让管理员能回答"码给了怎么还没用"）
+
+     */
     public List<Map<String, Object>> list() {
         List<Map<String, Object>> out = new ArrayList<>();
         try {
@@ -192,7 +196,11 @@ public class PasswordResetService {
         return ts == null ? null : ts.getTime();
     }
 
-    /** 生成重置码；用 SecureRandom 而非 Random，避免可预测序列 */
+    /**
+
+     * 生成重置码；用 SecureRandom 而非 Random，避免可预测序列
+
+     */
     private static String randomCode() {
         StringBuilder sb = new StringBuilder(CODE_LENGTH);
         for (int i = 0; i < CODE_LENGTH; i++) {

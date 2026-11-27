@@ -25,21 +25,16 @@ import com.joylin.waterkb.service.JwtService;
 /**
  * 认证入口（企业级登录 + OIDC 骨架）。
  *
- * <p>规则：
- * <ul>
- *   <li><b>白名单</b>（登录、刷新、健康检查、静态资源）直接放行；</li>
- *   <li>带 Bearer token → 校验签名/过期/类型(必须 access)/登出黑名单，有效才装填身份；
- *       任何无效都直接 401，绝不降级——"带 token 却放行"是认证绕过漏洞；</li>
- *   <li>不带 token：{@code requireLogin=true}（默认）时对 API 请求返回 401；
- *       {@code =false} 时降级到 X-User/X-Groups 演示头或 anonymous，保留作品集现场演示能力；</li>
- *   <li>401 全部显式记审计，否则认证失败逃逸出审计视野是合规大忌。</li>
- * </ul></p>
  */
 @Component
 @Order(1)
 public class JwtAuthFilter extends OncePerRequestFilter {
 
-    /** 无需登录即可访问的路径前缀 */
+    /**
+
+     * 无需登录即可访问的路径前缀
+
+     */
     private static final Set<String> WHITE_LIST = Set.of(
             "/api/auth/login", "/api/auth/refresh", "/api/auth/public-key", "/api/search/health", "/api/health", "/", "/index.html", "/login.html",
             // 忘记密码：用户还没登录才需要这两个接口和页面，必须放行

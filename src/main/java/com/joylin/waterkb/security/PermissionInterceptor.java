@@ -19,9 +19,6 @@ import com.joylin.waterkb.service.RolePermissions;
 /**
  * 权限拦截器：在 Controller 方法执行前校验 {@link RequirePermission} 声明的权限码。
  *
- * <p>这是服务端强制访问控制的核心——前端隐藏按钮只是体验优化，
- * 直接调接口、伪造请求头、跨租户越权都在这里被拒绝并记录审计。
- * 返回 403 而不是 401：认证通过但权限不足，语义必须准确。</p>
  */
 @Component
 public class PermissionInterceptor implements HandlerInterceptor {

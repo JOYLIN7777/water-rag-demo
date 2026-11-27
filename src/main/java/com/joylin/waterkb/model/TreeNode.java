@@ -4,32 +4,52 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * 消息树节点（pi-mono 风格会话模型的最小单元）。
- *
- * <p>与线性历史的区别：每条消息都记 parentId，因此一条消息可以有多个子节点——
- * 这就是 fork（分叉）的结构基础；rewind 只是把 head 指针移回旧节点，
- * 不删除任何节点，所以旧分支永远可找回。</p>
- *
- * @param id       节点 ID（UUID）
- * @param parentId 父节点 ID，根节点用 "root"
- * @param role     user / assistant
- * @param content  消息正文
- * @param ts       ISO 时间戳
- * @param sources  该回答引用的知识片段（仅 assistant 有，回显引用卡片用）
- * @param branch   分支名（可选，仅分叉起点标记，用于树视图标注）
- * @param usage    该轮真实消耗（仅 assistant 有：promptTokens/completionTokens/totalTokens/model/durationMs）。
- *                 跟着节点一起存，切会话、换浏览器重新拉历史时"本次消耗"才不会凭空消失。
+ * 消息树节点。
  */
 public record TreeNode(
+        /**
+         * 节点标识。
+         */
         String id,
+
+        /**
+         * 父节点标识。
+         */
         String parentId,
+
+        /**
+         * 消息角色。
+         */
         String role,
+
+        /**
+         * 消息正文。
+         */
         String content,
+
+        /**
+         * 消息时间。
+         */
         String ts,
+
+        /**
+         * 引用片段。
+         */
         List<Map<String, Object>> sources,
+
+        /**
+         * 分支名称。
+         */
         String branch,
+
+        /**
+         * 调用用量。
+         */
         Map<String, Object> usage) {
 
+    /**
+     * 构造消息树节点。
+     */
     public TreeNode {
         sources = sources == null ? List.of() : sources;
     }

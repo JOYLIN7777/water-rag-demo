@@ -34,9 +34,6 @@ import com.joylin.waterkb.model.ModelConfig;
 /**
  * 问答与工具接口。
  *
- * <p>为什么用 SSE 而不是 WebSocket：问答是单向的服务器→客户端推送，
- * SSE 基于 HTTP、自带断线重连、兼容 Nginx 反代，比 WebSocket 轻量；
- * WebSocket 的双向通道对 LLM 问答场景是过剩设计。</p>
  */
 @RestController
 @RequestMapping("/api/chat")
@@ -88,20 +85,30 @@ public class ChatController {
      * 首页推荐问题：从当前账号最近的提问里去重整理，不是写死的示例。
      * 没历史时返回空列表，由前端回退到默认引导语。
      */
-    /** 显式校验会话归属：sessionId 必须属于当前账号，避免只靠 Redis key 隐式隔离 */
+    /**
+     * 显式校验会话归属：sessionId 必须属于当前账号，避免只靠 Redis key 隐式隔离
+     */
     private void assertOwned(String sessionId) {
         if (sessionId == null || sessionId.isBlank()) throw new IllegalArgumentException("sessionId 不能为空");
         if (!sessionStore.exists(sessionId)) throw new IllegalArgumentException("会话不存在或不属于当前账号");
     }
 
-    /** 推荐问题的切入词：覆盖知识库常见主题，按时间轮换，避免每次都是那几条 */
+    /**
+
+     * 推荐问题的切入词：覆盖知识库常见主题，按时间轮换，避免每次都是那几条
+
+     */
     private static final String[] SUGGEST_SEEDS = {
             "水库调度 汛限水位 防洪限制", "监测设备 布设 运维 预警", "闸门 启闭 操作规程 流量",
             "应急预案 响应 分级 处置", "水质 水生态 监测 评价", "工程 除险加固 设计 标准",
             "巡视检查 安全监测 巡检路线", "降雨 洪水 预报 调度方案"
     };
 
-    /** 从片段真实内容里提炼一个短主题，再套多样问法，避免千篇一律的「主要包含哪些内容」 */
+    /**
+
+     * 从片段真实内容里提炼一个短主题，再套多样问法，避免千篇一律的「主要包含哪些内容」
+
+     */
     private String questionFromChunk(String text, int variant) {
         String t = String.valueOf(text == null ? "" : text)
                 .replaceAll("【片段[^】]*】", " ").replaceAll("\\s+", " ").trim();
@@ -208,13 +215,21 @@ public class ChatController {
         return out;
     }
 
-    /** 当前账号的全部会话，按最近更新倒序 */
+    /**
+
+     * 当前账号的全部会话，按最近更新倒序
+
+     */
     @GetMapping("/sessions")
     public List<Map<String, Object>> sessions() {
         return sessionStore.list();
     }
 
-    /** 新建会话（幂等：同一个 sessionId 重复提交只刷新时间） */
+    /**
+
+     * 新建会话（幂等：同一个 sessionId 重复提交只刷新时间）
+
+     */
     @PostMapping("/sessions")
     public Map<String, Object> createSession(@RequestBody Map<String, Object> body) {
         String id = String.valueOf(body.getOrDefault("sessionId", "")).trim();
@@ -224,7 +239,11 @@ public class ChatController {
         return Map.of("ok", true, "sessionId", id);
     }
 
-    /** 刷新会话：补标题（仅在原标题为空时生效）并更新时间戳 */
+    /**
+
+     * 刷新会话：补标题（仅在原标题为空时生效）并更新时间戳
+
+     */
     @PutMapping("/sessions/{sessionId}")
     public Map<String, Object> touchSession(@PathVariable String sessionId,
                                             @RequestBody(required = false) Map<String, Object> body) {
@@ -237,7 +256,11 @@ public class ChatController {
         return Map.of("ok", true, "sessionId", sessionId);
     }
 
-    /** 删除会话：清单行与消息树一起删，避免"列表没了，内容还占着 Redis" */
+    /**
+
+     * 删除会话：清单行与消息树一起删，避免"列表没了，内容还占着 Redis"
+
+     */
     @DeleteMapping("/sessions/{sessionId}")
     public Map<String, Object> deleteSession(@PathVariable String sessionId) {
         treeStore.clear(sessionId);
@@ -254,7 +277,11 @@ public class ChatController {
         return waterInfoTool.queryRealtimeWater(station);
     }
 
-    /** 当前身份可见的工具清单及是否有权调用（作品集演示工具权限治理） */
+    /**
+
+     * 当前身份可见的工具清单及是否有权调用（作品集演示工具权限治理）
+
+     */
     @GetMapping("/tools")
     public List<Map<String, Object>> tools() {
         return toolPermissions.listForCurrentUser();

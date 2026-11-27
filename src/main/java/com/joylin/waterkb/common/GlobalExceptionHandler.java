@@ -20,29 +20,38 @@ import java.util.Map;
 /**
  * 全局异常处理：统一返回 {code, message} 结构与真实 HTTP 状态码。
  *
- * <p>教训：早期版本返回 Map 时 HTTP 状态码恒为 200，前端靠 res.ok 判断成败
- * 全部失效——上传被拒时页面显示的是"✓ 解析完成（undefined 个切片）"。
- * 现在所有错误都带正确状态码，前端 r.ok 即可正确分流。</p>
  */
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
     private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
-    /** multipart 配置（用于超限提示动态显示真实上限，避免提示文案与配置脱节） */
+    /**
+
+     * multipart 配置（用于超限提示动态显示真实上限，避免提示文案与配置脱节）
+
+     */
     private final MultipartProperties multipartProperties;
 
     public GlobalExceptionHandler(MultipartProperties multipartProperties) {
         this.multipartProperties = multipartProperties;
     }
 
-    /** 业务校验类错误：400 */
+    /**
+
+     * 业务校验类错误：400
+
+     */
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<Map<String, Object>> handleBadRequest(IllegalArgumentException e) {
         return ResponseEntity.badRequest().body(Map.of("code", INVALID_ARGUMENT, "message", e.getMessage()));
     }
 
-    /** 参数校验失败：400（取首条校验消息，避免前端拿到一堆字段错误） */
+    /**
+
+     * 参数校验失败：400（取首条校验消息，避免前端拿到一堆字段错误）
+
+     */
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<Map<String, Object>> handleValid(MethodArgumentNotValidException e) {
         String msg = e.getBindingResult().getAllErrors().isEmpty() ? "参数校验失败"
@@ -50,7 +59,11 @@ public class GlobalExceptionHandler {
         return ResponseEntity.badRequest().body(Map.of("code", INVALID_ARGUMENT, "message", msg == null ? "参数校验失败" : msg));
     }
 
-    /** 参数绑定失败：400 */
+    /**
+
+     * 参数绑定失败：400
+
+     */
     @ExceptionHandler(BindException.class)
     public ResponseEntity<Map<String, Object>> handleBind(BindException e) {
         String msg = e.getBindingResult().getAllErrors().isEmpty() ? "参数绑定失败"
@@ -58,14 +71,22 @@ public class GlobalExceptionHandler {
         return ResponseEntity.badRequest().body(Map.of("code", INVALID_ARGUMENT, "message", msg == null ? "参数绑定失败" : msg));
     }
 
-    /** 状态冲突：409（Service 层 IllegalStateException 明确表达业务状态不对） */
+    /**
+
+     * 状态冲突：409（Service 层 IllegalStateException 明确表达业务状态不对）
+
+     */
     @ExceptionHandler(IllegalStateException.class)
     public ResponseEntity<Map<String, Object>> handleState(IllegalStateException e) {
         return ResponseEntity.status(HttpStatus.CONFLICT)
                 .body(Map.of("code", HttpStatus.CONFLICT.value(), "message", e.getMessage() == null ? "状态冲突" : e.getMessage()));
     }
 
-    /** 数据完整性冲突：409（唯一约束、外键约束等） */
+    /**
+
+     * 数据完整性冲突：409（唯一约束、外键约束等）
+
+     */
     @ExceptionHandler(DataIntegrityViolationException.class)
     public ResponseEntity<Map<String, Object>> handleIntegrity(DataIntegrityViolationException e) {
         log.warn("数据完整性冲突：{}", e.getMessage());
@@ -73,7 +94,11 @@ public class GlobalExceptionHandler {
                 .body(Map.of("code", HttpStatus.CONFLICT.value(), "message", "数据已存在或关联冲突"));
     }
 
-    /** 上传文件超限：413（上限文案动态读取并格式化为可读单位，避免出现 524288000B 这种原始字节数） */
+    /**
+
+     * 上传文件超限：413（上限文案动态读取并格式化为可读单位，避免出现 524288000B 这种原始字节数）
+
+     */
     @ExceptionHandler(MaxUploadSizeExceededException.class)
     public ResponseEntity<Map<String, Object>> handleMaxUpload(MaxUploadSizeExceededException e) {
         var max = multipartProperties.getMaxFileSize();
@@ -93,14 +118,22 @@ public class GlobalExceptionHandler {
                 .body(Map.of("code", AI_UPSTREAM, "message", "大模型接口调用失败：" + e.getMessage()));
     }
 
-    /** 静态资源不存在（例如已删除的旧页面）应返回 404，不要被兜底成 500 */
+    /**
+
+     * 静态资源不存在（例如已删除的旧页面）应返回 404，不要被兜底成 500
+
+     */
     @ExceptionHandler(org.springframework.web.servlet.resource.NoResourceFoundException.class)
     public ResponseEntity<Map<String, Object>> handleNoResource(Exception e) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND)
                 .body(Map.of("code", NOT_FOUND, "message", "页面不存在或已下线"));
     }
 
-    /** 兜底：500（必须把异常打进日志，否则排查时无迹可循） */
+    /**
+
+     * 兜底：500（必须把异常打进日志，否则排查时无迹可循）
+
+     */
     @ExceptionHandler(Exception.class)
     public ResponseEntity<Map<String, Object>> handleOther(Exception e) {
         log.error("未处理异常：{}", e.getMessage(), e);

@@ -24,11 +24,6 @@ import java.util.Base64;
 /**
  * 登录密码传输加密：RSA-OAEP(SHA-256)，公钥下发页面，私钥只在本进程内存。
  *
- * <p>密钥来源二选一：
- * ① 生产/多实例：环境变量 LOGIN_RSA_PRIVATE_KEY 注入 PKCS#8 Base64 私钥，
- *    所有实例共用同一把 → 重启/多实例都不会出现"旧公钥加密的密码解不开"；
- * ② 本地开发：未配置时启动自动生成一次性密钥（不落盘、不进 Git）。
- * 私钥永不写文件、永不进 Git。明文入参仅保留给内部脚本排障。</p>
  */
 @Service
 public class LoginCryptoService {
@@ -65,7 +60,11 @@ public class LoginCryptoService {
         }
     }
 
-    /** 从 PKCS#8 RSA 私钥推导公钥（CRT 参数含模数与指数） */
+    /**
+
+     * 从 PKCS#8 RSA 私钥推导公钥（CRT 参数含模数与指数）
+
+     */
     private PublicKey derivePublicKey(PrivateKey priv) throws Exception {
         if (priv instanceof RSAPrivateCrtKey crt) {
             RSAPublicKeySpec spec = new RSAPublicKeySpec(crt.getModulus(), crt.getPublicExponent());
@@ -74,10 +73,18 @@ public class LoginCryptoService {
         throw new IllegalArgumentException("LOGIN_RSA_PRIVATE_KEY 必须是 PKCS#8 格式的 RSA 私钥（含 CRT 参数）");
     }
 
-    /** DER(SubjectPublicKeyInfo) 的 Base64，前端 importKey('spki') 直接用 */
+    /**
+
+     * DER(SubjectPublicKeyInfo) 的 Base64，前端 importKey('spki') 直接用
+
+     */
     public String publicKey() { return publicKeyBase64; }
 
-    /** 前端加密后的 Base64 密文 → 明文；空值返回空串 */
+    /**
+
+     * 前端加密后的 Base64 密文 → 明文；空值返回空串
+
+     */
     public String decrypt(String cipherBase64) {
         if (cipherBase64 == null || cipherBase64.isBlank()) return "";
         try {

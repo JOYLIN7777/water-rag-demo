@@ -42,17 +42,7 @@ import com.joylin.waterkb.security.UserContext;
 /**
  * 文档入库服务：解析 → 切片 → 向量化 → 落 pgvector。
  *
- * <p>解析策略按语料类型分三路（设计决策见 README）：
- * <ul>
- *   <li>纯文本（txt/md/json/xml/yaml/sql/log 等）：UTF-8 直接读取，零解析开销；</li>
- *   <li>表格（xls/xlsx/csv/tsv）：POI/手写 CSV 解析，保留"表头当字段名"语义，
- *       否则表格进了向量库只剩一堆没有列名的值，检索时无法判断含义；</li>
- *   <li>其他所有格式（pdf/doc/docx/ppt/pptx/rtf/odt/html/epub 等）：Apache Tika
- *       统一自动检测解析。一个库覆盖几十种格式，比逐个引入 PDFBox/POI 分支更好维护。</li>
- * </ul></p>
  *
- * <p>vectorStore.add() 内部会调用配置的 EmbeddingModel 批量向量化，
- * 再写入 pgvector 的 vector_store 表并维护 HNSW 索引，我们只管喂文本。</p>
  */
 @Service
 public class DocumentIngestService {
@@ -66,27 +56,51 @@ public class DocumentIngestService {
         org.apache.poi.util.IOUtils.setByteArrayMaxOverride(1_500_000_000);
     }
 
-    /** 纯文本类：直接按 UTF-8 读，无需解析器（geojson/topojson 本质是 JSON 文本） */
+    /**
+
+     * 纯文本类：直接按 UTF-8 读，无需解析器（geojson/topojson 本质是 JSON 文本）
+
+     */
     private static final Set<String> PLAIN_TEXT_EXTENSIONS = Set.of(
             "txt", "md", "markdown", "json", "geojson", "topojson", "xml", "yaml", "yml",
             "sql", "log", "ini", "properties", "java", "py", "js", "ts", "css");
 
-    /** 表格类：走表头语义解析（csv/tsv 手写，xls/xlsx 走 POI） */
+    /**
+
+     * 表格类：走表头语义解析（csv/tsv 手写，xls/xlsx 走 POI）
+
+     */
     private static final Set<String> TABLE_EXTENSIONS = Set.of("xls", "xlsx", "csv", "tsv");
 
-    /** Tika 解析类：富文本与办公文档 */
+    /**
+
+     * Tika 解析类：富文本与办公文档
+
+     */
     private static final Set<String> TIKA_EXTENSIONS = Set.of(
             "pdf", "doc", "docx", "ppt", "pptx", "rtf", "odt", "ods", "odp",
             "html", "htm", "epub", "msg", "eml");
 
-    /** 图片：Tika 拿不到文本，走 OCR */
+    /**
+
+     * 图片：Tika 拿不到文本，走 OCR
+
+     */
     private static final Set<String> IMAGE_EXTENSIONS = Set.of(
             "png", "jpg", "jpeg", "bmp", "tif", "tiff", "gif", "webp");
 
-    /** 单工作表最多读取行数，防止超大表格把内存打爆 */
+    /**
+
+     * 单工作表最多读取行数，防止超大表格把内存打爆
+
+     */
     private static final int MAX_SHEET_ROWS = 5000;
 
-    /** 单元格文本最长保留字符数 */
+    /**
+
+     * 单元格文本最长保留字符数
+
+     */
     private static final int MAX_CELL_CHARS = 500;
 
     private static final DataFormatter DATA_FORMATTER = new DataFormatter(Locale.CHINA);
@@ -102,7 +116,11 @@ public class DocumentIngestService {
         this.props = props;
     }
 
-    /** 对外暴露支持的格式集合（供接口层校验与前端展示，避免两处硬编码不一致） */
+    /**
+
+     * 对外暴露支持的格式集合（供接口层校验与前端展示，避免两处硬编码不一致）
+
+     */
     public static Set<String> getSupportedExtensions() {
         Set<String> all = new LinkedHashSet<>(PLAIN_TEXT_EXTENSIONS);
         all.addAll(TABLE_EXTENSIONS);
@@ -111,7 +129,11 @@ public class DocumentIngestService {
         return all;
     }
 
-    /** 兼容旧调用（单测/演示脚本）：默认可见范围=本部门+上级，不下发子树 */
+    /**
+
+     * 兼容旧调用（单测/演示脚本）：默认可见范围=本部门+上级，不下发子树
+
+     */
     public UploadResult ingest(String fileName, byte[] bytes) throws IOException {
         return ingest(fileName, bytes, false);
     }
@@ -119,10 +141,6 @@ public class DocumentIngestService {
     /**
      * 解析文档并写入向量库。
      *
-     * @param fileName       原始文件名（决定解析方式）
-     * @param bytes          文件字节内容
-     * @param includeSubtree 可见范围是否含下级部门：false=本部门+上级可见；
-     *                       true=再向下下发到整个子树（兄弟部门依然不可见）
      * @return 入库结果（文件名、切片数、字符数）
      */
     public UploadResult ingest(String fileName, byte[] bytes, boolean includeSubtree) throws IOException {
@@ -266,7 +284,11 @@ public class DocumentIngestService {
         return sb.toString();
     }
 
-    /** 带引号的 CSV 行解析（"" 表示一个字面双引号） */
+    /**
+
+     * 带引号的 CSV 行解析（"" 表示一个字面双引号）
+
+     */
     private List<String> parseDelimitedLine(String line, char sep) {
         List<String> out = new ArrayList<>();
         StringBuilder cur = new StringBuilder();
@@ -291,7 +313,11 @@ public class DocumentIngestService {
         return out;
     }
 
-    /** 读取一行所有单元格（用 DataFormatter 保留数字/日期的显示值） */
+    /**
+
+     * 读取一行所有单元格（用 DataFormatter 保留数字/日期的显示值）
+
+     */
     private List<String> readRow(Row row) {
         List<String> out = new ArrayList<>();
         int last = Math.min(row.getLastCellNum(), 100); // 最多读 100 列
@@ -306,7 +332,11 @@ public class DocumentIngestService {
         return out;
     }
 
-    /** 表头 + 值行拼接为"列名：值"文本 */
+    /**
+
+     * 表头 + 值行拼接为"列名：值"文本
+
+     */
     private String joinRow(List<String> headers, List<String> values) {
         StringBuilder line = new StringBuilder();
         for (int i = 0; i < values.size(); i++) {
@@ -368,7 +398,11 @@ public class DocumentIngestService {
         }
     }
 
-    /** 执行外部命令并取 stdout；非 0 退出码视为失败 */
+    /**
+
+     * 执行外部命令并取 stdout；非 0 退出码视为失败
+
+     */
     private String run(java.nio.file.Path dir, String... cmd) throws Exception {
         ProcessBuilder pb = new ProcessBuilder(cmd).directory(dir.toFile()).redirectErrorStream(true);
         Process proc = pb.start();

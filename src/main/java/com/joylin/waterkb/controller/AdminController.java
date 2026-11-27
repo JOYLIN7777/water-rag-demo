@@ -32,9 +32,6 @@ import com.joylin.waterkb.service.LoginCryptoService;
 /**
  * 管理后台接口：用户查询与维护、角色权限、登录日志。
  *
- * <p>账号 CRUD 写入 app_users 表，重启后仍生效；写操作全部要求 ADMIN_ACCESS 权限。
- * 防止管理员把自己锁在外面：禁止删除自己、禁止把自己禁用或移除 admin 组、
- * 禁止删除/降级最后一个管理员。</p>
  */
 @RestController
 @RequestMapping("/api/admin")
@@ -77,9 +74,6 @@ public class AdminController {
     /**
      * 组织清单 + 成员数：组织架构页的主数据。
      *
-     * <p>三个数字各有用途：members 是本组织直属成员（账号的 tenant 直接等于它），
-     * membersAll 含所有子组织（看"这个部门一共多少人"），children 是下级组织数
-     * （决定能不能删、树上要不要画三角）。</p>
      */
     @GetMapping("/orgs")
     public List<Map<String, Object>> orgList() {
@@ -101,7 +95,11 @@ public class AdminController {
         return out;
     }
 
-    /** 新建组织：标识留空则自动生成；parentKey 决定挂在哪个节点下（空=顶层） */
+    /**
+
+     * 新建组织：标识留空则自动生成；parentKey 决定挂在哪个节点下（空=顶层）
+
+     */
     @PostMapping("/orgs")
     public Map<String, Object> createOrg(@RequestBody Map<String, Object> body) {
         String key = orgs.create(str(body.get("name")), str(body.get("key")), str(body.get("parentKey")));
@@ -111,8 +109,6 @@ public class AdminController {
     /**
      * 更新组织：改名与调整上级都可选。
      *
-     * <p>parentKey 用 {@code containsKey} 判断而不是判空——传空字符串表示"挪到顶层"，
-     * 与"不传（不改上级）"是两件事，混在一起就永远挪不回顶层了。</p>
      */
     @PutMapping("/orgs/{key}")
     public Map<String, Object> updateOrg(@PathVariable String key, @RequestBody Map<String, Object> body) {
@@ -125,11 +121,6 @@ public class AdminController {
     /**
      * 删除组织。
      *
-     * <p>有子组织仍然拒绝（要先把子组织处理掉）。有成员/文档/会话时给一条出路：
-     * 带 moveTo 就三样一起迁到目标组织再删——只迁账号是上一版的漏洞：
-     * 账号换了组织，文档的 tenantId 还挂在旧键上，组织一删这批文档就成了
-     * "系统里有、谁都看不到、也删不掉"的孤儿（实测丢过 3724 个分片）。
-     * 不带 moveTo 又确实有数据，直接拒绝，并说清各有几条。</p>
      */
     @DeleteMapping("/orgs/{key}")
     public Map<String, Object> deleteOrg(@PathVariable String key,
@@ -178,7 +169,11 @@ public class AdminController {
         return out;
     }
 
-    /** 用户列表：只返回可展示字段，绝不带出密码哈希 */
+    /**
+
+     * 用户列表：只返回可展示字段，绝不带出密码哈希
+
+     */
     @GetMapping("/users")
     public List<Map<String, Object>> users() {
         List<Map<String, Object>> out = new ArrayList<>();
@@ -197,8 +192,14 @@ public class AdminController {
         return out;
     }
 
-    /** 新增账号 */
-    /** 管理端设置密码：页面传 encrypted=true 时先解密，兼容内部脚本的明文调用 */
+    /**
+
+     * 新增账号
+
+     */
+    /**
+     * 管理端设置密码：页面传 encrypted=true 时先解密，兼容内部脚本的明文调用
+     */
     private String passwordOf(Map<String, Object> body) {
         if (body == null) return null;
         return Boolean.parseBoolean(String.valueOf(body.get("encrypted")))
@@ -221,7 +222,11 @@ public class AdminController {
         return Map.of("message", "账号已创建", "username", username.toLowerCase());
     }
 
-    /** 编辑账号：显示名、角色组、空间、启用状态 */
+    /**
+
+     * 编辑账号：显示名、角色组、空间、启用状态
+
+     */
     @PutMapping("/users/{username}")
     public Map<String, Object> updateUser(@PathVariable String username, @RequestBody Map<String, Object> body) {
         String name = username.toLowerCase();
@@ -267,7 +272,11 @@ public class AdminController {
         return Map.of("message", "账号已更新", "username", name);
     }
 
-    /** 删除账号：保护自己与最后一个管理员 */
+    /**
+
+     * 删除账号：保护自己与最后一个管理员
+
+     */
     @DeleteMapping("/users/{username}")
     public Map<String, Object> deleteUser(@PathVariable String username) {
         String name = username.toLowerCase();
@@ -279,7 +288,11 @@ public class AdminController {
         return Map.of("message", "账号已删除", "username", name);
     }
 
-    /** 重置密码：不要求原密码，仅管理员可操作 */
+    /**
+
+     * 重置密码：不要求原密码，仅管理员可操作
+
+     */
     @PostMapping("/users/{username}/reset-password")
     public Map<String, Object> resetPassword(@PathVariable String username, @RequestBody Map<String, Object> body) {
         String name = username.toLowerCase();
@@ -298,9 +311,6 @@ public class AdminController {
     /**
      * 待处理的密码重置申请：待审批 + 已发码未使用（后者便于回答"码给了怎么没用"）。
      *
-     * <p>顺带把账号的显示名带上：消息是给人看的，「r25user 申请重置密码」谁是谁得对半天。
-     * 显示名由服务端查账号表得出，不依赖前端是否刚好加载过用户列表——
-     * 刚建的账号在新开的页面里也能正确显示中文名。</p>
      */
     @GetMapping("/password-resets")
     public List<Map<String, Object>> passwordResets() {
@@ -315,7 +325,11 @@ public class AdminController {
         return rows;
     }
 
-    /** 批准申请：生成一次性重置码并返回明文（仅此一次），由管理员通过可靠渠道告知本人 */
+    /**
+
+     * 批准申请：生成一次性重置码并返回明文（仅此一次），由管理员通过可靠渠道告知本人
+
+     */
     @PostMapping("/password-resets/{id}/approve")
     public Map<String, Object> approvePasswordReset(@PathVariable long id) {
         String code = passwordReset.approve(id, UserContext.get().userId());
@@ -323,7 +337,11 @@ public class AdminController {
                 "message", "重置码已生成，请通过可靠渠道告知本人：30 分钟内有效，用一次即作废");
     }
 
-    /** 驳回申请 */
+    /**
+
+     * 驳回申请
+
+     */
     @PostMapping("/password-resets/{id}/reject")
     public Map<String, Object> rejectPasswordReset(@PathVariable long id) {
         passwordReset.reject(id, UserContext.get().userId());
@@ -354,13 +372,21 @@ public class AdminController {
                 .filter(x -> !x.isEmpty()).toList();
     }
 
-    /** 角色 → 权限码矩阵 */
+    /**
+
+     * 角色 → 权限码矩阵
+
+     */
     @GetMapping("/roles")
     public List<Map<String, Object>> roles() {
         return rolePermissions.roleMatrix();
     }
 
-    /** 编辑角色权限：保存后立即生效（内存缓存重建），admin 恒为全权限不可改 */
+    /**
+
+     * 编辑角色权限：保存后立即生效（内存缓存重建），admin 恒为全权限不可改
+
+     */
     @PutMapping("/roles/{role}/permissions")
     public Map<String, Object> setRolePermissions(@PathVariable String role,
                                                   @RequestBody Map<String, Object> body) {
@@ -372,7 +398,11 @@ public class AdminController {
                 "name", rolePermissions.roleName(role));
     }
 
-    /** 删除角色定义：删除后该角色回落内置默认（无记录的角色按无权限处理） */
+    /**
+
+     * 删除角色定义：删除后该角色回落内置默认（无记录的角色按无权限处理）
+
+     */
     @DeleteMapping("/roles/{role}")
     public Map<String, Object> deleteRole(@PathVariable String role) {
         boolean removed = rolePermissions.deleteRole(role);
@@ -381,13 +411,21 @@ public class AdminController {
 
     // ==================== 权限节点目录（菜单权限页） ====================
 
-    /** 全部权限节点（内置 + 自定义） */
+    /**
+
+     * 全部权限节点（内置 + 自定义）
+
+     */
     @GetMapping("/perms")
     public List<Map<String, Object>> perms() {
         return permCatalog.list();
     }
 
-    /** 新增自定义权限节点 */
+    /**
+
+     * 新增自定义权限节点
+
+     */
     @PostMapping("/perms")
     public Map<String, Object> createPerm(@RequestBody Map<String, Object> body) {
         permCatalog.create(str(body.get("code")), str(body.get("name")),
@@ -396,31 +434,51 @@ public class AdminController {
         return Map.of("message", "权限节点已创建", "code", str(body.get("code")));
     }
 
-    /** 页面自动发现：把本页声明的 data-perm 节点补进权限树，返回新增项 */
+    /**
+
+     * 页面自动发现：把本页声明的 data-perm 节点补进权限树，返回新增项
+
+     */
     @PostMapping("/perms/discover")
     public Map<String, Object> discoverPerms(@RequestBody List<Map<String, Object>> body) {
         return permCatalog.discover(body);
     }
 
-    /** 声明式清单对账：新增/改名/改路由/改层级，清单里消失的内置节点标记下线 */
+    /**
+
+     * 声明式清单对账：新增/改名/改路由/改层级，清单里消失的内置节点标记下线
+
+     */
     @PostMapping("/perms/sync")
     public Map<String, Object> syncPerms(@RequestBody List<Map<String, Object>> body) {
         return permCatalog.sync(body);
     }
 
-    /** 代码里所有在用的权限码（含已注册），供新增弹窗校验手填码是否真能生效 */
+    /**
+
+     * 代码里所有在用的权限码（含已注册），供新增弹窗校验手填码是否真能生效
+
+     */
     @GetMapping("/perms/used-codes")
     public java.util.Set<String> usedPermCodes() {
         return unregisteredPermScanner.allUsedCodes();
     }
 
-    /** 代码里在用、但权限树还没建的权限码（供新增权限弹窗快捷选择，选了就能控制真实功能） */
+    /**
+
+     * 代码里在用、但权限树还没建的权限码（供新增权限弹窗快捷选择，选了就能控制真实功能）
+
+     */
     @GetMapping("/perms/unused-codes")
     public List<Map<String, Object>> unusedPermCodes() {
         return unregisteredPermScanner.scan();
     }
 
-    /** 编辑节点显示信息；内置节点不可改标识、不可删除 */
+    /**
+
+     * 编辑节点显示信息；内置节点不可改标识、不可删除
+
+     */
     @PutMapping("/perms/{code}")
     public Map<String, Object> updatePerm(@PathVariable String code, @RequestBody Map<String, Object> body) {
         permCatalog.update(code, str(body.get("name")), str(body.get("type")),
@@ -429,7 +487,11 @@ public class AdminController {
         return Map.of("message", "权限节点已更新", "code", code);
     }
 
-    /** 删除节点：仅自定义节点可删，同时清理各角色的该权限配置 */
+    /**
+
+     * 删除节点：仅自定义节点可删，同时清理各角色的该权限配置
+
+     */
     @DeleteMapping("/perms/{code}")
     public Map<String, Object> deletePerm(@PathVariable String code) {
         permCatalog.delete(code);
@@ -438,7 +500,11 @@ public class AdminController {
         return Map.of("message", "权限节点已删除", "code", code);
     }
 
-    /** 登录日志：从审计里按登录相关动作过滤（含成功与失败）。审计员凭 loginlog:read 可读 */
+    /**
+
+     * 登录日志：从审计里按登录相关动作过滤（含成功与失败）。审计员凭 loginlog:read 可读
+
+     */
     @GetMapping("/login-logs")
     @RequirePermission(Permission.LOGINLOG_READ)
     public List<Map<String, Object>> loginLogs(@RequestParam(required = false, defaultValue = "100") int limit) {

@@ -29,15 +29,6 @@ import java.util.Map;
 /**
  * 用量统计：对接阿里云百炼官方 /api/v1/agentstudio/usage/summary 接口。
  *
- * <p>关键说明：
- * <ul>
- *   <li>该接口属于百炼 Managed Agents API，endpoint 形如
- *       https://{workspace_id}.cn-beijing.maas.aliyuncs.com/api/v1/agentstudio，
- *       需要工作空间 ID，通过环境变量 BAILIAN_WORKSPACE_ID 注入；</li>
- *   <li>API Key 只从环境变量 AI_API_KEY 读取，绝不写进代码、配置或日志；</li>
- *   <li>未配置工作空间 ID 或接口不可用时返回 configured=false 与明确提示，
- *       前端优雅降级，不编造用量数据。</li>
- * </ul></p>
  */
 @RestController
 @RequestMapping("/api/usage")
@@ -72,10 +63,6 @@ public class UsageController {
     /**
      * 今日 / 本月请求次数与 Token 消耗，以及按模型明细。
      *
-     * <p>统计口径以<b>本系统真实调用记录</b>为主：本系统走 DashScope 兼容模式直连，
-     * 官方 agentstudio 用量接口统计的是工作空间内的 Agent 调用，实测对兼容模式调用
-     * 返回 0。因此官方数据仅在确有数值时才作为对账参考覆盖展示，否则一律以本地记录
-     * 为准，保证页面任何情况都有真实数据。</p>
      */
     @GetMapping("/summary")
     public Map<String, Object> summary() {
@@ -136,8 +123,6 @@ public class UsageController {
     /**
      * 逐次调用明细：把「今日/本月消耗」钻取到每一次问答。
      *
-     * <p>只对本系统自己的调用记录可用——官方接口只给汇总，没有单次粒度。
-     * 官方口径命中时前端不给钻取入口，避免点了看不到东西。</p>
      */
     @GetMapping("/records")
     public Map<String, Object> records(@RequestParam(defaultValue = "today") String scope,
@@ -162,7 +147,11 @@ public class UsageController {
         try { return Long.parseLong(String.valueOf(v)); } catch (Exception e) { return 0L; }
     }
 
-    /** 构造官方接口要求的 RFC3339 时间范围请求体 */
+    /**
+
+     * 构造官方接口要求的 RFC3339 时间范围请求体
+
+     */
     private Map<String, Object> range(java.time.ZonedDateTime start, java.time.ZonedDateTime end, String granularity) {
         Map<String, Object> tr = new LinkedHashMap<>();
         tr.put("start_time", start.format(RFC3339));
@@ -174,7 +163,11 @@ public class UsageController {
         return body;
     }
 
-    /** 调用官方接口并取出 data.usage 节点 */
+    /**
+
+     * 调用官方接口并取出 data.usage 节点
+
+     */
     private JsonNode call(Map<String, Object> body) throws Exception {
         String url = "https://" + workspaceId + "." + region + ".maas.aliyuncs.com/api/v1/agentstudio/usage/summary";
         HttpRequest req = HttpRequest.newBuilder(URI.create(url))
@@ -191,7 +184,11 @@ public class UsageController {
         return root.path("data").path("usage");
     }
 
-    /** 从 usage.total 提取请求次数与总 Token，写入目标 Map */
+    /**
+
+     * 从 usage.total 提取请求次数与总 Token，写入目标 Map
+
+     */
     private void accumulate(Map<String, Object> out, JsonNode usage) {
         JsonNode total = usage.path("total");
         out.put("requests", value(total, "model_call_count"));
@@ -203,7 +200,11 @@ public class UsageController {
         return v.isNumber() ? v.asLong() : 0L;
     }
 
-    /** 按模型汇总明细 */
+    /**
+
+     * 按模型汇总明细
+
+     */
     private List<Map<String, Object>> modelRows(JsonNode usage) {
         List<Map<String, Object>> rows = new ArrayList<>();
         JsonNode models = usage.path("models");
@@ -221,7 +222,11 @@ public class UsageController {
         return rows;
     }
 
-    /** 错误信息只回传简短原因，避免把 API Key 或响应正文泄露到前端 */
+    /**
+
+     * 错误信息只回传简短原因，避免把 API Key 或响应正文泄露到前端
+
+     */
     private String safeMessage(Exception e) {
         String msg = e.getMessage();
         if (msg == null || msg.isBlank()) return "接口调用失败";

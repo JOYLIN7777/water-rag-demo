@@ -12,8 +12,6 @@ import java.util.Map;
 /**
  * 向量库管理操作（文档清单 / 按文件名删除）——底层已从 pgvector 切到 ES。
  *
- * <p>保留原类名是为了让 Controller 与前端零改动，内部全部委托 EsIndexService。
- * 这是"完全替换存储底座但上层 contracts 不变"的落地样例。</p>
  */
 @Repository
 public class VectorStoreAdminRepository {
@@ -45,7 +43,9 @@ public class VectorStoreAdminRepository {
                     if (s.path("key").asBoolean()) subtree = true;
                 }
                 Map<String, Object> row = new java.util.LinkedHashMap<>();
-                row.put("fileName", key.path("f").asText());
+                String fullName = key.path("f").asText();
+                row.put("fileName", fullName);
+                row.put("displayName", fullName.substring(fullName.lastIndexOf('/') + 1));
                 row.put("chunks", b.path("doc_count").asInt());
                 row.put("uploadedAt", b.path("latest").path("value_as_string").asText(""));
                 row.put("ownerUser", owner.isEmpty() ? "" : owner.get(0).path("key").asText());
@@ -63,12 +63,20 @@ public class VectorStoreAdminRepository {
         return es.deleteByFileName(fileName, tenantId);
     }
 
-    /** 可见范围内查文件归属部门（删除失败时区分"不存在"与"归属别部门"） */
+    /**
+
+     * 可见范围内查文件归属部门（删除失败时区分"不存在"与"归属别部门"）
+
+     */
     public String findDocTenant(String fileName) {
         return es.findDocTenant(fileName);
     }
 
-    /** 单份文档的全部切片（供分片树状预览） */
+    /**
+
+     * 单份文档的全部切片（供分片树状预览）
+
+     */
     public Map<String, Object> listChunks(String fileName) {
         try {
             return es.listChunks(fileName);

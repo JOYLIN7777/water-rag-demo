@@ -11,9 +11,6 @@ import java.io.IOException;
 /**
  * React SPA 路由回退。
  *
- * <p>前端已迁移到 React + Vite，构建产物只有 index.html + assets，
- * 所有页面路径（/login.html、/users.html 等）由 React Router 在浏览器端解析。
- * 这里统一回退到 index.html，避免 404 或静态页与 React 页混杂。</p>
  */
 @RestController
 public class ConsolePageController {

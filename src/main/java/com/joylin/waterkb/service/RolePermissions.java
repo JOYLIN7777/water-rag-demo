@@ -20,15 +20,6 @@ import com.joylin.waterkb.security.UserContext;
 /**
  * 角色 → 权限码映射（企业级 RBAC 的唯一判定处）。
  *
- * <p>设计要点：
- * <ul>
- *   <li><b>admin 是超级角色</b>：代码层面恒为全部权限，后台不可修改、不可删除——
- *       这是安全底线，防止管理员把自己锁在门外；</li>
- *   <li><b>权限可配置</b>：内置角色（analyst/viewer）可在后台调整权限，也可新增自定义角色，
- *       全部持久化到 role_permissions 表，修改实时生效（内存缓存，写时失效重建）；</li>
- *   <li>数据库没有记录的角色回落内置默认——未做过配置的系统行为与之前完全一致；</li>
- *   <li>一个用户可属于多个角色，权限取并集；匿名用户没有任何权限（默认拒绝）。</li>
- * </ul></p>
  */
 @Service
 public class RolePermissions {
@@ -61,19 +52,37 @@ public class RolePermissions {
         }
     }
 
-    /** 可为 null：单测与无数据库环境只用内置默认 */
+    /**
+
+     * 可为 null：单测与无数据库环境只用内置默认
+
+     */
     private final RolePermissionMapper mapper;
     private final SchemaSeedMapper seedMapper;
-    /** 权限节点目录：自定义权限码的合法性校验来源 */
+    /**
+     * 权限节点目录：自定义权限码的合法性校验来源
+     */
     private final PermissionCatalog catalog;
 
-    /** 运行期角色权限表（以库为准），volatile 保证并发读到最新快照 */
+    /**
+
+     * 运行期角色权限表（以库为准），volatile 保证并发读到最新快照
+
+     */
     private volatile Map<String, Set<String>> effective = Map.of();
 
-    /** 角色中文显示名（role_definitions 表），与权限矩阵一起下发给后台页面 */
+    /**
+
+     * 角色中文显示名（role_definitions 表），与权限矩阵一起下发给后台页面
+
+     */
     private volatile Map<String, String> roleNames = Map.of();
 
-    /** 无数据库环境（单测）：用 roles.json 种子初始化内存视图，不写库 */
+    /**
+
+     * 无数据库环境（单测）：用 roles.json 种子初始化内存视图，不写库
+
+     */
     public RolePermissions() {
         this.catalog = null; this.mapper = null; this.seedMapper = null;
         Map<String, Set<String>> fromSeed = new LinkedHashMap<>();
@@ -156,7 +165,11 @@ public class RolePermissions {
         }
     }
 
-    /** 获取某用户拥有的全部权限码（只读视图） */
+    /**
+
+     * 获取某用户拥有的全部权限码（只读视图）
+
+     */
     public Set<String> permissionsOf(UserContext.CurrentUser user) {
         if (user == null || user.isAnonymous()) return Set.of();
         if (user.hasGroup("admin")) return adminPermissions();
@@ -167,7 +180,11 @@ public class RolePermissions {
         return Set.copyOf(result);
     }
 
-    /** 是否拥有其中任意一个权限；all=true 时要求全部拥有 */
+    /**
+
+     * 是否拥有其中任意一个权限；all=true 时要求全部拥有
+
+     */
     public boolean allows(UserContext.CurrentUser user, String[] needed, boolean all) {
         if (needed == null || needed.length == 0) return true;
         if (user == null || user.isAnonymous()) return false;
@@ -177,7 +194,11 @@ public class RolePermissions {
         return List.of(needed).stream().anyMatch(owned::contains);
     }
 
-    /** 供前端展示：系统中所有角色及其权限（带中文显示名） */
+    /**
+
+     * 供前端展示：系统中所有角色及其权限（带中文显示名）
+
+     */
     public List<Map<String, Object>> roleMatrix() {
         List<Map<String, Object>> out = new ArrayList<>();
         Set<String> all = new LinkedHashSet<>(effective.keySet());
@@ -202,7 +223,11 @@ public class RolePermissions {
         return out;
     }
 
-    /** 角色中文显示名：DB 自定义名称优先，内置回落，未知角色原样返回 */
+    /**
+
+     * 角色中文显示名：DB 自定义名称优先，内置回落，未知角色原样返回
+
+     */
     public String roleName(String role) {
         String key = normalize(role);
         return roleNames.getOrDefault(key, key);
@@ -216,7 +241,11 @@ public class RolePermissions {
         setPermissions(role, permissions, null);
     }
 
-    /** displayName 非空时同时落角色名称，供后台列表/用户管理下拉统一显示 */
+    /**
+
+     * displayName 非空时同时落角色名称，供后台列表/用户管理下拉统一显示
+
+     */
     public void setPermissions(String role, List<String> permissions, String displayName) {
         String name = normalize(role);
         if (name.isEmpty()) throw new IllegalArgumentException("角色名不能为空");
@@ -237,7 +266,11 @@ public class RolePermissions {
         refresh();
     }
 
-    /** 删除角色定义：admin 不可删；DB 中没有记录的角色无需删除（内置默认不可移除） */
+    /**
+
+     * 删除角色定义：admin 不可删；DB 中没有记录的角色无需删除（内置默认不可移除）
+
+     */
     public boolean deleteRole(String role) {
         String name = normalize(role);
         if (name.equals("admin")) throw new IllegalArgumentException("管理员角色不可删除");

@@ -47,7 +47,11 @@ public class ModelController {
         return c == null ? ResponseEntity.notFound().build() : ResponseEntity.ok(masked(c));
     }
 
-    /** 脱敏副本：API Key 只回显前 4 后 4，绝不把明文发到前端 */
+    /**
+
+     * 脱敏副本：API Key 只回显前 4 后 4，绝不把明文发到前端
+
+     */
     private static ModelConfig masked(ModelConfig src) {
         ModelConfig c = new ModelConfig();
         c.setId(src.getId());
@@ -102,7 +106,11 @@ public class ModelController {
         return Map.of("message", "已删除", "id", id);
     }
 
-    /** 激活：维度校验 → 更新 active → 清缓存 + 换代理 */
+    /**
+
+     * 激活：维度校验 → 更新 active → 清缓存 + 换代理
+
+     */
     @PostMapping("/{id}/activate")
     @RequirePermission(Permission.MODEL_WRITE)
     public Map<String, Object> activate(@PathVariable long id) {
@@ -115,7 +123,11 @@ public class ModelController {
         return Map.of("message", "已激活：" + c.getName(), "type", c.getType());
     }
 
-    /** 设为全局默认：所有未显式选模型的用户都用这个 */
+    /**
+
+     * 设为全局默认：所有未显式选模型的用户都用这个
+
+     */
     @PostMapping("/{id}/set-default")
     @RequirePermission(Permission.MODEL_WRITE)
     public Map<String, Object> setDefault(@PathVariable long id) {
@@ -127,7 +139,11 @@ public class ModelController {
         return Map.of("message", "已设为全局默认：" + c.getName(), "id", id);
     }
 
-    /** 取消激活：只改 active、保留 enabled，清缓存并让代理回落其它激活配置 */
+    /**
+
+     * 取消激活：只改 active、保留 enabled，清缓存并让代理回落其它激活配置
+
+     */
     @PostMapping("/{id}/deactivate")
     @RequirePermission(Permission.MODEL_WRITE)
     public Map<String, Object> deactivate(@PathVariable long id) {
@@ -138,7 +154,11 @@ public class ModelController {
         return Map.of("message", "已取消激活：" + c.getName(), "type", c.getType());
     }
 
-    /** 连通性测试：真实调用模型端点，返回耗时与错误 */
+    /**
+
+     * 连通性测试：真实调用模型端点，返回耗时与错误
+
+     */
     @PostMapping("/{id}/test")
     @RequirePermission(Permission.MODEL_WRITE)
     public Map<String, Object> test(@PathVariable long id) {

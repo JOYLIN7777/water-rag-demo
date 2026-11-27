@@ -18,16 +18,8 @@ import java.util.Set;
 /**
  * 组织（原名"空间"）登记表，<b>树状</b>结构。
  *
- * <p>为什么是树而不是一层清单：企业里的组织天然分层（集团 → 分公司 → 部门 → 班组），
- * 一层清单只能靠名字前缀凑层级，改名、调架构时全是手工活。这里用 parent_key 自关联，
- * 任意层都能挂子组织，前端按父子关系画树。</p>
  *
- * <p>组织键（org_key）是数据隔离的真正依据：文档（ES 的 tenantId）、会话（Redis key）
- * 与用量都按它隔离，所以<b>改名不改键</b>，<b>挪上级也不改键</b>——改键等于把数据搬走，不做。</p>
  *
- * <p>层级只影响"归属关系与展示"，不改变隔离粒度：账号仍然只绑定一个组织键（tenant），
- * 不会因为挂在子组织下就自动继承父组织的文档可见范围。要看子组织的成员，用
- * {@link #subtreeKeys(String)} 做汇总查询，这是刻意的选择——隔离边界越简单越不容易漏权限。</p>
  */
 @Service
 public class OrgStore {
@@ -47,7 +39,11 @@ public class OrgStore {
     @PostConstruct
     public void init() { ensure(); }
 
-    /** 建表 + 补 parent_key 列 + 补默认组织 + 把历史账号里出现过的 tenant 补登记（幂等） */
+    /**
+
+     * 建表 + 补 parent_key 列 + 补默认组织 + 把历史账号里出现过的 tenant 补登记（幂等）
+
+     */
     private void ensure() {
         if (ready) return;
         synchronized (this) {
@@ -72,8 +68,6 @@ public class OrgStore {
     /**
      * 组织清单（扁平，含 parentKey；成员数由调用方按账号列表统计）。
      *
-     * <p>返回扁平表而不是嵌套 JSON：前端要同时用于画树、做下拉、算面包屑，
-     * 扁平一份数据三种用法都能派生，嵌套结构反而每处都得再拍平。</p>
      */
     public List<Map<String, Object>> list() {
         ensure();
@@ -114,9 +108,6 @@ public class OrgStore {
     /**
      * 新建组织（可挂在任意节点下）。
      *
-     * @param name      组织名称（2-20 字）
-     * @param key       组织标识；前端按名称英文名生成（如 org-shuili），重名自动追加 2 个随机字母
-     * @param parentKey 上级组织键；空字符串/null 表示顶层
      * @return 新组织键
      */
     public String create(String name, String key, String parentKey) {
@@ -150,7 +141,11 @@ public class OrgStore {
         return k;
     }
 
-    /** 兼容旧调用：建在顶层 */
+    /**
+
+     * 兼容旧调用：建在顶层
+
+     */
     public String create(String name, String key) {
         return create(name, key, null);
     }
@@ -162,7 +157,11 @@ public class OrgStore {
         return sb.toString();
     }
 
-    /** 重命名组织：只改显示名，组织键与上级关系都不动 */
+    /**
+
+     * 重命名组织：只改显示名，组织键与上级关系都不动
+
+     */
     public boolean rename(String key, String name) {
         ensure();
         String n = name == null ? "" : name.trim();
@@ -177,8 +176,6 @@ public class OrgStore {
     /**
      * 调整上级组织（把整棵子树挪走，键值都不变）。
      *
-     * <p>防环：新上级不能是自己或自己的子孙，否则树会变成环——画树的递归直接爆栈，
-     * 而且这些组织的成员从此无法从任何一个根走到。</p>
      */
     public void setParent(String key, String newParentKey) {
         ensure();
@@ -195,9 +192,6 @@ public class OrgStore {
     /**
      * 祖先链（从直接上级一路到根，不含自己）。
      *
-     * <p>部门知识库层级可见模型用：子部门的文档默认对上级可见（上级看下级是管理常态），
-     * 检索过滤时用本方法取"我能以上级身份看到的部门键集合"。
-     * 防环由 setParent 保证，这里不怕死循环。</p>
      */
     public List<String> ancestorKeys(String key) {
         ensure();
@@ -218,7 +212,11 @@ public class OrgStore {
         return out;
     }
 
-    /** key 自身 + 所有子孙的键（BFS；一次读全表，组织规模在几十上百，没必要递归查库） */
+    /**
+
+     * key 自身 + 所有子孙的键（BFS；一次读全表，组织规模在几十上百，没必要递归查库）
+
+     */
     public Set<String> subtreeKeys(String key) {
         ensure();
         Set<String> out = new LinkedHashSet<>();
@@ -238,7 +236,11 @@ public class OrgStore {
         return out;
     }
 
-    /** 下级组织个数（不含自身） */
+    /**
+
+     * 下级组织个数（不含自身）
+
+     */
     public int childCount(String key) {
         ensure();
         try {
@@ -247,7 +249,11 @@ public class OrgStore {
         } catch (Exception e) { return 0; }
     }
 
-    /** 组织总数（用于守住"不能删到一个都不剩"） */
+    /**
+
+     * 组织总数（用于守住"不能删到一个都不剩"）
+
+     */
     public int count() {
         ensure();
         try {
@@ -259,10 +265,6 @@ public class OrgStore {
     /**
      * 删除组织。
      *
-     * <p>不再有"内置组织不能删"的特例——第一个组织只是创建得早，不是系统资产。
-     * 但要守住两条：有子组织不能删（子组织会变成树上点不到的孤儿），
-     * 有成员不能删（那些账号会掉进一个不存在的组织，登录后文档与历史全空）；
-     * 外加一条底线：至少留一个组织，否则所有账号都失去归属。</p>
      */
     public void delete(String key, int members) {
         ensure();
@@ -277,7 +279,11 @@ public class OrgStore {
         }
     }
 
-    /** 组织键 → 名称（取不到就回键本身，界面不会空着） */
+    /**
+
+     * 组织键 → 名称（取不到就回键本身，界面不会空着）
+
+     */
     public Map<String, String> nameMap() {
         Map<String, String> out = new LinkedHashMap<>();
         for (Map<String, Object> m : list()) {

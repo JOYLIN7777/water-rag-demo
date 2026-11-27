@@ -17,21 +17,16 @@ import java.util.Set;
 /**
  * 统一身份上下文：把"当前请求是谁 / 属于哪个租户 / 用什么方式认证"放进 ThreadLocal。
  *
- * <p>这是全项目权限治理的唯一身份来源——行级权限、工具权限、多租户隔离、
- * 审计日志全部从此处读取，调用方无法传参覆盖。设计原则：
- * <ol>
- *   <li><b>不能靠调用方自觉</b>——各层服务自己从上下文拿身份，注入过滤条件；</li>
- *   <li>优先信任 JWT 解析出来的身份（JwtAuthFilter 放在本 Filter 之前，
- *       结果写入 request attribute）；没有 Bearer Token 时降级到 X-User/X-Groups 演示头；</li>
- *   <li>两者都没有则降级 anonymous，默认拒绝而非默认放行；</li>
- *   <li>finally 里 clear，防止线程池复用导致身份串台。</li>
- * </ol></p>
  */
 @Component
 @Order(2) // JwtAuthFilter 是 @Order(1)，必须先解析 token
 public class UserContext extends OncePerRequestFilter {
 
-    /** JWT Filter 写入 request attribute 的身份对象键 */
+    /**
+
+     * JWT Filter 写入 request attribute 的身份对象键
+
+     */
     public static final String JWT_PRINCIPAL = "water.rag.jwt.principal";
 
     private static final ThreadLocal<CurrentUser> CURRENT = new ThreadLocal<>();
@@ -43,7 +38,11 @@ public class UserContext extends OncePerRequestFilter {
 
     public static void clear() { CURRENT.remove(); }
 
-    /** 供单测注入上下文（生产请求由 Filter 设置） */
+    /**
+
+     * 供单测注入上下文（生产请求由 Filter 设置）
+
+     */
     public static void CURRENT_TEST(CurrentUser user) { CURRENT.set(user); }
 
     @Override
@@ -75,7 +74,11 @@ public class UserContext extends OncePerRequestFilter {
         }
     }
 
-    /** 不可变的当前用户值对象。两参数构造保留兼容旧调用/单测（默认租户 default）。 */
+    /**
+
+     * 不可变的当前用户值对象。两参数构造保留兼容旧调用/单测（默认租户 default）。
+
+     */
     public record CurrentUser(String userId, List<String> groups, String tenantId, String authType) {
 
         public CurrentUser(String userId, List<String> groups) {

@@ -12,11 +12,7 @@ import java.util.concurrent.ConcurrentHashMap;
 /**
  * 令牌会话存储：refresh token 白名单 + access token 登出黑名单。
  *
- * <p>有了它，登出才能"真正失效"——JWT 本身无状态，光清前端 cookie 服务端仍认旧 token，
- * 是常见安全漏洞。这里用 jti 作键：登出把 access 的 jti 拉黑到过期为止，同时删掉对应 refresh。</p>
  *
- * <p>Redis 不可用时降级到进程内 ConcurrentHashMap（单实例可用；多实例请务必启用 Redis），
- * 保证作品集在无本机 Redis 时登录链路仍可演示。</p>
  */
 @Component
 public class RefreshTokenStore {
@@ -35,13 +31,21 @@ public class RefreshTokenStore {
         this.redis = redis;
     }
 
-    /** 保存 refresh token（jti -> username），带过期 */
+    /**
+
+     * 保存 refresh token（jti -> username），带过期
+
+     */
     public void saveRefresh(String jti, String username, long ttlSeconds) {
         tryRedis(() -> redis.opsForValue().set(REFRESH_PREFIX + jti, username, Duration.ofSeconds(ttlSeconds)));
         if (redisDown) refreshMem.put(jti, username);
     }
 
-    /** 校验 refresh token 的 jti 是否有效且属于该用户 */
+    /**
+
+     * 校验 refresh token 的 jti 是否有效且属于该用户
+
+     */
     public boolean isRefreshValid(String jti, String username) {
         if (jti == null || jti.isBlank()) return false;
         try {
@@ -55,20 +59,32 @@ public class RefreshTokenStore {
         }
     }
 
-    /** 删除 refresh token（刷新时轮换 / 登出） */
+    /**
+
+     * 删除 refresh token（刷新时轮换 / 登出）
+
+     */
     public void removeRefresh(String jti) {
         tryRedis(() -> redis.delete(REFRESH_PREFIX + jti));
         if (redisDown) refreshMem.remove(jti);
     }
 
-    /** 拉黑 access token，直到其自然过期（ttl<=0 不拉黑） */
+    /**
+
+     * 拉黑 access token，直到其自然过期（ttl<=0 不拉黑）
+
+     */
     public void blacklist(String jti, long ttlSeconds) {
         if (jti == null || jti.isBlank() || ttlSeconds <= 0) return;
         tryRedis(() -> redis.opsForValue().set(BLACKLIST_PREFIX + jti, "1", Duration.ofSeconds(ttlSeconds)));
         if (redisDown) blacklistMem.put(jti, System.currentTimeMillis() / 1000 + ttlSeconds);
     }
 
-    /** access token 是否已被登出拉黑 */
+    /**
+
+     * access token 是否已被登出拉黑
+
+     */
     public boolean isBlacklisted(String jti) {
         if (jti == null || jti.isBlank()) return false;
         try {

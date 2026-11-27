@@ -5,26 +5,39 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 /**
  * Elasticsearch 连接与检索参数，外置到 application.yml 的 es 前缀下。
  *
- * <p>设计决策：不引入 Spring Data Elasticsearch / ES Java Client——
- * 一是版本兼容矩阵复杂，二是我们需要精确控制 BM25+kNN 的 RRF 融合 DSL，
- * 直接用 RestClient 打 REST API 反而最透明，面试时也能讲清每一步。</p>
  */
 @ConfigurationProperties(prefix = "es")
 public class EsProperties {
 
-    /** ES 服务地址（容器内用服务名 http://elasticsearch:9200） */
+    /**
+
+     * ES 服务地址（容器内用服务名 http://elasticsearch:9200）
+
+     */
     private String url = "http://localhost:9200";
     private String index = "water_knowledge";
-    /** 向量维度：必须与当前 Embedding 模型一致（text-embedding-v3 = 1024） */
+    /**
+     * 向量维度：必须与当前 Embedding 模型一致（text-embedding-v3 = 1024）
+     */
     private int dimensions = 1024;
 
-    /** kNN 候选数（HNSW ef_search 概念，越大越准越慢） */
+    /**
+
+     * kNN 候选数（HNSW ef_search 概念，越大越准越慢）
+
+     */
     private int knnCandidates = 100;
-    /** 最终返回条数 */
+    /**
+     * 最终返回条数
+     */
     private int topK = 5;
-    /** RRF 平滑常数：ES 官方建议 60 起步，越大越抹平头部差异 */
+    /**
+     * RRF 平滑常数：ES 官方建议 60 起步，越大越抹平头部差异
+     */
     private int rrfRankConstant = 60;
-    /** 全文检索的最低分数阈值（BM25 分数，0 表示不设阈值） */
+    /**
+     * 全文检索的最低分数阈值（BM25 分数，0 表示不设阈值）
+     */
     private double minScore = 0;
 
     public String getUrl() { return url; }

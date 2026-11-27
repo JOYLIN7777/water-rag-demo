@@ -13,11 +13,7 @@ import java.util.Map;
 /**
  * 本地模型用量记录：每次真实调用对话模型后落一条记录。
  *
- * <p>为什么自己记：官方百炼用量接口需要单独的工作空间 ID（BAILIAN_WORKSPACE_ID），
- * 没配置时用量页只能显示引导文案，用户会觉得"没有效果"。本地记录让用量页
- * 在任何部署形态下都有真实数据；配置了官方接口后官方数据优先、本地作为降级。</p>
  *
- * <p>Token 数来自模型响应的 usage 元数据，兼容端点不返回时记 0（请求次数仍然准确）。</p>
  */
 @Service
 public class UsageRecorder {
@@ -32,7 +28,13 @@ public class UsageRecorder {
     public UsageRecorder(UsageMapper mapper) { this.mapper = mapper; }
 
 
-    /** 记录一次真实模型调用；任何失败都静默吞掉，绝不影响问答主链路 */
+    /**
+
+
+     * 记录一次真实模型调用；任何失败都静默吞掉，绝不影响问答主链路
+
+
+     */
     public void record(String userId, String model, long promptTokens, long completionTokens, long durationMs) {
         record(userId, model, promptTokens, completionTokens, durationMs, null, null);
     }
@@ -40,15 +42,17 @@ public class UsageRecorder {
     /**
      * 记录一次真实模型调用，并带上会话与提问原文。
      *
-     * <p>带提问是为了让用量页可以"点总量看明细"：只记 token 数的话，
-     * 管理员看到今天涨了 30 万 token 却查不出是哪几次问答花的。</p>
      */
     public void record(String userId, String model, long promptTokens, long completionTokens,
                        long durationMs, String sessionId, String question) {
         record(userId, model, promptTokens, completionTokens, durationMs, sessionId, question, "default");
     }
 
-    /** tenantId 参与写入，查询时才能按部门过滤（admin 传 null 表示看全库） */
+    /**
+
+     * tenantId 参与写入，查询时才能按部门过滤（admin 传 null 表示看全库）
+
+     */
     public void record(String userId, String model, long promptTokens, long completionTokens,
                        long durationMs, String sessionId, String question, String tenantId) {
         try {
@@ -65,19 +69,25 @@ public class UsageRecorder {
     /**
      * 逐次调用明细（用量页钻取用）。
      *
-     * @param scope today=今天 0 点起；month=本月 1 日 0 点起
-     * @param limit 最多返回条数（默认 200，上限 500）
      */
     public List<Map<String, Object>> records(String scope, int limit) {
         return records(scope, limit, null);
     }
 
-    /** 只看某个账号的明细（非 admin 用） */
+    /**
+
+     * 只看某个账号的明细（非 admin 用）
+
+     */
     public List<Map<String, Object>> recordsOfUser(String scope, int limit, String user) {
         return records(scope, limit, null, user);
     }
 
-    /** tenant 非空时只返回本部门明细；admin 传 null 看全库 */
+    /**
+
+     * tenant 非空时只返回本部门明细；admin 传 null 看全库
+
+     */
     public List<Map<String, Object>> records(String scope, int limit, String tenant) {
         return records(scope, limit, tenant, null);
     }
@@ -118,12 +128,20 @@ public class UsageRecorder {
      */
     public Map<String, Object> summary() { return summary(null); }
 
-    /** 只看某个账号的汇总（非 admin 用） */
+    /**
+
+     * 只看某个账号的汇总（非 admin 用）
+
+     */
     public Map<String, Object> summaryOfUser(String user) {
         return summary(null, user);
     }
 
-    /** tenant 非空时只统计本部门；admin 传 null 看全库 */
+    /**
+
+     * tenant 非空时只统计本部门；admin 传 null 看全库
+
+     */
     public Map<String, Object> summary(String tenant) {
         return summary(tenant, null);
     }

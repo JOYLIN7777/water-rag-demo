@@ -8,20 +8,23 @@ import java.util.concurrent.atomic.AtomicInteger;
 /**
  * 面向大模型调用的极简熔断器（手写，不引入第三方依赖）。
  *
- * <p>设计决策：Resilience4j 功能全但配置面广，Demo 场景只需要
- * "连续失败 N 次 → 熔断 M 秒 → 半开放行一次重试" 的最小闭环，
- * 40 行手写代码比引一个框架更可控，面试时也更容易讲清原理。</p>
  *
- * <p>状态机：CLOSED（正常放行）→ 连续失败达阈值 → OPEN（直接降级）→
- * 熔断时间过 → 半开（放行一次尝试，成功则回到 CLOSED，失败继续 OPEN）。</p>
  */
 @Component
 public class LlmCircuitBreaker {
 
-    /** 连续失败计数 */
+    /**
+
+     * 连续失败计数
+
+     */
     private final AtomicInteger consecutiveFailures = new AtomicInteger();
 
-    /** 熔断打开的截止时间戳（毫秒），0 表示从未熔断 */
+    /**
+
+     * 熔断打开的截止时间戳（毫秒），0 表示从未熔断
+
+     */
     private volatile long openUntilEpochMs = 0L;
 
     private final RagProperties props;
@@ -38,7 +41,11 @@ public class LlmCircuitBreaker {
         return System.currentTimeMillis() >= openUntilEpochMs;
     }
 
-    /** 调用成功：清零失败计数，回到关闭状态 */
+    /**
+
+     * 调用成功：清零失败计数，回到关闭状态
+
+     */
     public void recordSuccess() {
         consecutiveFailures.set(0);
     }
@@ -55,7 +62,11 @@ public class LlmCircuitBreaker {
         }
     }
 
-    /** 是否处于熔断打开期（供监控/日志使用） */
+    /**
+
+     * 是否处于熔断打开期（供监控/日志使用）
+
+     */
     public boolean isOpen() {
         return System.currentTimeMillis() < openUntilEpochMs;
     }

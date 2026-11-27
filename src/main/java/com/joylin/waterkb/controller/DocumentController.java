@@ -48,7 +48,6 @@ public class DocumentController {
      * 上传文档：解析 → 切片 → 向量化入库。
      * 支持的格式与解析服务共用同一份定义（避免两处硬编码不一致）。
      *
-     * @param includeSubtree 可见范围勾选「含下级部门」；不传=仅本部门+上级可见
      */
     @PostMapping("/upload")
     @RequirePermission(Permission.DOC_WRITE)
@@ -117,7 +116,11 @@ public class DocumentController {
         return Map.of("fileName", fileName, "deletedChunks", deleted);
     }
 
-    /** 部门键 → 名称（组织已删时回键本身） */
+    /**
+
+     * 部门键 → 名称（组织已删时回键本身）
+
+     */
     private String orgName(String key) {
         String name = orgStore.nameMap().getOrDefault(key, key);
         return name.equals(key) ? key : name;

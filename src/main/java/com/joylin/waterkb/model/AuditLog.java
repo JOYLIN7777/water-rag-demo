@@ -1,32 +1,69 @@
 package com.joylin.waterkb.model;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
+import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.persistence.Column;
+import jakarta.persistence.Table;
+
 import java.time.LocalDateTime;
 
 /**
- * 审计日志条目：谁、在哪个租户、什么时间、对什么资源、做了什么、结果如何。
- *
- * @param ts       时间
- * @param tenantId 租户
- * @param userId   用户
- * @param groups   用户组（逗号拼接）
- * @param action   动作（HTTP 方法 + 语义，如 POST /api/docs/upload）
- * @param resource 资源（请求路径）
- * @param detail   细节（查询参数摘要等，脱敏后）
- * @param ip       来源 IP
- * @param status   HTTP 状态
- * @param durationMs 耗时毫秒
- * @param result   SUCCESS / DENIED / ERROR
+ * 审计日志表实体。
  */
+@Table(name = "audit_log")
 public record AuditLog(
-        LocalDateTime ts,
-        String tenantId,
-        String userId,
-        String groups,
-        String action,
-        String resource,
-        String detail,
-        String ip,
-        int status,
-        long durationMs,
-        String result) {
+        /**
+         * 记录时间。
+         */
+        @Column(name = "ts") @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss") @Schema(description = "记录时间") LocalDateTime ts,
+
+        /**
+         * 租户标识。
+         */
+        @Column(name = "tenant_id") @Schema(description = "租户标识") String tenantId,
+
+        /**
+         * 用户账号。
+         */
+        @Column(name = "user_id") @Schema(description = "用户账号") String userId,
+
+        /**
+         * 用户组。
+         */
+        @Column(name = "groups") @Schema(description = "用户组") String groups,
+
+        /**
+         * 操作动作。
+         */
+        @Column(name = "action") @Schema(description = "操作动作") String action,
+
+        /**
+         * 资源路径。
+         */
+        @Column(name = "resource") @Schema(description = "资源路径") String resource,
+
+        /**
+         * 操作细节。
+         */
+        @Column(name = "detail") @Schema(description = "操作细节") String detail,
+
+        /**
+         * 来源地址。
+         */
+        @Column(name = "ip") @Schema(description = "来源地址") String ip,
+
+        /**
+         * 响应状态。
+         */
+        @Column(name = "status") @Schema(description = "响应状态") int status,
+
+        /**
+         * 耗时毫秒。
+         */
+        @Column(name = "duration_ms") @Schema(description = "耗时毫秒") long durationMs,
+
+        /**
+         * 操作结果。
+         */
+        @Column(name = "result") @Schema(description = "操作结果") String result) {
 }

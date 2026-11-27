@@ -7,7 +7,11 @@ import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
 import org.springframework.web.servlet.config.annotation.ResourceHandlerRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
-/** 注册权限拦截器，覆盖所有 API 请求（静态页面不拦截） */
+/**
+
+ * 注册权限拦截器，覆盖所有 API 请求（静态页面不拦截）
+
+ */
 @Configuration
 public class WebConfig implements WebMvcConfigurer {
 
@@ -22,7 +26,11 @@ public class WebConfig implements WebMvcConfigurer {
         registry.addInterceptor(permissionInterceptor).addPathPatterns("/api/**");
     }
 
-    /** 前端页面与脚本不缓存，避免改版后浏览器继续用旧 DOM 导致"闪回用户管理" */
+    /**
+
+     * 前端页面与脚本不缓存，避免改版后浏览器继续用旧 DOM 导致"闪回用户管理"
+
+     */
     @Override
     public void addResourceHandlers(ResourceHandlerRegistry registry) {
         registry.addResourceHandler("/**")

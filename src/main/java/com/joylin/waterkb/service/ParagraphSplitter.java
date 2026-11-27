@@ -10,21 +10,7 @@ import java.util.regex.Pattern;
 /**
  * 中文段落重叠切片器。
  *
- * <p>切片流程：空行切自然段 → 超长段按句子边界二次切分 → 贪心聚合到
- * maxChars 以内 → 相邻切片携带上一片末尾 overlap 字符（重叠窗口）。</p>
  *
- * <p>设计决策（为什么默认 600 字切片 / 100 字重叠）：
- * <ul>
- *   <li>600 字 ≈ 400~600 token（中文约 0.6~1 token/字），远低于
- *       text-embedding-v3 的 8192 token 上限，且单段语义基本完整；</li>
- *   <li>切片太大（&gt;1000 字）：一个切片混入多个主题，检索命中时噪声多，
- *       回答容易跑偏，而且 Prompt 上下文预算被吃掉；</li>
- *   <li>切片太小（&lt;200 字）：句子被拦腰截断，向量语义不完整，召回率下降；</li>
- *   <li>100 字重叠 ≈ 1~2 个完整句子，保证跨切片边界的信息至少在一个
- *       切片内完整出现，缓解"答案正好切在两片之间"的召回空洞。</li>
- * </ul>
- * 参数已在 application.yml 外置（rag.chunk-max-chars / rag.chunk-overlap），
- * 实际项目应基于自有文档做网格搜索（300~800 字 × 0~200 重叠）+ 评测集调优。</p>
  */
 @Component
 public class ParagraphSplitter {

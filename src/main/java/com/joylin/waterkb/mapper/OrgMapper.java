@@ -6,7 +6,11 @@ import org.apache.ibatis.annotations.Param;
 import java.util.List;
 import java.util.Map;
 
-/** 组织表 Mapper（MyBatis）：org_unit 的 DML。DDL 由 OrgStore 负责。 */
+/**
+
+ * 组织表 Mapper（MyBatis）：org_unit 的 DML。DDL 由 OrgStore 负责。
+
+ */
 @Mapper
 public interface OrgMapper {
 
