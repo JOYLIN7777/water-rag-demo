@@ -40,8 +40,11 @@ export default function ChunkPreview({ fileName, onClose }: { fileName: string |
     setFull(new Set(list.map((_, i) => i)))
   }
 
+  // 显示只取文件名本身，目录路径不展示；接口查询仍用完整 fileName
+  const displayName = fileName ? fileName.substring(fileName.lastIndexOf('/') + 1) : ''
+
   return (
-    <WbModal size="chunk" title={'分片预览 · ' + (fileName || '')} open={!!fileName} okText="关闭" cancelText={null}
+    <WbModal size="chunk" title={'分片预览 · ' + displayName} open={!!fileName} okText="关闭" cancelText={null}
       onOk={onClose} onCancel={onClose}>
       {error
         ? <div className="chunk-empty">加载失败：{error}</div>
@@ -49,7 +52,7 @@ export default function ChunkPreview({ fileName, onClose }: { fileName: string |
           ? <div className="chunk-empty">正在读取分片…</div>
           : <div className="chunk-tree">
             <div className="chunk-root">
-              <span className="cf-name" title={fileName || ''}>{fileName}</span>
+              <span className="cf-name" title={displayName}>{displayName}</span>
               <span className="tag">共 {list.length} 片</span>
               <button className="btn btn-sm chunk-all" style={{ marginLeft: 'auto' }} onClick={expandAll}>{allOpen ? '全部收起' : '全部展开'}</button>
             </div>
